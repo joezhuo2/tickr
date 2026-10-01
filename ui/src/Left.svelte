@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { change, direction, price, ratingLabel, ratingTone, signed, span, upside, volume } from "./lib/format";
+  import { change, direction, num, price, ratingLabel, ratingTone, signed, span, upside, volume } from "./lib/format";
   import type { Consensus, Quote } from "./lib/types";
 
   // logo: undefined while loading, null when the symbol has none.
@@ -18,6 +18,8 @@
     onanalysts: () => void;
   } = $props();
   const up = $derived(upside(analyst?.target_mean, quote?.price));
+  // Whole numbers once prices reach 100, so the range fits the panel.
+  const compact = (v: number) => num(v, Math.abs(v) >= 100 ? 0 : 2);
   const DETAILS = ["Open", "Prev close", "Day range", "52w range", "Volume"];
 
   const SESSION: Record<string, string> = {
@@ -49,26 +51,6 @@
     <span class="sk" style="width: 150px; height: 14px; margin: 3px 0 13px"></span>
   {/if}
 
-  {#if analyst === undefined}
-    <span class="sk" style="width: 140px; height: 12px; margin: 0 0 10px"></span>
-  {:else if analyst}
-    <button
-      class="consensus"
-      onclick={onanalysts}
-      title={`12-month price target${analyst.analysts ? ` from ${analyst.analysts} analysts` : ""}` +
-        (analyst.target_low != null && analyst.target_high != null
-          ? `
-Range ${price(analyst.target_low, quote?.currency)} – ${price(analyst.target_high, quote?.currency)}`
-          : "")}
-    >
-      {#if analyst.rating}<span class="badge {ratingTone(analyst.rating)}">{ratingLabel(analyst.rating)}</span>{/if}
-      {#if analyst.target_mean != null}
-        <span>Target {price(analyst.target_mean, quote?.currency)}</span>
-        {#if up != null}<span class={direction(up)}>{signed(up, 1)}%</span>{/if}
-      {/if}
-    </button>
-  {/if}
-
   {#if quote}
     <div class="price">{price(quote.price, quote.currency)}</div>
     <div class="chg {direction(quote.change)}">{change(quote.change, quote.change_pct)}</div>
@@ -79,6 +61,24 @@ Range ${price(analyst.target_low, quote?.currency)} – ${price(analyst.target_h
         <span>{price(quote.extended.price, quote.currency)}</span>
         <span class={direction(quote.extended.change)}>{change(quote.extended.change, quote.extended.change_pct)}</span>
       </div>
+    {/if}
+
+    {#if analyst === undefined}
+      <span class="sk" style="width: 150px; height: 30px; margin-top: 10px"></span>
+    {:else if analyst}
+      <button class="consensus" onclick={onanalysts} title="12-month analyst price target. Click for details.">
+        <span class="line">
+          {#if analyst.rating}<span class="badge {ratingTone(analyst.rating)}">{ratingLabel(analyst.rating)}</span>{/if}
+          {#if analyst.target_mean != null}
+            <span class="pt">{price(analyst.target_mean, quote.currency)}</span>
+            {#if up != null}<span class={direction(up)}>{signed(up, 1)}%</span>{/if}
+          {/if}
+        </span>
+        <span class="line sub">
+          Target{#if analyst.analysts} · {analyst.analysts} analysts{/if}{#if analyst.target_low != null && analyst.target_high != null}
+            · {compact(analyst.target_low)}–{compact(analyst.target_high)}{/if}
+        </span>
+      </button>
     {/if}
 
     <dl>
@@ -156,19 +156,33 @@ Range ${price(analyst.target_low, quote?.currency)} – ${price(analyst.target_h
   }
   .consensus {
     display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    white-space: nowrap;
-    overflow: hidden;
-    margin: -4px 0 10px;
+    flex-direction: column;
+    gap: 3px;
+    margin-top: 10px;
     padding: 0;
     border: 0;
     background: none;
     color: inherit;
     text-align: left;
     cursor: pointer;
+    font-size: 12px;
     font-variant-numeric: tabular-nums;
+  }
+  .line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .line.sub {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .pt {
+    font-weight: 600;
   }
   .badge {
     padding: 1px 6px;

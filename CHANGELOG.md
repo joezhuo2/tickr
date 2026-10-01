@@ -4,6 +4,20 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] - 2026-10-01
+
+### Changed
+
+- The analyst summary in the left panel now sits below the price, daily
+  change and market state, and takes two lines: the rating, average target
+  and upside, then the analyst count and low–high target range. The range
+  and count no longer need a hover.
+
+### Fixed
+
+- The upside after the price target was cut off (shown as `+12.3` without the
+  `%`) when the rating, target and upside did not fit on one line.
+
 ## [0.2.0] - 2026-10-01
 
 ### Added
@@ -58,6 +72,7 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.2.1]: https://github.com/joezhuo2/tickr/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/joezhuo2/tickr/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/joezhuo2/tickr/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/joezhuo2/tickr/releases/tag/v0.1.0
