@@ -13,18 +13,47 @@ pub mod window;
 
 use std::sync::Arc;
 
-use tauri::RunEvent;
-use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
+use tauri::plugin::TauriPlugin;
+use tauri::{RunEvent, Wry};
+use tauri_plugin_autostart::MacosLauncher;
+use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 
 use crate::settings::Settings;
 use crate::state::{lock, Shared};
 
+/// Rotating file in the app log dir, so bug reports have something to attach.
+/// Dev builds also log to stdout.
+fn log_plugin() -> TauriPlugin<Wry> {
+    let mut b = tauri_plugin_log::Builder::new()
+        .clear_targets()
+        .target(Target::new(TargetKind::LogDir { file_name: None }))
+        .level(log::LevelFilter::Info)
+        .max_file_size(1_000_000)
+        .rotation_strategy(RotationStrategy::KeepSome(2))
+        .timezone_strategy(TimezoneStrategy::UseLocal);
+    if cfg!(debug_assertions) {
+        b = b.target(Target::new(TargetKind::Stdout)).level(log::LevelFilter::Debug);
+    }
+    b.build()
+}
+
+/// Release builds abort on panic with no console; log the message first.
+fn log_panics() {
+    let prev = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        log::error!("{info}");
+        prev(info);
+    }));
+}
+
 pub fn run() {
+    log_panics();
     let settings_path = settings::settings_path();
     let shared = Arc::new(Shared::new(settings_path.clone(), Settings::load(&settings_path)));
     let autostarted = std::env::args().any(|a| a == "--autostarted");
 
     let app = tauri::Builder::default()
+        .plugin(log_plugin())
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| window::open(app)))
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--autostarted"])))
         .plugin(hotkey::plugin())
@@ -45,23 +74,16 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
+            log::info!("tickr {} starting", app.package_info().version);
             let handle = app.handle().clone();
-            let first_run = !lock(&shared.settings).first_run_done;
-            // Dev builds never register themselves as a login item.
-            if first_run && !cfg!(debug_assertions) {
-                if let Err(e) = handle.autolaunch().enable() {
-                    log::warn!("enable autostart: {e}");
-                }
-            }
-            if first_run {
-                shared.update_settings(|s| s.first_run_done = true);
-            }
 
-            tray::build(&handle)?;
+            // Before the tray, so its first tooltip can report a failure.
             let hk = lock(&shared.settings).hotkey.clone();
             if let Err(e) = hotkey::register(&handle, &hk) {
                 log::warn!("hotkey: {e}");
+                *lock(&shared.hotkey_error) = Some(e);
             }
+            tray::build(&handle)?;
             poller::spawn(handle.clone(), shared.clone());
 
             if !autostarted && !lock(&shared.settings).start_hidden {

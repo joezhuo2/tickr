@@ -82,6 +82,8 @@ export interface Init {
   chart_mode: ChartMode;
   hotkey: string;
   default_hotkey: string;
+  /** Why the hotkey is not registered (taken at startup), if it is not. */
+  hotkey_error: string | null;
   quote: QuoteState;
   chart: Chart | null;
   logo: string | null;

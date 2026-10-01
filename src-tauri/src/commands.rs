@@ -17,6 +17,8 @@ pub struct Init {
     chart_mode: ChartMode,
     hotkey: String,
     default_hotkey: &'static str,
+    /// Why the hotkey is not registered, if it is not.
+    hotkey_error: Option<String>,
     quote: QuoteState,
     /// Last chart viewed, when it matches the current symbol and range.
     chart: Option<Chart>,
@@ -43,6 +45,7 @@ pub fn init_payload(shared: &Shared) -> Init {
         chart_mode: s.chart_mode,
         hotkey: s.hotkey,
         default_hotkey: DEFAULT_HOTKEY,
+        hotkey_error: lock(&shared.hotkey_error).clone(),
         quote: lock(&shared.quote).clone(),
         chart,
         logo_known: logo.is_some(),
@@ -112,6 +115,8 @@ pub fn set_hotkey(app: AppHandle, shared: State<'_, Arc<Shared>>, hotkey: String
     let old = lock(&shared.settings).hotkey.clone();
     crate::hotkey::swap(&app, &old, &hotkey)?;
     shared.update_settings(|s| s.hotkey = hotkey.clone());
+    *lock(&shared.hotkey_error) = None;
+    crate::tray::update(&app, &shared);
     Ok(hotkey)
 }
 

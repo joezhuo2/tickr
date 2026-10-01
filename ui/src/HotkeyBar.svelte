@@ -4,13 +4,18 @@
 
   let {
     hotkey = $bindable(),
+    error = $bindable(null),
     defaultHotkey,
     status,
-  }: { hotkey: string; defaultHotkey: string; status: { kind: "live" | "stale" | "offline" | "loading"; text: string } } =
-    $props();
+  }: {
+    hotkey: string;
+    /** Set by the backend when the saved hotkey could not be registered. */
+    error?: string | null;
+    defaultHotkey: string;
+    status: { kind: "live" | "stale" | "offline" | "loading"; text: string };
+  } = $props();
 
   let recording = $state(false);
-  let error = $state<string | null>(null);
 
   async function save(next: string) {
     recording = false;
@@ -39,13 +44,13 @@
 
 <footer>
   <span class="label">Hotkey</span>
-  <button class="key" class:recording onclick={() => ((recording = !recording), (error = null))} onblur={() => (recording = false)}>
+  <button class="key" class:recording onclick={() => (recording = !recording)} onblur={() => (recording = false)}>
     {recording ? "Press keys… (Esc to cancel)" : hotkey}
   </button>
   {#if hotkey !== defaultHotkey}
     <button class="link" onclick={() => save(defaultHotkey)}>Reset</button>
   {/if}
-  {#if error}<span class="error">{error}</span>{/if}
+  {#if error}<span class="error" title={error}>{error}</span>{/if}
   <span class="status {status.kind}" title={status.text}><i></i>{status.text}</span>
 </footer>
 

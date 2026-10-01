@@ -76,6 +76,35 @@ pub fn tooltip(q: &QuoteState, s: &Settings) -> String {
     tip.chars().take(TIP_MAX).collect()
 }
 
+/// Appends warning lines, cutting the quote text rather than the warnings
+/// when the tooltip would exceed the length limit.
+pub fn with_warnings(tip: String, warnings: &[String]) -> String {
+    if warnings.is_empty() {
+        return tip;
+    }
+    let tail: String = warnings.iter().map(|w| format!("\n⚠ {w}")).collect();
+    let room = TIP_MAX.saturating_sub(tail.chars().count());
+    let mut out: String = tip.chars().take(room).collect();
+    out += &tail;
+    out.chars().take(TIP_MAX).collect()
+}
+
+/// Problems the user should know about even with the window closed.
+fn warnings(shared: &Shared, s: &Settings) -> Vec<String> {
+    let mut w = Vec::new();
+    if lock(&shared.hotkey_error).is_some() {
+        w.push(format!("Hotkey {} unavailable", s.hotkey));
+    }
+    if let Some(e) = lock(&shared.autostart_error).as_ref() {
+        w.push(e.clone());
+    }
+    w
+}
+
+fn full_tooltip(shared: &Shared, q: &QuoteState, s: &Settings) -> String {
+    with_warnings(tooltip(q, s), &warnings(shared, s))
+}
+
 pub fn badge(q: &QuoteState) -> Badge {
     let Some(quote) = &q.quote else { return Badge::None };
     if quote.session == Session::Closed {
@@ -93,7 +122,8 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     let icon = trayicon::compose(None, Badge::None);
     // Separate statement: a guard inside the builder chain would still be
     // held when menu() locks the settings again.
-    let tip = tooltip(&QuoteState::default(), &lock(&shared.settings).clone());
+    let settings = lock(&shared.settings).clone();
+    let tip = full_tooltip(&shared, &QuoteState::default(), &settings);
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(Image::new_owned(icon, trayicon::SIZE, trayicon::SIZE))
         .tooltip(tip)
@@ -142,7 +172,18 @@ fn on_menu(app: &AppHandle, ev: MenuEvent) {
         "quit" => app.exit(0),
         "autostart" => {
             let al = app.autolaunch();
-            let _ = if al.is_enabled().unwrap_or(false) { al.disable() } else { al.enable() };
+            let enable = !al.is_enabled().unwrap_or(false);
+            let verb = if enable { "enable" } else { "disable" };
+            let res = if enable { al.enable() } else { al.disable() };
+            // The rebuilt menu reads the real state, so a failure leaves the
+            // check mark unchanged; the tooltip says why.
+            *lock(&shared.autostart_error) = match res {
+                Ok(()) => None,
+                Err(e) => {
+                    log::error!("{verb} autostart: {e}");
+                    Some(format!("Could not {verb} launch at login"))
+                }
+            };
         }
         "show_extended" => {
             shared.update_settings(|s| s.show_extended = !s.show_extended);
@@ -175,7 +216,7 @@ pub fn update(app: &AppHandle, shared: &Shared) {
     let Some(tray) = app.tray_by_id(TRAY_ID) else { return };
     let q = lock(&shared.quote).clone();
     let settings = lock(&shared.settings).clone();
-    let _ = tray.set_tooltip(Some(tooltip(&q, &settings)));
+    let _ = tray.set_tooltip(Some(full_tooltip(shared, &q, &settings)));
 
     let b = badge(&q);
     let logo = lock(&shared.logo)
@@ -235,6 +276,16 @@ mod tests {
         let empty = QuoteState { error: Some("No data found".into()), ..QuoteState::default() };
         assert_eq!(tooltip(&empty, &Settings::default()), "tickr: AAPL\nNo data found");
         assert_eq!(badge(&empty), Badge::None);
+    }
+
+    #[test]
+    fn warnings_survive_truncation() {
+        let w = vec!["Hotkey Ctrl+Alt+K unavailable".to_string()];
+        assert_eq!(with_warnings("AAPL  $1.00".into(), &w), "AAPL  $1.00\n⚠ Hotkey Ctrl+Alt+K unavailable");
+        assert_eq!(with_warnings("AAPL".into(), &[]), "AAPL");
+        let long = with_warnings("x".repeat(200), &w);
+        assert_eq!(long.chars().count(), TIP_MAX);
+        assert!(long.ends_with("⚠ Hotkey Ctrl+Alt+K unavailable"));
     }
 
     #[test]

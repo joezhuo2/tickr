@@ -16,10 +16,14 @@ Built with Tauri 2 (Rust) and Svelte 5.
 - **Tray icon:** hover for the quote. Left-click opens the window. Right-click
   holds every on/off setting: show pre-market/after-hours, show change as % or
   $, always on top, unload window when minimized, start hidden, and launch at
-  login.
+  login. Launch at login is off until you turn it on. If something needs
+  attention (the hotkey is taken, or launch at login could not be changed),
+  the tooltip ends with a ⚠ line.
 - **Global hotkey** (default `Ctrl+Alt+K`): opens the window, or minimizes it
   if it's focused. To change it, click the hotkey field at the bottom of the
-  window and press the new combination.
+  window and press the new combination. If another app already owns the
+  hotkey at startup, the window footer shows the error until you pick one
+  that works.
 - **Window:** search to change the symbol (you can only change it here).
   Pick a range from 1D to Max and switch between line and candles. Hover the
   chart, or use ← and →, to see time, open, high, low, close and volume.
@@ -30,6 +34,20 @@ Built with Tauri 2 (Rust) and Svelte 5.
 
 Windows may hide new tray icons in the overflow menu (^). Drag it onto the
 taskbar to keep it visible.
+
+## Files
+
+| What | Windows | macOS |
+| --- | --- | --- |
+| Settings | `%APPDATA%\tickr\settings.json` | `~/Library/Application Support/tickr/` |
+| Logo cache | `%LOCALAPPDATA%\tickr\` | `~/Library/Caches/tickr/` |
+| Logs | `%LOCALAPPDATA%\dev.tickr.desktop\logs\tickr.log` | `~/Library/Logs/dev.tickr.desktop/` |
+
+Logs rotate at 1 MB and keep two old files. Attach `tickr.log` to bug reports.
+
+Uninstalling on Windows removes the launch-at-login entry. Check "Delete the
+application data" in the uninstaller to also remove settings, the logo cache,
+logs and WebView data.
 
 ## Build
 
@@ -65,6 +83,7 @@ src-tauri/src/
   hotkey.rs     global shortcut register/swap with rollback
   commands.rs   window commands and the injected first-frame payload
   settings.rs   JSON settings in the OS config dir
+src-tauri/windows/hooks.nsh   NSIS uninstall hook: autostart entry and app data
 ui/src/         App, Left (ticker and details), Chart (canvas), Search, HotkeyBar
 ```
 

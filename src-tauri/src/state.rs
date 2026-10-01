@@ -43,6 +43,10 @@ pub struct Shared {
     pub geometry: Mutex<Option<Geometry>>,
     /// Last chart the window fetched; survives window unloads.
     pub last_chart: Mutex<Option<Chart>>,
+    /// Why the saved hotkey is not registered, if it is not.
+    pub hotkey_error: Mutex<Option<String>>,
+    /// Set when the last "Launch at login" toggle failed.
+    pub autostart_error: Mutex<Option<String>>,
 }
 
 impl Shared {
@@ -57,6 +61,8 @@ impl Shared {
             logo: Mutex::new(None),
             geometry: Mutex::new(geometry),
             last_chart: Mutex::new(None),
+            hotkey_error: Mutex::new(None),
+            autostart_error: Mutex::new(None),
         }
     }
 

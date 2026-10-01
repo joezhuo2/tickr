@@ -37,8 +37,6 @@ pub struct Settings {
     pub always_on_top: bool,
     pub unload_on_minimize: bool,
     pub start_hidden: bool,
-    /// Set after the first launch enabled autostart.
-    pub first_run_done: bool,
 }
 
 impl Default for Settings {
@@ -54,7 +52,6 @@ impl Default for Settings {
             always_on_top: false,
             unload_on_minimize: true,
             start_hidden: false,
-            first_run_done: false,
         }
     }
 }

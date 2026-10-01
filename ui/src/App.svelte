@@ -18,6 +18,7 @@
   let mode = $state<ChartMode>("line");
   let hotkey = $state("");
   let defaultHotkey = $state("");
+  let hotkeyError = $state<string | null>(null);
   let qs = $state<QuoteState>({ quote: null, error: null, updated_at: 0 });
   let chart = $state<Chart | null>(null);
   let chartError = $state<string | null>(null);
@@ -39,6 +40,7 @@
     mode = init.chart_mode;
     hotkey = init.hotkey;
     defaultHotkey = init.default_hotkey;
+    hotkeyError = init.hotkey_error;
     qs = init.quote;
     if (init.logo_known) logo = init.logo;
     // Shown at once, refreshed by loadChart (at = 0 marks it stale).
@@ -172,7 +174,7 @@
         {/if}
       </section>
     </main>
-    <HotkeyBar bind:hotkey {defaultHotkey} {status} />
+    <HotkeyBar bind:hotkey bind:error={hotkeyError} {defaultHotkey} {status} />
   </div>
 {/if}
 
