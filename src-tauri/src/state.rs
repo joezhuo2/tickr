@@ -6,7 +6,7 @@ use std::sync::{Mutex, MutexGuard};
 use serde::Serialize;
 use tokio::sync::Notify;
 
-use crate::quote::Quote;
+use crate::quote::{Chart, Quote};
 use crate::settings::{Geometry, Settings};
 
 /// Locks a mutex, recovering from poisoning.
@@ -41,6 +41,8 @@ pub struct Shared {
     pub logo: Mutex<Option<(String, Option<Vec<u8>>)>>,
     /// Last known window geometry while it was not minimized.
     pub geometry: Mutex<Option<Geometry>>,
+    /// Last chart the window fetched; survives window unloads.
+    pub last_chart: Mutex<Option<Chart>>,
 }
 
 impl Shared {
@@ -54,6 +56,7 @@ impl Shared {
             wake: Notify::new(),
             logo: Mutex::new(None),
             geometry: Mutex::new(geometry),
+            last_chart: Mutex::new(None),
         }
     }
 

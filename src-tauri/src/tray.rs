@@ -91,9 +91,12 @@ pub fn badge(q: &QuoteState) -> Badge {
 pub fn build(app: &AppHandle) -> tauri::Result<()> {
     let shared = app.state::<Arc<Shared>>().inner().clone();
     let icon = trayicon::compose(None, Badge::None);
+    // Separate statement: a guard inside the builder chain would still be
+    // held when menu() locks the settings again.
+    let tip = tooltip(&QuoteState::default(), &lock(&shared.settings).clone());
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(Image::new_owned(icon, trayicon::SIZE, trayicon::SIZE))
-        .tooltip(tooltip(&QuoteState::default(), &lock(&shared.settings)))
+        .tooltip(tip)
         .menu(&menu(app, &shared)?)
         .show_menu_on_left_click(false)
         .on_menu_event(on_menu)

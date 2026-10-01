@@ -18,11 +18,25 @@ pub struct Init {
     hotkey: String,
     default_hotkey: &'static str,
     quote: QuoteState,
+    /// Last chart viewed, when it matches the current symbol and range.
+    chart: Option<Chart>,
+    /// Logo data URI; only meaningful when `logo_known`.
+    logo: Option<String>,
+    logo_known: bool,
 }
 
-#[tauri::command]
-pub fn get_init(shared: State<'_, Arc<Shared>>) -> Init {
+fn data_uri(png: &[u8]) -> String {
+    format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(png))
+}
+
+/// Everything the window needs for its first frame. Also injected into the
+/// page before it loads, so a re-created window renders without waiting.
+pub fn init_payload(shared: &Shared) -> Init {
     let s = lock(&shared.settings).clone();
+    let chart = lock(&shared.last_chart)
+        .clone()
+        .filter(|c| c.meta.symbol.eq_ignore_ascii_case(&s.symbol) && c.range == s.range);
+    let logo = lock(&shared.logo).clone().filter(|(sym, _)| *sym == s.symbol);
     Init {
         symbol: s.symbol,
         range: s.range,
@@ -30,12 +44,28 @@ pub fn get_init(shared: State<'_, Arc<Shared>>) -> Init {
         hotkey: s.hotkey,
         default_hotkey: DEFAULT_HOTKEY,
         quote: lock(&shared.quote).clone(),
+        chart,
+        logo_known: logo.is_some(),
+        logo: logo.and_then(|(_, b)| b).map(|b| data_uri(&b)),
     }
+}
+
+/// Called by the page after its first paint; shows the hidden window.
+#[tauri::command]
+pub fn window_ready(window: tauri::WebviewWindow) {
+    crate::window::reveal(&window);
+}
+
+#[tauri::command]
+pub fn get_init(shared: State<'_, Arc<Shared>>) -> Init {
+    init_payload(&shared)
 }
 
 #[tauri::command]
 pub async fn get_chart(shared: State<'_, Arc<Shared>>, symbol: String, range: String) -> Result<Chart, String> {
-    quote::fetch_chart(&shared.http, &symbol, &range).await
+    let chart = quote::fetch_chart(&shared.http, &symbol, &range).await?;
+    *lock(&shared.last_chart) = Some(chart.clone());
+    Ok(chart)
 }
 
 #[tauri::command]
@@ -89,5 +119,5 @@ pub fn set_hotkey(app: AppHandle, shared: State<'_, Arc<Shared>>, hotkey: String
 #[tauri::command]
 pub async fn get_logo(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<Option<String>, String> {
     let bytes = crate::logo::get(&shared.http, &symbol).await;
-    Ok(bytes.map(|b| format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(b))))
+    Ok(bytes.map(|b| data_uri(&b)))
 }

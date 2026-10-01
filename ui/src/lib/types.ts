@@ -83,6 +83,17 @@ export interface Init {
   hotkey: string;
   default_hotkey: string;
   quote: QuoteState;
+  chart: Chart | null;
+  logo: string | null;
+  /** False when the logo has not been fetched yet. */
+  logo_known: boolean;
+}
+
+declare global {
+  interface Window {
+    /** Injected by the backend before the page loads (window.rs). */
+    __TICKR_INIT__?: Init | null;
+  }
 }
 
 export const RANGES: { id: string; label: string }[] = [

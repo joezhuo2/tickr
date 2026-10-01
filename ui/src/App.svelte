@@ -3,10 +3,14 @@
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
   import ChartView from "./Chart.svelte";
+  import ChartSkeleton from "./ChartSkeleton.svelte";
   import HotkeyBar from "./HotkeyBar.svelte";
   import Left from "./Left.svelte";
   import Search from "./Search.svelte";
   import { RANGES, type Chart, type ChartMode, type Init, type QuoteState } from "./lib/types";
+
+  // Injected before load, so the first frame already has real content.
+  const boot = window.__TICKR_INIT__ ?? null;
 
   let ready = $state(false);
   let symbol = $state("");
@@ -18,29 +22,61 @@
   let chart = $state<Chart | null>(null);
   let chartError = $state<string | null>(null);
   let loading = $state(false);
-  let logo = $state<string | null>(null);
+  // undefined while loading (skeleton), null when there is no logo.
+  let logo = $state<string | null | undefined>(undefined);
   let now = $state(Date.now() / 1000);
 
   let chartSeq = 0;
   let chartAt = 0;
+  /** Charts fetched this session, keyed "SYMBOL|range". */
+  const cache = new Map<string, { chart: Chart; at: number }>();
+  const FRESH_MS = 60_000;
+  const cacheKey = () => `${symbol}|${range}`;
+
+  function apply(init: Init) {
+    symbol = init.symbol;
+    range = init.range;
+    mode = init.chart_mode;
+    hotkey = init.hotkey;
+    defaultHotkey = init.default_hotkey;
+    qs = init.quote;
+    if (init.logo_known) logo = init.logo;
+    // Shown at once, refreshed by loadChart (at = 0 marks it stale).
+    if (init.chart) cache.set(cacheKey(), { chart: init.chart, at: 0 });
+    ready = true;
+    loadChart();
+    if (!init.logo_known) loadLogo();
+  }
+  if (boot) apply(boot);
 
   const quote = $derived(qs.quote && qs.quote.symbol === symbol ? qs.quote : null);
 
   const status = $derived.by(() => {
     if (qs.error && !quote) return { kind: "offline" as const, text: `Offline: ${qs.error}` };
+    if (!quote) return { kind: "loading" as const, text: "Loading…" };
     const age = now - qs.updated_at;
     if (qs.error || age > 20 * 60) return { kind: "stale" as const, text: qs.error ? `Stale: ${qs.error}` : "Stale" };
     return { kind: "live" as const, text: age < 90 ? "Live" : `Updated ${Math.round(age / 60)} min ago` };
   });
 
-  async function loadChart() {
+  /** Shows the cached chart (or a skeleton) at once, then fetches if stale. */
+  async function loadChart(force = false) {
     const mine = ++chartSeq;
+    const key = cacheKey();
+    const hit = cache.get(key);
+    chart = hit?.chart ?? null;
+    chartError = null;
+    if (hit && !force && Date.now() - hit.at < FRESH_MS) {
+      loading = false;
+      chartAt = hit.at;
+      return;
+    }
     loading = true;
     try {
       const c = await invoke<Chart>("get_chart", { symbol, range });
+      cache.set(key, { chart: c, at: Date.now() });
       if (mine !== chartSeq) return;
       chart = c;
-      chartError = null;
       chartAt = Date.now();
     } catch (e) {
       if (mine === chartSeq) chartError = String(e);
@@ -59,8 +95,7 @@
     try {
       qs = await invoke<QuoteState>("set_symbol", { symbol: next });
       symbol = qs.quote?.symbol ?? next.toUpperCase();
-      chart = null;
-      logo = null;
+      logo = undefined;
       loadChart();
       loadLogo();
       return null;
@@ -82,21 +117,20 @@
   }
 
   onMount(() => {
-    invoke<Init>("get_init").then((init) => {
-      symbol = init.symbol;
-      range = init.range;
-      mode = init.chart_mode;
-      hotkey = init.hotkey;
-      defaultHotkey = init.default_hotkey;
-      qs = init.quote;
-      ready = true;
-      loadChart();
-      loadLogo();
-    });
+    if (!boot) invoke<Init>("get_init").then(apply);
+    // Reveal after the first frame. A hidden window may throttle rAF, so a
+    // short timer races it.
+    let revealed = false;
+    const reveal = () => {
+      if (!revealed) invoke("window_ready");
+      revealed = true;
+    };
+    requestAnimationFrame(() => requestAnimationFrame(reveal));
+    setTimeout(reveal, 60);
     const un = listen<QuoteState>("quote", (e) => {
       qs = e.payload;
       // Keep the intraday chart current; longer ranges barely move.
-      if (range === "1d" && Date.now() - chartAt > 60_000) loadChart();
+      if (range === "1d" && Date.now() - chartAt > FRESH_MS) loadChart(true);
     });
     const tick = setInterval(() => (now = Date.now() / 1000), 15_000);
     return () => {
@@ -126,13 +160,15 @@
           {/each}
           {#if loading}<span class="spin" aria-label="Loading"></span>{/if}
         </div>
-        {#if chartError && !chart}
+        {#if chart}
+          <ChartView {chart} {mode} />
+        {:else if chartError}
           <div class="msg">
             {chartError}
-            <button class="retry" onclick={loadChart}>Retry</button>
+            <button class="retry" onclick={() => loadChart(true)}>Retry</button>
           </div>
         {:else}
-          <ChartView {chart} {mode} />
+          <ChartSkeleton />
         {/if}
       </section>
     </main>

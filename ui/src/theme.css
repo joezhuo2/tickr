@@ -69,3 +69,34 @@ button {
 .flat {
   color: var(--flat);
 }
+
+/* Skeleton placeholder: a shimmering block sized by the caller. */
+.sk {
+  display: block;
+  border-radius: 5px;
+  background: linear-gradient(90deg, var(--sk-base) 0%, var(--sk-shine) 50%, var(--sk-base) 100%) 0 0 / 300% 100%;
+  animation: sk-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes sk-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sk {
+    animation: none;
+  }
+}
+:root {
+  --sk-base: rgba(0, 0, 0, 0.06);
+  --sk-shine: rgba(0, 0, 0, 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --sk-base: rgba(255, 255, 255, 0.06);
+    --sk-shine: rgba(255, 255, 255, 0.13);
+  }
+}

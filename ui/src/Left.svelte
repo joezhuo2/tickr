@@ -2,7 +2,9 @@
   import { change, direction, price, span, volume } from "./lib/format";
   import type { Quote } from "./lib/types";
 
-  let { symbol, quote, logo }: { symbol: string; quote: Quote | null; logo: string | null } = $props();
+  // logo: undefined while loading, null when the symbol has none.
+  let { symbol, quote, logo }: { symbol: string; quote: Quote | null; logo: string | null | undefined } = $props();
+  const DETAILS = ["Open", "Prev close", "Day range", "52w range", "Volume"];
 
   const SESSION: Record<string, string> = {
     pre: "Pre-market",
@@ -13,17 +15,25 @@
 </script>
 
 <aside>
-  <div class="icon">
-    {#if logo}
-      <img src={logo} alt="" />
-    {:else}
-      <span>{symbol.slice(0, 1)}</span>
-    {/if}
-  </div>
+  {#if logo === undefined}
+    <span class="icon sk"></span>
+  {:else}
+    <div class="icon">
+      {#if logo}
+        <img src={logo} alt="" />
+      {:else}
+        <span>{symbol.slice(0, 1)}</span>
+      {/if}
+    </div>
+  {/if}
   <h1>{symbol}</h1>
-  <div class="name" title={quote?.name}>
-    {quote?.name || "—"}{#if quote?.exchange}<span> · {quote.exchange}</span>{/if}
-  </div>
+  {#if quote}
+    <div class="name" title={quote.name}>
+      {quote.name || "—"}{#if quote.exchange}<span> · {quote.exchange}</span>{/if}
+    </div>
+  {:else}
+    <span class="sk" style="width: 150px; height: 14px; margin: 3px 0 13px"></span>
+  {/if}
 
   {#if quote}
     <div class="price">{price(quote.price, quote.currency)}</div>
@@ -45,7 +55,17 @@
       <dt>Volume</dt><dd>{volume(quote.volume)}</dd>
     </dl>
   {:else}
-    <div class="price muted">—</div>
+    <div aria-busy="true" aria-label="Loading quote">
+      <span class="sk" style="width: 120px; height: 28px"></span>
+      <span class="sk" style="width: 110px; height: 14px; margin-top: 6px"></span>
+      <span class="sk" style="width: 90px; height: 12px; margin-top: 10px"></span>
+    </div>
+    <dl>
+      {#each DETAILS as d (d)}
+        <dt>{d}</dt>
+        <dd><span class="sk" style="width: 64px; height: 12px; margin: 2px 0 2px auto"></span></dd>
+      {/each}
+    </dl>
   {/if}
 </aside>
 
@@ -65,13 +85,18 @@
     height: 48px;
     border-radius: 12px;
     overflow: hidden;
-    background: var(--bg);
+    /* background-color only, so .sk's shimmer image still applies. */
+    background-color: var(--bg);
     border: 1px solid var(--faint);
     display: grid;
     place-items: center;
     font-size: 22px;
     font-weight: 700;
     color: var(--muted);
+  }
+  .icon.sk {
+    border: 0;
+    flex: none;
   }
   .icon img {
     width: 100%;
@@ -98,9 +123,6 @@
     font-size: 24px;
     font-weight: 650;
     font-variant-numeric: tabular-nums;
-  }
-  .muted {
-    color: var(--muted);
   }
   .chg {
     font-weight: 600;

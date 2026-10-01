@@ -31,6 +31,7 @@ pub fn run() {
         .manage(shared.clone())
         .invoke_handler(tauri::generate_handler![
             commands::get_init,
+            commands::window_ready,
             commands::get_chart,
             commands::search,
             commands::set_symbol,

@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 
+use tauri::window::Color;
 use tauri::{
     AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
     Window, WindowEvent,
@@ -52,6 +53,10 @@ fn create(app: &AppHandle) -> tauri::Result<()> {
     let shared = app.state::<Arc<Shared>>().inner().clone();
     let on_top = lock(&shared.settings).always_on_top;
     let geometry = *lock(&shared.geometry);
+    // The page reads this before its first frame instead of invoking get_init.
+    let init = serde_json::to_string(&crate::commands::init_payload(&shared)).unwrap_or_else(|_| "null".into());
+    // Match the page background so the window never flashes white.
+    let bg = if os_dark() { Color(17, 17, 19, 255) } else { Color(255, 255, 255, 255) };
 
     let builder = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html".into()));
     #[cfg(windows)]
@@ -61,6 +66,8 @@ fn create(app: &AppHandle) -> tauri::Result<()> {
         .inner_size(800.0, 420.0)
         .min_inner_size(640.0, 360.0)
         .always_on_top(on_top)
+        .background_color(bg)
+        .initialization_script(format!("window.__TICKR_INIT__ = {init};"))
         .visible(false)
         .build()?;
 
@@ -71,9 +78,50 @@ fn create(app: &AppHandle) -> tauri::Result<()> {
         }
         None => win.center()?,
     }
-    win.show()?;
-    win.set_focus()?;
+    // The page calls `window_ready` after its first paint, so the window
+    // appears already rendered. Fallback in case the page never reports.
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(800)).await;
+        reveal(&win);
+    });
     Ok(())
+}
+
+/// Shows and focuses a window created hidden. No-op once visible.
+pub fn reveal(win: &WebviewWindow) {
+    if !win.is_visible().unwrap_or(true) {
+        let _ = win.show();
+        let _ = win.set_focus();
+    }
+}
+
+/// Whether the OS is in dark mode (Windows apps theme setting).
+#[cfg(windows)]
+fn os_dark() -> bool {
+    use windows_sys::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD};
+    let wide = |s: &str| s.encode_utf16().chain(Some(0)).collect::<Vec<u16>>();
+    let key = wide(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+    let value = wide("AppsUseLightTheme");
+    let mut data: u32 = 1;
+    let mut size = std::mem::size_of::<u32>() as u32;
+    // SAFETY: valid NUL-terminated strings and a correctly sized out buffer.
+    let rc = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            key.as_ptr(),
+            value.as_ptr(),
+            RRF_RT_REG_DWORD,
+            std::ptr::null_mut(),
+            (&mut data as *mut u32).cast(),
+            &mut size,
+        )
+    };
+    rc == 0 && data == 0
+}
+
+#[cfg(not(windows))]
+fn os_dark() -> bool {
+    false
 }
 
 /// True when the saved top-left corner is on a connected monitor.

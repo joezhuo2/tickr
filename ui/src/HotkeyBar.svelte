@@ -6,7 +6,7 @@
     hotkey = $bindable(),
     defaultHotkey,
     status,
-  }: { hotkey: string; defaultHotkey: string; status: { kind: "live" | "stale" | "offline"; text: string } } =
+  }: { hotkey: string; defaultHotkey: string; status: { kind: "live" | "stale" | "offline" | "loading"; text: string } } =
     $props();
 
   let recording = $state(false);
@@ -112,5 +112,8 @@
   }
   .offline i {
     background: var(--down);
+  }
+  .loading i {
+    background: var(--flat);
   }
 </style>
