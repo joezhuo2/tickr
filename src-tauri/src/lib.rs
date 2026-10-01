@@ -1,6 +1,7 @@
 //! tickr: a tray stock ticker with a chart window behind a global hotkey.
 
 pub mod analyst;
+pub mod autostart;
 pub mod commands;
 pub mod hotkey;
 pub mod logo;
@@ -70,6 +71,8 @@ pub fn run() {
             commands::set_hotkey,
             commands::get_logo,
             commands::get_analyst,
+            commands::set_watchlist,
+            commands::get_watch_quotes,
         ])
         .on_window_event(window::on_event)
         .setup(move |app| {
@@ -85,6 +88,7 @@ pub fn run() {
                 log::warn!("hotkey: {e}");
                 *lock(&shared.hotkey_error) = Some(e);
             }
+            autostart::sync(&handle, &shared);
             tray::build(&handle)?;
             poller::spawn(handle.clone(), shared.clone());
 

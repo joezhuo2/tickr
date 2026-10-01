@@ -7,7 +7,7 @@ use serde::Serialize;
 use tauri::{AppHandle, State};
 
 use crate::analyst::Consensus;
-use crate::quote::{self, Chart, SearchHit};
+use crate::quote::{self, Chart, Quote, SearchHit};
 use crate::settings::{ChartMode, DEFAULT_HOTKEY};
 use crate::state::{lock, now_secs, QuoteState, Shared};
 
@@ -29,6 +29,8 @@ pub struct Init {
     /// Analyst consensus; only meaningful when `analyst_known`.
     analyst: Option<Consensus>,
     analyst_known: bool,
+    /// Starred symbols, in order.
+    watchlist: Vec<String>,
 }
 
 fn data_uri(png: &[u8]) -> String {
@@ -57,6 +59,7 @@ pub fn init_payload(shared: &Shared) -> Init {
         logo: logo.and_then(|(_, b)| b).map(|b| data_uri(&b)),
         analyst_known: analyst.is_some(),
         analyst: analyst.flatten(),
+        watchlist: s.watchlist,
     }
 }
 
@@ -138,4 +141,63 @@ pub async fn get_logo(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<
 #[tauri::command]
 pub async fn get_analyst(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<Option<Consensus>, String> {
     shared.analysts.get(&symbol, now_secs()).await.inspect_err(|e| log::warn!("analyst {symbol}: {e}"))
+}
+
+/// Upper-cased, trimmed, without blanks or repeats; order kept.
+fn clean_symbols(symbols: Vec<String>) -> Vec<String> {
+    let mut out: Vec<String> = Vec::with_capacity(symbols.len());
+    for s in symbols {
+        let s = s.trim().to_uppercase();
+        if !s.is_empty() && !out.contains(&s) {
+            out.push(s);
+        }
+    }
+    out
+}
+
+/// Replaces the watchlist (star, unstar and reorder all send the full list).
+#[tauri::command]
+pub fn set_watchlist(shared: State<'_, Arc<Shared>>, symbols: Vec<String>) -> Vec<String> {
+    let symbols = clean_symbols(symbols);
+    shared.update_settings(|s| s.watchlist = symbols.clone());
+    symbols
+}
+
+#[derive(Serialize)]
+pub struct WatchQuote {
+    symbol: String,
+    quote: Option<Quote>,
+    error: Option<String>,
+}
+
+/// Quotes for the watchlist, fetched in parallel; one failure does not fail the rest.
+#[tauri::command]
+pub async fn get_watch_quotes(shared: State<'_, Arc<Shared>>, symbols: Vec<String>) -> Result<Vec<WatchQuote>, String> {
+    let now = now_secs();
+    let tasks: Vec<_> = clean_symbols(symbols)
+        .into_iter()
+        .map(|symbol| {
+            let http = shared.http.clone();
+            tauri::async_runtime::spawn(async move {
+                let r = quote::fetch_quote(&http, &symbol, now).await;
+                WatchQuote { symbol, quote: r.as_ref().ok().cloned(), error: r.err() }
+            })
+        })
+        .collect();
+    let mut out = Vec::with_capacity(tasks.len());
+    for t in tasks {
+        out.push(t.await.map_err(|e| e.to_string())?);
+    }
+    Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clean_symbols_dedupes_and_normalizes() {
+        let got = clean_symbols(vec![" aapl ".into(), "MSFT".into(), "".into(), "AAPL".into(), "brk-b".into()]);
+        assert_eq!(got, ["AAPL", "MSFT", "BRK-B"]);
+    }
 }

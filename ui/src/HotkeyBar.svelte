@@ -7,12 +7,16 @@
     error = $bindable(null),
     defaultHotkey,
     status,
+    watchlistOn,
+    onwatchlist,
   }: {
     hotkey: string;
     /** Set by the backend when the saved hotkey could not be registered. */
     error?: string | null;
     defaultHotkey: string;
     status: { kind: "live" | "stale" | "offline" | "loading"; text: string };
+    watchlistOn: boolean;
+    onwatchlist: () => void;
   } = $props();
 
   let recording = $state(false);
@@ -50,6 +54,11 @@
   {#if hotkey !== defaultHotkey}
     <button class="link" onclick={() => save(defaultHotkey)}>Reset</button>
   {/if}
+  <span class="sep"></span>
+  <button class="watch" class:on={watchlistOn} aria-pressed={watchlistOn} onclick={onwatchlist}>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" /></svg>
+    Watchlist
+  </button>
   {#if error}<span class="error" title={error}>{error}</span>{/if}
   <span class="status {status.kind}" title={status.text}><i></i>{status.text}</span>
 </footer>
@@ -88,6 +97,37 @@
     color: var(--accent);
     cursor: pointer;
     padding: 0;
+  }
+  .sep {
+    width: 1px;
+    height: 14px;
+    background: var(--faint);
+  }
+  .watch {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 5px;
+    border: 1px solid var(--faint);
+    background: var(--bg);
+    cursor: pointer;
+    font-size: 11px;
+  }
+  .watch svg {
+    width: 12px;
+    height: 12px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linejoin: round;
+  }
+  .watch.on {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .watch.on svg {
+    fill: currentColor;
   }
   .error {
     color: var(--down);

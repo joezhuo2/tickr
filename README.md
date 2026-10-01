@@ -16,7 +16,9 @@ Built with Tauri 2 (Rust) and Svelte 5.
 - **Tray icon:** hover for the quote. Left-click opens the window. Right-click
   holds every on/off setting: show pre-market/after-hours, show change as % or
   $, always on top, unload window when minimized, start hidden, and launch at
-  login. Launch at login is off until you turn it on. If something needs
+  login. Launch at login is off until you turn it on; once on, it stays on
+  across upgrades (tickr re-registers itself if an installer removed the
+  entry, unless you turned it off in Task Manager). If something needs
   attention (the hotkey is taken, or launch at login could not be changed),
   the tooltip ends with a ⚠ line.
 - **Global hotkey** (default `Ctrl+Alt+K`): opens the window, or minimizes it
@@ -33,6 +35,11 @@ Built with Tauri 2 (Rust) and Svelte 5.
   **Analysts** tab next to the ranges, for the target range plotted against
   the current price and the count of each rating. Results are cached for 12
   hours. ETFs, indices and crypto have no coverage, so nothing is shown.
+- **Watchlist:** click the star next to the ticker to add or remove it.
+  The **Watchlist** button at the bottom of the window shows your starred
+  stocks as cards (three across, four rows visible, scroll for more) with
+  price and daily change, refreshed every minute while open. Click a card to
+  chart it; drag a card to reorder.
 - **Unload when minimized** (on by default): minimizing destroys the web view,
   so the app drops to one process using about 7 MB. The hotkey reopens it
   already painted, with the last chart and quote, then refreshes in the
@@ -71,7 +78,7 @@ npx tauri build            # installer (NSIS on Windows)
 ## Tests
 
 ```bash
-cd src-tauri && cargo test # quote and analyst parsing, sessions, tray tooltip, icon compositing, settings
+cd src-tauri && cargo test # quote and analyst parsing, sessions, tray tooltip, icon compositing, settings, watchlist symbols
 cd src-tauri && cargo test -- --ignored live   # analyst fetch against Yahoo (network)
 npm test                   # formatters, hotkey recording
 npm run check              # svelte-check
@@ -91,8 +98,9 @@ src-tauri/src/
   hotkey.rs     global shortcut register/swap with rollback
   commands.rs   window commands and the injected first-frame payload
   settings.rs   JSON settings in the OS config dir
+  autostart.rs  launch at login: restores the Run entry after upgrades
 src-tauri/windows/hooks.nsh   NSIS uninstall hook: autostart entry and app data
-ui/src/         App, Left (ticker and details), Chart (canvas), Analysts, Search, HotkeyBar
+ui/src/         App, Left (ticker and details), Chart (canvas), Analysts, Watchlist, Search, HotkeyBar
 ```
 
 ## Memory (Windows 11, release build)

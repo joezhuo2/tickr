@@ -9,13 +9,17 @@
     quote,
     logo,
     analyst,
+    starred,
     onanalysts,
+    onstar,
   }: {
     symbol: string;
     quote: Quote | null;
     logo: string | null | undefined;
     analyst: Consensus | null | undefined;
+    starred: boolean;
     onanalysts: () => void;
+    onstar: () => void;
   } = $props();
   const up = $derived(upside(analyst?.target_mean, quote?.price));
   // Whole numbers once prices reach 100, so the range fits the panel.
@@ -42,7 +46,18 @@
       {/if}
     </div>
   {/if}
-  <h1>{symbol}</h1>
+  <div class="title">
+    <h1>{symbol}</h1>
+    <button
+      class="star"
+      class:on={starred}
+      aria-pressed={starred}
+      title={starred ? "Remove from watchlist" : "Add to watchlist"}
+      onclick={onstar}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" /></svg>
+    </button>
+  </div>
   {#if quote}
     <div class="name" title={quote.name}>
       {quote.name || "—"}{#if quote.exchange}<span> · {quote.exchange}</span>{/if}
@@ -138,8 +153,45 @@
     height: 100%;
     object-fit: cover;
   }
+  .title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    min-width: 0;
+  }
+  .star {
+    flex: none;
+    width: 26px;
+    height: 26px;
+    padding: 3px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    cursor: pointer;
+    color: var(--muted);
+  }
+  .star:hover {
+    background: var(--bg);
+    color: var(--text);
+  }
+  .star svg {
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linejoin: round;
+  }
+  .star.on {
+    color: #f5b301;
+  }
+  .star.on svg {
+    fill: currentColor;
+  }
   h1 {
-    margin: 10px 0 0;
+    margin: 0;
+    min-width: 0;
     font-size: 38px;
     line-height: 1.05;
     font-weight: 800;

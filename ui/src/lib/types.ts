@@ -115,6 +115,15 @@ export interface Init {
   analyst: Consensus | null;
   /** False when the analyst consensus has not been fetched yet. */
   analyst_known: boolean;
+  /** Starred symbols, in the user's order. */
+  watchlist: string[];
+}
+
+/** One watchlist card; quote is null when the fetch failed. */
+export interface WatchQuote {
+  symbol: string;
+  quote: Quote | null;
+  error: string | null;
 }
 
 declare global {

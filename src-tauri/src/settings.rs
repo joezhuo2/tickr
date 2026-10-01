@@ -37,6 +37,10 @@ pub struct Settings {
     pub always_on_top: bool,
     pub unload_on_minimize: bool,
     pub start_hidden: bool,
+    /// Launch at login as last chosen; None until first recorded.
+    pub autostart: Option<bool>,
+    /// Starred symbols, in the user's order.
+    pub watchlist: Vec<String>,
 }
 
 impl Default for Settings {
@@ -52,6 +56,8 @@ impl Default for Settings {
             always_on_top: false,
             unload_on_minimize: true,
             start_hidden: false,
+            autostart: None,
+            watchlist: Vec::new(),
         }
     }
 }

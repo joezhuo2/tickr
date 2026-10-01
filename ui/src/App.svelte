@@ -8,6 +8,7 @@
   import HotkeyBar from "./HotkeyBar.svelte";
   import Left from "./Left.svelte";
   import Search from "./Search.svelte";
+  import Watchlist from "./Watchlist.svelte";
   import { RANGES, type Chart, type ChartMode, type Consensus, type Init, type QuoteState } from "./lib/types";
 
   // Injected before load, so the first frame already has real content.
@@ -28,7 +29,8 @@
   let logo = $state<string | null | undefined>(undefined);
   // undefined while loading, null when there is no coverage (or it failed).
   let analyst = $state<Consensus | null | undefined>(undefined);
-  let view = $state<"chart" | "analysts">("chart");
+  let view = $state<"chart" | "analysts" | "watchlist">("chart");
+  let watchlist = $state<string[]>([]);
   let now = $state(Date.now() / 1000);
 
   let chartSeq = 0;
@@ -46,6 +48,7 @@
     defaultHotkey = init.default_hotkey;
     hotkeyError = init.hotkey_error;
     qs = init.quote;
+    watchlist = init.watchlist ?? [];
     if (init.logo_known) logo = init.logo;
     if (init.analyst_known) analyst = init.analyst;
     // Shown at once, refreshed by loadChart (at = 0 marks it stale).
@@ -120,6 +123,20 @@
     }
   }
 
+  async function saveWatchlist(next: string[]) {
+    watchlist = next;
+    watchlist = await invoke<string[]>("set_watchlist", { symbols: next }).catch(() => next);
+  }
+
+  function toggleStar() {
+    saveWatchlist(watchlist.includes(symbol) ? watchlist.filter((s) => s !== symbol) : [...watchlist, symbol]);
+  }
+
+  async function openWatched(next: string) {
+    view = "chart";
+    if (next !== symbol) await pickSymbol(next);
+  }
+
   function setRange(r: string) {
     view = "chart";
     if (r === range) return;
@@ -160,7 +177,15 @@
 {#if ready}
   <div class="app">
     <main>
-      <Left {symbol} {quote} {logo} {analyst} onanalysts={() => (view = "analysts")} />
+      <Left
+        {symbol}
+        {quote}
+        {logo}
+        {analyst}
+        starred={watchlist.includes(symbol)}
+        onanalysts={() => (view = "analysts")}
+        onstar={toggleStar}
+      />
       <section>
         <div class="toolbar">
           <Search onpick={pickSymbol} />
@@ -182,7 +207,9 @@
           </button>
           {#if loading}<span class="spin" aria-label="Loading"></span>{/if}
         </div>
-        {#if view === "analysts"}
+        {#if view === "watchlist"}
+          <Watchlist symbols={watchlist} current={symbol} onopen={openWatched} onreorder={saveWatchlist} />
+        {:else if view === "analysts"}
           <Analysts {symbol} {quote} {analyst} />
         {:else if chart}
           <ChartView {chart} {mode} />
@@ -196,7 +223,14 @@
         {/if}
       </section>
     </main>
-    <HotkeyBar bind:hotkey bind:error={hotkeyError} {defaultHotkey} {status} />
+    <HotkeyBar
+      bind:hotkey
+      bind:error={hotkeyError}
+      {defaultHotkey}
+      {status}
+      watchlistOn={view === "watchlist"}
+      onwatchlist={() => (view = view === "watchlist" ? "chart" : "watchlist")}
+    />
   </div>
 {/if}
 

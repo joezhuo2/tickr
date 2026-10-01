@@ -178,7 +178,10 @@ fn on_menu(app: &AppHandle, ev: MenuEvent) {
             // The rebuilt menu reads the real state, so a failure leaves the
             // check mark unchanged; the tooltip says why.
             *lock(&shared.autostart_error) = match res {
-                Ok(()) => None,
+                Ok(()) => {
+                    shared.update_settings(|s| s.autostart = Some(enable));
+                    None
+                }
                 Err(e) => {
                     log::error!("{verb} autostart: {e}");
                     Some(format!("Could not {verb} launch at login"))
