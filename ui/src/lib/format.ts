@@ -1,0 +1,98 @@
+const SYMBOLS: Record<string, string> = { USD: "$", EUR: "€", GBP: "£", JPY: "¥" };
+
+export function digitsFor(v: number): number {
+  return Math.abs(v) < 1 ? 4 : 2;
+}
+
+export function num(v: number, digits = digitsFor(v)): string {
+  return v.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+
+export function price(v: number | null | undefined, currency = "USD"): string {
+  if (v == null) return "—";
+  const sym = SYMBOLS[currency || "USD"];
+  const d = currency === "JPY" ? 0 : digitsFor(v);
+  return sym ? `${sym}${num(v, d)}` : `${num(v, d)} ${currency}`;
+}
+
+/** "+1.23" / "−1.23" (true minus sign). Values that round to zero are "+0.00". */
+export function signed(v: number, digits = 2): string {
+  const r = Math.abs(v) < 0.5 * 10 ** -digits ? 0 : v;
+  return `${r >= 0 ? "+" : "−"}${num(Math.abs(r), digits)}`;
+}
+
+export function change(abs: number | null, pct: number | null): string {
+  if (abs == null || pct == null) return "—";
+  return `${signed(abs)} (${signed(pct)}%)`;
+}
+
+export function direction(v: number | null | undefined): "up" | "down" | "flat" {
+  if (v == null || v === 0) return "flat";
+  return v > 0 ? "up" : "down";
+}
+
+export function volume(v: number | null | undefined): string {
+  if (v == null) return "—";
+  const units: [number, string][] = [
+    [1e12, "T"],
+    [1e9, "B"],
+    [1e6, "M"],
+    [1e3, "K"],
+  ];
+  for (const [n, u] of units) {
+    if (Math.abs(v) >= n) return `${(v / n).toFixed(v / n >= 100 ? 0 : 1)}${u}`;
+  }
+  return String(Math.round(v));
+}
+
+export function span(lo: number | null | undefined, hi: number | null | undefined): string {
+  if (lo == null || hi == null) return "—";
+  return `${num(lo)} – ${num(hi)}`;
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** Exchange-local time for a unix time; read it with the getUTC* methods. */
+function local(t: number, gmtoffset: number): Date {
+  return new Date((t + gmtoffset) * 1000);
+}
+
+function hm(d: Date): string {
+  return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+/** Short axis label for a candle time. */
+export function axisTime(t: number, gmtoffset: number, range: string): string {
+  const d = local(t, gmtoffset);
+  switch (range) {
+    case "1d":
+      return hm(d);
+    case "5d":
+      return `${DAYS[d.getUTCDay()]} ${hm(d)}`;
+    case "1mo":
+    case "6mo":
+    case "ytd":
+      return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+    default:
+      return `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  }
+}
+
+/** Full label for the hover tooltip; intraday intervals include the time. */
+export function fullTime(t: number, gmtoffset: number, interval: string): string {
+  const d = local(t, gmtoffset);
+  const date = `${DAYS[d.getUTCDay()]} ${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
+  return /\dm$/.test(interval) ? `${date} ${hm(d)}` : date;
+}
+
+/** Evenly spaced "nice" tick values inside [lo, hi]. */
+export function niceTicks(lo: number, hi: number, count = 4): number[] {
+  if (!(hi > lo)) return [lo];
+  const raw = (hi - lo) / count;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw) ?? raw;
+  const out: number[] = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(Number(v.toFixed(10)));
+  return out;
+}
