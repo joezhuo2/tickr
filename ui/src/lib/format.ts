@@ -45,6 +45,34 @@ export function volume(v: number | null | undefined): string {
   return String(Math.round(v));
 }
 
+const RATINGS: Record<string, string> = {
+  strong_buy: "Strong buy",
+  buy: "Buy",
+  hold: "Hold",
+  underperform: "Underperform",
+  sell: "Sell",
+  strong_sell: "Strong sell",
+};
+
+/** "Strong buy" for "strong_buy"; unknown keys are title-cased. */
+export function ratingLabel(key: string | null | undefined): string {
+  if (!key) return "—";
+  return RATINGS[key] ?? key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, " ");
+}
+
+/** Color class for a rating: buys are up, sells are down, hold is flat. */
+export function ratingTone(key: string | null | undefined): "up" | "down" | "flat" {
+  if (key === "strong_buy" || key === "buy") return "up";
+  if (key === "underperform" || key === "sell" || key === "strong_sell") return "down";
+  return "flat";
+}
+
+/** Percent move from price to target, or null when either is missing. */
+export function upside(target: number | null | undefined, from: number | null | undefined): number | null {
+  if (target == null || from == null || from === 0) return null;
+  return ((target - from) / from) * 100;
+}
+
 export function span(lo: number | null | undefined, hi: number | null | undefined): string {
   if (lo == null || hi == null) return "—";
   return `${num(lo)} – ${num(hi)}`;

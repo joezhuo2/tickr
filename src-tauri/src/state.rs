@@ -6,6 +6,7 @@ use std::sync::{Mutex, MutexGuard};
 use serde::Serialize;
 use tokio::sync::Notify;
 
+use crate::analyst::Analysts;
 use crate::quote::{Chart, Quote};
 use crate::settings::{Geometry, Settings};
 
@@ -34,6 +35,8 @@ pub struct Shared {
     pub settings: Mutex<Settings>,
     pub settings_path: PathBuf,
     pub http: reqwest::Client,
+    /// Analyst consensus, with its own Yahoo session and cache.
+    pub analysts: Analysts,
     pub quote: Mutex<QuoteState>,
     /// Wakes the poller early (symbol changed).
     pub wake: Notify,
@@ -56,6 +59,7 @@ impl Shared {
             settings: Mutex::new(settings),
             settings_path,
             http: crate::quote::client(),
+            analysts: Analysts::new(),
             quote: Mutex::new(QuoteState::default()),
             wake: Notify::new(),
             logo: Mutex::new(None),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { axisTime, change, direction, fullTime, niceTicks, price, signed, span, volume } from "./format";
+import { axisTime, change, direction, fullTime, niceTicks, price, ratingLabel, ratingTone, signed, span, upside, volume } from "./format";
 import { accelerator } from "./hotkey";
 
 const key = (code: string, mods: Partial<Record<"ctrlKey" | "altKey" | "shiftKey" | "metaKey", boolean>> = {}) => ({
@@ -69,5 +69,23 @@ describe("hotkey", () => {
     expect(accelerator(key("KeyK"))).toBeNull();
     expect(accelerator(key("KeyK", { shiftKey: true }))).toBeNull();
     expect(accelerator(key("ControlLeft", { ctrlKey: true }))).toBeNull();
+  });
+});
+
+describe("analyst", () => {
+  it("labels and tones ratings", () => {
+    expect(ratingLabel("strong_buy")).toBe("Strong buy");
+    expect(ratingLabel("outperform")).toBe("Outperform");
+    expect(ratingLabel(null)).toBe("—");
+    expect(ratingTone("buy")).toBe("up");
+    expect(ratingTone("underperform")).toBe("down");
+    expect(ratingTone("hold")).toBe("flat");
+  });
+
+  it("computes upside", () => {
+    expect(upside(110, 100)).toBeCloseTo(10);
+    expect(upside(90, 100)).toBeCloseTo(-10);
+    expect(upside(null, 100)).toBeNull();
+    expect(upside(100, 0)).toBeNull();
   });
 });

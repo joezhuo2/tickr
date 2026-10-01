@@ -1,9 +1,23 @@
 <script lang="ts">
-  import { change, direction, price, span, volume } from "./lib/format";
-  import type { Quote } from "./lib/types";
+  import { change, direction, price, ratingLabel, ratingTone, signed, span, upside, volume } from "./lib/format";
+  import type { Consensus, Quote } from "./lib/types";
 
   // logo: undefined while loading, null when the symbol has none.
-  let { symbol, quote, logo }: { symbol: string; quote: Quote | null; logo: string | null | undefined } = $props();
+  // analyst: undefined while loading, null without coverage.
+  let {
+    symbol,
+    quote,
+    logo,
+    analyst,
+    onanalysts,
+  }: {
+    symbol: string;
+    quote: Quote | null;
+    logo: string | null | undefined;
+    analyst: Consensus | null | undefined;
+    onanalysts: () => void;
+  } = $props();
+  const up = $derived(upside(analyst?.target_mean, quote?.price));
   const DETAILS = ["Open", "Prev close", "Day range", "52w range", "Volume"];
 
   const SESSION: Record<string, string> = {
@@ -33,6 +47,26 @@
     </div>
   {:else}
     <span class="sk" style="width: 150px; height: 14px; margin: 3px 0 13px"></span>
+  {/if}
+
+  {#if analyst === undefined}
+    <span class="sk" style="width: 140px; height: 12px; margin: 0 0 10px"></span>
+  {:else if analyst}
+    <button
+      class="consensus"
+      onclick={onanalysts}
+      title={`12-month price target${analyst.analysts ? ` from ${analyst.analysts} analysts` : ""}` +
+        (analyst.target_low != null && analyst.target_high != null
+          ? `
+Range ${price(analyst.target_low, quote?.currency)} – ${price(analyst.target_high, quote?.currency)}`
+          : "")}
+    >
+      {#if analyst.rating}<span class="badge {ratingTone(analyst.rating)}">{ratingLabel(analyst.rating)}</span>{/if}
+      {#if analyst.target_mean != null}
+        <span>Target {price(analyst.target_mean, quote?.currency)}</span>
+        {#if up != null}<span class={direction(up)}>{signed(up, 1)}%</span>{/if}
+      {/if}
+    </button>
   {/if}
 
   {#if quote}
@@ -76,7 +110,8 @@
     padding: 18px 18px 12px;
     border-right: 1px solid var(--faint);
     background: var(--surface);
-    overflow: hidden;
+    overflow: hidden auto;
+    scrollbar-width: none;
     display: flex;
     flex-direction: column;
   }
@@ -118,6 +153,35 @@
     overflow: hidden;
     text-overflow: ellipsis;
     margin-bottom: 10px;
+  }
+  .consensus {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    margin: -4px 0 10px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    font-variant-numeric: tabular-nums;
+  }
+  .badge {
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 650;
+    color: #fff;
+    background: var(--flat);
+  }
+  .badge.up {
+    background: var(--up);
+  }
+  .badge.down {
+    background: var(--down);
   }
   .price {
     font-size: 24px;

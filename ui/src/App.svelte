@@ -2,12 +2,13 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
+  import Analysts from "./Analysts.svelte";
   import ChartView from "./Chart.svelte";
   import ChartSkeleton from "./ChartSkeleton.svelte";
   import HotkeyBar from "./HotkeyBar.svelte";
   import Left from "./Left.svelte";
   import Search from "./Search.svelte";
-  import { RANGES, type Chart, type ChartMode, type Init, type QuoteState } from "./lib/types";
+  import { RANGES, type Chart, type ChartMode, type Consensus, type Init, type QuoteState } from "./lib/types";
 
   // Injected before load, so the first frame already has real content.
   const boot = window.__TICKR_INIT__ ?? null;
@@ -25,6 +26,9 @@
   let loading = $state(false);
   // undefined while loading (skeleton), null when there is no logo.
   let logo = $state<string | null | undefined>(undefined);
+  // undefined while loading, null when there is no coverage (or it failed).
+  let analyst = $state<Consensus | null | undefined>(undefined);
+  let view = $state<"chart" | "analysts">("chart");
   let now = $state(Date.now() / 1000);
 
   let chartSeq = 0;
@@ -43,11 +47,13 @@
     hotkeyError = init.hotkey_error;
     qs = init.quote;
     if (init.logo_known) logo = init.logo;
+    if (init.analyst_known) analyst = init.analyst;
     // Shown at once, refreshed by loadChart (at = 0 marks it stale).
     if (init.chart) cache.set(cacheKey(), { chart: init.chart, at: 0 });
     ready = true;
     loadChart();
     if (!init.logo_known) loadLogo();
+    if (!init.analyst_known) loadAnalyst();
   }
   if (boot) apply(boot);
 
@@ -93,13 +99,21 @@
     if (sym === symbol) logo = l;
   }
 
+  async function loadAnalyst() {
+    const sym = symbol;
+    const a = await invoke<Consensus | null>("get_analyst", { symbol: sym }).catch(() => null);
+    if (sym === symbol) analyst = a;
+  }
+
   async function pickSymbol(next: string): Promise<string | null> {
     try {
       qs = await invoke<QuoteState>("set_symbol", { symbol: next });
       symbol = qs.quote?.symbol ?? next.toUpperCase();
       logo = undefined;
       loadChart();
+      analyst = undefined;
       loadLogo();
+      loadAnalyst();
       return null;
     } catch (e) {
       return String(e);
@@ -107,6 +121,7 @@
   }
 
   function setRange(r: string) {
+    view = "chart";
     if (r === range) return;
     range = r;
     invoke("set_range", { range: r });
@@ -145,7 +160,7 @@
 {#if ready}
   <div class="app">
     <main>
-      <Left {symbol} {quote} {logo} />
+      <Left {symbol} {quote} {logo} {analyst} onanalysts={() => (view = "analysts")} />
       <section>
         <div class="toolbar">
           <Search onpick={pickSymbol} />
@@ -156,13 +171,20 @@
         </div>
         <div class="ranges" role="tablist">
           {#each RANGES as r (r.id)}
-            <button role="tab" aria-selected={range === r.id} class:on={range === r.id} onclick={() => setRange(r.id)}>
+            {@const on = view === "chart" && range === r.id}
+            <button role="tab" aria-selected={on} class:on onclick={() => setRange(r.id)}>
               {r.label}
             </button>
           {/each}
+          <span class="sep"></span>
+          <button role="tab" aria-selected={view === "analysts"} class:on={view === "analysts"} onclick={() => (view = "analysts")}>
+            Analysts
+          </button>
           {#if loading}<span class="spin" aria-label="Loading"></span>{/if}
         </div>
-        {#if chart}
+        {#if view === "analysts"}
+          <Analysts {symbol} {quote} {analyst} />
+        {:else if chart}
           <ChartView {chart} {mode} />
         {:else if chartError}
           <div class="msg">
@@ -244,6 +266,12 @@
   .ranges button.on {
     background: var(--surface);
     color: var(--text);
+  }
+  .sep {
+    width: 1px;
+    height: 14px;
+    margin: 0 6px;
+    background: var(--faint);
   }
   .spin {
     width: 12px;

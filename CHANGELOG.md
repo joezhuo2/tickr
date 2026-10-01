@@ -4,6 +4,16 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-10-01
+
+### Added
+
+- Analyst consensus and 12-month price target from Yahoo Finance. The left
+  panel shows the rating, average target and upside under the company name.
+  Click it, or the new Analysts tab, for the low/average/high target range
+  against the current price and the buy/hold/sell counts. Results are cached
+  for 12 hours. Symbols without coverage (ETFs, indices, crypto) show nothing.
+
 ## [0.1.1] - 2026-10-01
 
 ### Added
@@ -48,5 +58,6 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.2.0]: https://github.com/joezhuo2/tickr/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/joezhuo2/tickr/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/joezhuo2/tickr/releases/tag/v0.1.0

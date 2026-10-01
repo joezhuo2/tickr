@@ -1,4 +1,4 @@
-// Mirrors the Rust types in src-tauri/src/quote.rs and state.rs.
+// Mirrors the Rust types in src-tauri/src/quote.rs, analyst.rs and state.rs.
 
 export type Session = "pre" | "regular" | "post" | "closed";
 export type ChartMode = "line" | "candles";
@@ -76,6 +76,29 @@ export interface SearchHit {
   kind: string;
 }
 
+export interface Ratings {
+  strong_buy: number;
+  buy: number;
+  hold: number;
+  sell: number;
+  strong_sell: number;
+}
+
+export interface Consensus {
+  symbol: string;
+  /** Yahoo's key: strong_buy, buy, hold, underperform or sell. */
+  rating: string | null;
+  /** Mean recommendation, 1 (strong buy) to 5 (strong sell). */
+  score: number | null;
+  analysts: number | null;
+  /** 12-month price targets, in the trading currency. */
+  target_mean: number | null;
+  target_median: number | null;
+  target_high: number | null;
+  target_low: number | null;
+  ratings: Ratings | null;
+}
+
 export interface Init {
   symbol: string;
   range: string;
@@ -89,6 +112,9 @@ export interface Init {
   logo: string | null;
   /** False when the logo has not been fetched yet. */
   logo_known: boolean;
+  analyst: Consensus | null;
+  /** False when the analyst consensus has not been fetched yet. */
+  analyst_known: boolean;
 }
 
 declare global {

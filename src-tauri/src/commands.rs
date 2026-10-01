@@ -6,6 +6,7 @@ use base64::Engine;
 use serde::Serialize;
 use tauri::{AppHandle, State};
 
+use crate::analyst::Consensus;
 use crate::quote::{self, Chart, SearchHit};
 use crate::settings::{ChartMode, DEFAULT_HOTKEY};
 use crate::state::{lock, now_secs, QuoteState, Shared};
@@ -25,6 +26,9 @@ pub struct Init {
     /// Logo data URI; only meaningful when `logo_known`.
     logo: Option<String>,
     logo_known: bool,
+    /// Analyst consensus; only meaningful when `analyst_known`.
+    analyst: Option<Consensus>,
+    analyst_known: bool,
 }
 
 fn data_uri(png: &[u8]) -> String {
@@ -39,6 +43,7 @@ pub fn init_payload(shared: &Shared) -> Init {
         .clone()
         .filter(|c| c.meta.symbol.eq_ignore_ascii_case(&s.symbol) && c.range == s.range);
     let logo = lock(&shared.logo).clone().filter(|(sym, _)| *sym == s.symbol);
+    let analyst = shared.analysts.cached(&s.symbol, now_secs());
     Init {
         symbol: s.symbol,
         range: s.range,
@@ -50,6 +55,8 @@ pub fn init_payload(shared: &Shared) -> Init {
         chart,
         logo_known: logo.is_some(),
         logo: logo.and_then(|(_, b)| b).map(|b| data_uri(&b)),
+        analyst_known: analyst.is_some(),
+        analyst: analyst.flatten(),
     }
 }
 
@@ -125,4 +132,10 @@ pub fn set_hotkey(app: AppHandle, shared: State<'_, Arc<Shared>>, hotkey: String
 pub async fn get_logo(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<Option<String>, String> {
     let bytes = crate::logo::get(&shared.http, &symbol).await;
     Ok(bytes.map(|b| data_uri(&b)))
+}
+
+/// Analyst consensus and 12-month price target, or None without coverage.
+#[tauri::command]
+pub async fn get_analyst(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<Option<Consensus>, String> {
+    shared.analysts.get(&symbol, now_secs()).await.inspect_err(|e| log::warn!("analyst {symbol}: {e}"))
 }

@@ -1,5 +1,6 @@
 //! tickr: a tray stock ticker with a chart window behind a global hotkey.
 
+pub mod analyst;
 pub mod commands;
 pub mod hotkey;
 pub mod logo;
@@ -68,6 +69,7 @@ pub fn run() {
             commands::set_chart_mode,
             commands::set_hotkey,
             commands::get_logo,
+            commands::get_analyst,
         ])
         .on_window_event(window::on_event)
         .setup(move |app| {
