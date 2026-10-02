@@ -43,9 +43,28 @@ pub fn toggle(app: &AppHandle) {
                 && !w.is_minimized().unwrap_or(false)
                 && w.is_visible().unwrap_or(false) =>
         {
-            let _ = w.minimize();
+            dismiss(&w);
         }
         _ => open(app),
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn dismiss(w: &WebviewWindow) {
+    let _ = w.minimize();
+}
+
+/// With no Dock icon (accessory policy) a minimized window has nowhere
+/// obvious to come back from, so the hotkey hides or unloads it instead.
+#[cfg(target_os = "macos")]
+fn dismiss(w: &WebviewWindow) {
+    let shared = w.state::<Arc<Shared>>().inner().clone();
+    if lock(&shared.settings).unload_on_minimize {
+        // Moved and Resized events keep the geometry current.
+        persist_geometry(&shared);
+        let _ = w.destroy();
+    } else {
+        let _ = w.hide();
     }
 }
 
@@ -119,7 +138,18 @@ fn os_dark() -> bool {
     rc == 0 && data == 0
 }
 
-#[cfg(not(windows))]
+/// Whether macOS is in dark mode. The global AppleInterfaceStyle default is
+/// "Dark" in dark mode (including "Auto" after sunset) and unset in light.
+#[cfg(target_os = "macos")]
+fn os_dark() -> bool {
+    std::process::Command::new("defaults")
+        .args(["read", "-g", "AppleInterfaceStyle"])
+        .output()
+        .map(|o| o.status.success() && String::from_utf8_lossy(&o.stdout).trim() == "Dark")
+        .unwrap_or(false)
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 fn os_dark() -> bool {
     false
 }

@@ -4,6 +4,36 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-10-02
+
+### Changed
+
+- Watchlist cards are sorted from biggest gain to biggest loss, and show the
+  price and percent move on one line (`$333.02 | +1.10%`). During pre-market
+  and after hours the card shows that session's price and move. Dragging to
+  reorder is gone, since the order now follows the market.
+- The default hotkey on macOS is `⌘⇧K` (`Super+Shift+K`), and the hotkey
+  field shows macOS shortcuts with ⌘ ⌥ ⌃ ⇧ symbols. Windows keeps
+  `Ctrl+Alt+K`. Saved hotkeys are not changed.
+- Windows installer: per-user install mode, English only with no language
+  picker, and the tickr icon on the installer and uninstaller.
+
+### Added
+
+- macOS: the price and change show next to the menu bar icon, with a "Show
+  price in menu bar" toggle in the tray menu.
+- macOS: `LSUIElement` in `Info.plist`, so no Dock icon appears at launch.
+
+### Fixed
+
+- macOS: the window flashed white in dark mode before the page painted,
+  because dark mode was only detected on Windows.
+- macOS: the menu bar icon was upscaled from 32 px and looked blurry on
+  Retina displays. It is now drawn at 36 px.
+- macOS: the hotkey minimized the window into a Dock tickr does not have.
+  It now hides the window, or unloads it when "Unload window when minimized"
+  is on.
+
 ## [0.3.0] - 2026-10-01
 
 ### Added
@@ -90,6 +120,7 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.4.0]: https://github.com/joezhuo2/tickr/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/joezhuo2/tickr/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/joezhuo2/tickr/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/joezhuo2/tickr/compare/v0.1.1...v0.2.0

@@ -64,3 +64,14 @@ export function accelerator(e: KeyLike): string | null {
   if (!strong && !/^F\d/.test(key)) return null;
   return [...mods, key].join("+");
 }
+
+const MAC_MODS: Record<string, string> = { Ctrl: "⌃", Alt: "⌥", Shift: "⇧", Super: "⌘" };
+
+/** How to show an accelerator: Mac symbols ("⌘⇧K") on macOS, as stored elsewhere. */
+export function display(accel: string, mac = /Mac/.test(navigator.platform || navigator.userAgent)): string {
+  if (!mac) return accel;
+  return accel
+    .split("+")
+    .map((p) => MAC_MODS[p] ?? p)
+    .join("");
+}

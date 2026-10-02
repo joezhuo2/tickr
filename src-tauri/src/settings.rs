@@ -4,6 +4,10 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+/// Cmd+Shift+K on macOS ("Super" is Cmd there), Ctrl+Alt+K elsewhere.
+#[cfg(target_os = "macos")]
+pub const DEFAULT_HOTKEY: &str = "Super+Shift+K";
+#[cfg(not(target_os = "macos"))]
 pub const DEFAULT_HOTKEY: &str = "Ctrl+Alt+K";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -37,6 +41,8 @@ pub struct Settings {
     pub always_on_top: bool,
     pub unload_on_minimize: bool,
     pub start_hidden: bool,
+    /// macOS: price and change next to the menu bar icon.
+    pub show_tray_title: bool,
     /// Launch at login as last chosen; None until first recorded.
     pub autostart: Option<bool>,
     /// Starred symbols, in the user's order.
@@ -56,6 +62,7 @@ impl Default for Settings {
             always_on_top: false,
             unload_on_minimize: true,
             start_hidden: false,
+            show_tray_title: true,
             autostart: None,
             watchlist: Vec::new(),
         }

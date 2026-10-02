@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { accelerator } from "./lib/hotkey";
+  import { accelerator, display } from "./lib/hotkey";
 
   let {
     hotkey = $bindable(),
@@ -49,7 +49,7 @@
 <footer>
   <span class="label">Hotkey</span>
   <button class="key" class:recording onclick={() => (recording = !recording)} onblur={() => (recording = false)}>
-    {recording ? "Press keys… (Esc to cancel)" : hotkey}
+    {recording ? "Press keys… (Esc to cancel)" : display(hotkey)}
   </button>
   {#if hotkey !== defaultHotkey}
     <button class="link" onclick={() => save(defaultHotkey)}>Reset</button>

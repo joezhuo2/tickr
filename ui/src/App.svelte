@@ -208,7 +208,7 @@
           {#if loading}<span class="spin" aria-label="Loading"></span>{/if}
         </div>
         {#if view === "watchlist"}
-          <Watchlist symbols={watchlist} current={symbol} onopen={openWatched} onreorder={saveWatchlist} />
+          <Watchlist symbols={watchlist} current={symbol} onopen={openWatched} />
         {:else if view === "analysts"}
           <Analysts {symbol} {quote} {analyst} />
         {:else if chart}

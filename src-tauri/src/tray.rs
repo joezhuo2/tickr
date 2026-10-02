@@ -76,6 +76,21 @@ pub fn tooltip(q: &QuoteState, s: &Settings) -> String {
     tip.chars().take(TIP_MAX).collect()
 }
 
+/// Short text next to the macOS menu bar icon: the latest price (extended
+/// when shown) and its change, e.g. "$333.02 +1.10%".
+pub fn title(q: &QuoteState, s: &Settings) -> String {
+    let Some(quote) = &q.quote else { return String::new() };
+    let (price, abs, pct) = match quote.extended.as_ref().filter(|_| s.show_extended) {
+        Some(e) => (e.price, Some(e.change), Some(e.change_pct)),
+        None => (quote.price, quote.change, quote.change_pct),
+    };
+    let px = fmt_price(price, &quote.currency);
+    match (abs, pct) {
+        (Some(a), Some(p)) => format!("{px} {}", change(a, p, s.show_percent)),
+        _ => px,
+    }
+}
+
 /// Appends warning lines, cutting the quote text rather than the warnings
 /// when the tooltip would exceed the length limit.
 pub fn with_warnings(tip: String, warnings: &[String]) -> String {
@@ -153,6 +168,8 @@ fn menu(app: &AppHandle, shared: &Shared) -> tauri::Result<Menu<Wry>> {
     m.append(&check("always_on_top", "Always on top", s.always_on_top)?)?;
     m.append(&check("unload_on_minimize", "Unload window when minimized", s.unload_on_minimize)?)?;
     m.append(&check("start_hidden", "Start hidden", s.start_hidden)?)?;
+    #[cfg(target_os = "macos")]
+    m.append(&check("show_tray_title", "Show price in menu bar", s.show_tray_title)?)?;
     m.append(&check("autostart", "Launch at login", autostart)?)?;
     m.append(&sep()?)?;
     m.append(&MenuItem::with_id(app, "quit", "Quit tickr", true, None::<&str>)?)?;
@@ -206,6 +223,9 @@ fn on_menu(app: &AppHandle, ev: MenuEvent) {
         "start_hidden" => {
             shared.update_settings(|s| s.start_hidden = !s.start_hidden);
         }
+        "show_tray_title" => {
+            shared.update_settings(|s| s.show_tray_title = !s.show_tray_title);
+        }
         _ => return,
     }
     // Keeps check marks in sync with the saved settings.
@@ -220,6 +240,9 @@ pub fn update(app: &AppHandle, shared: &Shared) {
     let q = lock(&shared.quote).clone();
     let settings = lock(&shared.settings).clone();
     let _ = tray.set_tooltip(Some(full_tooltip(shared, &q, &settings)));
+    // Hover tooltips are easy to miss in the menu bar.
+    #[cfg(target_os = "macos")]
+    let _ = tray.set_title(Some(if settings.show_tray_title { title(&q, &settings) } else { String::new() }));
 
     let b = badge(&q);
     let logo = lock(&shared.logo)
@@ -279,6 +302,16 @@ mod tests {
         let empty = QuoteState { error: Some("No data found".into()), ..QuoteState::default() };
         assert_eq!(tooltip(&empty, &Settings::default()), "tickr: AAPL\nNo data found");
         assert_eq!(badge(&empty), Badge::None);
+    }
+
+    #[test]
+    fn titles() {
+        let q = state(|p| p.post.start + 60);
+        let t = title(&q, &Settings::default());
+        assert!(t.starts_with('$') && t.ends_with('%') && !t.starts_with("$333.02"), "{t}");
+        let regular = Settings { show_extended: false, ..Settings::default() };
+        assert_eq!(title(&q, &regular), "$333.02 +1.10%");
+        assert_eq!(title(&QuoteState::default(), &regular), "");
     }
 
     #[test]

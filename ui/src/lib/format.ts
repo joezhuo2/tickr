@@ -124,3 +124,23 @@ export function niceTicks(lo: number, hi: number, count = 4): number[] {
   for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(Number(v.toFixed(10)));
   return out;
 }
+
+/** The latest price and its move for the session now trading: pre-market or
+ *  after hours when there is an extended quote, otherwise the regular day. */
+export function sessionMove(q: {
+  price: number;
+  change_pct: number | null;
+  extended: { price: number; change_pct: number } | null;
+}): { price: number; pct: number | null } {
+  return q.extended ? { price: q.extended.price, pct: q.extended.change_pct } : { price: q.price, pct: q.change_pct };
+}
+
+/** Symbols ordered by percent move, biggest gain first; unknown moves last,
+ *  in their original order. */
+export function byGain(symbols: string[], pct: (s: string) => number | null | undefined): string[] {
+  const rank = (s: string) => pct(s) ?? -Infinity;
+  return symbols
+    .map((s, i) => ({ s, i, r: rank(s) }))
+    .sort((a, b) => b.r - a.r || a.i - b.i)
+    .map((x) => x.s);
+}

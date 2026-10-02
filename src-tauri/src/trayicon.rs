@@ -3,7 +3,14 @@
 
 use image::imageops::FilterType;
 
+/// Pixel size of the icon. The macOS menu bar draws it 18pt tall, which is
+/// 36 px on Retina; a 32 px icon would be upscaled and blurry there.
+#[cfg(target_os = "macos")]
+pub const SIZE: u32 = 36;
+#[cfg(not(target_os = "macos"))]
 pub const SIZE: u32 = 32;
+/// The shapes below are drawn on a 32-unit grid and scaled to SIZE.
+const GRID: f64 = 32.0;
 const RADIUS: f64 = 7.0;
 const BADGE_R: f64 = 7.0;
 const BADGE_C: (f64, f64) = (24.5, 24.5);
@@ -23,26 +30,24 @@ const BG: [u8; 3] = [28, 28, 30];
 
 /// Signed distance to a rounded square covering the whole icon.
 fn rounded_sq(x: f64, y: f64) -> f64 {
-    let s = SIZE as f64;
-    let q = |v: f64| (v - s / 2.0).abs() - (s / 2.0 - RADIUS);
+    let q = |v: f64| (v - GRID / 2.0).abs() - (GRID / 2.0 - RADIUS);
     let (qx, qy) = (q(x), q(y));
     let outside = (qx.max(0.0).powi(2) + qy.max(0.0).powi(2)).sqrt();
     outside + qx.max(qy).min(0.0) - RADIUS
 }
 
+/// The 4x4 subsample points of a pixel, in grid units.
+fn samples(px: u32, py: u32) -> impl Iterator<Item = (f64, f64)> {
+    let k = GRID / SIZE as f64;
+    (0..16).map(move |i| {
+        let (sx, sy) = ((i % 4) as f64, (i / 4) as f64);
+        ((px as f64 + (sx + 0.5) / 4.0) * k, (py as f64 + (sy + 0.5) / 4.0) * k)
+    })
+}
+
 /// Supersampled coverage (0..1) of a shape given as an inside test.
 fn coverage(px: u32, py: u32, inside: impl Fn(f64, f64) -> bool) -> f64 {
-    let mut n = 0;
-    for sy in 0..4 {
-        for sx in 0..4 {
-            let x = px as f64 + (sx as f64 + 0.5) / 4.0;
-            let y = py as f64 + (sy as f64 + 0.5) / 4.0;
-            if inside(x, y) {
-                n += 1;
-            }
-        }
-    }
-    n as f64 / 16.0
+    samples(px, py).filter(|&(x, y)| inside(x, y)).count() as f64 / 16.0
 }
 
 /// Source-over blend of an RGB color at `a` onto a premultiplied-free RGBA pixel.
@@ -83,7 +88,7 @@ fn in_triangle(x: f64, y: f64, up: bool) -> bool {
     (x - cx).abs() <= w * dy / h
 }
 
-/// Composes the icon as 32x32 RGBA.
+/// Composes the icon as SIZE x SIZE RGBA.
 pub fn compose(logo_png: Option<&[u8]>, badge: Badge) -> Vec<u8> {
     let s = SIZE as usize;
     let logo = logo_png
@@ -107,16 +112,12 @@ pub fn compose(logo_png: Option<&[u8]>, badge: Badge) -> Vec<u8> {
                     blend(p, BG, mask);
                     let mut acc = [0.0f64; 3];
                     let mut n = 0.0;
-                    for sy in 0..4 {
-                        for sx in 0..4 {
-                            let x = px as f64 + (sx as f64 + 0.5) / 4.0;
-                            let y = py as f64 + (sy as f64 + 0.5) / 4.0;
-                            if let Some(c) = glyph(x, y) {
-                                for k in 0..3 {
-                                    acc[k] += c[k] as f64;
-                                }
-                                n += 1.0;
+                    for (x, y) in samples(px, py) {
+                        if let Some(c) = glyph(x, y) {
+                            for k in 0..3 {
+                                acc[k] += c[k] as f64;
                             }
+                            n += 1.0;
                         }
                     }
                     if n > 0.0 {

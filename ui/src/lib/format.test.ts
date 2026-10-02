@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { axisTime, change, direction, fullTime, niceTicks, price, ratingLabel, ratingTone, signed, span, upside, volume } from "./format";
-import { accelerator } from "./hotkey";
+import { axisTime, byGain, change, direction, fullTime, niceTicks, price, ratingLabel, ratingTone, sessionMove, signed, span, upside, volume } from "./format";
+import { accelerator, display } from "./hotkey";
 
 const key = (code: string, mods: Partial<Record<"ctrlKey" | "altKey" | "shiftKey" | "metaKey", boolean>> = {}) => ({
   code,
@@ -58,6 +58,12 @@ describe("format", () => {
 });
 
 describe("hotkey", () => {
+  it("displays Mac symbols on macOS only", () => {
+    expect(display("Super+Shift+K", true)).toBe("⌘⇧K");
+    expect(display("Ctrl+Alt+F12", true)).toBe("⌃⌥F12");
+    expect(display("Ctrl+Alt+K", false)).toBe("Ctrl+Alt+K");
+  });
+
   it("builds accelerators", () => {
     expect(accelerator(key("KeyK", { ctrlKey: true, altKey: true }))).toBe("Ctrl+Alt+K");
     expect(accelerator(key("Digit1", { metaKey: true, shiftKey: true }))).toBe("Shift+Super+1");
@@ -87,5 +93,17 @@ describe("analyst", () => {
     expect(upside(90, 100)).toBeCloseTo(-10);
     expect(upside(null, 100)).toBeNull();
     expect(upside(100, 0)).toBeNull();
+  });
+});
+
+describe("watchlist", () => {
+  it("uses the extended session when there is one", () => {
+    expect(sessionMove({ price: 100, change_pct: 1.5, extended: null })).toEqual({ price: 100, pct: 1.5 });
+    expect(sessionMove({ price: 100, change_pct: 1.5, extended: { price: 98, change_pct: -2 } })).toEqual({ price: 98, pct: -2 });
+  });
+
+  it("sorts by gain, unknown last", () => {
+    const pct: Record<string, number | null> = { A: -1, B: 3, C: null, D: 0.5, E: undefined as unknown as null };
+    expect(byGain(["A", "B", "C", "D", "E"], (s) => pct[s])).toEqual(["B", "D", "A", "C", "E"]);
   });
 });

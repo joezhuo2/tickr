@@ -1,36 +1,28 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { untrack } from "svelte";
-  import { change, direction, price } from "./lib/format";
+  import { byGain, direction, price, sessionMove, signed } from "./lib/format";
   import type { WatchQuote } from "./lib/types";
 
   let {
     symbols,
     current,
     onopen,
-    onreorder,
   }: {
     symbols: string[];
     /** The symbol shown in the chart, highlighted. */
     current: string;
     onopen: (symbol: string) => void;
-    onreorder: (symbols: string[]) => void;
   } = $props();
 
   const REFRESH_MS = 60_000;
-  // Pointer travel before a press becomes a drag instead of a click.
-  const DRAG_PX = 5;
-  const EDGE_PX = 36;
 
   let quotes = $state<Record<string, WatchQuote>>({});
-  // Order while dragging; null otherwise.
-  let draft = $state<string[] | null>(null);
-  const order = $derived(draft ?? symbols);
-  let dragging = $state<string | null>(null);
-  let grid: HTMLElement | undefined = $state();
-
-  let press: { symbol: string; x: number; y: number } | null = null;
-  let suppressClick = false;
+  const moves = $derived(
+    Object.fromEntries(Object.values(quotes).flatMap((w) => (w.quote ? [[w.symbol, sessionMove(w.quote)]] : []))),
+  );
+  // Biggest gain first, by the move of the session now trading.
+  const order = $derived(byGain(symbols, (s) => moves[s]?.pct));
 
   async function load(list: string[]) {
     if (!list.length) return;
@@ -47,7 +39,7 @@
     }
   }
 
-  // Refetch when the set changes, not when it is only reordered.
+  // Refetch when the set changes.
   const key = $derived([...symbols].sort().join(","));
   $effect(() => {
     key;
@@ -55,50 +47,6 @@
     const t = setInterval(() => load(symbols), REFRESH_MS);
     return () => clearInterval(t);
   });
-
-  function down(e: PointerEvent, symbol: string) {
-    if (e.button !== 0) return;
-    press = { symbol, x: e.clientX, y: e.clientY };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  }
-
-  function move(e: PointerEvent) {
-    if (!press) return;
-    if (!dragging) {
-      if (Math.hypot(e.clientX - press.x, e.clientY - press.y) < DRAG_PX) return;
-      dragging = press.symbol;
-      draft = [...symbols];
-    }
-    if (grid) {
-      const r = grid.getBoundingClientRect();
-      if (e.clientY < r.top + EDGE_PX) grid.scrollBy(0, -12);
-      else if (e.clientY > r.bottom - EDGE_PX) grid.scrollBy(0, 12);
-    }
-    const over = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-symbol]");
-    const target = over?.dataset.symbol;
-    if (!draft || !target || target === dragging) return;
-    const next = draft.filter((s) => s !== dragging);
-    next.splice(draft.indexOf(target), 0, dragging);
-    draft = next;
-  }
-
-  function up() {
-    if (dragging && draft) {
-      suppressClick = true;
-      onreorder(draft);
-    }
-    press = null;
-    dragging = null;
-    draft = null;
-  }
-
-  function click(symbol: string) {
-    if (suppressClick) {
-      suppressClick = false;
-      return;
-    }
-    onopen(symbol);
-  }
 </script>
 
 {#if symbols.length === 0}
@@ -108,21 +56,15 @@
     <p class="hint">Click the star next to a ticker to add it here.</p>
   </div>
 {:else}
-  <div class="grid" bind:this={grid} class:dragging={dragging !== null}>
+  <div class="grid">
     {#each order as symbol (symbol)}
       {@const w = quotes[symbol]}
       {@const q = w?.quote}
       <button
         class="card"
         class:current={symbol === current}
-        class:lifted={symbol === dragging}
-        data-symbol={symbol}
         title={w?.error && !q ? w.error : q?.name || symbol}
-        onpointerdown={(e) => down(e, symbol)}
-        onpointermove={move}
-        onpointerup={up}
-        onpointercancel={up}
-        onclick={() => click(symbol)}
+        onclick={() => onopen(symbol)}
       >
         <span class="top">
           <span class="sym">{symbol}</span>
@@ -130,15 +72,18 @@
         </span>
         {#if q}
           <span class="name">{q.name || q.exchange || "—"}</span>
-          <span class="px">{price(q.price, q.currency)}</span>
-          <span class="chg {direction(q.change)}">{change(q.change, q.change_pct)}</span>
+          {@const m = moves[symbol]}
+          <span class="line">
+            <span class="px">{price(m.price, q.currency)}</span>
+            <span class="bar">|</span>
+            <span class="chg {direction(m.pct)}">{m.pct == null ? "—" : `${signed(m.pct)}%`}</span>
+          </span>
         {:else if w?.error}
           <span class="name">Unavailable</span>
-          <span class="px">—</span>
+          <span class="line"><span class="px">—</span></span>
         {:else}
           <span class="sk" style="width: 70%; height: 11px; margin-top: 3px"></span>
-          <span class="sk" style="width: 55%; height: 18px; margin-top: auto"></span>
-          <span class="sk" style="width: 65%; height: 12px; margin-top: 5px"></span>
+          <span class="sk" style="width: 80%; height: 16px; margin-top: auto"></span>
         {/if}
       </button>
     {/each}
@@ -173,23 +118,13 @@
     cursor: pointer;
     overflow: hidden;
     font-variant-numeric: tabular-nums;
-    touch-action: none;
-    transition: border-color 0.12s, transform 0.12s, box-shadow 0.12s;
+    transition: border-color 0.12s;
   }
   .card:hover {
     border-color: var(--muted);
   }
   .card.current {
     border-color: var(--accent);
-  }
-  .grid.dragging .card {
-    cursor: grabbing;
-  }
-  .card.lifted {
-    transform: scale(1.03);
-    box-shadow: var(--shadow);
-    border-color: var(--accent);
-    opacity: 0.92;
   }
   .top {
     display: flex;
@@ -224,15 +159,24 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .px {
+  .line {
     margin-top: auto;
-    font-size: 16px;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .px {
+    font-size: 15px;
     font-weight: 650;
   }
+  .bar {
+    color: var(--muted);
+  }
   .chg {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
-    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
