@@ -4,6 +4,19 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.1] - 2026-10-02
+
+v0.5.0 was never published: both release builds failed at the updater signing
+step. v0.5.1 ships the same features, and auto-update works from v0.5.1
+onward.
+
+### Fixed
+
+- Release builds failed with "Missing comment in secret key" because the
+  `TAURI_SIGNING_PRIVATE_KEY` repository secret was not set. The release
+  workflow now checks the secret before building and stops with a clear error
+  if it is missing or is not the contents of the key file.
+
 ## [0.5.0] - 2026-10-02
 
 ### Added

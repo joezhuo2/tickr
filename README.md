@@ -48,7 +48,7 @@ into them.
 
 ### Updates
 
-From v0.5.0, tickr updates itself. It checks GitHub 30 seconds after launch
+From v0.5.1, tickr updates itself. It checks GitHub 30 seconds after launch
 and every 12 hours. When a new version is out, the tray tooltip says so and
 the update item in the tray menu reads **Install vX.Y.Z and restart**.
 Nothing installs until you click it. tickr then downloads the update, checks
@@ -56,8 +56,8 @@ its signature against the key built into the app, installs it and restarts.
 The first-launch warnings above don't come back after an update.
 
 **Check for updates** checks right away. Turn off **Check for updates
-automatically** to stop the background checks. Versions before v0.5.0 can't
-update themselves: install v0.5.0 once from Releases.
+automatically** to stop the background checks. Versions before v0.5.1 can't
+update themselves: install v0.5.1 once from Releases.
 
 ## Using it
 
@@ -153,8 +153,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.5.0
-git push origin v0.5.0
+git tag v0.5.1
+git push origin v0.5.1
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
@@ -171,12 +171,17 @@ latest (not a pre-release), because the updater reads
 Updates are signed with a minisign key pair, separate from code signing and
 free. The public key is `plugins.updater.pubkey` in
 `src-tauri/tauri.conf.json`. The private key stays off the repo, in
-`~/.tauri/tickr.key`, and CI reads it from two repository secrets:
+`~/.tauri/tickr.key`, and CI reads it from the `TAURI_SIGNING_PRIVATE_KEY`
+repository secret. Set it to the file's contents, unchanged (one base64 line):
 
 ```bash
 gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/tickr.key
-gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD --body ""
 ```
+
+The key has no password, so leave `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` unset.
+If the secret is missing or mangled, tauri fails at the end of the build with
+"Missing comment in secret key"; the release workflow checks the secret first
+and fails right away instead.
 
 Back the key up somewhere safe. If it is lost, installed copies reject every
 future update and users have to reinstall by hand. A local `npx tauri build`
