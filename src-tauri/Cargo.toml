@@ -1,6 +1,6 @@
 [package]
 name = "tickr"
-version = "0.4.2"
+version = "0.5.0"
 edition = "2021"
 license = "MIT"
 description = "Stock watcher for the Windows tray and the macOS menu bar"
@@ -28,6 +28,7 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 base64 = "0.22"
 dirs = "6"
 log = "0.4"
+tauri-plugin-updater = "2.13"
 
 [dev-dependencies]
 tempfile = "3"

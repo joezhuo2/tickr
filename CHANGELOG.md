@@ -4,6 +4,27 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-10-02
+
+### Added
+
+- Auto-update. tickr checks GitHub for a new release 30 seconds after launch
+  and every 12 hours, and says so in the tray tooltip. The tray menu item
+  changes to "Install vX.Y.Z and restart"; nothing installs until you pick
+  it. Updates are verified against a signing key built into the app. Turn
+  background checks off with "Check for updates automatically" in the tray
+  menu. Updating works from v0.5.0 onward; older versions need one manual
+  install.
+
+### Changed
+
+- "Check for updates" now checks in place instead of opening the Releases
+  page, and shows "Up to date" or the new version.
+- macOS builds are ad-hoc signed. They are still not notarized, but Gatekeeper
+  now reports an unidentified developer instead of calling the app damaged.
+- The README and release notes explain how to get past SmartScreen and
+  Gatekeeper on first launch, including the macOS 15 "Open Anyway" step.
+
 ## [0.4.2] - 2026-10-02
 
 ### Fixed

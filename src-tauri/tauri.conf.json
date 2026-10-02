@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "tickr",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "identifier": "dev.tickr.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -19,6 +19,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis", "dmg", "app"],
+    "createUpdaterArtifacts": true,
     "publisher": "Joe Zhuo",
     "copyright": "Copyright (c) 2026 Joe Zhuo",
     "category": "Finance",
@@ -36,7 +37,8 @@
       }
     },
     "macOS": {
-      "minimumSystemVersion": "10.15"
+      "minimumSystemVersion": "10.15",
+      "signingIdentity": "-"
     },
     "icon": [
       "icons/32x32.png",
@@ -45,5 +47,14 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZBREEwRTZBODY4MTYxNUIKUldSYllZR0dhZzdhK21wc2QwZkY5RVYxOVFISmtKU3YvVU1VQU8vUHQ5MTRFK3FRY2l3ellTMjAK",
+      "endpoints": ["https://github.com/joezhuo2/tickr/releases/latest/download/latest.json"],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

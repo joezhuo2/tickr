@@ -11,6 +11,7 @@ pub mod settings;
 pub mod state;
 pub mod tray;
 pub mod trayicon;
+pub mod updater;
 pub mod window;
 
 use std::sync::Arc;
@@ -59,6 +60,7 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| window::open(app)))
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--autostarted"])))
         .plugin(hotkey::plugin())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(shared.clone())
         .invoke_handler(tauri::generate_handler![
             commands::get_init,
@@ -92,6 +94,7 @@ pub fn run() {
             autostart::sync(&handle, &shared);
             tray::build(&handle)?;
             poller::spawn(handle.clone(), shared.clone());
+            updater::spawn(handle.clone(), shared.clone());
 
             if !autostarted && !lock(&shared.settings).start_hidden {
                 window::open(&handle);

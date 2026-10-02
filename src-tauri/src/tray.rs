@@ -15,7 +15,6 @@ use crate::state::{lock, QuoteState, Shared};
 use crate::trayicon::{self, Badge};
 
 const TRAY_ID: &str = "main";
-const RELEASES_URL: &str = "https://github.com/joezhuo2/tickr/releases/latest";
 /// Windows truncates tray tooltips at 127 UTF-16 units.
 const TIP_MAX: usize = 127;
 
@@ -114,6 +113,9 @@ fn warnings(shared: &Shared, s: &Settings) -> Vec<String> {
     if let Some(e) = lock(&shared.autostart_error).as_ref() {
         w.push(e.clone());
     }
+    if let Some(n) = crate::updater::notice(&lock(&shared.update_status)) {
+        w.push(n);
+    }
     w
 }
 
@@ -173,13 +175,15 @@ fn menu(app: &AppHandle, shared: &Shared) -> tauri::Result<Menu<Wry>> {
     m.append(&check("show_tray_title", "Show price in menu bar", s.show_tray_title)?)?;
     m.append(&check("autostart", "Launch at login", autostart)?)?;
     m.append(&sep()?)?;
-    let updates = format!("Check for updates (v{})", app.package_info().version);
-    m.append(&MenuItem::with_id(app, "updates", updates, true, None::<&str>)?)?;
+    let status = lock(&shared.update_status).clone();
+    let (label, enabled) = crate::updater::menu_label(&status, &app.package_info().version.to_string());
+    m.append(&MenuItem::with_id(app, "updates", label, enabled, None::<&str>)?)?;
+    m.append(&check("auto_update", "Check for updates automatically", s.auto_update)?)?;
     m.append(&MenuItem::with_id(app, "quit", "Quit tickr", true, None::<&str>)?)?;
     Ok(m)
 }
 
-fn rebuild_menu(app: &AppHandle, shared: &Shared) {
+pub fn rebuild_menu(app: &AppHandle, shared: &Shared) {
     if let (Some(tray), Ok(m)) = (app.tray_by_id(TRAY_ID), menu(app, shared)) {
         let _ = tray.set_menu(Some(m));
     }
@@ -191,7 +195,7 @@ fn on_menu(app: &AppHandle, ev: MenuEvent) {
         "open" => crate::window::open(app),
         "quit" => app.exit(0),
         "updates" => {
-            open_url(RELEASES_URL);
+            crate::updater::on_menu(app);
             return;
         }
         "autostart" => {
@@ -229,6 +233,9 @@ fn on_menu(app: &AppHandle, ev: MenuEvent) {
         }
         "start_hidden" => {
             shared.update_settings(|s| s.start_hidden = !s.start_hidden);
+        }
+        "auto_update" => {
+            shared.update_settings(|s| s.auto_update = !s.auto_update);
         }
         "show_tray_title" => {
             shared.update_settings(|s| s.show_tray_title = !s.show_tray_title);

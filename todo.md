@@ -1,10 +1,4 @@
-# Release and video checklist
-
-What's left before the public release and the demo video. Current state:
-v0.4.0 is committed and pushed to `main`, the repo is public, and there are
-no GitHub releases yet.
-
-## Blockers
+## Testing
 
 - [ ] **Test on real macOS hardware.** No macOS build has been run yet. Check:
   - [ ] Dark mode window background (no white flash)
@@ -14,21 +8,10 @@ no GitHub releases yet.
   - [ ] No Dock icon at launch (`LSUIElement`)
   - [ ] Settings, cache and log paths match the README table
 
-## Signing
-
-- [ ] Decide: sign now, or ship unsigned first and document the warnings.
-- [ ] macOS: Developer ID certificate + notarization (Apple Developer Program, $99/yr). Without it, Gatekeeper blocks the app and users need right-click > Open or `xattr -dr com.apple.quarantine`.
-- [ ] Windows: Authenticode cert or Azure Trusted Signing. Without it, SmartScreen shows "Windows protected your PC".
-- [ ] If shipping unsigned, add a short "First launch" section to the README explaining both warnings and how to get past them.
-
 ## README and repo polish
 
 - [ ] Screenshots or a GIF at the top: tray tooltip, chart window, analyst panel, watchlist, macOS menu bar title.
 - [ ] Set the repo homepage URL (release page or video link).
-
-## Legal and data sources
-
-- [ ] Review Yahoo Finance's terms. tickr uses unofficial endpoints; the README disclaimer is there, but say it again in the video description. Have a plan if Yahoo blocks or changes the endpoints (error state in the UI, fallback source).
 
 ## Video prep
 

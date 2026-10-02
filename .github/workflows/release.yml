@@ -34,6 +34,10 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signs the updater bundles and latest.json. Required: without the
+          # key, createUpdaterArtifacts makes the build fail.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # Signing (optional). Add these as repository secrets and uncomment.
           # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -49,8 +53,25 @@ jobs:
           releaseBody: |
             See [CHANGELOG.md](https://github.com/joezhuo2/tickr/blob/main/CHANGELOG.md) for what changed.
 
-            **Windows:** download the `-setup.exe` installer. It is unsigned, so SmartScreen may show "Windows protected your PC"; click **More info** > **Run anyway**.
-            **macOS:** download the `.dmg` (universal, Apple silicon and Intel). If the build is unsigned, right-click the app > **Open** the first time, or run `xattr -dr com.apple.quarantine /Applications/tickr.app`.
+            **Windows:** download the `-setup.exe` installer. It is not code-signed, so SmartScreen may show "Windows protected your PC": click **More info** > **Run anyway**.
+            **macOS:** download the `.dmg` (universal, Apple silicon and Intel). It is not notarized, so macOS blocks the first launch. On macOS 15 or later, open tickr, close the warning, then go to **System Settings > Privacy & Security** and click **Open Anyway**. On macOS 14 or earlier, right-click tickr in Applications and choose **Open**.
+
+            Already on v0.5.0 or later? tickr updates itself: right-click the tray icon and pick **Install vX.Y.Z and restart**.
 
             Data comes from Yahoo Finance's unofficial endpoints and may be delayed. Not investment advice.
           args: ${{ matrix.args }}
+
+  # Both build jobs merge their platform into the release's latest.json; if
+  # they race, one entry can be lost and that platform stops auto-updating.
+  check-updater-json:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "${{ github.ref_name }}" --repo "${{ github.repository }}" --pattern latest.json
+          for p in windows-x86_64 darwin-aarch64 darwin-x86_64; do
+            jq -e --arg p "$p" '.platforms[$p].signature' latest.json > /dev/null || { echo "latest.json is missing $p"; exit 1; }
+          done
+          jq . latest.json

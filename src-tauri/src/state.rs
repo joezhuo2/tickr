@@ -50,6 +50,10 @@ pub struct Shared {
     pub hotkey_error: Mutex<Option<String>>,
     /// Set when the last "Launch at login" toggle failed.
     pub autostart_error: Mutex<Option<String>>,
+    /// Where the update check or install stands.
+    pub update_status: Mutex<crate::updater::Status>,
+    /// The update found by the last check, installed from the tray menu.
+    pub pending_update: Mutex<Option<tauri_plugin_updater::Update>>,
 }
 
 impl Shared {
@@ -67,6 +71,8 @@ impl Shared {
             last_chart: Mutex::new(None),
             hotkey_error: Mutex::new(None),
             autostart_error: Mutex::new(None),
+            update_status: Mutex::new(Default::default()),
+            pending_update: Mutex::new(None),
         }
     }
 

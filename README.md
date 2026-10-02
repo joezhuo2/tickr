@@ -24,21 +24,49 @@ Get the latest installer from
 - **macOS:** `tickr_x.y.z_universal.dmg` (Apple silicon and Intel), macOS 10.15
   or later. Drag tickr into Applications.
 
-Builds are not code-signed yet. On Windows, SmartScreen may say "Windows
-protected your PC": click **More info**, then **Run anyway**. On macOS,
-Gatekeeper blocks the first launch: right-click tickr in Applications and
-choose **Open**, or run `xattr -dr com.apple.quarantine /Applications/tickr.app`.
+### First launch
 
-There is no auto-update. **Check for updates** in the tray menu shows your
-version and opens the latest release.
+tickr is not code-signed yet, so both systems warn the first time you open
+it. The builds come from the public
+[release workflow](.github/workflows/release.yml), so you can check what went
+into them.
+
+- **Windows:** SmartScreen says "Windows protected your PC". Click
+  **More info**, then **Run anyway**. You only see this once.
+- **macOS 15 (Sequoia) or later:** open tickr and close the warning that it
+  can't be verified. Go to **System Settings > Privacy & Security**, scroll
+  down to the message about tickr and click **Open Anyway**, then confirm
+  with your password.
+- **macOS 14 or earlier:** right-click tickr in Applications, choose
+  **Open**, then **Open** again.
+- **macOS says tickr "is damaged and can't be opened":** the download was
+  quarantined. Run this, then open it again:
+
+  ```bash
+  xattr -dr com.apple.quarantine /Applications/tickr.app
+  ```
+
+### Updates
+
+From v0.5.0, tickr updates itself. It checks GitHub 30 seconds after launch
+and every 12 hours. When a new version is out, the tray tooltip says so and
+the update item in the tray menu reads **Install vX.Y.Z and restart**.
+Nothing installs until you click it. tickr then downloads the update, checks
+its signature against the key built into the app, installs it and restarts.
+The first-launch warnings above don't come back after an update.
+
+**Check for updates** checks right away. Turn off **Check for updates
+automatically** to stop the background checks. Versions before v0.5.0 can't
+update themselves: install v0.5.0 once from Releases.
 
 ## Using it
 
 - **Tray icon:** hover for the quote. Left-click opens the window. Right-click
   holds every on/off setting: show pre-market/after-hours, show change as % or
   $, always on top, unload window when minimized, start hidden, launch at
-  login and, on macOS, show price in menu bar. **Check for updates** shows the
-  installed version and opens the latest GitHub release. Launch at login is off until you turn it on; once on, it stays on
+  login, check for updates automatically and, on macOS, show price in menu
+  bar. The update item shows the installed version, checks for a new one
+  and installs it (see [Updates](#updates)). Launch at login is off until you turn it on; once on, it stays on
   across upgrades (tickr re-registers itself if an installer removed the
   entry, unless you turned it off in Task Manager). If something needs
   attention (the hotkey is taken, or launch at login could not be changed),
@@ -107,6 +135,13 @@ npm run tauri dev          # dev build with hot reload
 npx tauri build            # installer (NSIS on Windows, .app and .dmg on macOS)
 ```
 
+`npx tauri build` also signs the updater bundles, which needs the private key
+(see [Updater key](#updater-key)). Without it, skip the updater artifacts:
+
+```bash
+npx tauri build -c '{"bundle":{"createUpdaterArtifacts":false}}'
+```
+
 The Windows installer installs per user (no UAC prompt), in English. On
 macOS, `src-tauri/Info.plist` sets `LSUIElement` so tickr never shows a Dock
 icon; the minimum version is macOS 10.15.
@@ -118,26 +153,51 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.4.2
-git push origin v0.4.2
+git tag v0.5.0
+git push origin v0.5.0
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
 universal macOS `.app`/`.dmg` with `tauri-apps/tauri-action`, and attaches them
-to a **draft** release for that tag. Review the notes and publish it from the
-Releases page.
+to a **draft** release for that tag, along with the signed updater bundles and
+`latest.json`. A last job checks that `latest.json` lists Windows and both
+macOS architectures. Review the notes and publish the release from the
+Releases page. Installed copies only see it once it is published and marked
+latest (not a pre-release), because the updater reads
+`releases/latest/download/latest.json`.
+
+### Updater key
+
+Updates are signed with a minisign key pair, separate from code signing and
+free. The public key is `plugins.updater.pubkey` in
+`src-tauri/tauri.conf.json`. The private key stays off the repo, in
+`~/.tauri/tickr.key`, and CI reads it from two repository secrets:
+
+```bash
+gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/tickr.key
+gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD --body ""
+```
+
+Back the key up somewhere safe. If it is lost, installed copies reject every
+future update and users have to reinstall by hand. A local `npx tauri build`
+needs the same two variables, or it fails at the updater signing step.
 
 `.github/workflows/ci.yml` runs `npm run check`, `npm test`,
 `cargo clippy -- -D warnings` and `cargo test` (Windows and macOS) on every
 push to `main` and every pull request.
 
-Unsigned builds work, but Windows SmartScreen warns about the installer and
-macOS Gatekeeper blocks the app. Signing needs certificates, so it is set up
-through environment variables at build time rather than in the repo.
+### Code signing
+
+Releases are not code-signed yet (see [First launch](#first-launch)). macOS
+builds are ad-hoc signed (`bundle.macOS.signingIdentity: "-"`), so Gatekeeper
+reports an unidentified developer rather than a damaged app. Signing needs
+certificates, so it is set up through environment variables at build time
+rather than in the repo.
 
 **macOS** needs a Developer ID Application certificate in the keychain and an
 Apple ID app-specific password (or an App Store Connect API key) for
-notarization. `tauri build` signs, notarizes and staples when these are set:
+notarization. Remove `"signingIdentity": "-"` from `tauri.conf.json` first;
+`tauri build` signs, notarizes and staples when these are set:
 
 ```bash
 export APPLE_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID)"
@@ -162,7 +222,7 @@ the Apple values as repository secrets (plus `APPLE_CERTIFICATE`, the base64
 ## Tests
 
 ```bash
-cd src-tauri && cargo test # quote and analyst parsing, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols
+cd src-tauri && cargo test # quote and analyst parsing, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols, update menu labels
 cd src-tauri && cargo test -- --ignored live   # analyst fetch against Yahoo (network)
 npm test                   # formatters, watchlist sort, hotkey recording and display
 npm run check              # svelte-check
@@ -183,8 +243,9 @@ src-tauri/src/
   commands.rs   window commands and the injected first-frame payload
   settings.rs   JSON settings in the OS config dir
   autostart.rs  launch at login: restores the Run entry after upgrades
+  updater.rs    background update checks, tray menu state, install and restart
 src-tauri/windows/hooks.nsh   NSIS uninstall hook: autostart entry and app data
-.github/workflows/  ci.yml (checks on push/PR), release.yml (installers on tag push)
+.github/workflows/  ci.yml (checks on push/PR), release.yml (installers, updater bundles and latest.json on tag push)
 ui/src/         App, Left (ticker and details), Chart (canvas), Analysts, Watchlist, Search, HotkeyBar
 ```
 

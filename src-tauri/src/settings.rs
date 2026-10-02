@@ -47,6 +47,8 @@ pub struct Settings {
     pub autostart: Option<bool>,
     /// Starred symbols, in the user's order.
     pub watchlist: Vec<String>,
+    /// Look for new releases in the background.
+    pub auto_update: bool,
 }
 
 impl Default for Settings {
@@ -65,6 +67,7 @@ impl Default for Settings {
             show_tray_title: true,
             autostart: None,
             watchlist: Vec::new(),
+            auto_update: true,
         }
     }
 }
@@ -125,5 +128,6 @@ mod tests {
         assert_eq!(s.symbol, "NVDA");
         assert_eq!(s.chart_mode, ChartMode::Candles);
         assert!(s.unload_on_minimize);
+        assert!(s.auto_update);
     }
 }

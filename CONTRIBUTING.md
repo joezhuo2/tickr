@@ -5,7 +5,8 @@ Bug reports and pull requests are welcome.
 ## Reporting a bug
 
 Open an issue with the bug report template. Include your tickr version (shown
-in the tray menu next to "Check for updates"), your OS and version, and
+in the tray menu, on the "Check for updates" or "Up to date" item), your OS
+and version, and
 `tickr.log`:
 
 - Windows: `%LOCALAPPDATA%\dev.tickr.desktop\logs\tickr.log`

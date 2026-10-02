@@ -13,8 +13,8 @@ body:
     id: version
     attributes:
       label: tickr version
-      description: Shown in the tray menu next to "Check for updates".
-      placeholder: v0.4.1
+      description: Shown in the tray menu, on the "Check for updates" or "Up to date" item.
+      placeholder: v0.5.0
     validations:
       required: true
   - type: input
