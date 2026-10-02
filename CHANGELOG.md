@@ -4,6 +4,15 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.2] - 2026-10-02
+
+### Fixed
+
+- The tray badge test checked pixel positions that only hold for the 32 px
+  Windows icon, so it failed on macOS, where the icon is 36 px. It now scales
+  its probe points to the icon size. The app itself is unchanged; this release
+  exists because the v0.4.1 CI run failed.
+
 ## [0.4.1] - 2026-10-02
 
 ### Added
@@ -141,6 +150,7 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.4.2]: https://github.com/joezhuo2/tickr/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/joezhuo2/tickr/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/joezhuo2/tickr/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/joezhuo2/tickr/compare/v0.2.1...v0.3.0

@@ -168,15 +168,21 @@ mod tests {
         assert_eq!(px(&img, 16, 2)[3], 255, "inside is opaque");
     }
 
+    /// Pixel containing a point given in grid units (SIZE differs per platform).
+    fn at(img: &[u8], x: f64, y: f64) -> [u8; 4] {
+        let k = SIZE as f64 / GRID;
+        px(img, (x * k) as usize, (y * k) as usize)
+    }
+
     #[test]
     fn badge_colors() {
-        let (cx, cy) = (BADGE_C.0 as usize, (BADGE_C.1 + 5.0) as usize);
+        let (cx, cy) = BADGE_C;
         let up = compose(None, Badge::Up);
         let down = compose(None, Badge::Down);
-        assert_eq!(&px(&up, cx, cy)[..3], &UP);
-        assert_eq!(&px(&down, cx, cy - 10)[..3], &DOWN);
+        assert_eq!(&at(&up, cx, cy + 5.0)[..3], &UP);
+        assert_eq!(&at(&down, cx, cy - 5.0)[..3], &DOWN);
         // Triangle center is white.
-        assert_eq!(&px(&up, cx, BADGE_C.1 as usize)[..3], &[255, 255, 255]);
+        assert_eq!(&at(&up, cx, cy)[..3], &[255, 255, 255]);
     }
 
     #[test]
