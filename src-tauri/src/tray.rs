@@ -15,6 +15,7 @@ use crate::state::{lock, QuoteState, Shared};
 use crate::trayicon::{self, Badge};
 
 const TRAY_ID: &str = "main";
+const RELEASES_URL: &str = "https://github.com/joezhuo2/tickr/releases/latest";
 /// Windows truncates tray tooltips at 127 UTF-16 units.
 const TIP_MAX: usize = 127;
 
@@ -172,6 +173,8 @@ fn menu(app: &AppHandle, shared: &Shared) -> tauri::Result<Menu<Wry>> {
     m.append(&check("show_tray_title", "Show price in menu bar", s.show_tray_title)?)?;
     m.append(&check("autostart", "Launch at login", autostart)?)?;
     m.append(&sep()?)?;
+    let updates = format!("Check for updates (v{})", app.package_info().version);
+    m.append(&MenuItem::with_id(app, "updates", updates, true, None::<&str>)?)?;
     m.append(&MenuItem::with_id(app, "quit", "Quit tickr", true, None::<&str>)?)?;
     Ok(m)
 }
@@ -187,6 +190,10 @@ fn on_menu(app: &AppHandle, ev: MenuEvent) {
     match ev.id().as_ref() {
         "open" => crate::window::open(app),
         "quit" => app.exit(0),
+        "updates" => {
+            open_url(RELEASES_URL);
+            return;
+        }
         "autostart" => {
             let al = app.autolaunch();
             let enable = !al.is_enabled().unwrap_or(false);
@@ -232,6 +239,19 @@ fn on_menu(app: &AppHandle, ev: MenuEvent) {
     rebuild_menu(app, &shared);
     update(app, &shared);
     crate::poller::emit(app, &shared);
+}
+
+/// Opens a URL in the default browser without pulling in an opener plugin.
+pub fn open_url(url: &str) {
+    #[cfg(target_os = "windows")]
+    let res = std::process::Command::new("explorer").arg(url).spawn();
+    #[cfg(target_os = "macos")]
+    let res = std::process::Command::new("open").arg(url).spawn();
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let res = std::process::Command::new("xdg-open").arg(url).spawn();
+    if let Err(e) = res {
+        log::error!("open {url}: {e}");
+    }
 }
 
 /// Refreshes the tooltip, and the icon when symbol, badge or logo changed.

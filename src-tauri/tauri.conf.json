@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "tickr",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "identifier": "dev.tickr.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -19,6 +19,12 @@
   "bundle": {
     "active": true,
     "targets": ["nsis", "dmg", "app"],
+    "publisher": "Joe Zhuo",
+    "copyright": "Copyright (c) 2026 Joe Zhuo",
+    "category": "Finance",
+    "shortDescription": "Stock watcher for the tray and menu bar",
+    "longDescription": "A small stock watcher for the Windows tray and the macOS menu bar, with a chart, analyst consensus and a watchlist. Data from Yahoo Finance. Not investment advice.",
+    "homepage": "https://github.com/joezhuo2/tickr",
     "windows": {
       "nsis": {
         "installMode": "currentUser",

@@ -130,6 +130,12 @@ pub fn set_hotkey(app: AppHandle, shared: State<'_, Arc<Shared>>, hotkey: String
     Ok(hotkey)
 }
 
+/// Opens the logo provider's page; its free tier requires the link.
+#[tauri::command]
+pub fn open_logo_credit() {
+    crate::tray::open_url(crate::logo::CREDIT_URL);
+}
+
 /// Logo as a data: URI, or None when the symbol has no logo.
 #[tauri::command]
 pub async fn get_logo(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<Option<String>, String> {

@@ -4,6 +4,27 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.1] - 2026-10-02
+
+### Added
+
+- "Check for updates" in the tray menu shows the installed version and opens
+  the latest GitHub release. There is no auto-update.
+- GitHub Actions: CI runs svelte-check, the frontend tests, clippy and the Rust
+  tests on Windows and macOS for every push and pull request; pushing a `v*`
+  tag builds the Windows installer and a universal macOS `.dmg` into a draft
+  release.
+- Installer and bundle metadata: publisher, copyright, category (Finance) and
+  descriptions, shown in the installer, Add/Remove Programs and the macOS
+  About box.
+- `CONTRIBUTING.md` and issue templates.
+
+### Changed
+
+- Logos are fetched from Elbstream's logo API (`api.elbstream.com`), which
+  replaced Parqet's. The window footer links to Elbstream, as its free tier
+  requires. Cached logos are kept.
+
 ## [0.4.0] - 2026-10-02
 
 ### Changed
@@ -120,6 +141,7 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.4.1]: https://github.com/joezhuo2/tickr/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/joezhuo2/tickr/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/joezhuo2/tickr/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/joezhuo2/tickr/compare/v0.2.0...v0.2.1

@@ -59,6 +59,7 @@
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" /></svg>
     Watchlist
   </button>
+  <button class="link credit" onclick={() => invoke("open_logo_credit")}>Logos by Elbstream</button>
   {#if error}<span class="error" title={error}>{error}</span>{/if}
   <span class="status {status.kind}" title={status.text}><i></i>{status.text}</span>
 </footer>
@@ -97,6 +98,15 @@
     color: var(--accent);
     cursor: pointer;
     padding: 0;
+  }
+  /* Elbstream's free tier asks for a visible link of at least 12 pt. */
+  .credit {
+    font-size: 12pt;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .credit:hover {
+    color: var(--accent);
   }
   .sep {
     width: 1px;

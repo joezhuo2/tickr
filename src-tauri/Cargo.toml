@@ -1,8 +1,11 @@
 [package]
 name = "tickr"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 license = "MIT"
+description = "Stock watcher for the Windows tray and the macOS menu bar"
+authors = ["Joe Zhuo"]
+repository = "https://github.com/joezhuo2/tickr"
 
 [lib]
 name = "tickr_lib"

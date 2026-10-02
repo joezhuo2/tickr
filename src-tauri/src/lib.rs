@@ -70,6 +70,7 @@ pub fn run() {
             commands::set_chart_mode,
             commands::set_hotkey,
             commands::get_logo,
+            commands::open_logo_credit,
             commands::get_analyst,
             commands::set_watchlist,
             commands::get_watch_quotes,

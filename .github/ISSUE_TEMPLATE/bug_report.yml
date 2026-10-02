@@ -1,0 +1,35 @@
+name: Bug report
+description: Something in tickr doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: tickr version
+      description: Shown in the tray menu next to "Check for updates".
+      placeholder: v0.4.1
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS and version
+      placeholder: Windows 11 24H2 / macOS 15.1
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: tickr.log
+      description: |
+        Attach or paste the log.
+        Windows: `%LOCALAPPDATA%\dev.tickr.desktop\logs\tickr.log`
+        macOS: `~/Library/Logs/dev.tickr.desktop/tickr.log`
+      render: text

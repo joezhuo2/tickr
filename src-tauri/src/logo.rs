@@ -1,10 +1,13 @@
-//! Company logos from Parqet's public logo CDN, cached on disk.
+//! Company logos from Elbstream's logo API (formerly Parqet), cached on disk.
+//! The free tier requires a visible link to elbstream.com wherever a logo is
+//! shown; the window footer carries it.
 //! Misses are cached too (as an empty file) so we do not refetch for a day.
 
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
-const LOGO_URL: &str = "https://assets.parqet.com/logos/symbol";
+const LOGO_URL: &str = "https://api.elbstream.com/logos/symbol";
+pub const CREDIT_URL: &str = "https://elbstream.com/logos";
 const MISS_TTL: Duration = Duration::from_secs(24 * 3600);
 const HIT_TTL: Duration = Duration::from_secs(30 * 24 * 3600);
 
@@ -34,7 +37,7 @@ pub async fn get(client: &reqwest::Client, symbol: &str) -> Option<Vec<u8>> {
             return (!bytes.is_empty()).then_some(bytes);
         }
     }
-    // Yahoo suffixes (BRK-B, SHOP.TO) are not always known to Parqet; try the base too.
+    // Yahoo suffixes (BRK-B, SHOP.TO) are not always known to Elbstream; try the base too.
     let base = symbol.split(['.', '-']).next().unwrap_or(&symbol).to_string();
     let mut found = None;
     for s in [symbol.as_str(), base.as_str()] {

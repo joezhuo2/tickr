@@ -1,0 +1,11 @@
+name: Feature request
+description: Suggest an idea for tickr
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like
+      description: The problem it solves and how you picture it working.
+    validations:
+      required: true
