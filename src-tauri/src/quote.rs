@@ -6,7 +6,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 const CHART_URL: &str = "https://query1.finance.yahoo.com/v8/finance/chart";
-const SEARCH_URL: &str = "https://query1.finance.yahoo.com/v1/finance/search";
+pub(crate) const SEARCH_URL: &str = "https://query1.finance.yahoo.com/v1/finance/search";
 pub const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36";
 
 pub const RANGES: [&str; 8] = ["1d", "5d", "1mo", "6mo", "ytd", "1y", "5y", "max"];
@@ -292,7 +292,7 @@ pub fn client() -> reqwest::Client {
         .expect("http client")
 }
 
-async fn get(client: &reqwest::Client, url: &str, query: &[(&str, &str)]) -> Result<Vec<u8>, String> {
+pub(crate) async fn get(client: &reqwest::Client, url: &str, query: &[(&str, &str)]) -> Result<Vec<u8>, String> {
     let res = client.get(url).query(query).send().await.map_err(|e| format!("network: {e}"))?;
     let status = res.status();
     let body = res.bytes().await.map_err(|e| format!("network: {e}"))?;

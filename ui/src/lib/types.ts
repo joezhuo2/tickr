@@ -1,4 +1,4 @@
-// Mirrors the Rust types in src-tauri/src/quote.rs, analyst.rs and state.rs.
+// Mirrors the Rust types in src-tauri/src/quote.rs, analyst.rs, news.rs and state.rs.
 
 export type Session = "pre" | "regular" | "post" | "closed";
 export type ChartMode = "line" | "candles";
@@ -117,6 +117,15 @@ export interface Init {
   analyst_known: boolean;
   /** Starred symbols, in the user's order. */
   watchlist: string[];
+}
+
+/** A headline from news.rs. */
+export interface Article {
+  title: string;
+  publisher: string;
+  link: string;
+  /** Unix seconds. */
+  published: number;
 }
 
 /** One watchlist card; quote is null when the fetch failed. */

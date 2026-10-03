@@ -4,11 +4,11 @@ A small stock watcher for the Windows tray and the macOS menu bar. The tray
 icon shows the company's logo with an up/down badge. Hover over it for the
 current price, the day's change and the pre-market or after-hours move. On
 macOS the price and change also sit next to the icon. A global hotkey opens a window
-with a chart and the analyst consensus.
+with a chart, the analyst consensus and recent news.
 
 Built with Tauri 2 (Rust) and Svelte 5.
 
-> Data comes from Yahoo Finance's public chart, search and quoteSummary
+> Data comes from Yahoo Finance's public chart, search (symbols and news) and quoteSummary
 > endpoints, and logos come from [Elbstream](https://elbstream.com/logos)'s
 > logo API (formerly Parqet). Yahoo's endpoints are not an official API and can
 > change or rate-limit without notice. Quotes may be delayed. Not investment
@@ -82,6 +82,13 @@ update themselves: install v0.5.1 once from Releases.
 - **Window:** search to change the symbol (you can only change it here).
   Pick a range from 1D to Max and switch between line and candles. Hover the
   chart, or use ← and →, to see time, open, high, low, close and volume.
+- **News:** the **News** button, left of Line/Candles, swaps the chart for
+  the 20 latest headlines on the symbol, newest first. Each shows the title,
+  publisher, date and time, and how long ago it was published. Click one to
+  open it in your default browser. Headlines load when you open News (and
+  when you change symbol while it is open); ones already seen this session
+  show at once while the fresh list loads. Click Line, Candles or a range to
+  go back to the chart.
 - **Analyst consensus:** below the price, the left panel shows the rating
   (Strong buy to Sell), the average 12-month price target with its upside,
   and the analyst count and low–high target range. Click it, or the
@@ -153,8 +160,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.5.2
-git push origin v0.5.2
+git tag v0.6.0
+git push origin v0.6.0
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
@@ -228,7 +235,7 @@ the Apple values as repository secrets (plus `APPLE_CERTIFICATE`, the base64
 ## Tests
 
 ```bash
-cd src-tauri && cargo test # quote and analyst parsing, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols, update menu labels
+cd src-tauri && cargo test # quote, analyst and news parsing, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols, update menu labels
 cd src-tauri && cargo test -- --ignored live   # analyst fetch against Yahoo (network)
 npm test                   # formatters, watchlist sort, hotkey recording and display
 npm run check              # svelte-check
@@ -240,6 +247,7 @@ npm run check              # svelte-check
 src-tauri/src/
   quote.rs      Yahoo chart/search: fetch, parse, market session, extended-hours price
   analyst.rs    Yahoo quoteSummary: cookie/crumb session, consensus and price targets, 12 h cache
+  news.rs       Yahoo search news: 20 latest headlines, newest first, web links only
   poller.rs     background refresh: 15 s during market hours, 60 s pre/post, 15 min when closed
   tray.rs       tooltip text, macOS menu bar title, and the right-click menu
   trayicon.rs   icon (32 px, 36 px on macOS): logo in a rounded square plus a direction badge
@@ -252,7 +260,7 @@ src-tauri/src/
   updater.rs    background update checks, tray menu state, install and restart
 src-tauri/windows/hooks.nsh   NSIS uninstall hook: autostart entry and app data
 .github/workflows/  ci.yml (checks on push/PR), release.yml (installers, updater bundles and latest.json on tag push)
-ui/src/         App, Left (ticker and details), Chart (canvas), Analysts, Watchlist, Search, HotkeyBar
+ui/src/         App, Left (ticker and details), Chart (canvas), Analysts, News, Watchlist, Search, HotkeyBar
 ```
 
 ## Memory (Windows 11, release build)

@@ -7,6 +7,7 @@ use serde::Serialize;
 use tauri::{AppHandle, State};
 
 use crate::analyst::Consensus;
+use crate::news::Article;
 use crate::quote::{self, Chart, Quote, SearchHit};
 use crate::settings::{ChartMode, DEFAULT_HOTKEY};
 use crate::state::{lock, now_secs, QuoteState, Shared};
@@ -147,6 +148,22 @@ pub async fn get_logo(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<
 #[tauri::command]
 pub async fn get_analyst(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<Option<Consensus>, String> {
     shared.analysts.get(&symbol, now_secs()).await.inspect_err(|e| log::warn!("analyst {symbol}: {e}"))
+}
+
+/// Recent headlines for the symbol, newest first.
+#[tauri::command]
+pub async fn get_news(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<Vec<Article>, String> {
+    crate::news::fetch(&shared.http, &symbol).await.inspect_err(|e| log::warn!("news {symbol}: {e}"))
+}
+
+/// Opens a headline in the default browser.
+#[tauri::command]
+pub fn open_news(url: String) -> Result<(), String> {
+    if !crate::news::is_web_url(&url) {
+        return Err("not a web link".into());
+    }
+    crate::tray::open_url(&url);
+    Ok(())
 }
 
 /// Upper-cased, trimmed, without blanks or repeats; order kept.

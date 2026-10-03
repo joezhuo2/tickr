@@ -114,6 +114,21 @@ export function fullTime(t: number, gmtoffset: number, interval: string): string
   return /\dm$/.test(interval) ? `${date} ${hm(d)}` : date;
 }
 
+/** How long ago a Unix time was: "now", "5m ago", "3h ago", "2d ago". */
+export function ago(t: number, now: number): string {
+  const s = Math.max(0, now - t);
+  if (s < 60) return "now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
+
+/** Headline date, e.g. "Oct 2, 2026 14:05", in the given UTC offset (seconds). */
+export function newsDate(t: number, gmtoffset: number): string {
+  const d = local(t, gmtoffset);
+  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()} ${hm(d)}`;
+}
+
 /** Evenly spaced "nice" tick values inside [lo, hi]. */
 export function niceTicks(lo: number, hi: number, count = 4): number[] {
   if (!(hi > lo)) return [lo];

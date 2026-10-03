@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { axisTime, byGain, change, direction, fullTime, niceTicks, price, ratingLabel, ratingTone, sessionMove, signed, span, upside, volume } from "./format";
+import { ago, axisTime, byGain, change, direction, fullTime, newsDate, niceTicks, price, ratingLabel, ratingTone, sessionMove, signed, span, upside, volume } from "./format";
 import { accelerator, display } from "./hotkey";
 
 const key = (code: string, mods: Partial<Record<"ctrlKey" | "altKey" | "shiftKey" | "metaKey", boolean>> = {}) => ({
@@ -48,6 +48,15 @@ describe("format", () => {
     expect(fullTime(t, -14400, "5m")).toBe("Wed Sep 30, 2026 09:30");
     expect(fullTime(t, -14400, "1d")).toBe("Wed Sep 30, 2026");
     expect(fullTime(t, -14400, "1mo")).toBe("Wed Sep 30, 2026");
+    expect(newsDate(t, -14400)).toBe("Sep 30, 2026 09:30");
+  });
+
+  it("ago", () => {
+    expect(ago(1000, 1030)).toBe("now");
+    expect(ago(1000, 1000 + 5 * 60 + 9)).toBe("5m ago");
+    expect(ago(1000, 1000 + 3 * 3600)).toBe("3h ago");
+    expect(ago(1000, 1000 + 2 * 86400 + 5)).toBe("2d ago");
+    expect(ago(2000, 1000)).toBe("now");
   });
 
   it("nice ticks", () => {

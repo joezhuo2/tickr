@@ -4,6 +4,16 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] - 2026-10-02
+
+### Added
+
+- News view. A **News** button left of the Line/Candles toggle replaces the
+  chart with the 20 latest headlines for the symbol, newest first, showing
+  title, publisher, date and how long ago. Clicking a headline opens it in
+  the default browser. Headlines are fetched when News opens and cached for
+  the session, so reopening shows the last list at once while it refreshes.
+
 ## [0.5.2] - 2026-10-02
 
 ### Fixed
@@ -193,6 +203,7 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.6.0]: https://github.com/joezhuo2/tickr/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/joezhuo2/tickr/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/joezhuo2/tickr/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/joezhuo2/tickr/compare/v0.4.2...v0.5.0

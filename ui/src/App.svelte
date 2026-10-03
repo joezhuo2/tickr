@@ -7,9 +7,10 @@
   import ChartSkeleton from "./ChartSkeleton.svelte";
   import HotkeyBar from "./HotkeyBar.svelte";
   import Left from "./Left.svelte";
+  import News from "./News.svelte";
   import Search from "./Search.svelte";
   import Watchlist from "./Watchlist.svelte";
-  import { RANGES, type Chart, type ChartMode, type Consensus, type Init, type QuoteState } from "./lib/types";
+  import { RANGES, type Article, type Chart, type ChartMode, type Consensus, type Init, type QuoteState } from "./lib/types";
 
   // Injected before load, so the first frame already has real content.
   const boot = window.__TICKR_INIT__ ?? null;
@@ -29,7 +30,11 @@
   let logo = $state<string | null | undefined>(undefined);
   // undefined while loading, null when there is no coverage (or it failed).
   let analyst = $state<Consensus | null | undefined>(undefined);
-  let view = $state<"chart" | "analysts" | "watchlist">("chart");
+  let view = $state<"chart" | "analysts" | "news" | "watchlist">("chart");
+  // undefined while loading with nothing cached for the symbol.
+  let news = $state<Article[] | undefined>(undefined);
+  let newsError = $state<string | null>(null);
+  let newsLoading = $state(false);
   let watchlist = $state<string[]>([]);
   let now = $state(Date.now() / 1000);
 
@@ -39,6 +44,9 @@
   const cache = new Map<string, { chart: Chart; at: number }>();
   const FRESH_MS = 60_000;
   const cacheKey = () => `${symbol}|${range}`;
+  /** Headlines fetched this session, keyed by symbol. */
+  const newsCache = new Map<string, Article[]>();
+  let newsSeq = 0;
 
   function apply(init: Init) {
     symbol = init.symbol;
@@ -108,6 +116,29 @@
     if (sym === symbol) analyst = a;
   }
 
+  /** Shows cached headlines at once, then refetches. Only runs when News opens. */
+  async function loadNews() {
+    const mine = ++newsSeq;
+    const sym = symbol;
+    news = newsCache.get(sym);
+    newsError = null;
+    newsLoading = true;
+    try {
+      const list = await invoke<Article[]>("get_news", { symbol: sym });
+      newsCache.set(sym, list);
+      if (mine === newsSeq) news = list;
+    } catch (e) {
+      if (mine === newsSeq) newsError = String(e);
+    } finally {
+      if (mine === newsSeq) newsLoading = false;
+    }
+  }
+
+  function openNews() {
+    view = "news";
+    loadNews();
+  }
+
   async function pickSymbol(next: string): Promise<string | null> {
     try {
       qs = await invoke<QuoteState>("set_symbol", { symbol: next });
@@ -117,6 +148,7 @@
       analyst = undefined;
       loadLogo();
       loadAnalyst();
+      if (view === "news") loadNews();
       return null;
     } catch (e) {
       return String(e);
@@ -146,6 +178,7 @@
   }
 
   function setMode(m: ChartMode) {
+    view = "chart";
     mode = m;
     invoke("set_chart_mode", { mode: m });
   }
@@ -189,9 +222,14 @@
       <section>
         <div class="toolbar">
           <Search onpick={pickSymbol} />
-          <div class="seg" role="group" aria-label="Chart type">
-            <button class:on={mode === "line"} onclick={() => setMode("line")}>Line</button>
-            <button class:on={mode === "candles"} onclick={() => setMode("candles")}>Candles</button>
+          <div class="views">
+            <div class="seg">
+              <button class:on={view === "news"} aria-pressed={view === "news"} onclick={openNews}>News</button>
+            </div>
+            <div class="seg" role="group" aria-label="Chart type">
+              <button class:on={view !== "news" && mode === "line"} onclick={() => setMode("line")}>Line</button>
+              <button class:on={view !== "news" && mode === "candles"} onclick={() => setMode("candles")}>Candles</button>
+            </div>
           </div>
         </div>
         <div class="ranges" role="tablist">
@@ -205,12 +243,14 @@
           <button role="tab" aria-selected={view === "analysts"} class:on={view === "analysts"} onclick={() => (view = "analysts")}>
             Analysts
           </button>
-          {#if loading}<span class="spin" aria-label="Loading"></span>{/if}
+          {#if view === "news" ? newsLoading : loading}<span class="spin" aria-label="Loading"></span>{/if}
         </div>
         {#if view === "watchlist"}
           <Watchlist symbols={watchlist} current={symbol} onopen={openWatched} />
         {:else if view === "analysts"}
           <Analysts {symbol} {quote} {analyst} />
+        {:else if view === "news"}
+          <News {symbol} articles={news} error={newsError} {now} onretry={loadNews} />
         {:else if chart}
           <ChartView {chart} {mode} />
         {:else if chartError}
@@ -257,6 +297,10 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+  }
+  .views {
+    display: flex;
+    gap: 6px;
   }
   .seg {
     display: flex;

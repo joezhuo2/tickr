@@ -5,6 +5,7 @@ pub mod autostart;
 pub mod commands;
 pub mod hotkey;
 pub mod logo;
+pub mod news;
 pub mod poller;
 pub mod quote;
 pub mod settings;
@@ -76,6 +77,8 @@ pub fn run() {
             commands::get_analyst,
             commands::set_watchlist,
             commands::get_watch_quotes,
+            commands::get_news,
+            commands::open_news,
         ])
         .on_window_event(window::on_event)
         .setup(move |app| {
