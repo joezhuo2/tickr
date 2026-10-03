@@ -75,6 +75,10 @@ jobs:
 
             Data comes from Yahoo Finance's unofficial endpoints and may be delayed. Not investment advice.
           args: ${{ matrix.args }}
+          # GitHub sometimes drops an asset upload ("other side closed"). A
+          # retry re-uploads instead of failing the job and leaving latest.json
+          # without this platform.
+          retryAttempts: 2
 
   # Both build jobs merge their platform into the release's latest.json; if
   # they race, one entry can be lost and that platform stops auto-updating.

@@ -14,7 +14,7 @@ body:
     attributes:
       label: tickr version
       description: Shown in the tray menu, on the "Check for updates" or "Up to date" item.
-      placeholder: v0.5.1
+      placeholder: v0.5.2
     validations:
       required: true
   - type: input

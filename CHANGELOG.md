@@ -4,6 +4,15 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.2] - 2026-10-02
+
+### Fixed
+
+- The v0.5.1 Windows release job failed with "other side closed" while
+  uploading `latest.json`, so the draft release had the Windows installer but
+  no Windows entry in `latest.json`, and Windows copies could not auto-update.
+  The release workflow now retries failed uploads (`retryAttempts: 2`).
+
 ## [0.5.1] - 2026-10-02
 
 v0.5.0 was never published: both release builds failed at the updater signing
@@ -184,6 +193,9 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.5.2]: https://github.com/joezhuo2/tickr/compare/v0.5.1...v0.5.2
+[0.5.1]: https://github.com/joezhuo2/tickr/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/joezhuo2/tickr/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/joezhuo2/tickr/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/joezhuo2/tickr/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/joezhuo2/tickr/compare/v0.3.0...v0.4.0

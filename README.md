@@ -153,15 +153,16 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.5.1
-git push origin v0.5.1
+git tag v0.5.2
+git push origin v0.5.2
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
 universal macOS `.app`/`.dmg` with `tauri-apps/tauri-action`, and attaches them
 to a **draft** release for that tag, along with the signed updater bundles and
-`latest.json`. A last job checks that `latest.json` lists Windows and both
-macOS architectures. Review the notes and publish the release from the
+`latest.json`. Failed asset uploads are retried twice. A last job checks that
+`latest.json` lists Windows and both macOS architectures; if it fails, re-run
+the failed jobs from the Actions tab, which re-uploads into the same draft. Review the notes and publish the release from the
 Releases page. Installed copies only see it once it is published and marked
 latest (not a pre-release), because the updater reads
 `releases/latest/download/latest.json`.
