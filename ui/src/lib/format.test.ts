@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ago, axisTime, byGain, change, direction, fullTime, newsDate, niceTicks, price, ratingLabel, ratingTone, sessionMove, signed, span, upside, volume } from "./format";
+import { ago, alignTimes, axisTime, biasLabel, biasTone, byGain, change, direction, fullTime, newsDate, niceTicks, price, ratingLabel, ratingTone, sessionMove, signed, span, upside, volume } from "./format";
 import { accelerator, display } from "./hotkey";
 
 const key = (code: string, mods: Partial<Record<"ctrlKey" | "altKey" | "shiftKey" | "metaKey", boolean>> = {}) => ({
@@ -9,6 +9,20 @@ const key = (code: string, mods: Partial<Record<"ctrlKey" | "altKey" | "shiftKey
   shiftKey: false,
   metaKey: false,
   ...mods,
+});
+
+describe("technicals", () => {
+  it("bias labels and tones", () => {
+    expect(biasLabel("strong_bullish")).toBe("Strong bullish");
+    expect(biasTone("strong_bearish")).toBe("down");
+    expect(biasTone("bullish")).toBe("up");
+    expect(biasTone("neutral")).toBe("flat");
+  });
+
+  it("aligns a refreshed chart to the analyzed candles by time", () => {
+    // Chart gained a candle (40) after the analysis; 10 dropped off the front.
+    expect(alignTimes([20, 30, 40], [10, 20, 30])).toEqual([1, 2, -1]);
+  });
 });
 
 describe("format", () => {

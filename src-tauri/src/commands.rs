@@ -6,6 +6,7 @@ use base64::Engine;
 use serde::Serialize;
 use tauri::{AppHandle, State};
 
+use crate::analysis::Analysis;
 use crate::analyst::Consensus;
 use crate::news::Article;
 use crate::quote::{self, Chart, Quote, SearchHit};
@@ -80,6 +81,25 @@ pub async fn get_chart(shared: State<'_, Arc<Shared>>, symbol: String, range: St
     let chart = quote::fetch_chart(&shared.http, &symbol, &range).await?;
     *lock(&shared.last_chart) = Some(chart.clone());
     Ok(chart)
+}
+
+/// Technical analysis of the chart on screen. Runs only when the user asks.
+/// Reuses the last fetched chart when it matches, so the analysis covers the
+/// same candles the window shows; fetches otherwise.
+#[tauri::command]
+pub async fn analyze(shared: State<'_, Arc<Shared>>, symbol: String, range: String) -> Result<Analysis, String> {
+    let cached = lock(&shared.last_chart)
+        .clone()
+        .filter(|c| c.meta.symbol.eq_ignore_ascii_case(symbol.trim()) && c.range == range);
+    let chart = match cached {
+        Some(c) => c,
+        None => {
+            let c = quote::fetch_chart(&shared.http, &symbol, &range).await?;
+            *lock(&shared.last_chart) = Some(c.clone());
+            c
+        }
+    };
+    crate::analysis::analyze(&chart).inspect_err(|e| log::info!("analyze {symbol} {range}: {e}"))
 }
 
 #[tauri::command]

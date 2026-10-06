@@ -9,8 +9,19 @@
   import Left from "./Left.svelte";
   import News from "./News.svelte";
   import Search from "./Search.svelte";
+  import Technicals from "./Technicals.svelte";
   import Watchlist from "./Watchlist.svelte";
-  import { RANGES, type Article, type Chart, type ChartMode, type Consensus, type Init, type QuoteState } from "./lib/types";
+  import {
+    RANGES,
+    type Analysis,
+    type Article,
+    type Chart,
+    type ChartMode,
+    type Consensus,
+    type Init,
+    type Overlays,
+    type QuoteState,
+  } from "./lib/types";
 
   // Injected before load, so the first frame already has real content.
   const boot = window.__TICKR_INIT__ ?? null;
@@ -30,7 +41,17 @@
   let logo = $state<string | null | undefined>(undefined);
   // undefined while loading, null when there is no coverage (or it failed).
   let analyst = $state<Consensus | null | undefined>(undefined);
-  let view = $state<"chart" | "analysts" | "news" | "watchlist">("chart");
+  let view = $state<"chart" | "technicals" | "analysts" | "news" | "watchlist">("chart");
+  // Technical analysis: computed only when the user clicks Analyze, and
+  // cleared when the symbol or range changes. A chart refresh keeps it.
+  const ALL_OVERLAYS: Overlays = { mas: true, fib: true, targets: true, patterns: true, rsi: true };
+  let analysis = $state<Analysis | null>(null);
+  /** cacheKey() the analysis belongs to. */
+  let analysisKey = $state("");
+  let analyzing = $state(false);
+  let analysisError = $state<string | null>(null);
+  let overlays = $state<Overlays>({ ...ALL_OVERLAYS });
+  let analysisSeq = 0;
   // undefined while loading with nothing cached for the symbol.
   let news = $state<Article[] | undefined>(undefined);
   let newsError = $state<string | null>(null);
@@ -139,10 +160,41 @@
     loadNews();
   }
 
+  const activeAnalysis = $derived(analysis && analysisKey === cacheKey() ? analysis : null);
+
+  /** Runs the local technical analysis on the chart on screen. */
+  async function runAnalysis() {
+    const mine = ++analysisSeq;
+    const key = cacheKey();
+    analyzing = true;
+    analysisError = null;
+    try {
+      const a = await invoke<Analysis>("analyze", { symbol, range });
+      if (mine !== analysisSeq || key !== cacheKey()) return;
+      analysis = a;
+      analysisKey = key;
+    } catch (e) {
+      if (mine === analysisSeq) analysisError = String(e);
+    } finally {
+      if (mine === analysisSeq) analyzing = false;
+    }
+  }
+
+  /** Drops results and overlays; the Analyze button shows again. */
+  function clearAnalysis() {
+    analysisSeq++;
+    analysis = null;
+    analysisKey = "";
+    analyzing = false;
+    analysisError = null;
+    overlays = { ...ALL_OVERLAYS };
+  }
+
   async function pickSymbol(next: string): Promise<string | null> {
     try {
       qs = await invoke<QuoteState>("set_symbol", { symbol: next });
       symbol = qs.quote?.symbol ?? next.toUpperCase();
+      clearAnalysis();
       logo = undefined;
       loadChart();
       analyst = undefined;
@@ -170,15 +222,17 @@
   }
 
   function setRange(r: string) {
-    view = "chart";
+    // The Technicals view keeps its split chart across range changes.
+    if (view !== "technicals") view = "chart";
     if (r === range) return;
     range = r;
+    clearAnalysis();
     invoke("set_range", { range: r });
     loadChart();
   }
 
   function setMode(m: ChartMode) {
-    view = "chart";
+    if (view !== "technicals") view = "chart";
     mode = m;
     invoke("set_chart_mode", { mode: m });
   }
@@ -234,16 +288,27 @@
         </div>
         <div class="ranges" role="tablist">
           {#each RANGES as r (r.id)}
-            {@const on = view === "chart" && range === r.id}
+            {@const on = (view === "chart" || view === "technicals") && range === r.id}
             <button role="tab" aria-selected={on} class:on onclick={() => setRange(r.id)}>
               {r.label}
             </button>
           {/each}
           <span class="sep"></span>
+          <button
+            role="tab"
+            aria-selected={view === "technicals"}
+            class:on={view === "technicals"}
+            onclick={() => (view = "technicals")}
+          >
+            Technicals
+          </button>
           <button role="tab" aria-selected={view === "analysts"} class:on={view === "analysts"} onclick={() => (view = "analysts")}>
             Analysts
           </button>
-          {#if view === "news" ? newsLoading : loading}<span class="spin" aria-label="Loading"></span>{/if}
+          {#if view === "news" ? newsLoading : loading || (view === "technicals" && analyzing)}<span
+              class="spin"
+              aria-label="Loading"
+            ></span>{/if}
         </div>
         {#if view === "watchlist"}
           <Watchlist symbols={watchlist} current={symbol} onopen={openWatched} />
@@ -251,6 +316,28 @@
           <Analysts {symbol} {quote} {analyst} />
         {:else if view === "news"}
           <News {symbol} articles={news} error={newsError} {now} onretry={loadNews} />
+        {:else if view === "technicals"}
+          <div class="split">
+            {#if chart}
+              <ChartView {chart} {mode} analysis={activeAnalysis} {overlays} />
+            {:else if chartError}
+              <div class="msg">
+                {chartError}
+                <button class="retry" onclick={() => loadChart(true)}>Retry</button>
+              </div>
+            {:else}
+              <ChartSkeleton />
+            {/if}
+            <Technicals
+              analysis={activeAnalysis}
+              loading={analyzing}
+              error={analysisError}
+              bars={chart?.candles.length ?? 0}
+              gmtoffset={chart?.meta.gmtoffset ?? 0}
+              bind:overlays
+              onanalyze={runAnalysis}
+            />
+          </div>
         {:else if chart}
           <ChartView {chart} {mode} />
         {:else if chartError}
@@ -291,6 +378,12 @@
     display: flex;
     flex-direction: column;
     padding: 12px 12px 6px 14px;
+  }
+  .split {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
   }
   .toolbar {
     display: flex;

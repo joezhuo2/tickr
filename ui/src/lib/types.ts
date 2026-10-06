@@ -135,6 +135,127 @@ export interface WatchQuote {
   error: string | null;
 }
 
+// Technical analysis, mirroring src-tauri/src/analysis.
+
+export type Direction = "bullish" | "bearish" | "neutral";
+export type Bias = "strong_bearish" | "bearish" | "neutral" | "bullish" | "strong_bullish";
+
+export interface Line {
+  key: string;
+  label: string;
+  period: number;
+  /** Aligned with Series.t. */
+  values: (number | null)[];
+  /** First index with a full window; earlier values are warm-up estimates. */
+  full_from: number;
+}
+
+export interface Signal {
+  label: string;
+  direction: Direction;
+  limited: boolean;
+}
+
+export interface Reading {
+  key: string;
+  label: string;
+  value: number | null;
+  needed: number;
+  limited: boolean;
+}
+
+export interface Component {
+  key: string;
+  label: string;
+  weight: number;
+  /** -1..1. */
+  value: number;
+}
+
+export interface Target {
+  price: number;
+  raw: number;
+  fib: string | null;
+}
+
+export interface FibLevel {
+  ratio: number;
+  price: number;
+  kind: "retracement" | "extension";
+  label: string;
+}
+
+export interface FibPoint {
+  i: number;
+  t: number;
+  price: number;
+}
+
+export interface Swing {
+  from: FibPoint;
+  to: FibPoint;
+  up: boolean;
+  confirmed: boolean;
+  levels: FibLevel[];
+}
+
+export interface Pattern {
+  kind: string;
+  name: string;
+  direction: Direction;
+  start: number;
+  end: number;
+  /** Time of the pattern's last candle. */
+  t: number;
+  trend: "up" | "down" | "flat";
+  /** The prior trend supports the reversal; only these count toward the score. */
+  context_ok: boolean;
+  strength: number;
+  limited: boolean;
+}
+
+export interface Analysis {
+  symbol: string;
+  range: string;
+  interval: string;
+  currency: string;
+  /** Time of the last candle analyzed. */
+  as_of: number;
+  bars: number;
+  limited: boolean;
+  full_warmup: number;
+  close: number;
+  /** -100 (strong bearish) to +100 (strong bullish). */
+  score: number;
+  bias: Bias;
+  /** 0..100. */
+  confidence: number;
+  confidence_label: "low" | "medium" | "high";
+  components: Component[];
+  signals: Signal[];
+  readings: Reading[];
+  targets: {
+    horizon: number;
+    atr_move: number;
+    sigma_move: number | null;
+    upside: Target;
+    downside: Target;
+    invalidation: Target | null;
+  };
+  fib: Swing | null;
+  patterns: Pattern[];
+  series: { t: number[]; mas: Line[]; rsi: Line };
+}
+
+/** Which analysis layers the chart draws. */
+export interface Overlays {
+  mas: boolean;
+  fib: boolean;
+  targets: boolean;
+  patterns: boolean;
+  rsi: boolean;
+}
+
 declare global {
   interface Window {
     /** Injected by the backend before the page loads (window.rs). */

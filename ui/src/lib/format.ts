@@ -159,3 +159,31 @@ export function byGain(symbols: string[], pct: (s: string) => number | null | un
     .sort((a, b) => b.r - a.r || a.i - b.i)
     .map((x) => x.s);
 }
+
+const BIASES: Record<string, string> = {
+  strong_bearish: "Strong bearish",
+  bearish: "Bearish",
+  neutral: "Neutral",
+  bullish: "Bullish",
+  strong_bullish: "Strong bullish",
+};
+
+/** "Strong bullish" for "strong_bullish". */
+export function biasLabel(key: string): string {
+  return BIASES[key] ?? key;
+}
+
+/** Color class for a bias or signal direction. */
+export function biasTone(key: string): "up" | "down" | "flat" {
+  if (key.endsWith("bullish")) return "up";
+  if (key.endsWith("bearish")) return "down";
+  return "flat";
+}
+
+/** Maps candle times to indexes of `series`, for overlays on a refreshed
+ *  chart: entry i is the series index for candle i, or -1. */
+export function alignTimes(chartTimes: number[], seriesTimes: number[]): number[] {
+  const at = new Map<number, number>();
+  seriesTimes.forEach((t, i) => at.set(t, i));
+  return chartTimes.map((t) => at.get(t) ?? -1);
+}

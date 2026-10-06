@@ -4,6 +4,32 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Technicals view. A **Technicals** tab next to Analysts splits the window
+  into the chart and an analysis panel. Nothing is computed until you click
+  **Analyze**; the analysis runs locally and deterministically on the candles
+  of the range on screen:
+  - RSI 14 (Wilder), SMA 20/50/200, EMA 9/21 with golden/death and EMA
+    crosses, ATR 14 and the volatility of returns.
+  - 15 candlestick patterns (doji, hammer, inverted hammer, hanging man,
+    shooting star, engulfing, harami, piercing line, dark cloud cover,
+    morning/evening star, three white soldiers/black crows). A reversal only
+    counts when the trend before it agrees.
+  - Fibonacci retracements and extensions from the last major swing.
+  - A score from −100 to +100 (trend 35%, momentum 25%, crosses 15%,
+    patterns 25%), a bias from Strong bearish to Strong bullish, a confidence
+    level, upside and downside targets over the next 10 bars (ATR × √10,
+    snapped to a Fibonacci level within half an ATR) and an invalidation level.
+  - Chart overlays, each with its own toggle: moving averages, Fibonacci
+    levels, targets, pattern markers and an RSI pane.
+  - Charts with fewer than 200 candles are still analyzed, with a "Limited
+    data" warning, estimates marked * and lower confidence.
+  - Changing the symbol or range clears the results. A chart refresh keeps
+    them, labeled with the time of the last candle analyzed.
+
 ## [0.6.0] - 2026-10-02
 
 ### Added

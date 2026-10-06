@@ -1,5 +1,6 @@
 //! tickr: a tray stock ticker with a chart window behind a global hotkey.
 
+pub mod analysis;
 pub mod analyst;
 pub mod autostart;
 pub mod commands;
@@ -67,6 +68,7 @@ pub fn run() {
             commands::get_init,
             commands::window_ready,
             commands::get_chart,
+            commands::analyze,
             commands::search,
             commands::set_symbol,
             commands::set_range,

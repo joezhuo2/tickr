@@ -95,6 +95,16 @@ update themselves: install v0.5.1 once from Releases.
   **Analysts** tab next to the ranges, for the target range plotted against
   the current price and the count of each rating. Results are cached for 12
   hours. ETFs, indices and crypto have no coverage, so nothing is shown.
+- **Technicals:** the **Technicals** tab shows the chart above an analysis
+  panel. Click **Analyze** to run RSI, moving averages, candlestick patterns
+  and volatility/Fibonacci targets on the candles of the selected range. It
+  runs on your machine and gives the same result for the same candles. You
+  get a score from −100 to +100 with a bias and confidence, upside and
+  downside targets for the next 10 bars, an invalidation level and the
+  signals behind the score. Checkboxes toggle the chart overlays: moving
+  averages, Fibonacci levels, targets, pattern markers and an RSI pane.
+  Ranges with fewer than 200 candles show a "Limited data" warning.
+  Changing the symbol or range clears the results. Not investment advice.
 - **Watchlist:** click the star next to the ticker to add or remove it.
   The **Watchlist** button at the bottom of the window shows your starred
   stocks as cards (three across, four rows visible, scroll for more),
@@ -235,7 +245,7 @@ the Apple values as repository secrets (plus `APPLE_CERTIFICATE`, the base64
 ## Tests
 
 ```bash
-cd src-tauri && cargo test # quote, analyst and news parsing, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols, update menu labels
+cd src-tauri && cargo test # technical analysis (indicators, patterns, Fibonacci, scoring), quote, analyst and news parsing, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols, update menu labels
 cd src-tauri && cargo test -- --ignored live   # analyst fetch against Yahoo (network)
 npm test                   # formatters, watchlist sort, hotkey recording and display
 npm run check              # svelte-check
@@ -246,6 +256,7 @@ npm run check              # svelte-check
 ```
 src-tauri/src/
   quote.rs      Yahoo chart/search: fetch, parse, market session, extended-hours price
+  analysis/     local technical analysis: indicators (RSI, SMA/EMA, ATR, σ), patterns, Fibonacci swing, score and targets
   analyst.rs    Yahoo quoteSummary: cookie/crumb session, consensus and price targets, 12 h cache
   news.rs       Yahoo search news: 20 latest headlines, newest first, web links only
   poller.rs     background refresh: 15 s during market hours, 60 s pre/post, 15 min when closed
@@ -260,7 +271,7 @@ src-tauri/src/
   updater.rs    background update checks, tray menu state, install and restart
 src-tauri/windows/hooks.nsh   NSIS uninstall hook: autostart entry and app data
 .github/workflows/  ci.yml (checks on push/PR), release.yml (installers, updater bundles and latest.json on tag push)
-ui/src/         App, Left (ticker and details), Chart (canvas), Analysts, News, Watchlist, Search, HotkeyBar
+ui/src/         App, Left (ticker and details), Chart (canvas, analysis overlays), Technicals, Analysts, News, Watchlist, Search, HotkeyBar
 ```
 
 ## Memory (Windows 11, release build)

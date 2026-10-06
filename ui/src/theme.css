@@ -17,6 +17,16 @@
   --crosshair: rgba(0, 0, 0, 0.35);
   --tooltip-bg: rgba(255, 255, 255, 0.96);
   --shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+  /* Technical analysis overlays. */
+  --ma-1: #e08a00;
+  --ma-2: #7c4dff;
+  --ma-3: #c2185b;
+  --ma-4: #0097a7;
+  --ma-5: #5d8a00;
+  --fib: rgba(176, 120, 0, 0.75);
+  --rsi: #7c4dff;
+  --warn-bg: #fff6e0;
+  --warn-text: #7a5200;
   color-scheme: light;
 }
 
@@ -36,6 +46,15 @@
     --crosshair: rgba(255, 255, 255, 0.4);
     --tooltip-bg: rgba(28, 28, 30, 0.96);
     --shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+    --ma-1: #ffb340;
+    --ma-2: #a68bff;
+    --ma-3: #ff6fa8;
+    --ma-4: #4dd0e1;
+    --ma-5: #a5d64c;
+    --fib: rgba(255, 196, 77, 0.7);
+    --rsi: #a68bff;
+    --warn-bg: #3a2e12;
+    --warn-text: #ffd27a;
     color-scheme: dark;
   }
 }
