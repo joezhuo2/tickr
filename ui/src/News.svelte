@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { ago, newsDate } from "./lib/format";
+  import { ago, newsDate, sentimentLabel, sentimentTone } from "./lib/format";
   import type { Article } from "./lib/types";
 
   // articles: undefined while loading with nothing cached.
@@ -53,6 +53,9 @@
             {#if a.publisher}<span>{a.publisher}</span> ·{/if}
             <time datetime={new Date(a.published * 1000).toISOString()}>{newsDate(a.published, offset)}</time>
             · <span>{ago(a.published, now)}</span>
+            <span class="pill {sentimentTone(a.sentiment)}" title="Tone of the headline, guessed from its words"
+              >{sentimentLabel(a.sentiment)}</span
+            >
           </span>
         </button>
       </li>
@@ -104,6 +107,24 @@
   .meta {
     font-size: 11.5px;
     color: var(--muted);
+  }
+  .pill {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 7px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 650;
+    line-height: 16px;
+    vertical-align: 1px;
+    color: #fff;
+    background: var(--flat);
+  }
+  .pill.up {
+    background: var(--up);
+  }
+  .pill.down {
+    background: var(--down);
   }
   .msg {
     flex: 1;
