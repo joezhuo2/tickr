@@ -13,9 +13,15 @@
   let seq = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
+  /** Drops the pending debounce and any in-flight search, so a late result can't reopen the list. */
+  function cancelSearch() {
+    clearTimeout(timer);
+    seq++;
+  }
+
   function onInput() {
     error = null;
-    clearTimeout(timer);
+    cancelSearch();
     const query = q.trim();
     if (!query) {
       hits = [];
@@ -37,6 +43,7 @@
   }
 
   async function pick(symbol: string) {
+    cancelSearch();
     busy = true;
     open = false;
     error = await onpick(symbol);
