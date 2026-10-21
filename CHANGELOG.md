@@ -4,6 +4,18 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.3] - 2026-10-21
+
+### Added
+
+- Headline sentiment. Each headline in News has a pill after how long ago it
+  was published: **Positive** (green), **Negative** (red) or **Neutral**
+  (gray) ([#3](https://github.com/joezhuo2/tickr/issues/3)). Yahoo gives no
+  sentiment, so tickr guesses it locally from the words of the title, using a
+  financial keyword list that handles negation ("don't expect a slowdown")
+  and concessions ("rises although ..."). It reads headlines only, not the
+  articles, so treat it as a hint.
+
 ## [0.7.2] - 2026-10-20
 
 ### Fixed
@@ -238,6 +250,7 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.7.3]: https://github.com/joezhuo2/tickr/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/joezhuo2/tickr/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/joezhuo2/tickr/compare/v0.6.0...v0.7.1
 [0.6.0]: https://github.com/joezhuo2/tickr/compare/v0.5.2...v0.6.0

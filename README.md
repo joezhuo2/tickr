@@ -84,7 +84,10 @@ update themselves: install v0.5.1 once from Releases.
   chart, or use ← and →, to see time, open, high, low, close and volume.
 - **News:** the **News** button, left of Line/Candles, swaps the chart for
   the 20 latest headlines on the symbol, newest first. Each shows the title,
-  publisher, date and time, and how long ago it was published. Click one to
+  publisher, date and time, how long ago it was published, and a sentiment
+  pill: Positive (green), Negative (red) or Neutral (gray). The sentiment is
+  guessed on your machine from the headline's words, not the article, so
+  take it as a hint. Click one to
   open it in your default browser. Headlines load when you open News (and
   when you change symbol while it is open); ones already seen this session
   show at once while the fresh list loads. Click Line, Candles or a range to
@@ -170,8 +173,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.7.2
-git push origin v0.7.2
+git tag v0.7.3
+git push origin v0.7.3
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
@@ -245,7 +248,7 @@ the Apple values as repository secrets (plus `APPLE_CERTIFICATE`, the base64
 ## Tests
 
 ```bash
-cd src-tauri && cargo test # technical analysis (indicators, patterns, Fibonacci, scoring), quote, analyst and news parsing, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols, update menu labels
+cd src-tauri && cargo test # technical analysis (indicators, patterns, Fibonacci, scoring), quote, analyst and news parsing, headline sentiment, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols, update menu labels
 cd src-tauri && cargo test -- --ignored live   # analyst fetch against Yahoo (network)
 npm test                   # formatters, watchlist sort, hotkey recording and display
 npm run check              # svelte-check
@@ -259,6 +262,7 @@ src-tauri/src/
   analysis/     local technical analysis: indicators (RSI, SMA/EMA, ATR, σ), patterns, Fibonacci swing, score and targets
   analyst.rs    Yahoo quoteSummary: cookie/crumb session, consensus and price targets, 12 h cache
   news.rs       Yahoo search news: 20 latest headlines, newest first, web links only
+  sentiment.rs  headline tone (positive, negative, neutral) from a financial keyword list
   poller.rs     background refresh: 15 s during market hours, 60 s pre/post, 15 min when closed
   tray.rs       tooltip text, macOS menu bar title, and the right-click menu
   trayicon.rs   icon (32 px, 36 px on macOS): logo in a rounded square plus a direction badge

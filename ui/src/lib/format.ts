@@ -1,3 +1,5 @@
+import type { Sentiment } from "./types";
+
 const SYMBOLS: Record<string, string> = { USD: "$", EUR: "€", GBP: "£", JPY: "¥" };
 
 export function digitsFor(v: number): number {
@@ -127,6 +129,18 @@ export function ago(t: number, now: number): string {
 export function newsDate(t: number, gmtoffset: number): string {
   const d = local(t, gmtoffset);
   return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()} ${hm(d)}`;
+}
+
+/** "Positive", "Negative" or "Neutral" for a headline's tone. */
+export function sentimentLabel(s: Sentiment): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Color class for a headline's tone: positive is up, negative down. */
+export function sentimentTone(s: Sentiment): "up" | "down" | "flat" {
+  if (s === "positive") return "up";
+  if (s === "negative") return "down";
+  return "flat";
 }
 
 /** Evenly spaced "nice" tick values inside [lo, hi]. */

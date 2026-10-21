@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ago, alignTimes, axisTime, biasLabel, biasTone, byGain, change, direction, fullTime, newsDate, niceTicks, price, ratingLabel, ratingTone, sessionMove, signed, span, upside, volume } from "./format";
+import { ago, alignTimes, axisTime, biasLabel, biasTone, byGain, change, direction, fullTime, newsDate, niceTicks, price, ratingLabel, ratingTone, sentimentLabel, sentimentTone, sessionMove, signed, span, upside, volume } from "./format";
 import { accelerator, display } from "./hotkey";
 
 const key = (code: string, mods: Partial<Record<"ctrlKey" | "altKey" | "shiftKey" | "metaKey", boolean>> = {}) => ({
@@ -71,6 +71,15 @@ describe("format", () => {
     expect(ago(1000, 1000 + 3 * 3600)).toBe("3h ago");
     expect(ago(1000, 1000 + 2 * 86400 + 5)).toBe("2d ago");
     expect(ago(2000, 1000)).toBe("now");
+  });
+
+  it("sentiment labels and tones", () => {
+    expect(sentimentLabel("positive")).toBe("Positive");
+    expect(sentimentLabel("negative")).toBe("Negative");
+    expect(sentimentLabel("neutral")).toBe("Neutral");
+    expect(sentimentTone("positive")).toBe("up");
+    expect(sentimentTone("negative")).toBe("down");
+    expect(sentimentTone("neutral")).toBe("flat");
   });
 
   it("nice ticks", () => {

@@ -4,6 +4,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::quote::{get, SEARCH_URL};
+use crate::sentiment::{self, Sentiment};
 
 /// How many headlines to ask for.
 pub const COUNT: &str = "20";
@@ -15,6 +16,8 @@ pub struct Article {
     pub link: String,
     /// Unix seconds.
     pub published: i64,
+    /// Tone of the title, from sentiment.rs.
+    pub sentiment: Sentiment,
 }
 
 /// Headlines with a title and an http(s) link, newest first.
@@ -36,6 +39,7 @@ pub fn parse(body: &[u8]) -> Result<Vec<Article>, String> {
                 publisher: n["publisher"].as_str().unwrap_or_default().to_string(),
                 link: link.to_string(),
                 published: n["providerPublishTime"].as_i64().unwrap_or(0),
+                sentiment: sentiment::classify(title),
             })
         })
         .collect();
@@ -79,6 +83,17 @@ mod tests {
         ]}"#;
         let titles: Vec<_> = parse(body).unwrap().into_iter().map(|a| a.title).collect();
         assert_eq!(titles, ["new", "old"]);
+    }
+
+    #[test]
+    fn tags_each_headline() {
+        let got = parse(AAPL).unwrap();
+        let tone = |title: &str| got.iter().find(|a| a.title.starts_with(title)).unwrap().sentiment;
+        assert_eq!(tone("Apple Says Some AT&T"), Sentiment::Negative);
+        assert_eq!(tone("Apple (AAPL) Exceeds Market Returns"), Sentiment::Positive);
+        assert_eq!(tone("Apple Tightens macOS"), Sentiment::Neutral);
+        let json = serde_json::to_value(&got[0]).unwrap();
+        assert_eq!(json["sentiment"], "negative");
     }
 
     #[test]

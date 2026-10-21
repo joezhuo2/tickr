@@ -119,6 +119,9 @@ export interface Init {
   watchlist: string[];
 }
 
+/** Tone of a headline, from sentiment.rs. */
+export type Sentiment = "positive" | "negative" | "neutral";
+
 /** A headline from news.rs. */
 export interface Article {
   title: string;
@@ -126,6 +129,7 @@ export interface Article {
   link: string;
   /** Unix seconds. */
   published: number;
+  sentiment: Sentiment;
 }
 
 /** One watchlist card; quote is null when the fetch failed. */
