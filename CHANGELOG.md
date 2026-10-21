@@ -4,6 +4,15 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.2] - 2026-10-20
+
+### Fixed
+
+- The search dropdown no longer stays open after switching symbol. Typing a
+  symbol and pressing Enter before the results arrived opened the new
+  symbol's page, then the late results reopened the dropdown on top of it
+  ([#1](https://github.com/joezhuo2/tickr/issues/1)).
+
 ## [0.7.1]
 
 ### Added
@@ -229,6 +238,7 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.7.2]: https://github.com/joezhuo2/tickr/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/joezhuo2/tickr/compare/v0.6.0...v0.7.1
 [0.6.0]: https://github.com/joezhuo2/tickr/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/joezhuo2/tickr/compare/v0.5.1...v0.5.2
