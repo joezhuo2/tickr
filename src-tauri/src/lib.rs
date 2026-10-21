@@ -9,6 +9,7 @@ pub mod logo;
 pub mod news;
 pub mod poller;
 pub mod quote;
+pub mod sentiment;
 pub mod settings;
 pub mod state;
 pub mod tray;
