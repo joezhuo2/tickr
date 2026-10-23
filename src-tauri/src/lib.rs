@@ -74,6 +74,7 @@ pub fn run() {
             commands::analyze,
             commands::search,
             commands::set_symbol,
+            commands::refresh_quote,
             commands::set_range,
             commands::set_chart_mode,
             commands::set_hotkey,

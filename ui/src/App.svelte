@@ -63,6 +63,7 @@
   let newsLoading = $state(false);
   let watchlist = $state<string[]>([]);
   let now = $state(Date.now() / 1000);
+  let refreshing = $state(false);
 
   let chartSeq = 0;
   let chartAt = 0;
@@ -254,6 +255,12 @@
     loadChart();
   }
 
+  function refresh() {
+    refreshing = true;
+    invoke("refresh_quote");
+    loadChart(true);
+  }
+
   function setMode(m: ChartMode) {
     if (view !== "technicals") view = "chart";
     mode = m;
@@ -273,6 +280,7 @@
     setTimeout(reveal, 60);
     const un = listen<QuoteState>("quote", (e) => {
       qs = e.payload;
+      refreshing = false;
       // Keep the intraday chart current; longer ranges barely move.
       if (range === "1d" && Date.now() - chartAt > FRESH_MS) loadChart(true);
     });
@@ -385,6 +393,8 @@
       {status}
       watchlistOn={view === "watchlist"}
       onwatchlist={() => (view = view === "watchlist" ? "chart" : "watchlist")}
+      {refreshing}
+      onrefresh={refresh}
     />
   </div>
 {/if}

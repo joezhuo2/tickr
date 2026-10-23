@@ -4,6 +4,15 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.6] - 2026-10-23
+
+### Added
+
+- **Refresh** button ([#7](https://github.com/joezhuo2/tickr/issues/7)) in the
+  bottom bar, left of the "Live" / "Updated x min ago" status. Clicking it
+  fetches the quote right away instead of waiting for the next poll, and
+  reloads the chart. The icon spins until the new quote arrives.
+
 ## [0.7.5] - 2026-10-23
 
 ### Added
@@ -276,6 +285,7 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.7.6]: https://github.com/joezhuo2/tickr/compare/v0.7.5...v0.7.6
 [0.7.5]: https://github.com/joezhuo2/tickr/compare/v0.7.4...v0.7.5
 [0.7.4]: https://github.com/joezhuo2/tickr/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/joezhuo2/tickr/compare/v0.7.2...v0.7.3
