@@ -7,6 +7,7 @@
   import ChartSkeleton from "./ChartSkeleton.svelte";
   import EarningsView from "./Earnings.svelte";
   import HotkeyBar from "./HotkeyBar.svelte";
+  import MarketView from "./Market.svelte";
   import StatsView from "./Stats.svelte";
   import Left from "./Left.svelte";
   import News from "./News.svelte";
@@ -19,6 +20,7 @@
     type Article,
     type Chart,
     type ChartMode,
+    type Market,
     type Consensus,
     type Earnings,
     type Init,
@@ -49,7 +51,12 @@
   let earnings = $state<Earnings | null | undefined>(undefined);
   let ratingChanges = $state<RatingChange[]>([]);
   let stats = $state<StatSection[] | null | undefined>(undefined);
-  let view = $state<"chart" | "technicals" | "analysts" | "earnings" | "stats" | "news" | "watchlist">("chart");
+  let market = $state<Market | undefined>(undefined);
+  let marketError = $state<string | null>(null);
+  let marketLoading = $state(false);
+  let view = $state<"chart" | "technicals" | "analysts" | "earnings" | "stats" | "market" | "news" | "watchlist">(
+    "chart",
+  );
   // Technical analysis: computed only when the user clicks Analyze, and
   // cleared when the symbol or range changes. A chart refresh keeps it.
   const ALL_OVERLAYS: Overlays = { mas: true, fib: true, targets: true, patterns: true, rsi: true };
@@ -268,10 +275,28 @@
     loadChart();
   }
 
+  async function loadMarket() {
+    marketError = null;
+    marketLoading = true;
+    try {
+      market = await invoke<Market>("get_market");
+    } catch (e) {
+      marketError = String(e);
+    } finally {
+      marketLoading = false;
+    }
+  }
+
+  function toggleMarket() {
+    view = view === "market" ? "chart" : "market";
+    if (view === "market") loadMarket();
+  }
+
   function refresh() {
     refreshing = true;
     invoke("refresh_quote");
     loadChart(true);
+    if (view === "market") loadMarket();
   }
 
   function setMode(m: ChartMode) {
@@ -355,7 +380,10 @@
           <button role="tab" aria-selected={view === "stats"} class:on={view === "stats"} onclick={() => (view = view === "stats" ? "chart" : "stats")}>
             Stats
           </button>
-          {#if view === "news" ? newsLoading : loading || (view === "technicals" && analyzing)}<span
+          <button role="tab" aria-selected={view === "market"} class:on={view === "market"} onclick={toggleMarket}>
+            Market
+          </button>
+          {#if view === "news" ? newsLoading : view === "market" ? marketLoading : loading || (view === "technicals" && analyzing)}<span
               class="spin"
               aria-label="Loading"
             ></span>{/if}
@@ -368,6 +396,8 @@
           <EarningsView {symbol} {earnings} />
         {:else if view === "stats"}
           <StatsView {symbol} {stats} />
+        {:else if view === "market"}
+          <MarketView {market} error={marketError} onretry={loadMarket} onopen={openWatched} />
         {:else if view === "news"}
           <News {symbol} articles={news} error={newsError} {now} onretry={loadNews} />
         {:else if view === "technicals"}

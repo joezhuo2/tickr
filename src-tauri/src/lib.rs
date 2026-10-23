@@ -8,6 +8,7 @@ pub mod earnings;
 pub mod grades;
 pub mod hotkey;
 pub mod logo;
+pub mod market;
 pub mod news;
 pub mod poller;
 pub mod quote;
@@ -85,6 +86,7 @@ pub fn run() {
             commands::get_earnings,
             commands::get_rating_changes,
             commands::get_stats,
+            commands::get_market,
             commands::set_watchlist,
             commands::get_watch_quotes,
             commands::get_news,

@@ -10,6 +10,7 @@ use crate::analysis::Analysis;
 use crate::analyst::Consensus;
 use crate::earnings::Earnings;
 use crate::grades::RatingChange;
+use crate::market::Market;
 use crate::stats::Section;
 use crate::news::Article;
 use crate::quote::{self, Chart, Quote, SearchHit};
@@ -191,6 +192,11 @@ pub async fn get_rating_changes(shared: State<'_, Arc<Shared>>, symbol: String) 
 #[tauri::command]
 pub async fn get_stats(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<Vec<Section>, String> {
     crate::stats::fetch(&shared.analysts, &symbol).await.inspect_err(|e| log::warn!("stats {symbol}: {e}"))
+}
+
+#[tauri::command]
+pub async fn get_market(shared: State<'_, Arc<Shared>>) -> Result<Market, String> {
+    crate::market::fetch(&shared.analysts).await.inspect_err(|e| log::warn!("market: {e}"))
 }
 
 /// Recent headlines for the symbol, newest first.
