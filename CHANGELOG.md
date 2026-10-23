@@ -4,6 +4,15 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.16] - 2026-10-23
+
+### Changed
+
+- The **Watchlist** button in the bottom bar is now just a star icon, styled
+  like the Refresh button; it turns gold while the watchlist is open
+  ([#26](https://github.com/joezhuo2/tickr/issues/26)). Hover it for the
+  "Watchlist" label.
+
 ## [0.7.15] - 2026-10-23
 
 ### Added
@@ -378,6 +387,7 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.7.16]: https://github.com/joezhuo2/tickr/compare/v0.7.15...v0.7.16
 [0.7.15]: https://github.com/joezhuo2/tickr/compare/v0.7.14...v0.7.15
 [0.7.14]: https://github.com/joezhuo2/tickr/compare/v0.7.13...v0.7.14
 [0.7.13]: https://github.com/joezhuo2/tickr/compare/v0.7.12...v0.7.13

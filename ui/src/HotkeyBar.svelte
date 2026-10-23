@@ -59,9 +59,8 @@
     <button class="link" onclick={() => save(defaultHotkey)}>Reset</button>
   {/if}
   <span class="sep"></span>
-  <button class="watch" class:on={watchlistOn} aria-pressed={watchlistOn} onclick={onwatchlist}>
+  <button class="watch" class:on={watchlistOn} aria-pressed={watchlistOn} title="Watchlist" aria-label="Watchlist" onclick={onwatchlist}>
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" /></svg>
-    Watchlist
   </button>
   <button class="link credit" onclick={() => invoke("open_logo_credit").catch(console.warn)}>Logos by Elbstream</button>
   {#if error}<span class="error" title={error}>{error}</span>{/if}
@@ -121,27 +120,29 @@
     background: var(--faint);
   }
   .watch {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 2px 8px;
+    width: 22px;
+    height: 22px;
+    padding: 3px;
+    border: 0;
     border-radius: 5px;
-    border: 1px solid var(--faint);
-    background: var(--bg);
+    background: none;
+    color: var(--muted);
     cursor: pointer;
-    font-size: 11px;
+  }
+  .watch:hover {
+    background: var(--bg);
+    color: var(--text);
   }
   .watch svg {
-    width: 12px;
-    height: 12px;
+    width: 100%;
+    height: 100%;
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
     stroke-linejoin: round;
   }
   .watch.on {
-    border-color: var(--accent);
-    color: var(--accent);
+    color: #f5b301;
   }
   .watch.on svg {
     fill: currentColor;
