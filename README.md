@@ -120,7 +120,8 @@ update themselves: install v0.5.1 once from Releases.
   signals behind the score. Checkboxes toggle the chart overlays: moving
   averages, Fibonacci levels, targets, pattern markers and an RSI pane.
   Ranges with fewer than 200 candles show a "Limited data" warning.
-  Changing the symbol or range clears the results. Not investment advice.
+  Changing the symbol or range clears the results. Clicking **Technicals**
+  again closes it and returns to the chart. Not investment advice.
 - **Watchlist:** click the star next to the ticker to add or remove it.
   The **Watchlist** button at the bottom of the window shows your starred
   stocks as cards (three across, four rows visible, scroll for more),
@@ -186,8 +187,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.7.6
-git push origin v0.7.6
+git tag v0.7.7
+git push origin v0.7.7
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
