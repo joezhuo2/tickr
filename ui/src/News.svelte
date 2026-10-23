@@ -23,7 +23,7 @@
   const offset = -new Date().getTimezoneOffset() * 60;
 
   function open(a: Article) {
-    invoke("open_news", { url: a.link });
+    invoke("open_news", { url: a.link }).catch(console.warn);
   }
 </script>
 
