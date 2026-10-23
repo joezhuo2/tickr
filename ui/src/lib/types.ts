@@ -155,6 +155,21 @@ export interface Earnings {
   history: EarningsReport[];
 }
 
+export interface Mover {
+  symbol: string;
+  name: string;
+  price: number | null;
+  change_pct: number | null;
+}
+
+export interface Market {
+  indices: Mover[];
+  macros: Mover[];
+  sectors: Mover[];
+  gainers: Mover[];
+  losers: Mover[];
+}
+
 export interface StatSection {
   title: string;
   rows: [string, string][];
