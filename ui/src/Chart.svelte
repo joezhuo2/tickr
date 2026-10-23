@@ -1,6 +1,6 @@
 <script lang="ts">
   import { alignTimes, axisTime, candleAt, fullTime, niceTicks, num, price, quarterLabel, volume } from "./lib/format";
-  import type { Analysis, Chart, ChartMode, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
+  import type { Analysis, Article, Chart, ChartMode, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
 
   let {
     chart,
@@ -9,6 +9,7 @@
     overlays = null,
     earnings = [],
     ratings = [],
+    news = [],
   }: {
     chart: Chart | null;
     mode: ChartMode;
@@ -16,6 +17,7 @@
     overlays?: Overlays | null;
     earnings?: EarningsReport[];
     ratings?: RatingChange[];
+    news?: Article[];
   } = $props();
 
   let wrap: HTMLDivElement | undefined = $state();
@@ -69,6 +71,15 @@
     for (const r of ratings) {
       const i = candleAt(times, r.date);
       if (i >= 0) m.set(i, [...(m.get(i) ?? []), r]);
+    }
+    return m;
+  });
+  const newsAt = $derived.by(() => {
+    const times = candles.map((c) => c.t);
+    const m = new Map<number, Article[]>();
+    for (const a of news) {
+      const i = candleAt(times, a.published);
+      if (i >= 0) m.set(i, [...(m.get(i) ?? []), a]);
     }
     return m;
   });
@@ -277,17 +288,20 @@
 
     if (show && analysis) drawOverlays(ctx, g, v);
 
-    ctx.fillStyle = v("--accent");
-    for (const i of earningsAt.keys()) {
-      ctx.beginPath();
-      ctx.arc(g.x(i), PAD.t + g.priceH - 5, 4, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.fillStyle = v("--rating");
-    for (const i of ratingsAt.keys()) {
-      ctx.beginPath();
-      ctx.arc(g.x(i), PAD.t + g.priceH - (earningsAt.has(i) ? 15 : 5), 4, 0, Math.PI * 2);
-      ctx.fill();
+    const stacked = new Map<number, number>();
+    for (const [color, at] of [
+      ["--accent", earningsAt],
+      ["--rating", ratingsAt],
+      ["--news", newsAt],
+    ] as const) {
+      ctx.fillStyle = v(color);
+      for (const i of at.keys()) {
+        const k = stacked.get(i) ?? 0;
+        stacked.set(i, k + 1);
+        ctx.beginPath();
+        ctx.arc(g.x(i), PAD.t + g.priceH - 5 - 10 * k, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     // Crosshair.
@@ -509,7 +523,7 @@
 
   $effect(() => {
     // Redraw when any of these change.
-    void [candles, mode, width, height, hover, geo, analysis, show && { ...show }, earningsAt, ratingsAt];
+    void [candles, mode, width, height, hover, geo, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt];
     draw();
   });
 
@@ -561,7 +575,7 @@
     const left = x > width / 2;
     const rsi = show && analysis ? valueAt(analysis.series.rsi, hover) : null;
     const pats = show?.patterns ? (patternsAt.get(hover) ?? []) : [];
-    return { c, x, left, ext: isExtended(c.t), rsi, pats, earn: earningsAt.get(hover), grades: ratingsAt.get(hover) ?? [] };
+    return { c, x, left, ext: isExtended(c.t), rsi, pats, earn: earningsAt.get(hover), grades: ratingsAt.get(hover) ?? [], heads: newsAt.get(hover) ?? [] };
   });
 </script>
 
@@ -605,6 +619,9 @@
           ● {r.firm}: {r.from && r.action !== "init" ? `${r.from} → ${r.to}` : `initiates ${r.to}`}{#if r.target != null}
             · PT {price(r.target, chart.meta.currency)}{/if}
         </div>
+      {/each}
+      {#each tip.heads as a (a.link)}
+        <div class="head">● {a.title}</div>
       {/each}
       {#each tip.pats as p (p.kind)}
         <div class="pat {p.direction === 'bullish' ? 'up' : 'down'}">{p.direction === "bullish" ? "▲" : "▼"} {p.name}</div>
@@ -682,5 +699,14 @@
     margin-top: 3px;
     font-weight: 600;
     color: var(--rating);
+  }
+  .head {
+    margin-top: 3px;
+    max-width: 280px;
+    font-weight: 600;
+    color: var(--news);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 </style>
