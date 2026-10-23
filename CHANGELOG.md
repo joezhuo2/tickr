@@ -4,6 +4,18 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.12] - 2026-10-23
+
+### Added
+
+- **Market** tab next to Stats ([#21](https://github.com/joezhuo2/tickr/issues/21)),
+  an overview that does not depend on the current symbol: major indices with
+  the VIX; the 10-year Treasury yield, crude oil, gold, the US dollar index
+  and Bitcoin; the 11 S&P sector ETFs ranked by day change; and the day's top
+  5 gainers and losers from Yahoo's screeners. Click any row to open it on the
+  chart. It loads when the tab opens and when you press Refresh, with no
+  background polling. Clicking the tab again returns to the chart.
+
 ## [0.7.11] - 2026-10-23
 
 ### Added
@@ -335,6 +347,7 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.7.12]: https://github.com/joezhuo2/tickr/compare/v0.7.11...v0.7.12
 [0.7.11]: https://github.com/joezhuo2/tickr/compare/v0.7.10...v0.7.11
 [0.7.10]: https://github.com/joezhuo2/tickr/compare/v0.7.9...v0.7.10
 [0.7.9]: https://github.com/joezhuo2/tickr/compare/v0.7.8...v0.7.9

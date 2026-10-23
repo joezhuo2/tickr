@@ -113,6 +113,13 @@ update themselves: install v0.5.1 once from Releases.
   flow, cash, debt, ratios). ETFs get a Fund section (assets, yield, expense
   ratio, returns) and crypto a Crypto section (supply, 24 h volume). Values
   missing for a symbol are left out. Clicking **Stats** again closes it.
+- **Market:** the **Market** tab, next to Stats, is an overview of the whole
+  market rather than the current symbol: the S&P 500, Nasdaq, Dow, Russell
+  2000 and VIX; the 10-year Treasury yield, crude oil, gold, the US dollar
+  index and Bitcoin; the 11 S&P sector ETFs ranked by day change; and the
+  day's top 5 gainers and losers. Click any row to open it on the chart. It
+  loads when you open the tab, and the Refresh button reloads it. Clicking
+  **Market** again closes it.
 - **Rating changes:** each time a firm starts coverage, upgrades or downgrades
   the symbol, an orange dot at the bottom of the chart marks the candle it
   happened in. Hover the candle for the firm, old and new rating and the new
@@ -199,8 +206,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.7.11
-git push origin v0.7.11
+git tag v0.7.12
+git push origin v0.7.12
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
@@ -274,8 +281,8 @@ the Apple values as repository secrets (plus `APPLE_CERTIFICATE`, the base64
 ## Tests
 
 ```bash
-cd src-tauri && cargo test # technical analysis (indicators, patterns, Fibonacci, scoring), quote, analyst, earnings, rating change, stats and news parsing, headline sentiment, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols, update menu labels
-cd src-tauri && cargo test -- --ignored live   # analyst fetch against Yahoo (network)
+cd src-tauri && cargo test # technical analysis (indicators, patterns, Fibonacci, scoring), quote, analyst, earnings, rating change, stats, market and news parsing, headline sentiment, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols, update menu labels
+cd src-tauri && cargo test -- --ignored live   # analyst and market fetches against Yahoo (network)
 npm test                   # formatters, watchlist sort, hotkey recording and display
 npm run check              # svelte-check
 ```
@@ -290,6 +297,7 @@ src-tauri/src/
   earnings.rs   Yahoo quoteSummary: past EPS reports and next report date
   grades.rs     Yahoo quoteSummary: analyst upgrades, downgrades and initiations
   stats.rs      Yahoo quoteSummary: key statistics in labeled sections
+  market.rs     Yahoo batch quotes and screeners: indices, macro, sectors, top movers
   news.rs       Yahoo search news: 20 latest headlines, newest first, web links only
   sentiment.rs  headline tone (positive, negative, neutral) from a financial keyword list
   poller.rs     background refresh: 15 s during market hours, 60 s pre/post, 15 min when closed
@@ -304,7 +312,7 @@ src-tauri/src/
   updater.rs    background update checks, tray menu state, install and restart
 src-tauri/windows/hooks.nsh   NSIS uninstall hook: autostart entry and app data
 .github/workflows/  ci.yml (checks on push/PR), release.yml (installers, updater bundles and latest.json on tag push)
-ui/src/         App, Left (ticker and details), Chart (canvas, analysis overlays), Technicals, Analysts, Earnings, Stats, News, Watchlist, Search, HotkeyBar
+ui/src/         App, Left (ticker and details), Chart (canvas, analysis overlays), Technicals, Analysts, Earnings, Stats, Market, News, Watchlist, Search, HotkeyBar
 ```
 
 ## Memory (Windows 11, release build)
