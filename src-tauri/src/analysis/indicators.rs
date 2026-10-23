@@ -25,6 +25,35 @@ pub fn sma(src: &[f64], n: usize) -> Vec<f64> {
     out
 }
 
+pub fn bollinger(src: &[f64], n: usize, k: f64) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+    let mid = sma(src, n);
+    let (mut up, mut lo) = (Vec::with_capacity(src.len()), Vec::with_capacity(src.len()));
+    for (i, &m) in mid.iter().enumerate() {
+        let w = &src[(i + 1).saturating_sub(n.max(1))..=i];
+        let sd = (w.iter().map(|x| (x - m).powi(2)).sum::<f64>() / w.len() as f64).sqrt();
+        up.push(m + k * sd);
+        lo.push(m - k * sd);
+    }
+    (mid, up, lo)
+}
+
+pub fn vwap(c: &[Candle], session: impl Fn(i64) -> i64) -> Vec<Option<f64>> {
+    let (mut pv, mut vol, mut cur) = (0.0, 0.0, None);
+    c.iter()
+        .map(|k| {
+            let s = session(k.t);
+            if cur != Some(s) {
+                cur = Some(s);
+                pv = 0.0;
+                vol = 0.0;
+            }
+            pv += (k.h + k.l + k.c) / 3.0 * k.v;
+            vol += k.v;
+            (vol > 0.0).then(|| pv / vol)
+        })
+        .collect()
+}
+
 /// Exponential smoothing with `alpha`, seeded with the SMA of the first `n`
 /// values (expanding mean before that).
 fn smoothed(src: &[f64], n: usize, alpha: f64) -> Vec<f64> {
@@ -166,6 +195,25 @@ pub(crate) mod tests {
     fn sma_rolls_and_expands_during_warmup() {
         let s = sma(&[1.0, 2.0, 3.0, 4.0, 5.0], 3);
         assert_eq!(s, vec![1.0, 1.5, 2.0, 3.0, 4.0]);
+    }
+
+    #[test]
+    fn bollinger_bands_use_population_stdev() {
+        let (mid, up, lo) = bollinger(&[1.0, 2.0, 3.0, 5.0, 5.0, 5.0], 3, 2.0);
+        assert_eq!(mid[2], 2.0);
+        assert!(close_enough(up[2], 2.0 + 2.0 * (2.0f64 / 3.0).sqrt(), 1e-12));
+        assert!(close_enough(lo[2], 2.0 - 2.0 * (2.0f64 / 3.0).sqrt(), 1e-12));
+        assert_eq!((up[0], lo[0]), (1.0, 1.0));
+        assert_eq!((mid[5], up[5], lo[5]), (5.0, 5.0, 5.0));
+    }
+
+    #[test]
+    fn vwap_resets_each_session() {
+        let k = |t, c, v| Candle { t, o: c, h: c, l: c, c, v };
+        let bars = [k(1, 10.0, 1.0), k(2, 20.0, 3.0), k(100, 30.0, 0.0), k(101, 40.0, 2.0)];
+        let got = vwap(&bars, |t| t / 100);
+        assert_eq!(got, vec![Some(10.0), Some(17.5), None, Some(40.0)]);
+        assert_eq!(vwap(&bars, |_| 0)[3], Some((10.0 + 60.0 + 80.0) / 6.0));
     }
 
     #[test]

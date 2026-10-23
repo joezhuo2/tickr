@@ -4,6 +4,20 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.17] - 2026-10-23
+
+### Added
+
+- **Bollinger bands and VWAP** in Technicals
+  ([#25](https://github.com/joezhuo2/tickr/issues/25)). Bollinger bands (20
+  bars, 2 standard deviations, population σ as on TradingView) draw as a
+  shaded band with upper, middle and lower lines. VWAP uses the typical
+  price weighted by volume: on intraday ranges (1D, 5D, 1M) it resets each
+  trading day; on daily and longer ranges it is anchored to the first candle
+  on the chart. Each has its own overlay checkbox, and the indicator list
+  shows the latest upper band, lower band and VWAP. Symbols with no volume,
+  such as indices, have no VWAP.
+
 ## [0.7.16] - 2026-10-23
 
 ### Changed
@@ -387,6 +401,7 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.7.17]: https://github.com/joezhuo2/tickr/compare/v0.7.16...v0.7.17
 [0.7.16]: https://github.com/joezhuo2/tickr/compare/v0.7.15...v0.7.16
 [0.7.15]: https://github.com/joezhuo2/tickr/compare/v0.7.14...v0.7.15
 [0.7.14]: https://github.com/joezhuo2/tickr/compare/v0.7.13...v0.7.14

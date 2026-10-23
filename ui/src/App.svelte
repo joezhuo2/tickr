@@ -59,7 +59,7 @@
   );
   // Technical analysis: computed only when the user clicks Analyze, and
   // cleared when the symbol or range changes. A chart refresh keeps it.
-  const ALL_OVERLAYS: Overlays = { mas: true, fib: true, targets: true, patterns: true, rsi: true };
+  const ALL_OVERLAYS: Overlays = { mas: true, bollinger: true, vwap: true, fib: true, targets: true, patterns: true, rsi: true };
   let analysis = $state<Analysis | null>(null);
   /** cacheKey() the analysis belongs to. */
   let analysisKey = $state("");

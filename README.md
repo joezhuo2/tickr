@@ -143,7 +143,10 @@ update themselves: install v0.5.1 once from Releases.
   get a score from −100 to +100 with a bias and confidence, upside and
   downside targets for the next 10 bars, an invalidation level and the
   signals behind the score. Checkboxes toggle the chart overlays: moving
-  averages, Fibonacci levels, targets, pattern markers and an RSI pane.
+  averages, Bollinger bands (20, 2), VWAP, Fibonacci levels, targets, pattern
+  markers and an RSI pane. VWAP resets each day on 1D, 5D and 1M; on longer
+  ranges it is anchored to the first candle. The indicator list shows the
+  latest band and VWAP values.
   Ranges with fewer than 200 candles show a "Limited data" warning.
   Changing the symbol or range clears the results. Clicking **Technicals**
   again closes it and returns to the chart. Not investment advice.
@@ -212,8 +215,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.7.16
-git push origin v0.7.16
+git tag v0.7.17
+git push origin v0.7.17
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

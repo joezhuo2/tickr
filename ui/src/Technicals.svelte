@@ -41,6 +41,8 @@
 
   const TOGGLES: { key: keyof Overlays; label: string }[] = [
     { key: "mas", label: "Moving averages" },
+    { key: "bollinger", label: "Bollinger bands" },
+    { key: "vwap", label: "VWAP" },
     { key: "fib", label: "Fibonacci" },
     { key: "targets", label: "Targets" },
     { key: "patterns", label: "Patterns" },
