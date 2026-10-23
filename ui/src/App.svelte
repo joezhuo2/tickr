@@ -271,7 +271,7 @@
     if (r === range) return;
     range = r;
     clearAnalysis();
-    invoke("set_range", { range: r });
+    invoke("set_range", { range: r }).catch(console.warn);
     loadChart();
   }
 
@@ -294,7 +294,10 @@
 
   function refresh() {
     refreshing = true;
-    invoke("refresh_quote");
+    invoke("refresh_quote").catch((e) => {
+      console.warn(e);
+      refreshing = false;
+    });
     loadChart(true);
     if (view === "market") loadMarket();
   }
@@ -302,7 +305,7 @@
   function setMode(m: ChartMode) {
     if (view !== "technicals") view = "chart";
     mode = m;
-    invoke("set_chart_mode", { mode: m });
+    invoke("set_chart_mode", { mode: m }).catch(console.warn);
   }
 
   onMount(() => {
@@ -311,7 +314,7 @@
     // short timer races it.
     let revealed = false;
     const reveal = () => {
-      if (!revealed) invoke("window_ready");
+      if (!revealed) invoke("window_ready").catch(console.warn);
       revealed = true;
     };
     requestAnimationFrame(() => requestAnimationFrame(reveal));
