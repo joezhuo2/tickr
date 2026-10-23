@@ -302,12 +302,14 @@ export interface Analysis {
   };
   fib: Swing | null;
   patterns: Pattern[];
-  series: { t: number[]; mas: Line[]; rsi: Line };
+  series: { t: number[]; mas: Line[]; rsi: Line; bollinger: Line[]; vwap: Line };
 }
 
 /** Which analysis layers the chart draws. */
 export interface Overlays {
   mas: boolean;
+  bollinger: boolean;
+  vwap: boolean;
   fib: boolean;
   targets: boolean;
   patterns: boolean;
