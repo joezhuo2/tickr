@@ -350,11 +350,14 @@
           <Search onpick={pickSymbol} />
           <div class="views">
             <div class="seg">
+              <button class:on={view === "market"} aria-pressed={view === "market"} onclick={toggleMarket}>Market</button>
+            </div>
+            <div class="seg">
               <button class:on={view === "news"} aria-pressed={view === "news"} onclick={openNews}>News</button>
             </div>
             <div class="seg" role="group" aria-label="Chart type">
-              <button class:on={view !== "news" && mode === "line"} onclick={() => setMode("line")}>Line</button>
-              <button class:on={view !== "news" && mode === "candles"} onclick={() => setMode("candles")}>Candles</button>
+              <button class:on={view !== "news" && view !== "market" && mode === "line"} onclick={() => setMode("line")}>Line</button>
+              <button class:on={view !== "news" && view !== "market" && mode === "candles"} onclick={() => setMode("candles")}>Candles</button>
             </div>
           </div>
         </div>
@@ -382,9 +385,6 @@
           </button>
           <button role="tab" aria-selected={view === "stats"} class:on={view === "stats"} onclick={() => (view = view === "stats" ? "chart" : "stats")}>
             Stats
-          </button>
-          <button role="tab" aria-selected={view === "market"} class:on={view === "market"} onclick={toggleMarket}>
-            Market
           </button>
           {#if view === "news" ? newsLoading : view === "market" ? marketLoading : loading || (view === "technicals" && analyzing)}<span
               class="spin"
