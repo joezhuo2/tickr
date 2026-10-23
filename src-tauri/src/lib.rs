@@ -84,6 +84,7 @@ pub fn run() {
             commands::get_analyst,
             commands::get_earnings,
             commands::get_rating_changes,
+            commands::get_stats,
             commands::set_watchlist,
             commands::get_watch_quotes,
             commands::get_news,
