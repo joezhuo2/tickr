@@ -4,6 +4,16 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.19] - 2026-10-23
+
+### Changed
+
+- Stats now color signed values green or red
+  ([#35](https://github.com/joezhuo2/tickr/issues/35)): 52-week change (and
+  the S&P 500's), revenue and earnings growth, return on assets and equity,
+  and fund returns (YTD, 3- and 5-year). Levels such as market cap, P/E or
+  margins stay uncolored.
+
 ## [0.7.18] - 2026-10-23
 
 ### Changed
@@ -411,6 +421,7 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.7.19]: https://github.com/joezhuo2/tickr/compare/v0.7.18...v0.7.19
 [0.7.18]: https://github.com/joezhuo2/tickr/compare/v0.7.17...v0.7.18
 [0.7.17]: https://github.com/joezhuo2/tickr/compare/v0.7.16...v0.7.17
 [0.7.16]: https://github.com/joezhuo2/tickr/compare/v0.7.15...v0.7.16
