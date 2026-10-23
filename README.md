@@ -98,6 +98,7 @@ update themselves: install v0.5.1 once from Releases.
   **Analysts** tab next to the ranges, for the target range plotted against
   the current price and the count of each rating. Results are cached for 12
   hours. ETFs, indices and crypto have no coverage, so nothing is shown.
+  Clicking **Analysts** again closes it and returns to the chart.
 - **Earnings:** the **Earnings** tab, next to Analysts, shows the next report
   date (confirmed or estimated) with the EPS and revenue estimates, and the
   last four quarters with EPS estimate, actual EPS and surprise % (green beat,
@@ -187,8 +188,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.7.7
-git push origin v0.7.7
+git tag v0.7.8
+git push origin v0.7.8
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
