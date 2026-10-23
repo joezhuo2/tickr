@@ -5,6 +5,7 @@ pub mod analyst;
 pub mod autostart;
 pub mod commands;
 pub mod earnings;
+pub mod grades;
 pub mod hotkey;
 pub mod logo;
 pub mod news;
