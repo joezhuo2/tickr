@@ -108,12 +108,12 @@ update themselves: install v0.5.1 once from Releases.
   flow, cash, debt, ratios). ETFs get a Fund section (assets, yield, expense
   ratio, returns) and crypto a Crypto section (supply, 24 h volume). Values
   missing for a symbol are left out. Clicking **Stats** again closes it.
-- **Market:** the **Market** tab, next to Stats, is an overview of the whole
+- **Market:** the **Market** button, left of News, is an overview of the whole
   market rather than the current symbol: the S&P 500, Nasdaq, Dow, Russell
   2000 and VIX; the 10-year Treasury yield, crude oil, gold, the US dollar
   index and Bitcoin; the 11 S&P sector ETFs ranked by day change; and the
   day's top 5 gainers and losers. Click any row to open it on the chart. It
-  loads when you open the tab, and the Refresh button reloads it. Clicking
+  loads when you open it, and the Refresh button reloads it. Clicking
   **Market** again closes it.
 - **Rating changes:** each time a firm starts coverage, upgrades or downgrades
   the symbol, an orange dot at the bottom of the chart marks the candle it
@@ -214,8 +214,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.7.17
-git push origin v0.7.17
+git tag v0.7.18
+git push origin v0.7.18
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
