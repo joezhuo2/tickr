@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ago, alignTimes, axisTime, biasLabel, biasTone, byGain, change, direction, fullTime, newsDate, niceTicks, price, ratingLabel, ratingTone, sentimentLabel, sentimentTone, sessionMove, signed, span, upside, volume } from "./format";
+import { ago, alignTimes, axisTime, biasLabel, biasTone, byGain, candleAt, change, direction, fullTime, newsDate, niceTicks, price, quarterLabel, ratingLabel, ratingTone, sentimentLabel, sentimentTone, sessionMove, signed, span, upside, volume } from "./format";
 import { accelerator, display } from "./hotkey";
 
 const key = (code: string, mods: Partial<Record<"ctrlKey" | "altKey" | "shiftKey" | "metaKey", boolean>> = {}) => ({
@@ -137,5 +137,22 @@ describe("watchlist", () => {
   it("sorts by gain, unknown last", () => {
     const pct: Record<string, number | null> = { A: -1, B: 3, C: null, D: 0.5, E: undefined as unknown as null };
     expect(byGain(["A", "B", "C", "D", "E"], (s) => pct[s])).toEqual(["B", "D", "A", "C", "E"]);
+  });
+});
+
+describe("earnings", () => {
+  it("labels fiscal quarters", () => {
+    expect(quarterLabel("4Q2025")).toBe("Q4 FY2025");
+    expect(quarterLabel("odd")).toBe("odd");
+  });
+
+  it("finds the candle a report falls in", () => {
+    const t = [100, 200, 300];
+    expect(candleAt(t, 99)).toBe(-1);
+    expect(candleAt(t, 100)).toBe(0);
+    expect(candleAt(t, 250)).toBe(1);
+    expect(candleAt(t, 399)).toBe(2);
+    expect(candleAt(t, 400)).toBe(-1);
+    expect(candleAt([], 100)).toBe(-1);
   });
 });
