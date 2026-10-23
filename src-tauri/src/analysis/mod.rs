@@ -571,6 +571,8 @@ mod tests {
             range: "1y".into(),
             interval: "1d".into(),
             candles,
+            dividends: Vec::new(),
+            splits: Vec::new(),
         }
     }
 

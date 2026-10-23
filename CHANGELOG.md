@@ -4,6 +4,17 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.15] - 2026-10-23
+
+### Added
+
+- **Dividend and split markers** on the chart
+  ([#24](https://github.com/joezhuo2/tickr/issues/24)). On 6M to Max, a green
+  dot marks each ex-dividend date and a purple dot each stock split, stacked
+  with the earnings, rating and news dots. Hovering the candle shows the
+  dividend amount or split ratio. The chart request now asks Yahoo for
+  dividend and split events; intraday ranges (1D, 5D, 1M) have none.
+
 ## [0.7.14] - 2026-10-23
 
 ### Fixed
@@ -367,6 +378,7 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.7.15]: https://github.com/joezhuo2/tickr/compare/v0.7.14...v0.7.15
 [0.7.14]: https://github.com/joezhuo2/tickr/compare/v0.7.13...v0.7.14
 [0.7.13]: https://github.com/joezhuo2/tickr/compare/v0.7.12...v0.7.13
 [0.7.12]: https://github.com/joezhuo2/tickr/compare/v0.7.11...v0.7.12

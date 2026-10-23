@@ -33,6 +33,8 @@ export interface Chart {
   range: string;
   interval: string;
   candles: Candle[];
+  dividends: { t: number; amount: number }[];
+  splits: { t: number; ratio: string }[];
 }
 
 export interface Extended {

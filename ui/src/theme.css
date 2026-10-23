@@ -27,6 +27,8 @@
   --rsi: #7c4dff;
   --rating: #f07800;
   --news: #c9a000;
+  --dividend: #00a37a;
+  --split: #8e44ad;
   --warn-bg: #fff6e0;
   --warn-text: #7a5200;
   color-scheme: light;
@@ -57,6 +59,8 @@
     --rsi: #a68bff;
     --rating: #ff9f0a;
     --news: #ffd60a;
+    --dividend: #30d1a0;
+    --split: #bf5af2;
     --warn-bg: #3a2e12;
     --warn-text: #ffd27a;
     color-scheme: dark;
