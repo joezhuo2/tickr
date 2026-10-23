@@ -4,6 +4,18 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.5] - 2026-10-23
+
+### Added
+
+- **Rating changes** on the chart ([#6](https://github.com/joezhuo2/tickr/issues/6)).
+  Each time a firm starts coverage, upgrades or downgrades the symbol, an
+  orange dot marks the candle at the bottom of the chart (stacked above the
+  blue earnings dot when both fall on one candle). Hovering the candle lists
+  each change: firm, old → new rating (or "initiates" for new coverage) and
+  the new price target when given. Reiterated and maintained ratings are left
+  out. Data comes from Yahoo's quoteSummary upgrade/downgrade history.
+
 ## [0.7.4] - 2026-10-23
 
 ### Added
@@ -264,6 +276,7 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.7.5]: https://github.com/joezhuo2/tickr/compare/v0.7.4...v0.7.5
 [0.7.4]: https://github.com/joezhuo2/tickr/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/joezhuo2/tickr/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/joezhuo2/tickr/compare/v0.7.1...v0.7.2

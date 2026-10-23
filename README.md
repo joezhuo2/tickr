@@ -104,6 +104,10 @@ update themselves: install v0.5.1 once from Releases.
   red miss). Each past report is a blue dot at the bottom of the chart on the
   candle it was reported in; hover it for the quarter and EPS vs estimate.
   Yahoo keeps only four quarters, so older reports have no dot.
+- **Rating changes:** each time a firm starts coverage, upgrades or downgrades
+  the symbol, an orange dot at the bottom of the chart marks the candle it
+  happened in. Hover the candle for the firm, old and new rating and the new
+  price target. Reiterated ratings are left out.
 - **Technicals:** the **Technicals** tab shows the chart above an analysis
   panel. Click **Analyze** to run RSI, moving averages, candlestick patterns
   and volatility/Fibonacci targets on the candles of the selected range. It
@@ -179,8 +183,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.7.4
-git push origin v0.7.4
+git tag v0.7.5
+git push origin v0.7.5
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
@@ -254,7 +258,7 @@ the Apple values as repository secrets (plus `APPLE_CERTIFICATE`, the base64
 ## Tests
 
 ```bash
-cd src-tauri && cargo test # technical analysis (indicators, patterns, Fibonacci, scoring), quote, analyst, earnings and news parsing, headline sentiment, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols, update menu labels
+cd src-tauri && cargo test # technical analysis (indicators, patterns, Fibonacci, scoring), quote, analyst, earnings, rating change and news parsing, headline sentiment, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols, update menu labels
 cd src-tauri && cargo test -- --ignored live   # analyst fetch against Yahoo (network)
 npm test                   # formatters, watchlist sort, hotkey recording and display
 npm run check              # svelte-check
@@ -268,6 +272,7 @@ src-tauri/src/
   analysis/     local technical analysis: indicators (RSI, SMA/EMA, ATR, σ), patterns, Fibonacci swing, score and targets
   analyst.rs    Yahoo quoteSummary: cookie/crumb session, consensus and price targets, 12 h cache
   earnings.rs   Yahoo quoteSummary: past EPS reports and next report date
+  grades.rs     Yahoo quoteSummary: analyst upgrades, downgrades and initiations
   news.rs       Yahoo search news: 20 latest headlines, newest first, web links only
   sentiment.rs  headline tone (positive, negative, neutral) from a financial keyword list
   poller.rs     background refresh: 15 s during market hours, 60 s pre/post, 15 min when closed
