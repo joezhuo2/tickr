@@ -94,6 +94,7 @@
     if (!init.analyst_known) loadAnalyst();
     loadEarnings();
     loadRatingChanges();
+    loadNews();
   }
   if (boot) apply(boot);
 
@@ -224,7 +225,7 @@
       loadEarnings();
       ratingChanges = [];
       loadRatingChanges();
-      if (view === "news") loadNews();
+      loadNews();
       return null;
     } catch (e) {
       return String(e);
@@ -355,7 +356,7 @@
         {:else if view === "technicals"}
           <div class="split">
             {#if chart}
-              <ChartView {chart} {mode} analysis={activeAnalysis} {overlays} earnings={earnings?.history} ratings={ratingChanges} />
+              <ChartView {chart} {mode} analysis={activeAnalysis} {overlays} earnings={earnings?.history} ratings={ratingChanges} {news} />
             {:else if chartError}
               <div class="msg">
                 {chartError}
@@ -375,7 +376,7 @@
             />
           </div>
         {:else if chart}
-          <ChartView {chart} {mode} earnings={earnings?.history} ratings={ratingChanges} />
+          <ChartView {chart} {mode} earnings={earnings?.history} ratings={ratingChanges} {news} />
         {:else if chartError}
           <div class="msg">
             {chartError}
