@@ -88,9 +88,8 @@ update themselves: install v0.5.1 once from Releases.
   pill: Positive (green), Negative (red) or Neutral (gray). The sentiment is
   guessed on your machine from the headline's words, not the article, so
   take it as a hint. Click one to
-  open it in your default browser. Headlines load when you open News (and
-  when you change symbol while it is open); ones already seen this session
-  show at once while the fresh list loads. Click Line, Candles or a range to
+  open it in your default browser. Headlines load with the symbol; ones
+  already seen this session show at once while the fresh list loads. Click Line, Candles or a range to
   go back to the chart.
 - **Analyst consensus:** below the price, the left panel shows the rating
   (Strong buy to Sell), the average 12-month price target with its upside,
@@ -110,6 +109,9 @@ update themselves: install v0.5.1 once from Releases.
   the symbol, an orange dot at the bottom of the chart marks the candle it
   happened in. Hover the candle for the firm, old and new rating and the new
   price target. Reiterated ratings are left out.
+- **News dots:** each of the 20 latest headlines puts a yellow dot at the
+  bottom of the chart on the candle it was published in. Hover the candle for
+  the headlines. Dots stack when a candle also has an earnings or rating dot.
 - **Refresh:** the **Refresh** button in the bottom bar, left of the "Live" or
   "Updated" status, fetches the quote right away and reloads the chart. The
   icon spins until the new quote arrives.
@@ -189,8 +191,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.7.9
-git push origin v0.7.9
+git tag v0.7.10
+git push origin v0.7.10
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

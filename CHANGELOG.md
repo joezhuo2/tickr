@@ -4,6 +4,17 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.10] - 2026-10-23
+
+### Added
+
+- **News dots** on the chart ([#17](https://github.com/joezhuo2/tickr/issues/17)).
+  Each of the 20 latest headlines puts a yellow dot at the bottom of the chart
+  on the candle it was published in, stacked with the blue earnings and orange
+  rating change dots when they share a candle. Hovering the candle lists the
+  headlines. Headlines now load whenever the symbol changes, not only when
+  News is open.
+
 ## [0.7.9] - 2026-10-23
 
 ### Changed
@@ -310,6 +321,7 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.7.10]: https://github.com/joezhuo2/tickr/compare/v0.7.9...v0.7.10
 [0.7.9]: https://github.com/joezhuo2/tickr/compare/v0.7.8...v0.7.9
 [0.7.8]: https://github.com/joezhuo2/tickr/compare/v0.7.7...v0.7.8
 [0.7.7]: https://github.com/joezhuo2/tickr/compare/v0.7.6...v0.7.7
