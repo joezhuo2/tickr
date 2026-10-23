@@ -81,6 +81,7 @@ pub fn run() {
             commands::open_logo_credit,
             commands::get_analyst,
             commands::get_earnings,
+            commands::get_rating_changes,
             commands::set_watchlist,
             commands::get_watch_quotes,
             commands::get_news,
