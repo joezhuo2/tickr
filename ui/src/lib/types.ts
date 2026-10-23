@@ -155,6 +155,15 @@ export interface Earnings {
   history: EarningsReport[];
 }
 
+export interface RatingChange {
+  date: number;
+  firm: string;
+  action: "init" | "up" | "down";
+  from: string | null;
+  to: string;
+  target: number | null;
+}
+
 /** One watchlist card; quote is null when the fetch failed. */
 export interface WatchQuote {
   symbol: string;
