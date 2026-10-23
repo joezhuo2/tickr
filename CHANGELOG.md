@@ -4,6 +4,16 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.14] - 2026-10-23
+
+### Fixed
+
+- Window commands sent without waiting for an answer (saving the range and
+  chart type, refresh, opening a headline or the logo credit) could fail
+  with an unhandled promise rejection
+  ([#23](https://github.com/joezhuo2/tickr/issues/23)). Failures are now
+  logged to the console, and a failed refresh stops the spinning icon.
+
 ## [0.7.13] - 2026-10-23
 
 ### Fixed
@@ -357,6 +367,7 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.7.14]: https://github.com/joezhuo2/tickr/compare/v0.7.13...v0.7.14
 [0.7.13]: https://github.com/joezhuo2/tickr/compare/v0.7.12...v0.7.13
 [0.7.12]: https://github.com/joezhuo2/tickr/compare/v0.7.11...v0.7.12
 [0.7.11]: https://github.com/joezhuo2/tickr/compare/v0.7.10...v0.7.11
