@@ -24,6 +24,8 @@ use patterns::Pattern;
 pub const RSI_LEN: usize = 14;
 pub const ATR_LEN: usize = 14;
 pub const STDEV_LEN: usize = 20;
+pub const BB_LEN: usize = 20;
+pub const BB_K: f64 = 2.0;
 pub const SMA_LENS: [usize; 3] = [20, 50, 200];
 pub const EMA_LENS: [usize; 2] = [9, 21];
 
@@ -136,6 +138,8 @@ pub struct Series {
     pub t: Vec<i64>,
     pub mas: Vec<Line>,
     pub rsi: Line,
+    pub bollinger: Vec<Line>,
+    pub vwap: Line,
 }
 
 /// An indicator's latest value.
@@ -336,6 +340,11 @@ pub fn analyze(chart: &Chart) -> Result<Analysis, String> {
     let rsi_s = indicators::rsi(&closes, RSI_LEN);
     let sigma = indicators::stdev_returns(&closes, STDEV_LEN);
     let mas = mas(&closes);
+    let (bb_mid, bb_up, bb_lo) = indicators::bollinger(&closes, BB_LEN, BB_K);
+    let intraday = chart.interval.ends_with('m') && !chart.interval.ends_with("mo");
+    let gmt = chart.meta.gmtoffset;
+    let vwap_s = indicators::vwap(c, |t| if intraday { (t + gmt).div_euclid(86_400) } else { 0 });
+    let vwap_label = if intraday { "VWAP" } else { "VWAP (anchored)" };
     let pats = patterns::detect(c, &atr_s);
     let swing = fib::swing(c);
     let mut signals = Vec::new();
@@ -493,7 +502,24 @@ pub fn analyze(chart: &Chart) -> Result<Analysis, String> {
         needed: STDEV_LEN + 1,
         limited: n <= STDEV_LEN,
     });
+    for (key, label, v) in [("bb_upper", "Bollinger upper", bb_up[last]), ("bb_lower", "Bollinger lower", bb_lo[last])] {
+        readings.push(Reading {
+            key,
+            label: format!("{label} ({BB_LEN}, {BB_K})"),
+            value: Some(v),
+            needed: BB_LEN,
+            limited: n < BB_LEN,
+        });
+    }
+    readings.push(Reading { key: "vwap", label: vwap_label.into(), value: vwap_s[last], needed: 1, limited: false });
 
+    let band = |key, label: &str, values: &[f64]| Line {
+        key,
+        label: label.to_string(),
+        period: BB_LEN,
+        values: values.iter().map(|&v| Some(v)).collect(),
+        full_from: BB_LEN - 1,
+    };
     let series = Series {
         t: c.iter().map(|k| k.t).collect(),
         mas: mas
@@ -507,6 +533,12 @@ pub fn analyze(chart: &Chart) -> Result<Analysis, String> {
             })
             .collect(),
         rsi: Line { key: "rsi", label: format!("RSI {RSI_LEN}"), period: RSI_LEN, values: rsi_s, full_from: RSI_LEN },
+        bollinger: vec![
+            band("bb_upper", "BB upper", &bb_up),
+            band("bb_mid", &format!("BB {BB_LEN}, {BB_K}"), &bb_mid),
+            band("bb_lower", "BB lower", &bb_lo),
+        ],
+        vwap: Line { key: "vwap", label: vwap_label.into(), period: 1, values: vwap_s, full_from: 0 },
     };
 
     Ok(Analysis {
@@ -604,6 +636,22 @@ mod tests {
     fn is_deterministic() {
         let c = chart((0..120).map(|i| 50.0 + wave(i) + 0.1 * i as f64));
         assert_eq!(analyze(&c).unwrap(), analyze(&c).unwrap());
+    }
+
+    #[test]
+    fn bollinger_and_vwap_series() {
+        let mut c = chart((0..120).map(|i| 50.0 + wave(i)));
+        let a = analyze(&c).unwrap();
+        let [up, mid, lo] = [0, 1, 2].map(|k| &a.series.bollinger[k]);
+        assert!(up.values.iter().zip(&lo.values).all(|(u, l)| u >= l));
+        assert_eq!((mid.values.len(), mid.full_from), (120, BB_LEN - 1));
+        assert_eq!(a.series.vwap.label, "VWAP (anchored)");
+        assert!(a.series.vwap.values.iter().all(Option::is_some));
+        let r = |k| a.readings.iter().find(|r| r.key == k).unwrap().value;
+        assert_eq!(r("bb_upper"), up.values[119]);
+        assert_eq!(r("vwap"), a.series.vwap.values[119]);
+        c.interval = "5m".into();
+        assert_eq!(analyze(&c).unwrap().series.vwap.label, "VWAP");
     }
 
     #[test]
