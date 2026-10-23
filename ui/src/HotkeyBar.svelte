@@ -63,7 +63,7 @@
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" /></svg>
     Watchlist
   </button>
-  <button class="link credit" onclick={() => invoke("open_logo_credit")}>Logos by Elbstream</button>
+  <button class="link credit" onclick={() => invoke("open_logo_credit").catch(console.warn)}>Logos by Elbstream</button>
   {#if error}<span class="error" title={error}>{error}</span>{/if}
   <button class="refresh" class:spinning={refreshing} title="Refresh" aria-label="Refresh" onclick={onrefresh}>
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" /></svg>
