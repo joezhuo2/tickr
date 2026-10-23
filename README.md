@@ -1,18 +1,13 @@
 <p align="center"><img src="assets/tickr-banner.png" alt="tickr" width="100%"></p>
 
-A small stock watcher for the Windows tray and the macOS menu bar. The tray
-icon shows the company's logo with an up/down badge. Hover over it for the
-current price, the day's change and the pre-market or after-hours move. On
-macOS the price and change also sit next to the icon. A global hotkey opens a window
-with a chart, the analyst consensus, earnings and recent news.
+> A small stock watcher built with Tauri 2 and Svelte 5 for the Windows tray
+> and the macOS menu bar. The tray icon shows the company's logo with an up/down
+> badge. Hover over it for the current price, the day's change and the pre-market
+> or after-hours move. On macOS the price and change also sit next to the icon. A
+> global hotkey opens a window with a chart, the analyst consensus, earnings and
+> recent news.
 
 Built with Tauri 2 (Rust) and Svelte 5.
-
-> Data comes from Yahoo Finance's public chart, search (symbols and news) and quoteSummary
-> endpoints, and logos come from [Elbstream](https://elbstream.com/logos)'s
-> logo API (formerly Parqet). Yahoo's endpoints are not an official API and can
-> change or rate-limit without notice. Quotes may be delayed. Not investment
-> advice.
 
 ## Download
 
@@ -171,6 +166,12 @@ taskbar to keep it visible.
 
 The window opens with a dark or light background to match the OS theme, so it
 never flashes white before the page paints.
+
+> Data comes from Yahoo Finance's public chart, search (symbols and news) and quoteSummary
+> endpoints, and logos come from [Elbstream](https://elbstream.com/logos)'s
+> logo API (formerly Parqet). Yahoo's endpoints are not an official API and can
+> change or rate-limit without notice. Quotes may be delayed. Not investment
+> advice.
 
 ## Files
 
