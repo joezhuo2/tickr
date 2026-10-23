@@ -201,3 +201,18 @@ export function alignTimes(chartTimes: number[], seriesTimes: number[]): number[
   seriesTimes.forEach((t, i) => at.set(t, i));
   return chartTimes.map((t) => at.get(t) ?? -1);
 }
+
+export function quarterLabel(q: string): string {
+  const m = /^(\d)Q(\d{4})$/.exec(q);
+  return m ? `Q${m[1]} FY${m[2]}` : q;
+}
+
+export function candleAt(times: number[], t: number): number {
+  const n = times.length;
+  if (n === 0 || t < times[0]) return -1;
+  const gap = n > 1 ? times[n - 1] - times[n - 2] : 0;
+  if (t >= times[n - 1] + gap) return -1;
+  let i = n - 1;
+  while (times[i] > t) i--;
+  return i;
+}

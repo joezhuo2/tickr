@@ -4,7 +4,7 @@ A small stock watcher for the Windows tray and the macOS menu bar. The tray
 icon shows the company's logo with an up/down badge. Hover over it for the
 current price, the day's change and the pre-market or after-hours move. On
 macOS the price and change also sit next to the icon. A global hotkey opens a window
-with a chart, the analyst consensus and recent news.
+with a chart, the analyst consensus, earnings and recent news.
 
 Built with Tauri 2 (Rust) and Svelte 5.
 
@@ -98,6 +98,12 @@ update themselves: install v0.5.1 once from Releases.
   **Analysts** tab next to the ranges, for the target range plotted against
   the current price and the count of each rating. Results are cached for 12
   hours. ETFs, indices and crypto have no coverage, so nothing is shown.
+- **Earnings:** the **Earnings** tab, next to Analysts, shows the next report
+  date (confirmed or estimated) with the EPS and revenue estimates, and the
+  last four quarters with EPS estimate, actual EPS and surprise % (green beat,
+  red miss). Each past report is a blue dot at the bottom of the chart on the
+  candle it was reported in; hover it for the quarter and EPS vs estimate.
+  Yahoo keeps only four quarters, so older reports have no dot.
 - **Technicals:** the **Technicals** tab shows the chart above an analysis
   panel. Click **Analyze** to run RSI, moving averages, candlestick patterns
   and volatility/Fibonacci targets on the candles of the selected range. It
@@ -173,8 +179,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.7.3
-git push origin v0.7.3
+git tag v0.7.4
+git push origin v0.7.4
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
@@ -248,7 +254,7 @@ the Apple values as repository secrets (plus `APPLE_CERTIFICATE`, the base64
 ## Tests
 
 ```bash
-cd src-tauri && cargo test # technical analysis (indicators, patterns, Fibonacci, scoring), quote, analyst and news parsing, headline sentiment, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols, update menu labels
+cd src-tauri && cargo test # technical analysis (indicators, patterns, Fibonacci, scoring), quote, analyst, earnings and news parsing, headline sentiment, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols, update menu labels
 cd src-tauri && cargo test -- --ignored live   # analyst fetch against Yahoo (network)
 npm test                   # formatters, watchlist sort, hotkey recording and display
 npm run check              # svelte-check
@@ -261,6 +267,7 @@ src-tauri/src/
   quote.rs      Yahoo chart/search: fetch, parse, market session, extended-hours price
   analysis/     local technical analysis: indicators (RSI, SMA/EMA, ATR, σ), patterns, Fibonacci swing, score and targets
   analyst.rs    Yahoo quoteSummary: cookie/crumb session, consensus and price targets, 12 h cache
+  earnings.rs   Yahoo quoteSummary: past EPS reports and next report date
   news.rs       Yahoo search news: 20 latest headlines, newest first, web links only
   sentiment.rs  headline tone (positive, negative, neutral) from a financial keyword list
   poller.rs     background refresh: 15 s during market hours, 60 s pre/post, 15 min when closed
@@ -275,7 +282,7 @@ src-tauri/src/
   updater.rs    background update checks, tray menu state, install and restart
 src-tauri/windows/hooks.nsh   NSIS uninstall hook: autostart entry and app data
 .github/workflows/  ci.yml (checks on push/PR), release.yml (installers, updater bundles and latest.json on tag push)
-ui/src/         App, Left (ticker and details), Chart (canvas, analysis overlays), Technicals, Analysts, News, Watchlist, Search, HotkeyBar
+ui/src/         App, Left (ticker and details), Chart (canvas, analysis overlays), Technicals, Analysts, Earnings, News, Watchlist, Search, HotkeyBar
 ```
 
 ## Memory (Windows 11, release build)

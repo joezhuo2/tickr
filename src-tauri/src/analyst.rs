@@ -167,13 +167,17 @@ impl Analysts {
     }
 
     async fn fetch(&self, symbol: &str) -> Result<Option<Consensus>, String> {
+        parse(&self.summary(symbol, MODULES).await?, symbol)
+    }
+
+    pub async fn summary(&self, symbol: &str, modules: &str) -> Result<Vec<u8>, String> {
         let url = format!("{SUMMARY_URL}/{symbol}");
         for renew in [false, true] {
             let crumb = self.crumb(renew).await?;
             let res = self
                 .client
                 .get(&url)
-                .query(&[("modules", MODULES), ("crumb", crumb.as_str())])
+                .query(&[("modules", modules), ("crumb", crumb.as_str())])
                 .send()
                 .await
                 .map_err(network)?;
@@ -184,11 +188,11 @@ impl Analysts {
                 401 | 403 => continue,
                 429 => return Err("rate limited".into()),
                 // Unknown symbols and uncovered ones come back as 404 with a JSON body.
-                200..=299 | 404 => return parse(&body, symbol),
+                200..=299 | 404 => return Ok(body.to_vec()),
                 _ => return Err(format!("HTTP {status}")),
             }
         }
-        log::warn!("analyst {symbol}: Yahoo rejected the session twice");
+        log::warn!("quoteSummary {symbol}: Yahoo rejected the session twice");
         Err("Yahoo rejected the session".into())
     }
 }

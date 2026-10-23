@@ -1,13 +1,20 @@
 <script lang="ts">
-  import { alignTimes, axisTime, fullTime, niceTicks, num, price, volume } from "./lib/format";
-  import type { Analysis, Chart, ChartMode, Line, Overlays, Pattern } from "./lib/types";
+  import { alignTimes, axisTime, candleAt, fullTime, niceTicks, num, price, quarterLabel, volume } from "./lib/format";
+  import type { Analysis, Chart, ChartMode, EarningsReport, Line, Overlays, Pattern } from "./lib/types";
 
   let {
     chart,
     mode,
     analysis = null,
     overlays = null,
-  }: { chart: Chart | null; mode: ChartMode; analysis?: Analysis | null; overlays?: Overlays | null } = $props();
+    earnings = [],
+  }: {
+    chart: Chart | null;
+    mode: ChartMode;
+    analysis?: Analysis | null;
+    overlays?: Overlays | null;
+    earnings?: EarningsReport[];
+  } = $props();
 
   let wrap: HTMLDivElement | undefined = $state();
   let canvas: HTMLCanvasElement | undefined = $state();
@@ -42,6 +49,15 @@
       const i = indexOf.get(p.t);
       if (i == null) continue;
       m.set(i, [...(m.get(i) ?? []), p]);
+    }
+    return m;
+  });
+  const earningsAt = $derived.by(() => {
+    const times = candles.map((c) => c.t);
+    const m = new Map<number, EarningsReport>();
+    for (const e of earnings) {
+      const i = candleAt(times, e.reported);
+      if (i >= 0) m.set(i, e);
     }
     return m;
   });
@@ -249,6 +265,13 @@
     }
 
     if (show && analysis) drawOverlays(ctx, g, v);
+
+    ctx.fillStyle = v("--accent");
+    for (const i of earningsAt.keys()) {
+      ctx.beginPath();
+      ctx.arc(g.x(i), PAD.t + g.priceH - 5, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // Crosshair.
     if (hover != null && candles[hover]) {
@@ -469,7 +492,7 @@
 
   $effect(() => {
     // Redraw when any of these change.
-    void [candles, mode, width, height, hover, geo, analysis, show && { ...show }];
+    void [candles, mode, width, height, hover, geo, analysis, show && { ...show }, earningsAt];
     draw();
   });
 
@@ -521,7 +544,7 @@
     const left = x > width / 2;
     const rsi = show && analysis ? valueAt(analysis.series.rsi, hover) : null;
     const pats = show?.patterns ? (patternsAt.get(hover) ?? []) : [];
-    return { c, x, left, ext: isExtended(c.t), rsi, pats };
+    return { c, x, left, ext: isExtended(c.t), rsi, pats, earn: earningsAt.get(hover) };
   });
 </script>
 
@@ -554,6 +577,12 @@
         <dt>Volume</dt><dd>{volume(tip.c.v)}</dd>
         {#if tip.rsi != null}<dt>RSI</dt><dd>{num(tip.rsi, 1)}</dd>{/if}
       </dl>
+      {#if tip.earn}
+        <div class="earn">
+          ● Earnings {quarterLabel(tip.earn.quarter)}{#if tip.earn.eps_actual != null}: EPS {num(tip.earn.eps_actual)}{#if tip.earn.eps_estimate != null}
+              vs {num(tip.earn.eps_estimate)} est{/if}{/if}
+        </div>
+      {/if}
       {#each tip.pats as p (p.kind)}
         <div class="pat {p.direction === 'bullish' ? 'up' : 'down'}">{p.direction === "bullish" ? "▲" : "▼"} {p.name}</div>
       {/each}
@@ -620,5 +649,10 @@
   .pat {
     margin-top: 3px;
     font-weight: 600;
+  }
+  .earn {
+    margin-top: 3px;
+    font-weight: 600;
+    color: var(--accent);
   }
 </style>

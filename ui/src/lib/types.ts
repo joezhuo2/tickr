@@ -132,6 +132,29 @@ export interface Article {
   sentiment: Sentiment;
 }
 
+export interface EarningsReport {
+  quarter: string;
+  reported: number;
+  eps_actual: number | null;
+  eps_estimate: number | null;
+  surprise_pct: number | null;
+  revenue: number | null;
+}
+
+export interface Earnings {
+  symbol: string;
+  currency: string | null;
+  upcoming: {
+    date: number;
+    estimated: boolean;
+    eps_estimate: number | null;
+    eps_low: number | null;
+    eps_high: number | null;
+    revenue_estimate: number | null;
+  } | null;
+  history: EarningsReport[];
+}
+
 /** One watchlist card; quote is null when the fetch failed. */
 export interface WatchQuote {
   symbol: string;

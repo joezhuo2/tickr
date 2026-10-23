@@ -8,6 +8,7 @@ use tauri::{AppHandle, State};
 
 use crate::analysis::Analysis;
 use crate::analyst::Consensus;
+use crate::earnings::Earnings;
 use crate::news::Article;
 use crate::quote::{self, Chart, Quote, SearchHit};
 use crate::settings::{ChartMode, DEFAULT_HOTKEY};
@@ -168,6 +169,11 @@ pub async fn get_logo(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<
 #[tauri::command]
 pub async fn get_analyst(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<Option<Consensus>, String> {
     shared.analysts.get(&symbol, now_secs()).await.inspect_err(|e| log::warn!("analyst {symbol}: {e}"))
+}
+
+#[tauri::command]
+pub async fn get_earnings(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<Option<Earnings>, String> {
+    crate::earnings::fetch(&shared.analysts, &symbol).await.inspect_err(|e| log::warn!("earnings {symbol}: {e}"))
 }
 
 /// Recent headlines for the symbol, newest first.
