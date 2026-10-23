@@ -13,6 +13,7 @@ pub mod poller;
 pub mod quote;
 pub mod sentiment;
 pub mod settings;
+pub mod stats;
 pub mod state;
 pub mod tray;
 pub mod trayicon;
