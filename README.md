@@ -108,6 +108,9 @@ update themselves: install v0.5.1 once from Releases.
   the symbol, an orange dot at the bottom of the chart marks the candle it
   happened in. Hover the candle for the firm, old and new rating and the new
   price target. Reiterated ratings are left out.
+- **Refresh:** the **Refresh** button in the bottom bar, left of the "Live" or
+  "Updated" status, fetches the quote right away and reloads the chart. The
+  icon spins until the new quote arrives.
 - **Technicals:** the **Technicals** tab shows the chart above an analysis
   panel. Click **Analyze** to run RSI, moving averages, candlestick patterns
   and volatility/Fibonacci targets on the candles of the selected range. It
@@ -183,8 +186,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.7.5
-git push origin v0.7.5
+git tag v0.7.6
+git push origin v0.7.6
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
