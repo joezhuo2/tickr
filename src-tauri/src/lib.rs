@@ -13,6 +13,7 @@ pub mod poller;
 pub mod quote;
 pub mod sentiment;
 pub mod settings;
+pub mod stats;
 pub mod state;
 pub mod tray;
 pub mod trayicon;
@@ -83,6 +84,7 @@ pub fn run() {
             commands::get_analyst,
             commands::get_earnings,
             commands::get_rating_changes,
+            commands::get_stats,
             commands::set_watchlist,
             commands::get_watch_quotes,
             commands::get_news,

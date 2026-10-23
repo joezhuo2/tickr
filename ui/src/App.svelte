@@ -7,6 +7,7 @@
   import ChartSkeleton from "./ChartSkeleton.svelte";
   import EarningsView from "./Earnings.svelte";
   import HotkeyBar from "./HotkeyBar.svelte";
+  import StatsView from "./Stats.svelte";
   import Left from "./Left.svelte";
   import News from "./News.svelte";
   import Search from "./Search.svelte";
@@ -24,6 +25,7 @@
     type Overlays,
     type QuoteState,
     type RatingChange,
+    type StatSection,
   } from "./lib/types";
 
   // Injected before load, so the first frame already has real content.
@@ -46,7 +48,8 @@
   let analyst = $state<Consensus | null | undefined>(undefined);
   let earnings = $state<Earnings | null | undefined>(undefined);
   let ratingChanges = $state<RatingChange[]>([]);
-  let view = $state<"chart" | "technicals" | "analysts" | "earnings" | "news" | "watchlist">("chart");
+  let stats = $state<StatSection[] | null | undefined>(undefined);
+  let view = $state<"chart" | "technicals" | "analysts" | "earnings" | "stats" | "news" | "watchlist">("chart");
   // Technical analysis: computed only when the user clicks Analyze, and
   // cleared when the symbol or range changes. A chart refresh keeps it.
   const ALL_OVERLAYS: Overlays = { mas: true, fib: true, targets: true, patterns: true, rsi: true };
@@ -94,6 +97,7 @@
     if (!init.analyst_known) loadAnalyst();
     loadEarnings();
     loadRatingChanges();
+    loadStats();
     loadNews();
   }
   if (boot) apply(boot);
@@ -150,6 +154,12 @@
     const sym = symbol;
     const e = await invoke<Earnings | null>("get_earnings", { symbol: sym }).catch(() => null);
     if (sym === symbol) earnings = e;
+  }
+
+  async function loadStats() {
+    const sym = symbol;
+    const s = await invoke<StatSection[]>("get_stats", { symbol: sym }).catch(() => null);
+    if (sym === symbol) stats = s;
   }
 
   async function loadRatingChanges() {
@@ -225,6 +235,8 @@
       loadEarnings();
       ratingChanges = [];
       loadRatingChanges();
+      stats = undefined;
+      loadStats();
       loadNews();
       return null;
     } catch (e) {
@@ -340,6 +352,9 @@
           <button role="tab" aria-selected={view === "earnings"} class:on={view === "earnings"} onclick={() => (view = view === "earnings" ? "chart" : "earnings")}>
             Earnings
           </button>
+          <button role="tab" aria-selected={view === "stats"} class:on={view === "stats"} onclick={() => (view = view === "stats" ? "chart" : "stats")}>
+            Stats
+          </button>
           {#if view === "news" ? newsLoading : loading || (view === "technicals" && analyzing)}<span
               class="spin"
               aria-label="Loading"
@@ -351,6 +366,8 @@
           <Analysts {symbol} {quote} {analyst} />
         {:else if view === "earnings"}
           <EarningsView {symbol} {earnings} />
+        {:else if view === "stats"}
+          <StatsView {symbol} {stats} />
         {:else if view === "news"}
           <News {symbol} articles={news} error={newsError} {now} onretry={loadNews} />
         {:else if view === "technicals"}

@@ -155,6 +155,11 @@ export interface Earnings {
   history: EarningsReport[];
 }
 
+export interface StatSection {
+  title: string;
+  rows: [string, string][];
+}
+
 export interface RatingChange {
   date: number;
   firm: string;

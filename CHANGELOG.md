@@ -4,6 +4,20 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.11] - 2026-10-23
+
+### Added
+
+- **Stats** tab next to Earnings ([#20](https://github.com/joezhuo2/tickr/issues/20)).
+  Key statistics in sections: Valuation (market cap, enterprise value, P/E,
+  PEG, price/sales, price/book, EV/revenue, EV/EBITDA), Trading (beta, 52w
+  change vs the S&P 500, 50- and 200-day averages, average volume, all-time
+  high/low), Dividends & splits, Shares & short interest, Profitability and
+  Financials. ETFs show a Fund section and crypto a Crypto section instead of
+  the company ones. Values come pre-formatted from Yahoo's quoteSummary (same
+  session as analyst targets); missing values are left out. Clicking the tab
+  again returns to the chart.
+
 ## [0.7.10] - 2026-10-23
 
 ### Added
@@ -321,6 +335,7 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.7.11]: https://github.com/joezhuo2/tickr/compare/v0.7.10...v0.7.11
 [0.7.10]: https://github.com/joezhuo2/tickr/compare/v0.7.9...v0.7.10
 [0.7.9]: https://github.com/joezhuo2/tickr/compare/v0.7.8...v0.7.9
 [0.7.8]: https://github.com/joezhuo2/tickr/compare/v0.7.7...v0.7.8
