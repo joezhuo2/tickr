@@ -171,13 +171,17 @@ impl Analysts {
     }
 
     pub async fn summary(&self, symbol: &str, modules: &str) -> Result<Vec<u8>, String> {
-        let url = format!("{SUMMARY_URL}/{symbol}");
+        self.request(&format!("{SUMMARY_URL}/{symbol}"), &[("modules", modules)]).await
+    }
+
+    pub async fn request(&self, url: &str, query: &[(&str, &str)]) -> Result<Vec<u8>, String> {
         for renew in [false, true] {
             let crumb = self.crumb(renew).await?;
             let res = self
                 .client
-                .get(&url)
-                .query(&[("modules", modules), ("crumb", crumb.as_str())])
+                .get(url)
+                .query(query)
+                .query(&[("crumb", crumb.as_str())])
                 .send()
                 .await
                 .map_err(network)?;
@@ -192,7 +196,7 @@ impl Analysts {
                 _ => return Err(format!("HTTP {status}")),
             }
         }
-        log::warn!("quoteSummary {symbol}: Yahoo rejected the session twice");
+        log::warn!("{url}: Yahoo rejected the session twice");
         Err("Yahoo rejected the session".into())
     }
 }
