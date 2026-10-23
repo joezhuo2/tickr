@@ -335,7 +335,8 @@ pub async fn fetch_chart(client: &reqwest::Client, symbol: &str, range: &str) ->
     let (interval, prepost) = interval_for(range).ok_or("unknown range")?;
     let url = format!("{CHART_URL}/{}", symbol.trim().to_uppercase());
     let prepost = if prepost { "true" } else { "false" };
-    let body = get(client, &url, &[("range", range), ("interval", interval), ("includePrePost", prepost)]).await?;
+    let query = [("range", range), ("interval", interval), ("includePrePost", prepost), ("events", "div,split")];
+    let body = get(client, &url, &query).await?;
     parse_chart(&body, range, interval)
 }
 
