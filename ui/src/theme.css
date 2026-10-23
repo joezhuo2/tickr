@@ -26,6 +26,7 @@
   --fib: rgba(176, 120, 0, 0.75);
   --rsi: #7c4dff;
   --rating: #f07800;
+  --news: #c9a000;
   --warn-bg: #fff6e0;
   --warn-text: #7a5200;
   color-scheme: light;
@@ -55,6 +56,7 @@
     --fib: rgba(255, 196, 77, 0.7);
     --rsi: #a68bff;
     --rating: #ff9f0a;
+    --news: #ffd60a;
     --warn-bg: #3a2e12;
     --warn-text: #ffd27a;
     color-scheme: dark;
