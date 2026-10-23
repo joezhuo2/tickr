@@ -329,7 +329,7 @@
             role="tab"
             aria-selected={view === "technicals"}
             class:on={view === "technicals"}
-            onclick={() => (view = "technicals")}
+            onclick={() => (view = view === "technicals" ? "chart" : "technicals")}
           >
             Technicals
           </button>
