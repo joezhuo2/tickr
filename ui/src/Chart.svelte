@@ -83,6 +83,24 @@
     }
     return m;
   });
+  const dividendsAt = $derived.by(() => {
+    const times = candles.map((c) => c.t);
+    const m = new Map<number, number>();
+    for (const d of chart?.dividends ?? []) {
+      const i = candleAt(times, d.t);
+      if (i >= 0) m.set(i, d.amount);
+    }
+    return m;
+  });
+  const splitsAt = $derived.by(() => {
+    const times = candles.map((c) => c.t);
+    const m = new Map<number, string>();
+    for (const s of chart?.splits ?? []) {
+      const i = candleAt(times, s.t);
+      if (i >= 0) m.set(i, s.ratio);
+    }
+    return m;
+  });
   const targetLevels = $derived.by(() => {
     if (!analysis || !show?.targets) return [];
     const t = analysis.targets;
@@ -293,6 +311,8 @@
       ["--accent", earningsAt],
       ["--rating", ratingsAt],
       ["--news", newsAt],
+      ["--dividend", dividendsAt],
+      ["--split", splitsAt],
     ] as const) {
       ctx.fillStyle = v(color);
       for (const i of at.keys()) {
@@ -523,7 +543,7 @@
 
   $effect(() => {
     // Redraw when any of these change.
-    void [candles, mode, width, height, hover, geo, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt];
+    void [candles, mode, width, height, hover, geo, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt];
     draw();
   });
 
@@ -575,7 +595,7 @@
     const left = x > width / 2;
     const rsi = show && analysis ? valueAt(analysis.series.rsi, hover) : null;
     const pats = show?.patterns ? (patternsAt.get(hover) ?? []) : [];
-    return { c, x, left, ext: isExtended(c.t), rsi, pats, earn: earningsAt.get(hover), grades: ratingsAt.get(hover) ?? [], heads: newsAt.get(hover) ?? [] };
+    return { c, x, left, ext: isExtended(c.t), rsi, pats, earn: earningsAt.get(hover), grades: ratingsAt.get(hover) ?? [], heads: newsAt.get(hover) ?? [], div: dividendsAt.get(hover), split: splitsAt.get(hover) };
   });
 </script>
 
@@ -623,6 +643,8 @@
       {#each tip.heads as a (a.link)}
         <div class="head">● {a.title}</div>
       {/each}
+      {#if tip.div != null}<div class="div">● Dividend {price(tip.div, chart.meta.currency)}</div>{/if}
+      {#if tip.split}<div class="split">● Split {tip.split}</div>{/if}
       {#each tip.pats as p (p.kind)}
         <div class="pat {p.direction === 'bullish' ? 'up' : 'down'}">{p.direction === "bullish" ? "▲" : "▼"} {p.name}</div>
       {/each}
@@ -699,6 +721,15 @@
     margin-top: 3px;
     font-weight: 600;
     color: var(--rating);
+  }
+  .div,
+  .split {
+    margin-top: 3px;
+    font-weight: 600;
+    color: var(--dividend);
+  }
+  .split {
+    color: var(--split);
   }
   .head {
     margin-top: 3px;
