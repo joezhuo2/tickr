@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { statTone } from "./lib/format";
   import type { StatSection } from "./lib/types";
 
   let { symbol, stats }: { symbol: string; stats: StatSection[] | null | undefined } = $props();
@@ -25,7 +26,7 @@
         <dl>
           {#each s.rows as [label, value] (label)}
             <dt>{label}</dt>
-            <dd>{value}</dd>
+            <dd class={statTone(label, value)}>{value}</dd>
           {/each}
         </dl>
       </section>
@@ -75,6 +76,12 @@
     text-align: right;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+  }
+  .up {
+    color: var(--up);
+  }
+  .down {
+    color: var(--down);
   }
   .msg {
     flex: 1;
