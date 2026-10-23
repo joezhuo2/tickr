@@ -129,6 +129,10 @@ update themselves: install v0.5.1 once from Releases.
 - **News dots:** each of the 20 latest headlines puts a yellow dot at the
   bottom of the chart on the candle it was published in. Hover the candle for
   the headlines. Dots stack when a candle also has an earnings or rating dot.
+- **Dividends and splits:** on daily and longer charts (6M to Max), a green
+  dot marks each ex-dividend date and a purple dot each stock split. Hover the
+  candle for the dividend amount or split ratio. Yahoo sends no dividend or
+  split data for 1D, 5D and 1M.
 - **Refresh:** the **Refresh** button in the bottom bar, left of the "Live" or
   "Updated" status, fetches the quote right away and reloads the chart. The
   icon spins until the new quote arrives.
@@ -208,8 +212,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.7.14
-git push origin v0.7.14
+git tag v0.7.15
+git push origin v0.7.15
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
