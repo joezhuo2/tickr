@@ -130,6 +130,11 @@ pub async fn set_symbol(app: AppHandle, shared: State<'_, Arc<Shared>>, symbol: 
 }
 
 #[tauri::command]
+pub fn refresh_quote(shared: State<'_, Arc<Shared>>) {
+    shared.wake.notify_one();
+}
+
+#[tauri::command]
 pub fn set_range(shared: State<'_, Arc<Shared>>, range: String) -> Result<(), String> {
     if quote::interval_for(&range).is_none() {
         return Err(format!("unknown range {range}"));
