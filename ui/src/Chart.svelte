@@ -1,6 +1,6 @@
 <script lang="ts">
   import { alignTimes, axisTime, candleAt, fullTime, niceTicks, num, price, quarterLabel, volume } from "./lib/format";
-  import type { Analysis, Chart, ChartMode, EarningsReport, Line, Overlays, Pattern } from "./lib/types";
+  import type { Analysis, Chart, ChartMode, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
 
   let {
     chart,
@@ -8,12 +8,14 @@
     analysis = null,
     overlays = null,
     earnings = [],
+    ratings = [],
   }: {
     chart: Chart | null;
     mode: ChartMode;
     analysis?: Analysis | null;
     overlays?: Overlays | null;
     earnings?: EarningsReport[];
+    ratings?: RatingChange[];
   } = $props();
 
   let wrap: HTMLDivElement | undefined = $state();
@@ -58,6 +60,15 @@
     for (const e of earnings) {
       const i = candleAt(times, e.reported);
       if (i >= 0) m.set(i, e);
+    }
+    return m;
+  });
+  const ratingsAt = $derived.by(() => {
+    const times = candles.map((c) => c.t);
+    const m = new Map<number, RatingChange[]>();
+    for (const r of ratings) {
+      const i = candleAt(times, r.date);
+      if (i >= 0) m.set(i, [...(m.get(i) ?? []), r]);
     }
     return m;
   });
@@ -270,6 +281,12 @@
     for (const i of earningsAt.keys()) {
       ctx.beginPath();
       ctx.arc(g.x(i), PAD.t + g.priceH - 5, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = v("--rating");
+    for (const i of ratingsAt.keys()) {
+      ctx.beginPath();
+      ctx.arc(g.x(i), PAD.t + g.priceH - (earningsAt.has(i) ? 15 : 5), 4, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -492,7 +509,7 @@
 
   $effect(() => {
     // Redraw when any of these change.
-    void [candles, mode, width, height, hover, geo, analysis, show && { ...show }, earningsAt];
+    void [candles, mode, width, height, hover, geo, analysis, show && { ...show }, earningsAt, ratingsAt];
     draw();
   });
 
@@ -544,7 +561,7 @@
     const left = x > width / 2;
     const rsi = show && analysis ? valueAt(analysis.series.rsi, hover) : null;
     const pats = show?.patterns ? (patternsAt.get(hover) ?? []) : [];
-    return { c, x, left, ext: isExtended(c.t), rsi, pats, earn: earningsAt.get(hover) };
+    return { c, x, left, ext: isExtended(c.t), rsi, pats, earn: earningsAt.get(hover), grades: ratingsAt.get(hover) ?? [] };
   });
 </script>
 
@@ -583,6 +600,12 @@
               vs {num(tip.earn.eps_estimate)} est{/if}{/if}
         </div>
       {/if}
+      {#each tip.grades as r, k (k)}
+        <div class="grade">
+          ● {r.firm}: {r.from && r.action !== "init" ? `${r.from} → ${r.to}` : `initiates ${r.to}`}{#if r.target != null}
+            · PT {price(r.target, chart.meta.currency)}{/if}
+        </div>
+      {/each}
       {#each tip.pats as p (p.kind)}
         <div class="pat {p.direction === 'bullish' ? 'up' : 'down'}">{p.direction === "bullish" ? "▲" : "▼"} {p.name}</div>
       {/each}
@@ -654,5 +677,10 @@
     margin-top: 3px;
     font-weight: 600;
     color: var(--accent);
+  }
+  .grade {
+    margin-top: 3px;
+    font-weight: 600;
+    color: var(--rating);
   }
 </style>
