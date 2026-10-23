@@ -4,6 +4,16 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.13] - 2026-10-23
+
+### Fixed
+
+- The newest candle on 5D and 1M charts never updated while the window was
+  open; only 1D reloaded as new quotes arrived
+  ([#22](https://github.com/joezhuo2/tickr/issues/22)). Every chart with
+  intraday candles (1D, 5D, 1M) now reloads at most once a minute as quotes
+  come in.
+
 ## [0.7.12] - 2026-10-23
 
 ### Added
@@ -347,6 +357,7 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.7.13]: https://github.com/joezhuo2/tickr/compare/v0.7.12...v0.7.13
 [0.7.12]: https://github.com/joezhuo2/tickr/compare/v0.7.11...v0.7.12
 [0.7.11]: https://github.com/joezhuo2/tickr/compare/v0.7.10...v0.7.11
 [0.7.10]: https://github.com/joezhuo2/tickr/compare/v0.7.9...v0.7.10

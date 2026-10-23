@@ -82,6 +82,8 @@ update themselves: install v0.5.1 once from Releases.
 - **Window:** search to change the symbol (you can only change it here).
   Pick a range from 1D to Max and switch between line and candles. Hover the
   chart, or use ← and →, to see time, open, high, low, close and volume.
+  1D, 5D and 1M charts reload about once a minute so the newest candle stays
+  current.
 - **News:** the **News** button, left of Line/Candles, swaps the chart for
   the 20 latest headlines on the symbol, newest first. Each shows the title,
   publisher, date and time, how long ago it was published, and a sentiment
@@ -206,8 +208,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.7.12
-git push origin v0.7.12
+git tag v0.7.13
+git push origin v0.7.13
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
