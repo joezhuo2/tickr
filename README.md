@@ -7,8 +7,6 @@
 > global hotkey opens a window with a chart, the analyst consensus, earnings and
 > recent news.
 
-Built with Tauri 2 (Rust) and Svelte 5.
-
 ## Download
 
 Get the latest installer from
