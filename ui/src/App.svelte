@@ -319,8 +319,8 @@
     const un = listen<QuoteState>("quote", (e) => {
       qs = e.payload;
       refreshing = false;
-      // Keep the intraday chart current; longer ranges barely move.
-      if (range === "1d" && Date.now() - chartAt > FRESH_MS) loadChart(true);
+      // Keep intraday-candle charts (1D, 5D, 1M) current; daily ones barely move.
+      if (/^\d+m$/.test(chart?.interval ?? "") && Date.now() - chartAt > FRESH_MS) loadChart(true);
     });
     const tick = setInterval(() => (now = Date.now() / 1000), 15_000);
     return () => {
