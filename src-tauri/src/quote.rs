@@ -77,6 +77,20 @@ pub struct Chart {
     pub range: String,
     pub interval: String,
     pub candles: Vec<Candle>,
+    pub dividends: Vec<Dividend>,
+    pub splits: Vec<Split>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Dividend {
+    pub t: i64,
+    pub amount: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Split {
+    pub t: i64,
+    pub ratio: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -197,7 +211,18 @@ pub fn parse_chart(body: &[u8], range: &str, interval: &str) -> Result<Chart, St
             })
         })
         .collect();
-    Ok(Chart { meta, range: range.into(), interval: interval.into(), candles })
+    let events = |kind: &str| r["events"][kind].as_object().map(|o| o.values().cloned().collect::<Vec<_>>()).unwrap_or_default();
+    let mut dividends: Vec<Dividend> = events("dividends")
+        .iter()
+        .filter_map(|d| Some(Dividend { t: d["date"].as_i64()?, amount: f(&d["amount"])? }))
+        .collect();
+    dividends.sort_by_key(|d| d.t);
+    let mut splits: Vec<Split> = events("splits")
+        .iter()
+        .filter_map(|x| Some(Split { t: x["date"].as_i64()?, ratio: x["splitRatio"].as_str()?.to_string() }))
+        .collect();
+    splits.sort_by_key(|x| x.t);
+    Ok(Chart { meta, range: range.into(), interval: interval.into(), candles, dividends, splits })
 }
 
 pub fn session_at(periods: Option<&Periods>, now: i64) -> Session {
@@ -349,6 +374,20 @@ mod tests {
         assert!(!c.candles.is_empty());
         assert!(c.candles.windows(2).all(|w| w[0].t < w[1].t));
         assert!(c.candles.iter().all(|k| k.h >= k.l));
+    }
+
+    #[test]
+    fn parses_dividends_and_splits() {
+        let c = parse_chart(include_bytes!("../../fixtures/chart-5y-events.json"), "5y", "1wk").unwrap();
+        assert_eq!(c.dividends.len(), 20);
+        assert!(c.dividends.windows(2).all(|w| w[0].t < w[1].t));
+        assert_eq!(c.dividends[0], Dividend { t: 1636119000, amount: 0.22 });
+        assert!(c.splits.is_empty());
+        let body = br#"{"chart":{"result":[{"meta":{"regularMarketPrice":1},"events":{"splits":{
+            "1598880600":{"date":1598880600,"numerator":4,"denominator":1,"splitRatio":"4:1"}}}}]}}"#;
+        let c = parse_chart(body, "max", "1mo").unwrap();
+        assert_eq!(c.splits, [Split { t: 1598880600, ratio: "4:1".into() }]);
+        assert!(day().dividends.is_empty());
     }
 
     #[test]
