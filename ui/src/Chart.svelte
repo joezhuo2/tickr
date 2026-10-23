@@ -141,8 +141,13 @@
       hi = Math.max(hi, prevClose);
     }
     // Keep overlays in view.
-    if (analysis && show?.mas) {
-      for (const line of analysis.series.mas) {
+    if (analysis && show) {
+      const fit = [
+        ...(show.mas ? analysis.series.mas : []),
+        ...(show.bollinger ? analysis.series.bollinger : []),
+        ...(show.vwap ? [analysis.series.vwap] : []),
+      ];
+      for (const line of fit) {
         for (let i = 0; i < n; i++) {
           const v = valueAt(line, i);
           if (v != null) {
@@ -429,21 +434,50 @@
       ctx.setLineDash([]);
     }
 
-    // Moving averages, with a legend.
+    // Moving averages, bands and VWAP, with a legend.
+    ctx.font = `10px ${v("--font")}`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    let lx = PAD.l + 4;
+    const legend = (label: string, col: string) => {
+      ctx.fillStyle = col;
+      ctx.fillText(label, lx, PAD.t + 2);
+      lx += ctx.measureText(label).width + 10;
+    };
+    if (s.bollinger) {
+      const [up, mid, lo] = a.series.bollinger;
+      const pts = (line: Line) =>
+        [...Array(g.n).keys()].flatMap((i) => {
+          const val = valueAt(line, i);
+          return val == null ? [] : [[g.x(i), g.y(val)]];
+        });
+      const band = [...pts(up), ...pts(lo).reverse()];
+      if (band.length) {
+        ctx.beginPath();
+        band.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+        ctx.closePath();
+        ctx.fillStyle = v("--bb-fill");
+        ctx.fill();
+      }
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = v("--bb");
+      for (const line of [up, mid, lo]) strokeLine(ctx, line, g.y, g);
+      legend(mid.label, v("--bb"));
+    }
     if (s.mas) {
       ctx.lineWidth = 1.2;
-      ctx.font = `10px ${v("--font")}`;
-      ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      let lx = PAD.l + 4;
       a.series.mas.forEach((line, k) => {
         const col = v(`--ma-${k + 1}`);
         ctx.strokeStyle = col;
         strokeLine(ctx, line, g.y, g);
-        ctx.fillStyle = col;
-        ctx.fillText(line.label, lx, PAD.t + 2);
-        lx += ctx.measureText(line.label).width + 10;
+        legend(line.label, col);
       });
+    }
+    if (s.vwap) {
+      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = v("--vwap");
+      strokeLine(ctx, a.series.vwap, g.y, g);
+      legend(a.series.vwap.label, v("--vwap"));
     }
 
     // Targets: full-width levels, labeled inside the plot.
