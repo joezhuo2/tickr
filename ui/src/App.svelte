@@ -23,6 +23,7 @@
     type Init,
     type Overlays,
     type QuoteState,
+    type RatingChange,
   } from "./lib/types";
 
   // Injected before load, so the first frame already has real content.
@@ -44,6 +45,7 @@
   // undefined while loading, null when there is no coverage (or it failed).
   let analyst = $state<Consensus | null | undefined>(undefined);
   let earnings = $state<Earnings | null | undefined>(undefined);
+  let ratingChanges = $state<RatingChange[]>([]);
   let view = $state<"chart" | "technicals" | "analysts" | "earnings" | "news" | "watchlist">("chart");
   // Technical analysis: computed only when the user clicks Analyze, and
   // cleared when the symbol or range changes. A chart refresh keeps it.
@@ -90,6 +92,7 @@
     if (!init.logo_known) loadLogo();
     if (!init.analyst_known) loadAnalyst();
     loadEarnings();
+    loadRatingChanges();
   }
   if (boot) apply(boot);
 
@@ -145,6 +148,12 @@
     const sym = symbol;
     const e = await invoke<Earnings | null>("get_earnings", { symbol: sym }).catch(() => null);
     if (sym === symbol) earnings = e;
+  }
+
+  async function loadRatingChanges() {
+    const sym = symbol;
+    const r = await invoke<RatingChange[]>("get_rating_changes", { symbol: sym }).catch(() => []);
+    if (sym === symbol) ratingChanges = r;
   }
 
   /** Shows cached headlines at once, then refetches. Only runs when News opens. */
@@ -212,6 +221,8 @@
       loadAnalyst();
       earnings = undefined;
       loadEarnings();
+      ratingChanges = [];
+      loadRatingChanges();
       if (view === "news") loadNews();
       return null;
     } catch (e) {
@@ -336,7 +347,7 @@
         {:else if view === "technicals"}
           <div class="split">
             {#if chart}
-              <ChartView {chart} {mode} analysis={activeAnalysis} {overlays} earnings={earnings?.history} />
+              <ChartView {chart} {mode} analysis={activeAnalysis} {overlays} earnings={earnings?.history} ratings={ratingChanges} />
             {:else if chartError}
               <div class="msg">
                 {chartError}
@@ -356,7 +367,7 @@
             />
           </div>
         {:else if chart}
-          <ChartView {chart} {mode} earnings={earnings?.history} />
+          <ChartView {chart} {mode} earnings={earnings?.history} ratings={ratingChanges} />
         {:else if chartError}
           <div class="msg">
             {chartError}

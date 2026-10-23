@@ -9,6 +9,7 @@ use tauri::{AppHandle, State};
 use crate::analysis::Analysis;
 use crate::analyst::Consensus;
 use crate::earnings::Earnings;
+use crate::grades::RatingChange;
 use crate::news::Article;
 use crate::quote::{self, Chart, Quote, SearchHit};
 use crate::settings::{ChartMode, DEFAULT_HOTKEY};
@@ -174,6 +175,11 @@ pub async fn get_analyst(shared: State<'_, Arc<Shared>>, symbol: String) -> Resu
 #[tauri::command]
 pub async fn get_earnings(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<Option<Earnings>, String> {
     crate::earnings::fetch(&shared.analysts, &symbol).await.inspect_err(|e| log::warn!("earnings {symbol}: {e}"))
+}
+
+#[tauri::command]
+pub async fn get_rating_changes(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<Vec<RatingChange>, String> {
+    crate::grades::fetch(&shared.analysts, &symbol).await.inspect_err(|e| log::warn!("rating changes {symbol}: {e}"))
 }
 
 /// Recent headlines for the symbol, newest first.
