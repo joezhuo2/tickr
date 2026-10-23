@@ -9,6 +9,8 @@
     status,
     watchlistOn,
     onwatchlist,
+    refreshing,
+    onrefresh,
   }: {
     hotkey: string;
     /** Set by the backend when the saved hotkey could not be registered. */
@@ -17,6 +19,8 @@
     status: { kind: "live" | "stale" | "offline" | "loading"; text: string };
     watchlistOn: boolean;
     onwatchlist: () => void;
+    refreshing: boolean;
+    onrefresh: () => void;
   } = $props();
 
   let recording = $state(false);
@@ -61,6 +65,9 @@
   </button>
   <button class="link credit" onclick={() => invoke("open_logo_credit")}>Logos by Elbstream</button>
   {#if error}<span class="error" title={error}>{error}</span>{/if}
+  <button class="refresh" class:spinning={refreshing} title="Refresh" aria-label="Refresh" onclick={onrefresh}>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" /></svg>
+  </button>
   <span class="status {status.kind}" title={status.text}><i></i>{status.text}</span>
 </footer>
 
@@ -146,8 +153,39 @@
     white-space: nowrap;
     min-width: 0;
   }
-  .status {
+  .refresh {
     margin-left: auto;
+    width: 22px;
+    height: 22px;
+    padding: 3px;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .refresh:hover {
+    background: var(--bg);
+    color: var(--text);
+  }
+  .refresh svg {
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .refresh.spinning svg {
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .status {
     display: flex;
     align-items: center;
     gap: 6px;
