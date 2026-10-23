@@ -4,6 +4,20 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.4] - 2026-10-23
+
+### Added
+
+- **Earnings** tab next to Analysts ([#5](https://github.com/joezhuo2/tickr/issues/5)).
+  It shows the next report date (confirmed or estimated) with the EPS
+  estimate, EPS range and revenue estimate, and the last four reported
+  quarters with fiscal quarter, report date, EPS estimate, actual EPS, surprise
+  % (green beat, red miss) and revenue. Each past report also shows as a blue
+  dot at the bottom of the chart on the candle it was reported in; hovering
+  that candle shows the quarter and EPS vs estimate. Data comes from Yahoo's
+  quoteSummary (same session as analyst targets). Yahoo only returns the last
+  four quarters, so older reports have no dot.
+
 ## [0.7.3] - 2026-10-21
 
 ### Added
@@ -250,6 +264,7 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.7.4]: https://github.com/joezhuo2/tickr/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/joezhuo2/tickr/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/joezhuo2/tickr/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/joezhuo2/tickr/compare/v0.6.0...v0.7.1
