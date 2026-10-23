@@ -333,7 +333,7 @@
           >
             Technicals
           </button>
-          <button role="tab" aria-selected={view === "analysts"} class:on={view === "analysts"} onclick={() => (view = "analysts")}>
+          <button role="tab" aria-selected={view === "analysts"} class:on={view === "analysts"} onclick={() => (view = view === "analysts" ? "chart" : "analysts")}>
             Analysts
           </button>
           <button role="tab" aria-selected={view === "earnings"} class:on={view === "earnings"} onclick={() => (view = "earnings")}>
