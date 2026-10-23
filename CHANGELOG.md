@@ -4,6 +4,14 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.9] - 2026-10-23
+
+### Changed
+
+- Clicking the **Earnings** tab while it is already open now closes it and
+  returns to the chart, in the Line or Candles mode you were using
+  ([#15](https://github.com/joezhuo2/tickr/issues/15)).
+
 ## [0.7.8] - 2026-10-23
 
 ### Changed
@@ -302,6 +310,7 @@ First release.
 - Quotes from Yahoo Finance, refreshed every 15 s during market hours, every
   60 s pre/post-market, and every 15 min when the market is closed.
 
+[0.7.9]: https://github.com/joezhuo2/tickr/compare/v0.7.8...v0.7.9
 [0.7.8]: https://github.com/joezhuo2/tickr/compare/v0.7.7...v0.7.8
 [0.7.7]: https://github.com/joezhuo2/tickr/compare/v0.7.6...v0.7.7
 [0.7.6]: https://github.com/joezhuo2/tickr/compare/v0.7.5...v0.7.6

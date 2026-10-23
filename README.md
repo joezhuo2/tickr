@@ -105,6 +105,7 @@ update themselves: install v0.5.1 once from Releases.
   red miss). Each past report is a blue dot at the bottom of the chart on the
   candle it was reported in; hover it for the quarter and EPS vs estimate.
   Yahoo keeps only four quarters, so older reports have no dot.
+  Clicking **Earnings** again closes it and returns to the chart.
 - **Rating changes:** each time a firm starts coverage, upgrades or downgrades
   the symbol, an orange dot at the bottom of the chart marks the candle it
   happened in. Hover the candle for the firm, old and new rating and the new
@@ -188,8 +189,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.7.8
-git push origin v0.7.8
+git tag v0.7.9
+git push origin v0.7.9
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
