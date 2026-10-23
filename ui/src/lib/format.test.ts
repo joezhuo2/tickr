@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ago, alignTimes, axisTime, biasLabel, biasTone, byGain, candleAt, change, direction, fullTime, newsDate, niceTicks, price, quarterLabel, ratingLabel, ratingTone, sentimentLabel, sentimentTone, sessionMove, signed, span, upside, volume } from "./format";
+import { ago, alignTimes, axisTime, biasLabel, biasTone, byGain, candleAt, change, direction, fullTime, newsDate, niceTicks, price, quarterLabel, ratingLabel, ratingTone, sentimentLabel, sentimentTone, sessionMove, signed, span, statTone, upside, volume } from "./format";
 import { accelerator, display } from "./hotkey";
 
 const key = (code: string, mods: Partial<Record<"ctrlKey" | "altKey" | "shiftKey" | "metaKey", boolean>> = {}) => ({
@@ -154,5 +154,15 @@ describe("earnings", () => {
     expect(candleAt(t, 399)).toBe(2);
     expect(candleAt(t, 400)).toBe(-1);
     expect(candleAt([], 100)).toBe(-1);
+  });
+});
+
+describe("stats", () => {
+  it("colors only signed change values", () => {
+    expect(statTone("52w change", "34.15%")).toBe("up");
+    expect(statTone("Revenue growth (yoy)", "-2.10%")).toBe("down");
+    expect(statTone("YTD return", "0.00%")).toBe("flat");
+    expect(statTone("Market cap", "-5.08T")).toBe("flat");
+    expect(statTone("5y avg return", "N/A")).toBe("flat");
   });
 });

@@ -216,3 +216,9 @@ export function candleAt(times: number[], t: number): number {
   while (times[i] > t) i--;
   return i;
 }
+
+export function statTone(label: string, value: string): "up" | "down" | "flat" {
+  if (!/change|growth|return/i.test(label)) return "flat";
+  const v = parseFloat(value);
+  return Number.isFinite(v) ? direction(v) : "flat";
+}
