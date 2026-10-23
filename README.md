@@ -1,4 +1,4 @@
-# tickr
+<p align="center"><img src="assets/tickr-banner.png" alt="tickr" width="100%"></p>
 
 A small stock watcher for the Windows tray and the macOS menu bar. The tray
 icon shows the company's logo with an up/down badge. Hover over it for the
