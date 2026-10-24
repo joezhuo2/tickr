@@ -68,10 +68,20 @@ update themselves: install v0.5.1 once from Releases.
   the window, or minimizes it if it's focused. On macOS, where tickr has no
   Dock icon, the hotkey hides the window instead of minimizing it (or unloads
   it, when unload is on). Settings saved by an older version keep their
-  hotkey; **Reset** switches to the new default. To change it, click the hotkey field at the bottom of the
-  window and press the new combination. If another app already owns the
+  hotkey; **Reset** switches to the new default. To change it, open
+  **Settings** (the gear at the bottom left of the window), click the hotkey
+  field and press the new combination. If another app already owns the
   hotkey at startup, the window footer shows the error until you pick one
   that works.
+- **Settings:** the gear at the bottom left opens an overlay with the global
+  hotkey, the in-window keybinds and the chart dot toggles. Keybinds are
+  single keys: `C` switches line/candles, `R` refreshes, `V` cycles the date
+  range, `T`, `A` and `E` open Technicals, Analysts and Earnings, `X` jumps to
+  the next stock on the watchlist and `S` focuses the search box. Click a key
+  and press a new one to rebind it (an action already on that key takes the
+  old one), or press Backspace to unbind it. Keybinds are ignored while typing
+  in a text field. The earnings, news and analyst rating dots can each be
+  turned off. Esc or a click outside closes the overlay.
 - **Window:** search to change the symbol (you can only change it here).
   Pick a range from 1D to Max and switch between line and candles. Hover the
   chart, or use ← and →, to see time, open, high, low, close and volume.
@@ -216,8 +226,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.7.19
-git push origin v0.7.19
+git tag v0.8.0
+git push origin v0.8.0
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
@@ -293,7 +303,7 @@ the Apple values as repository secrets (plus `APPLE_CERTIFICATE`, the base64
 ```bash
 cd src-tauri && cargo test # technical analysis (indicators, patterns, Fibonacci, scoring), quote, analyst, earnings, rating change, stats, market and news parsing, headline sentiment, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols, update menu labels
 cd src-tauri && cargo test -- --ignored live   # analyst and market fetches against Yahoo (network)
-npm test                   # formatters, watchlist sort, hotkey recording and display
+npm test                   # formatters, watchlist sort, hotkey recording and display, keybinds
 npm run check              # svelte-check
 ```
 
@@ -322,7 +332,7 @@ src-tauri/src/
   updater.rs    background update checks, tray menu state, install and restart
 src-tauri/windows/hooks.nsh   NSIS uninstall hook: autostart entry and app data
 .github/workflows/  ci.yml (checks on push/PR), release.yml (installers, updater bundles and latest.json on tag push)
-ui/src/         App, Left (ticker and details), Chart (canvas, analysis overlays), Technicals, Analysts, Earnings, Stats, Market, News, Watchlist, Search, HotkeyBar
+ui/src/         App, Left (ticker and details), Chart (canvas, analysis overlays), Technicals, Analysts, Earnings, Stats, Market, News, Watchlist, Search, Settings, Footer
 ```
 
 ## Memory (Windows 11, release build)
