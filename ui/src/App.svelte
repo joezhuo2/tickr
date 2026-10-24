@@ -451,7 +451,7 @@
         {:else if view === "technicals"}
           <div class="split">
             {#if chart}
-              <ChartView {chart} {mode} analysis={activeAnalysis} {overlays} earnings={earnings?.history} ratings={ratingChanges} {news} />
+              <ChartView {chart} {mode} analysis={activeAnalysis} {overlays} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
             {:else if chartError}
               <div class="msg">
                 {chartError}
@@ -471,7 +471,7 @@
             />
           </div>
         {:else if chart}
-          <ChartView {chart} {mode} earnings={earnings?.history} ratings={ratingChanges} {news} />
+          <ChartView {chart} {mode} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
         {:else if chartError}
           <div class="msg">
             {chartError}
