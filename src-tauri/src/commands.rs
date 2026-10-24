@@ -37,6 +37,7 @@ pub struct Init {
     analyst_known: bool,
     /// Starred symbols, in order.
     watchlist: Vec<String>,
+    groups: Vec<Group>,
     keybinds: Keybinds,
     dots: Dots,
 }
@@ -68,6 +69,7 @@ pub fn init_payload(shared: &Shared) -> Init {
         analyst_known: analyst.is_some(),
         analyst: analyst.flatten(),
         watchlist: s.watchlist,
+        groups: s.groups,
         keybinds: s.keybinds,
         dots: s.dots,
     }
