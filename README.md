@@ -218,7 +218,9 @@ Uninstalling on Windows removes the launch-at-login entry. Check "Delete the
 application data" in the uninstaller to also remove settings, the logo cache,
 logs and WebView data.
 
-## Build
+## Development
+
+### Build
 
 Requirements: Rust 1.85+, Node 20+, and the
 [Tauri 2 prerequisites](https://tauri.app/start/prerequisites/).
@@ -240,7 +242,7 @@ The Windows installer installs per user (no UAC prompt), in English. On
 macOS, `src-tauri/Info.plist` sets `LSUIElement` so tickr never shows a Dock
 icon; the minimum version is macOS 10.15.
 
-## Releasing
+### Releasing
 
 Releases are built by GitHub Actions. Bump the version in `package.json`,
 `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`, add a `CHANGELOG.md`
@@ -261,7 +263,7 @@ Releases page. Installed copies only see it once it is published and marked
 latest (not a pre-release), because the updater reads
 `releases/latest/download/latest.json`.
 
-### Updater key
+#### Updater key
 
 Updates are signed with a minisign key pair, separate from code signing and
 free. The public key is `plugins.updater.pubkey` in
@@ -286,7 +288,7 @@ needs the same two variables, or it fails at the updater signing step.
 `cargo clippy -- -D warnings` and `cargo test` (Windows and macOS) on every
 push to `main` and every pull request.
 
-### Code signing
+#### Code signing
 
 Releases are not code-signed yet (see [First launch](#first-launch)). macOS
 builds are ad-hoc signed (`bundle.macOS.signingIdentity: "-"`), so Gatekeeper
@@ -319,7 +321,7 @@ the Apple values as repository secrets (plus `APPLE_CERTIFICATE`, the base64
 
 `npm run icon` regenerates the app icons from `scripts/make-icon.mjs`.
 
-## Tests
+### Tests
 
 ```bash
 cd src-tauri && cargo test # technical analysis (indicators, patterns, Fibonacci, scoring), quote, analyst, earnings, rating change, stats, market and news parsing, headline sentiment, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols and groups, update menu labels
@@ -328,7 +330,7 @@ npm test                   # formatters, watchlist sort, hotkey recording and di
 npm run check              # svelte-check
 ```
 
-## Layout
+### Layout
 
 ```
 src-tauri/src/
@@ -356,7 +358,7 @@ src-tauri/windows/hooks.nsh   NSIS uninstall hook: autostart entry and app data
 ui/src/         App, Left (ticker and details), Chart (canvas, analysis overlays), Technicals, Analysts, Earnings, Stats, Market, News, Watchlist, Search, Settings, Footer
 ```
 
-## Memory (Windows 11, release build)
+### Memory (Windows 11, release build)
 
 | State | Processes | Private |
 | --- | --- | --- |
