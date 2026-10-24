@@ -300,4 +300,12 @@ mod tests {
         let got = clean_symbols(vec![" aapl ".into(), "MSFT".into(), "".into(), "AAPL".into(), "brk-b".into()]);
         assert_eq!(got, ["AAPL", "MSFT", "BRK-B"]);
     }
+
+    #[test]
+    fn clean_groups_trims_dedupes_and_drops_unstarred() {
+        let g = |name: &str, symbols: &[&str]| Group { name: name.into(), symbols: symbols.iter().map(|s| s.to_string()).collect() };
+        let watchlist = vec!["AAPL".to_string(), "NVDA".to_string()];
+        let got = clean_groups(vec![g(" Tech ", &["aapl", "TSLA", "NVDA"]), g("tech", &["AAPL"]), g("  ", &["AAPL"]), g("Empty", &[])], &watchlist);
+        assert_eq!(got, [g("Tech", &["AAPL", "NVDA"]), g("Empty", &[])]);
+    }
 }
