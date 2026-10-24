@@ -87,6 +87,11 @@ update themselves: install v0.5.1 once from Releases.
   chart, or use ← and →, to see time, open, high, low, close and volume.
   1D, 5D and 1M charts reload about once a minute so the newest candle stays
   current.
+- **Exports:** hover the chart for two buttons at its top left
+  ([#42](https://github.com/joezhuo2/tickr/issues/42)). The first copies the
+  chart as a PNG image, the second copies its candles as CSV (time in UTC,
+  open, high, low, close, volume). A button turns green once the copy lands
+  on the clipboard.
 - **News:** the **News** button, left of Line/Candles, swaps the chart for
   the 20 latest headlines on the symbol, newest first. Each shows the title,
   publisher, date and time, how long ago it was published, and a sentiment
