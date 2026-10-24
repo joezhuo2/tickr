@@ -10,6 +10,18 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/joezhuo2/tickr?color=green" alt="license"></a>
 </p>
 
+<p align="center">
+  <a href="#download">Download</a> •
+  <a href="#features">Features</a> •
+  <a href="#settings-and-keybinds">Keybinds</a> •
+  <a href="#screenshots">Screenshots</a> •
+  <a href="#data">Data</a> •
+  <a href="#files">Files</a> •
+  <a href="#development">Development</a> •
+  <a href="#contributing">Contributing</a> •
+  <a href="#license">License</a>
+</p>
+
 > A small stock watcher built with Tauri 2 and Svelte 5 for the Windows tray
 > and the macOS menu bar. The tray icon shows the company's logo with an up/down
 > badge. Hover over it for the current price, the day's change and the pre-market
