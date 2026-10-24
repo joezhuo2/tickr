@@ -626,6 +626,21 @@
     navigator.clipboard.writeText(candlesCsv(candles)).catch(console.warn);
   }
 
+  function copyImage() {
+    if (!canvas) return;
+    hover = null;
+    draw();
+    const out = document.createElement("canvas");
+    out.width = canvas.width;
+    out.height = canvas.height;
+    const ctx = out.getContext("2d")!;
+    ctx.fillStyle = getComputedStyle(canvas).getPropertyValue("--bg").trim();
+    ctx.fillRect(0, 0, out.width, out.height);
+    ctx.drawImage(canvas, 0, 0);
+    const png = new Promise<Blob>((ok, fail) => out.toBlob((b) => (b ? ok(b) : fail(new Error("toBlob failed")))));
+    navigator.clipboard.write([new ClipboardItem({ "image/png": png })]).catch(console.warn);
+  }
+
   const tip = $derived.by(() => {
     if (hover == null || !chart || !candles[hover]) return null;
     const c = candles[hover];
