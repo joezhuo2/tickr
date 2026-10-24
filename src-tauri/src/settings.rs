@@ -178,4 +178,16 @@ mod tests {
         assert!(s.unload_on_minimize);
         assert!(s.auto_update);
     }
+
+    #[test]
+    fn partial_keybinds_and_dots_fill_defaults() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        std::fs::write(&p, r#"{"keybinds": {"refresh": "F5"}, "dots": {"news": false}}"#).unwrap();
+        let s = Settings::load(&p);
+        assert_eq!(s.keybinds.refresh, "F5");
+        assert_eq!(s.keybinds.chart_mode, "c");
+        assert!(!s.dots.news);
+        assert!(s.dots.earnings && s.dots.analysts);
+    }
 }
