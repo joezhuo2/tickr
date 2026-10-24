@@ -37,9 +37,24 @@
     if (!name || groups.some((g) => g.name.toLowerCase() === name.toLowerCase())) return;
     ongroups([...groups, { name, symbols: [] }]);
     tab = name;
+    editing = true;
   }
 
-  const shown = $derived(group ? group.symbols : symbols);
+  /** In a group tab: show every starred stock and toggle membership on click. */
+  let editing = $state(false);
+  const shown = $derived(group && !editing ? group.symbols : symbols);
+
+  function pick(g: Group | null) {
+    tab = g?.name ?? null;
+    editing = false;
+  }
+
+  function toggle(symbol: string) {
+    if (!group) return;
+    const has = group.symbols.includes(symbol);
+    const next = has ? group.symbols.filter((s) => s !== symbol) : [...group.symbols, symbol];
+    ongroups(groups.map((g) => (g === group ? { ...g, symbols: next } : g)));
+  }
   // Biggest gain first, by the move of the session now trading.
   const order = $derived(byGain(shown, (s) => moves[s]?.pct));
 
@@ -76,9 +91,9 @@
   </div>
 {:else}
   <div class="tabs" role="tablist">
-    <button role="tab" aria-selected={!group} class:on={!group} onclick={() => (tab = null)}>All</button>
+    <button role="tab" aria-selected={!group} class:on={!group} onclick={() => pick(null)}>All</button>
     {#each groups as g (g.name)}
-      <button role="tab" aria-selected={group === g} class:on={group === g} onclick={() => (tab = g.name)}>{g.name}</button>
+      <button role="tab" aria-selected={group === g} class:on={group === g} onclick={() => pick(g)}>{g.name}</button>
     {/each}
     {#if draft != null}
       <!-- svelte-ignore a11y_autofocus -->
@@ -98,6 +113,9 @@
     {:else}
       <button class="add" title="New group" aria-label="New group" onclick={() => (draft = "")}>+</button>
     {/if}
+    {#if group}
+      <button class="edit" class:on={editing} aria-pressed={editing} onclick={() => (editing = !editing)}>{editing ? "Done" : "Edit"}</button>
+    {/if}
   </div>
   <div class="grid">
     {#each order as symbol (symbol)}
@@ -105,9 +123,11 @@
       {@const q = w?.quote}
       <button
         class="card"
-        class:current={symbol === current}
+        class:current={symbol === current && !editing}
+        class:in={editing && group?.symbols.includes(symbol)}
+        aria-pressed={editing ? !!group?.symbols.includes(symbol) : undefined}
         title={w?.error && !q ? w.error : q?.name || symbol}
-        onclick={() => onopen(symbol)}
+        onclick={() => (editing ? toggle(symbol) : onopen(symbol))}
       >
         <span class="top">
           <span class="sym">{symbol}</span>
@@ -165,6 +185,13 @@
     color: var(--text);
     font: inherit;
     font-size: 12px;
+  }
+  .edit {
+    margin-left: auto;
+  }
+  .card.in {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
   }
   .tabs button.on {
     background: var(--surface);
