@@ -14,7 +14,7 @@ use crate::market::Market;
 use crate::stats::Section;
 use crate::news::Article;
 use crate::quote::{self, Chart, Quote, SearchHit};
-use crate::settings::{ChartMode, Keybinds, DEFAULT_HOTKEY};
+use crate::settings::{ChartMode, Dots, Keybinds, DEFAULT_HOTKEY};
 use crate::state::{lock, now_secs, QuoteState, Shared};
 
 #[derive(Serialize)]
@@ -163,6 +163,11 @@ pub fn set_hotkey(app: AppHandle, shared: State<'_, Arc<Shared>>, hotkey: String
 #[tauri::command]
 pub fn set_keybinds(shared: State<'_, Arc<Shared>>, keybinds: Keybinds) {
     shared.update_settings(|s| s.keybinds = keybinds);
+}
+
+#[tauri::command]
+pub fn set_dots(shared: State<'_, Arc<Shared>>, dots: Dots) {
+    shared.update_settings(|s| s.dots = dots);
 }
 
 /// Opens the logo provider's page; its free tier requires the link.
