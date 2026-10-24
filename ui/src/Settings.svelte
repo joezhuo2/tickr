@@ -2,13 +2,14 @@
   import { invoke } from "@tauri-apps/api/core";
   import { accelerator, display } from "./lib/hotkey";
   import { ACTIONS, bindKey, keyLabel, rebind, type Action } from "./lib/keybinds";
-  import type { Keybinds } from "./lib/types";
+  import type { Dots, Keybinds } from "./lib/types";
 
   let {
     hotkey = $bindable(),
     error = $bindable(null),
     defaultHotkey,
     keybinds = $bindable(),
+    dots = $bindable(),
     onclose,
   }: {
     hotkey: string;
@@ -16,8 +17,20 @@
     error?: string | null;
     defaultHotkey: string;
     keybinds: Keybinds;
+    dots: Dots;
     onclose: () => void;
   } = $props();
+
+  const DOTS: { id: keyof Dots; label: string }[] = [
+    { id: "earnings", label: "Earnings" },
+    { id: "news", label: "News" },
+    { id: "analysts", label: "Analyst ratings" },
+  ];
+
+  function toggleDot(id: keyof Dots) {
+    dots = { ...dots, [id]: !dots[id] };
+    invoke("set_dots", { dots }).catch(console.warn);
+  }
 
   let recording = $state<"hotkey" | Action | null>(null);
 
@@ -106,6 +119,14 @@
           {recording === a.id ? "Press a key…" : keyLabel(keybinds[a.id])}
         </button>
       </div>
+    {/each}
+
+    <h3>Chart dots</h3>
+    {#each DOTS as d (d.id)}
+      <label class="row">
+        <span>{d.label}</span>
+        <input type="checkbox" checked={dots[d.id]} onchange={() => toggleDot(d.id)} />
+      </label>
     {/each}
   </div>
 </div>
