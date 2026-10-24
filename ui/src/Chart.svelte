@@ -623,9 +623,11 @@
     e.preventDefault();
   }
 
+  let flashTimer: ReturnType<typeof setTimeout> | undefined;
   function flash(kind: "image" | "csv") {
     copied = kind;
-    setTimeout(() => (copied = null), 1200);
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => (copied = null), 1200);
   }
 
   function copyCsv() {
