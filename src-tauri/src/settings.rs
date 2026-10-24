@@ -27,6 +27,50 @@ pub struct Geometry {
     pub h: u32,
 }
 
+/// In-window shortcuts: one key each, matched without modifiers. Empty is unbound.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Keybinds {
+    pub chart_mode: String,
+    pub refresh: String,
+    pub range: String,
+    pub technicals: String,
+    pub analysts: String,
+    pub earnings: String,
+    pub watchlist: String,
+    pub search: String,
+}
+
+impl Default for Keybinds {
+    fn default() -> Self {
+        Self {
+            chart_mode: "c".into(),
+            refresh: "r".into(),
+            range: "v".into(),
+            technicals: "t".into(),
+            analysts: "a".into(),
+            earnings: "e".into(),
+            watchlist: "x".into(),
+            search: "s".into(),
+        }
+    }
+}
+
+/// Which event dots the chart draws.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Dots {
+    pub earnings: bool,
+    pub news: bool,
+    pub analysts: bool,
+}
+
+impl Default for Dots {
+    fn default() -> Self {
+        Self { earnings: true, news: true, analysts: true }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -49,6 +93,8 @@ pub struct Settings {
     pub watchlist: Vec<String>,
     /// Look for new releases in the background.
     pub auto_update: bool,
+    pub keybinds: Keybinds,
+    pub dots: Dots,
 }
 
 impl Default for Settings {
@@ -68,6 +114,8 @@ impl Default for Settings {
             autostart: None,
             watchlist: Vec::new(),
             auto_update: true,
+            keybinds: Keybinds::default(),
+            dots: Dots::default(),
         }
     }
 }
@@ -129,5 +177,17 @@ mod tests {
         assert_eq!(s.chart_mode, ChartMode::Candles);
         assert!(s.unload_on_minimize);
         assert!(s.auto_update);
+    }
+
+    #[test]
+    fn partial_keybinds_and_dots_fill_defaults() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        std::fs::write(&p, r#"{"keybinds": {"refresh": "F5"}, "dots": {"news": false}}"#).unwrap();
+        let s = Settings::load(&p);
+        assert_eq!(s.keybinds.refresh, "F5");
+        assert_eq!(s.keybinds.chart_mode, "c");
+        assert!(!s.dots.news);
+        assert!(s.dots.earnings && s.dots.analysts);
     }
 }

@@ -80,6 +80,8 @@ pub fn run() {
             commands::set_range,
             commands::set_chart_mode,
             commands::set_hotkey,
+            commands::set_keybinds,
+            commands::set_dots,
             commands::get_logo,
             commands::open_logo_credit,
             commands::get_analyst,

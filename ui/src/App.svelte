@@ -6,12 +6,13 @@
   import ChartView from "./Chart.svelte";
   import ChartSkeleton from "./ChartSkeleton.svelte";
   import EarningsView from "./Earnings.svelte";
-  import HotkeyBar from "./HotkeyBar.svelte";
+  import Footer from "./Footer.svelte";
   import MarketView from "./Market.svelte";
   import StatsView from "./Stats.svelte";
   import Left from "./Left.svelte";
   import News from "./News.svelte";
   import Search from "./Search.svelte";
+  import Settings from "./Settings.svelte";
   import Technicals from "./Technicals.svelte";
   import Watchlist from "./Watchlist.svelte";
   import {
@@ -22,13 +23,16 @@
     type ChartMode,
     type Market,
     type Consensus,
+    type Dots,
     type Earnings,
     type Init,
+    type Keybinds,
     type Overlays,
     type QuoteState,
     type RatingChange,
     type StatSection,
   } from "./lib/types";
+  import { actionFor, bindKey } from "./lib/keybinds";
 
   // Injected before load, so the first frame already has real content.
   const boot = window.__TICKR_INIT__ ?? null;
@@ -40,6 +44,10 @@
   let hotkey = $state("");
   let defaultHotkey = $state("");
   let hotkeyError = $state<string | null>(null);
+  let keybinds = $state<Keybinds>() as Keybinds;
+  let dots = $state<Dots>() as Dots;
+  let settingsOpen = $state(false);
+  let search: Search | undefined = $state();
   let qs = $state<QuoteState>({ quote: null, error: null, updated_at: 0 });
   let chart = $state<Chart | null>(null);
   let chartError = $state<string | null>(null);
@@ -92,6 +100,8 @@
     hotkey = init.hotkey;
     defaultHotkey = init.default_hotkey;
     hotkeyError = init.hotkey_error;
+    keybinds = init.keybinds;
+    dots = init.dots;
     qs = init.quote;
     watchlist = init.watchlist ?? [];
     if (init.logo_known) logo = init.logo;
@@ -308,6 +318,39 @@
     invoke("set_chart_mode", { mode: m }).catch(console.warn);
   }
 
+  function onKey(e: KeyboardEvent) {
+    if (!ready || settingsOpen || e.defaultPrevented) return;
+    if (e.target instanceof Element && e.target.closest("input, textarea, select, [contenteditable]")) return;
+    const key = bindKey(e);
+    const action = key && actionFor(keybinds, key);
+    if (!action) return;
+    e.preventDefault();
+    switch (action) {
+      case "chart_mode":
+        setMode(mode === "line" ? "candles" : "line");
+        break;
+      case "refresh":
+        refresh();
+        break;
+      case "range":
+        setRange(RANGES[(RANGES.findIndex((r) => r.id === range) + 1) % RANGES.length].id);
+        break;
+      case "technicals":
+      case "analysts":
+      case "earnings":
+        view = view === action ? "chart" : action;
+        break;
+      case "watchlist": {
+        const next = watchlist[(watchlist.indexOf(symbol) + 1) % watchlist.length];
+        if (next && next !== symbol) pickSymbol(next);
+        break;
+      }
+      case "search":
+        search?.focus();
+        break;
+    }
+  }
+
   onMount(() => {
     if (!boot) invoke<Init>("get_init").then(apply);
     // Reveal after the first frame. A hidden window may throttle rAF, so a
@@ -333,6 +376,8 @@
   });
 </script>
 
+<svelte:window onkeydown={onKey} />
+
 {#if ready}
   <div class="app">
     <main>
@@ -347,7 +392,7 @@
       />
       <section>
         <div class="toolbar">
-          <Search onpick={pickSymbol} />
+          <Search bind:this={search} onpick={pickSymbol} />
           <div class="views">
             <div class="seg">
               <button class:on={view === "market"} aria-pressed={view === "market"} onclick={toggleMarket}>Market</button>
@@ -406,7 +451,7 @@
         {:else if view === "technicals"}
           <div class="split">
             {#if chart}
-              <ChartView {chart} {mode} analysis={activeAnalysis} {overlays} earnings={earnings?.history} ratings={ratingChanges} {news} />
+              <ChartView {chart} {mode} analysis={activeAnalysis} {overlays} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
             {:else if chartError}
               <div class="msg">
                 {chartError}
@@ -426,7 +471,7 @@
             />
           </div>
         {:else if chart}
-          <ChartView {chart} {mode} earnings={earnings?.history} ratings={ratingChanges} {news} />
+          <ChartView {chart} {mode} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
         {:else if chartError}
           <div class="msg">
             {chartError}
@@ -437,16 +482,19 @@
         {/if}
       </section>
     </main>
-    <HotkeyBar
-      bind:hotkey
-      bind:error={hotkeyError}
-      {defaultHotkey}
+    <Footer
+      error={hotkeyError}
       {status}
+      settingsOn={settingsOpen}
+      onsettings={() => (settingsOpen = !settingsOpen)}
       watchlistOn={view === "watchlist"}
       onwatchlist={() => (view = view === "watchlist" ? "chart" : "watchlist")}
       {refreshing}
       onrefresh={refresh}
     />
+    {#if settingsOpen}
+      <Settings bind:hotkey bind:error={hotkeyError} {defaultHotkey} bind:keybinds bind:dots onclose={() => (settingsOpen = false)} />
+    {/if}
   </div>
 {/if}
 

@@ -4,6 +4,20 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] - 2026-10-23
+
+### Added
+
+- **Settings** overlay ([#19](https://github.com/joezhuo2/tickr/issues/19)),
+  opened from a gear at the bottom left of the window. It holds the global
+  hotkey and its Reset button, which moved out of the footer.
+- Configurable in-window keybinds: `C` line/candles, `R` refresh, `V` cycle
+  the date range, `T` Technicals, `A` Analysts, `E` Earnings, `X` next
+  watchlist stock and `S` focus search. Rebinding a key already in use swaps
+  the two; Backspace unbinds. Keys typed into a text field are ignored.
+- Toggles for the earnings, news and analyst rating dots on the chart, each
+  on by default.
+
 ## [0.7.19] - 2026-10-23
 
 ### Changed

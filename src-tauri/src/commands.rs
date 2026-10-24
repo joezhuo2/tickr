@@ -14,7 +14,7 @@ use crate::market::Market;
 use crate::stats::Section;
 use crate::news::Article;
 use crate::quote::{self, Chart, Quote, SearchHit};
-use crate::settings::{ChartMode, DEFAULT_HOTKEY};
+use crate::settings::{ChartMode, Dots, Keybinds, DEFAULT_HOTKEY};
 use crate::state::{lock, now_secs, QuoteState, Shared};
 
 #[derive(Serialize)]
@@ -37,6 +37,8 @@ pub struct Init {
     analyst_known: bool,
     /// Starred symbols, in order.
     watchlist: Vec<String>,
+    keybinds: Keybinds,
+    dots: Dots,
 }
 
 fn data_uri(png: &[u8]) -> String {
@@ -66,6 +68,8 @@ pub fn init_payload(shared: &Shared) -> Init {
         analyst_known: analyst.is_some(),
         analyst: analyst.flatten(),
         watchlist: s.watchlist,
+        keybinds: s.keybinds,
+        dots: s.dots,
     }
 }
 
@@ -158,6 +162,16 @@ pub fn set_hotkey(app: AppHandle, shared: State<'_, Arc<Shared>>, hotkey: String
     *lock(&shared.hotkey_error) = None;
     crate::tray::update(&app, &shared);
     Ok(hotkey)
+}
+
+#[tauri::command]
+pub fn set_keybinds(shared: State<'_, Arc<Shared>>, keybinds: Keybinds) {
+    shared.update_settings(|s| s.keybinds = keybinds);
+}
+
+#[tauri::command]
+pub fn set_dots(shared: State<'_, Arc<Shared>>, dots: Dots) {
+    shared.update_settings(|s| s.dots = dots);
 }
 
 /// Opens the logo provider's page; its free tier requires the link.
