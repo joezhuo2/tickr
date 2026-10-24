@@ -17,6 +17,8 @@
 > global hotkey opens a window with a chart, the analyst consensus, earnings and
 > recent news.
 
+<p align="center"><img src="assets/screenshots/chart.png" alt="tickr window: AAPL six-month candle chart with the hover tooltip and event dots" width="85%"></p>
+
 ## Download
 
 Get the latest installer from
