@@ -729,6 +729,37 @@
     position: absolute;
     inset: 0;
   }
+  .exports {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    display: flex;
+    gap: 2px;
+    cursor: default;
+  }
+  .exports button {
+    width: 22px;
+    height: 22px;
+    padding: 3px;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .exports button:hover {
+    background: var(--surface);
+    color: var(--text);
+  }
+  .exports svg {
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
   .tip {
     position: absolute;
     top: 8px;
