@@ -186,6 +186,15 @@ typing in a text field.
 | `X` | Next watchlist stock |
 | `S` | Focus search |
 
+## Data
+
+Quotes, charts, news and fundamentals come from Yahoo Finance's public chart,
+search and quoteSummary endpoints. They are not an official API and can change
+or rate-limit without notice, and quotes may be delayed. Logos come from
+[Elbstream](https://elbstream.com/logos)'s logo API (formerly Parqet); the
+**Logos by Elbstream** link in the footer is the attribution its free tier
+requires. Analysis and sentiment run on your machine. Not investment advice.
+
 ## Files
 
 | What | Windows | macOS |
