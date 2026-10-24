@@ -53,7 +53,7 @@
     if (!group) return;
     const has = group.symbols.includes(symbol);
     const next = has ? group.symbols.filter((s) => s !== symbol) : [...group.symbols, symbol];
-    ongroups(groups.map((g) => (g === group ? { ...g, symbols: next } : g)));
+    ongroups(groups.map((g) => (g.name === group.name ? { ...g, symbols: next } : g)));
   }
   // Biggest gain first, by the move of the session now trading.
   const order = $derived(byGain(shown, (s) => moves[s]?.pct));
@@ -117,7 +117,7 @@
       <button class="edit" class:on={editing} aria-pressed={editing} onclick={() => (editing = !editing)}>{editing ? "Done" : "Edit"}</button>
     {/if}
   </div>
-  <div class="grid">
+  <div class="grid" class:editing>
     {#each order as symbol (symbol)}
       {@const w = quotes[symbol]}
       {@const q = w?.quote}
@@ -188,6 +188,9 @@
   }
   .edit {
     margin-left: auto;
+  }
+  .editing .card:not(.in) {
+    opacity: 0.55;
   }
   .card.in {
     border-color: var(--accent);
