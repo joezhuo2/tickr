@@ -27,6 +27,35 @@ pub struct Geometry {
     pub h: u32,
 }
 
+/// In-window shortcuts: one key each, matched without modifiers. Empty is unbound.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Keybinds {
+    pub chart_mode: String,
+    pub refresh: String,
+    pub range: String,
+    pub technicals: String,
+    pub analysts: String,
+    pub earnings: String,
+    pub watchlist: String,
+    pub search: String,
+}
+
+impl Default for Keybinds {
+    fn default() -> Self {
+        Self {
+            chart_mode: "c".into(),
+            refresh: "r".into(),
+            range: "v".into(),
+            technicals: "t".into(),
+            analysts: "a".into(),
+            earnings: "e".into(),
+            watchlist: "x".into(),
+            search: "s".into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -49,6 +78,7 @@ pub struct Settings {
     pub watchlist: Vec<String>,
     /// Look for new releases in the background.
     pub auto_update: bool,
+    pub keybinds: Keybinds,
 }
 
 impl Default for Settings {
@@ -68,6 +98,7 @@ impl Default for Settings {
             autostart: None,
             watchlist: Vec::new(),
             auto_update: true,
+            keybinds: Keybinds::default(),
         }
     }
 }
