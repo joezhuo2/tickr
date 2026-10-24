@@ -1,21 +1,31 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { accelerator, display } from "./lib/hotkey";
+  import { ACTIONS, bindKey, keyLabel, rebind, type Action } from "./lib/keybinds";
+  import type { Keybinds } from "./lib/types";
 
   let {
     hotkey = $bindable(),
     error = $bindable(null),
     defaultHotkey,
+    keybinds = $bindable(),
     onclose,
   }: {
     hotkey: string;
     /** Set by the backend when the saved hotkey could not be registered. */
     error?: string | null;
     defaultHotkey: string;
+    keybinds: Keybinds;
     onclose: () => void;
   } = $props();
 
-  let recording = $state<"hotkey" | null>(null);
+  let recording = $state<"hotkey" | Action | null>(null);
+
+  function saveKeybinds(next: Keybinds) {
+    recording = null;
+    keybinds = next;
+    invoke("set_keybinds", { keybinds: next }).catch(console.warn);
+  }
 
   async function saveHotkey(next: string) {
     recording = null;
@@ -38,8 +48,17 @@
       recording = null;
       return;
     }
-    const accel = accelerator(e);
-    if (accel) saveHotkey(accel);
+    if (recording === "hotkey") {
+      const accel = accelerator(e);
+      if (accel) saveHotkey(accel);
+      return;
+    }
+    if (e.key === "Backspace" || e.key === "Delete") {
+      saveKeybinds({ ...keybinds, [recording]: "" });
+      return;
+    }
+    const key = bindKey(e);
+    if (key) saveKeybinds(rebind(keybinds, recording, key));
   }
 </script>
 
@@ -72,6 +91,22 @@
       </span>
     </div>
     {#if error}<p class="error">{error}</p>{/if}
+
+    <h3>Keybinds</h3>
+    {#each ACTIONS as a (a.id)}
+      <div class="row">
+        <span>{a.label}</span>
+        <button
+          class="key"
+          class:recording={recording === a.id}
+          title="Backspace to unbind"
+          onclick={() => (recording = recording === a.id ? null : a.id)}
+          onblur={() => (recording = null)}
+        >
+          {recording === a.id ? "Press a key…" : keyLabel(keybinds[a.id])}
+        </button>
+      </div>
+    {/each}
   </div>
 </div>
 
