@@ -4,6 +4,14 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.3] - 2026-10-24
+
+### Changed
+
+- README reorganized: badges, a one-line quick navigation bar, screenshots
+  of every view, usage grouped into Features sections with a keybind table,
+  and build and release docs under Development.
+
 ## [0.8.2] - 2026-10-24
 
 ### Added
