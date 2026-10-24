@@ -49,6 +49,24 @@
     editing = false;
   }
 
+  function rename(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const name = input.value.trim();
+    if (!group || name === group.name) return;
+    if (!name || groups.some((g) => g.name !== group.name && g.name.toLowerCase() === name.toLowerCase())) {
+      input.value = group.name;
+      return;
+    }
+    ongroups(groups.map((g) => (g.name === group.name ? { ...g, name } : g)));
+    tab = name;
+  }
+
+  function remove() {
+    if (!group) return;
+    ongroups(groups.filter((g) => g.name !== group.name));
+    pick(null);
+  }
+
   function toggle(symbol: string) {
     if (!group) return;
     const has = group.symbols.includes(symbol);
@@ -112,6 +130,17 @@
       />
     {:else}
       <button class="add" title="New group" aria-label="New group" onclick={() => (draft = "")}>+</button>
+    {/if}
+    {#if group && editing}
+      <input
+        class="new rename"
+        aria-label="Group name"
+        maxlength="24"
+        value={group.name}
+        onchange={rename}
+        onkeydown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+      />
+      <button class="delete" onclick={remove}>Delete</button>
     {/if}
     {#if group}
       <button class="edit" class:on={editing} aria-pressed={editing} onclick={() => (editing = !editing)}>{editing ? "Done" : "Edit"}</button>
@@ -186,8 +215,17 @@
     font: inherit;
     font-size: 12px;
   }
+  .rename {
+    margin-left: auto;
+  }
   .edit {
     margin-left: auto;
+  }
+  .rename ~ .edit {
+    margin-left: 0;
+  }
+  .tabs .delete:hover {
+    color: var(--down);
   }
   .editing .card:not(.in) {
     opacity: 0.55;
