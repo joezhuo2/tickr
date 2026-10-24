@@ -25,6 +25,7 @@
     type Consensus,
     type Dots,
     type Earnings,
+    type Group,
     type Init,
     type Keybinds,
     type Overlays,
@@ -80,6 +81,7 @@
   let newsError = $state<string | null>(null);
   let newsLoading = $state(false);
   let watchlist = $state<string[]>([]);
+  let groups = $state<Group[]>([]);
   let now = $state(Date.now() / 1000);
   let refreshing = $state(false);
 
@@ -104,6 +106,7 @@
     dots = init.dots;
     qs = init.quote;
     watchlist = init.watchlist ?? [];
+    groups = init.groups ?? [];
     if (init.logo_known) logo = init.logo;
     if (init.analyst_known) analyst = init.analyst;
     // Shown at once, refreshed by loadChart (at = 0 marks it stale).
@@ -264,6 +267,12 @@
   async function saveWatchlist(next: string[]) {
     watchlist = next;
     watchlist = await invoke<string[]>("set_watchlist", { symbols: next }).catch(() => next);
+    groups = groups.map((g) => ({ ...g, symbols: g.symbols.filter((s) => watchlist.includes(s)) }));
+  }
+
+  async function saveGroups(next: Group[]) {
+    groups = next;
+    groups = await invoke<Group[]>("set_groups", { groups: next }).catch(() => next);
   }
 
   function toggleStar() {
