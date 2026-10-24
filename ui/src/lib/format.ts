@@ -1,4 +1,4 @@
-import type { Sentiment } from "./types";
+import type { Candle, Sentiment } from "./types";
 
 const SYMBOLS: Record<string, string> = { USD: "$", EUR: "€", GBP: "£", JPY: "¥" };
 
@@ -221,4 +221,9 @@ export function statTone(label: string, value: string): "up" | "down" | "flat" {
   if (!/change|growth|return/i.test(label)) return "flat";
   const v = parseFloat(value);
   return Number.isFinite(v) ? direction(v) : "flat";
+}
+
+export function candlesCsv(candles: Candle[]): string {
+  const rows = candles.map((c) => [new Date(c.t * 1000).toISOString(), c.o, c.h, c.l, c.c, c.v].join(","));
+  return ["time,open,high,low,close,volume", ...rows].join("\n");
 }

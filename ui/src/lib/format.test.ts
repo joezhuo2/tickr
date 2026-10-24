@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ago, alignTimes, axisTime, biasLabel, biasTone, byGain, candleAt, change, direction, fullTime, newsDate, niceTicks, price, quarterLabel, ratingLabel, ratingTone, sentimentLabel, sentimentTone, sessionMove, signed, span, statTone, upside, volume } from "./format";
+import { ago, alignTimes, axisTime, biasLabel, biasTone, byGain, candleAt, candlesCsv, change, direction, fullTime, newsDate, niceTicks, price, quarterLabel, ratingLabel, ratingTone, sentimentLabel, sentimentTone, sessionMove, signed, span, statTone, upside, volume } from "./format";
 import { accelerator, display } from "./hotkey";
 
 const key = (code: string, mods: Partial<Record<"ctrlKey" | "altKey" | "shiftKey" | "metaKey", boolean>> = {}) => ({
@@ -164,5 +164,14 @@ describe("stats", () => {
     expect(statTone("YTD return", "0.00%")).toBe("flat");
     expect(statTone("Market cap", "-5.08T")).toBe("flat");
     expect(statTone("5y avg return", "N/A")).toBe("flat");
+  });
+});
+
+describe("exports", () => {
+  it("writes candles as CSV with a header", () => {
+    expect(candlesCsv([{ t: 0, o: 1, h: 2, l: 0.5, c: 1.5, v: 100 }])).toBe(
+      "time,open,high,low,close,volume\n1970-01-01T00:00:00.000Z,1,2,0.5,1.5,100",
+    );
+    expect(candlesCsv([])).toBe("time,open,high,low,close,volume");
   });
 });

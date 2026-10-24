@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { alignTimes, axisTime, candleAt, fullTime, niceTicks, num, price, quarterLabel, volume } from "./lib/format";
+  import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, niceTicks, num, price, quarterLabel, volume } from "./lib/format";
   import type { Analysis, Article, Chart, ChartMode, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
 
   let {
@@ -25,6 +25,7 @@
   let width = $state(0);
   let height = $state(0);
   let hover = $state<number | null>(null);
+  let copied = $state<"image" | "csv" | null>(null);
 
   const PAD = { l: 6, r: 62, t: 10, b: 22 };
 
@@ -622,6 +623,32 @@
     e.preventDefault();
   }
 
+  let flashTimer: ReturnType<typeof setTimeout> | undefined;
+  function flash(kind: "image" | "csv") {
+    copied = kind;
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => (copied = null), 1200);
+  }
+
+  function copyCsv() {
+    navigator.clipboard.writeText(candlesCsv(candles)).then(() => flash("csv"), console.warn);
+  }
+
+  function copyImage() {
+    if (!canvas) return;
+    hover = null;
+    draw();
+    const out = document.createElement("canvas");
+    out.width = canvas.width;
+    out.height = canvas.height;
+    const ctx = out.getContext("2d")!;
+    ctx.fillStyle = getComputedStyle(canvas).getPropertyValue("--bg").trim();
+    ctx.fillRect(0, 0, out.width, out.height);
+    ctx.drawImage(canvas, 0, 0);
+    const png = new Promise<Blob>((ok, fail) => out.toBlob((b) => (b ? ok(b) : fail(new Error("toBlob failed")))));
+    navigator.clipboard.write([new ClipboardItem({ "image/png": png })]).then(() => flash("image"), console.warn);
+  }
+
   const tip = $derived.by(() => {
     if (hover == null || !chart || !candles[hover]) return null;
     const c = candles[hover];
@@ -645,6 +672,23 @@
   onkeydown={onKey}
 >
   <canvas bind:this={canvas} style:width="{width}px" style:height="{height}px"></canvas>
+  {#if candles.length}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="exports"
+      onpointermove={(e) => {
+        e.stopPropagation();
+        hover = null;
+      }}
+    >
+      <button class:done={copied === "image"} title="Copy chart image" aria-label="Copy chart image" onclick={copyImage}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="M21 16l-5-5-8 8" /></svg>
+      </button>
+      <button class:done={copied === "csv"} title="Copy candles as CSV" aria-label="Copy candles as CSV" onclick={copyCsv}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6M8 13h8M8 17h8" /></svg>
+      </button>
+    </div>
+  {/if}
   {#if tip && chart}
     <div
       class="tip"
@@ -701,6 +745,47 @@
   canvas {
     position: absolute;
     inset: 0;
+  }
+  .exports {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    display: flex;
+    gap: 2px;
+    cursor: default;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .chart:hover .exports,
+  .exports:focus-within {
+    opacity: 1;
+  }
+  .exports button {
+    width: 22px;
+    height: 22px;
+    padding: 3px;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .exports button.done,
+  .exports button.done:hover {
+    color: var(--up);
+  }
+  .exports button:hover {
+    background: var(--surface);
+    color: var(--text);
+  }
+  .exports svg {
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   .tip {
     position: absolute;
