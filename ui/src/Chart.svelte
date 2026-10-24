@@ -736,6 +736,12 @@
     display: flex;
     gap: 2px;
     cursor: default;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .chart:hover .exports,
+  .exports:focus-within {
+    opacity: 1;
   }
   .exports button {
     width: 22px;
