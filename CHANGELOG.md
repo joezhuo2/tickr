@@ -4,6 +4,14 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.1] - 2026-10-24
+
+### Added
+
+- Chart **exports** ([#42](https://github.com/joezhuo2/tickr/issues/42)): two
+  icon buttons at the top left of the chart, shown while hovering it, copy
+  the chart as a PNG image or its candles as CSV to the clipboard.
+
 ## [0.8.0] - 2026-10-23
 
 ### Added
