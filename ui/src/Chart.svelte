@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { alignTimes, axisTime, candleAt, fullTime, niceTicks, num, price, quarterLabel, volume } from "./lib/format";
+  import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, niceTicks, num, price, quarterLabel, volume } from "./lib/format";
   import type { Analysis, Article, Chart, ChartMode, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
 
   let {
@@ -620,6 +620,10 @@
     else if (e.key === "Escape") hover = null;
     else return;
     e.preventDefault();
+  }
+
+  function copyCsv() {
+    navigator.clipboard.writeText(candlesCsv(candles)).catch(console.warn);
   }
 
   const tip = $derived.by(() => {
