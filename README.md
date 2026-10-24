@@ -64,147 +64,116 @@ The first-launch warnings above don't come back after an update.
 automatically** to stop the background checks. Versions before v0.5.1 can't
 update themselves: install v0.5.1 once from Releases.
 
-## Using it
+## Features
 
-- **Tray icon:** hover for the quote. Left-click opens the window. Right-click
-  holds every on/off setting: show pre-market/after-hours, show change as % or
-  $, always on top, unload window when minimized, start hidden, launch at
-  login, check for updates automatically and, on macOS, show price in menu
-  bar. The update item shows the installed version, checks for a new one
-  and installs it (see [Updates](#updates)). Launch at login is off until you turn it on; once on, it stays on
-  across upgrades (tickr re-registers itself if an installer removed the
-  entry, unless you turned it off in Task Manager). If something needs
-  attention (the hotkey is taken, or launch at login could not be changed),
-  the tooltip ends with a ⚠ line.
+### Tray and hotkey
+
+- **Tray icon:** the company logo with an up/down badge. Hover for the
+  quote, left-click to open the window. Right-click holds every on/off
+  setting: show pre-market/after-hours, show change as % or $, always on top,
+  unload window when minimized, start hidden, launch at login, check for
+  updates automatically and, on macOS, show price in menu bar. If something
+  needs attention (the hotkey is taken, or launch at login could not be
+  changed), the tooltip ends with a ⚠ line.
 - **Global hotkey** (default `Ctrl+Alt+K` on Windows, `⌘⇧K` on macOS): opens
   the window, or minimizes it if it's focused. On macOS, where tickr has no
-  Dock icon, the hotkey hides the window instead of minimizing it (or unloads
-  it, when unload is on). Settings saved by an older version keep their
-  hotkey; **Reset** switches to the new default. To change it, open
-  **Settings** (the gear at the bottom left of the window), click the hotkey
-  field and press the new combination. If another app already owns the
+  Dock icon, it hides the window instead (or unloads it, when unload is on).
+  Change it in [Settings](#settings-and-keybinds). If another app owns the
   hotkey at startup, the window footer shows the error until you pick one
   that works.
-- **Settings:** the gear at the bottom left opens an overlay with the global
-  hotkey, the in-window keybinds and the chart dot toggles. Keybinds are
-  single keys: `C` switches line/candles, `R` refreshes, `V` cycles the date
-  range, `T`, `A` and `E` open Technicals, Analysts and Earnings, `X` jumps to
-  the next stock on the watchlist and `S` focuses the search box. Click a key
-  and press a new one to rebind it (an action already on that key takes the
-  old one), or press Backspace to unbind it. Keybinds are ignored while typing
-  in a text field. The earnings, news and analyst rating dots can each be
-  turned off. Esc or a click outside closes the overlay.
-- **Window:** search to change the symbol (you can only change it here).
-  Pick a range from 1D to Max and switch between line and candles. Hover the
-  chart, or use ← and →, to see time, open, high, low, close and volume.
-  1D, 5D and 1M charts reload about once a minute so the newest candle stays
-  current.
-- **Exports:** hover the chart for two buttons at its top left
-  ([#42](https://github.com/joezhuo2/tickr/issues/42)). The first copies the
-  chart as a PNG image, the second copies its candles as CSV (time in UTC,
-  open, high, low, close, volume). A button turns green once the copy lands
-  on the clipboard.
-- **News:** the **News** button, left of Line/Candles, swaps the chart for
-  the 20 latest headlines on the symbol, newest first. Each shows the title,
-  publisher, date and time, how long ago it was published, and a sentiment
-  pill: Positive (green), Negative (red) or Neutral (gray). The sentiment is
-  guessed on your machine from the headline's words, not the article, so
-  take it as a hint. Click one to
-  open it in your default browser. Headlines load with the symbol; ones
-  already seen this session show at once while the fresh list loads. Click Line, Candles or a range to
-  go back to the chart.
-- **Analyst consensus:** below the price, the left panel shows the rating
-  (Strong buy to Sell), the average 12-month price target with its upside,
-  and the analyst count and low–high target range. Click it, or the
-  **Analysts** tab next to the ranges, for the target range plotted against
-  the current price and the count of each rating. Results are cached for 12
-  hours. ETFs, indices and crypto have no coverage, so nothing is shown.
-  Clicking **Analysts** again closes it and returns to the chart.
-- **Earnings:** the **Earnings** tab, next to Analysts, shows the next report
-  date (confirmed or estimated) with the EPS and revenue estimates, and the
-  last four quarters with EPS estimate, actual EPS and surprise % (green beat,
-  red miss). Each past report is a blue dot at the bottom of the chart on the
-  candle it was reported in; hover it for the quarter and EPS vs estimate.
-  Yahoo keeps only four quarters, so older reports have no dot.
-  Clicking **Earnings** again closes it and returns to the chart.
-- **Stats:** the **Stats** tab, next to Earnings, lists key statistics grouped
-  into Valuation (market cap, P/E, PEG, price/sales, price/book, EV
-  multiples), Trading (beta, 52w change, moving averages, average volume,
-  all-time high/low), Dividends & splits, Shares & short interest,
-  Profitability (margins, returns) and Financials (revenue, growth, EPS, cash
-  flow, cash, debt, ratios). ETFs get a Fund section (assets, yield, expense
-  ratio, returns) and crypto a Crypto section (supply, 24 h volume). Values
-  missing for a symbol are left out. Changes, growth rates and returns show
-  green when positive and red when negative. Clicking **Stats** again closes
-  it.
-- **Market:** the **Market** button, left of News, is an overview of the whole
-  market rather than the current symbol: the S&P 500, Nasdaq, Dow, Russell
-  2000 and VIX; the 10-year Treasury yield, crude oil, gold, the US dollar
-  index and Bitcoin; the 11 S&P sector ETFs ranked by day change; and the
-  day's top 5 gainers and losers. Click any row to open it on the chart. It
-  loads when you open it, and the Refresh button reloads it. Clicking
-  **Market** again closes it.
-- **Rating changes:** each time a firm starts coverage, upgrades or downgrades
-  the symbol, an orange dot at the bottom of the chart marks the candle it
-  happened in. Hover the candle for the firm, old and new rating and the new
-  price target. Reiterated ratings are left out.
-- **News dots:** each of the 20 latest headlines puts a yellow dot at the
-  bottom of the chart on the candle it was published in. Hover the candle for
-  the headlines. Dots stack when a candle also has an earnings or rating dot.
-- **Dividends and splits:** on daily and longer charts (6M to Max), a green
-  dot marks each ex-dividend date and a purple dot each stock split. Hover the
-  candle for the dividend amount or split ratio. Yahoo sends no dividend or
-  split data for 1D, 5D and 1M.
-- **Refresh:** the **Refresh** button in the bottom bar, left of the "Live" or
-  "Updated" status, fetches the quote right away and reloads the chart. The
-  icon spins until the new quote arrives.
-- **Technicals:** the **Technicals** tab shows the chart above an analysis
-  panel. Click **Analyze** to run RSI, moving averages, candlestick patterns
-  and volatility/Fibonacci targets on the candles of the selected range. It
-  runs on your machine and gives the same result for the same candles. You
-  get a score from −100 to +100 with a bias and confidence, upside and
-  downside targets for the next 10 bars, an invalidation level and the
-  signals behind the score. Checkboxes toggle the chart overlays: moving
-  averages, Bollinger bands (20, 2), VWAP, Fibonacci levels, targets, pattern
-  markers and an RSI pane. VWAP resets each day on 1D, 5D and 1M; on longer
-  ranges it is anchored to the first candle. The indicator list shows the
-  latest band and VWAP values.
-  Ranges with fewer than 200 candles show a "Limited data" warning.
-  Changing the symbol or range clears the results. Clicking **Technicals**
-  again closes it and returns to the chart. Not investment advice.
-- **Watchlist:** click the star next to the ticker to add or remove it.
-  The star button at the bottom of the window shows your starred
-  stocks as cards (three across, four rows visible, scroll for more),
-  refreshed every minute while open. Each card shows the price and the
-  percent move on one line, like `$333.02 | +1.10%`, for the session now
-  trading: the pre-market or after-hours price and move when there is one,
-  otherwise the regular day. Cards are sorted from biggest gain to biggest
-  loss; stocks without a quote go last. Click a card to chart it.
-  **Groups** ([#40](https://github.com/joezhuo2/tickr/issues/40)) split the
-  watchlist into tabs such as "Tech" or "Crypto"; **All** always shows every
-  starred stock. Click **+** and type a name to add a group. In a group tab,
-  **Edit** shows every starred stock: click cards to add or remove them,
-  rename the group in the field, or **Delete** it. Unstarring a stock removes
-  it from every group.
+- **Launch at login** is off until you turn it on. Once on, it survives
+  upgrades: tickr re-registers itself if an installer removed the entry,
+  unless you turned it off in Task Manager.
 - **Unload when minimized** (on by default): minimizing destroys the web view,
   so the app drops to one process using about 7 MB. The hotkey reopens it
-  already painted, with the last chart and quote, then refreshes in the
-  background. Skeletons show while data loads.
-
-The **Logos by Elbstream** link in the window footer is the attribution
-Elbstream's free logo tier requires.
+  already painted with the last chart and quote, then refreshes in the
+  background. The window opens on a dark or light background to match the
+  OS theme, so it never flashes white.
 
 Windows may hide new tray icons in the overflow menu (^). Drag it onto the
 taskbar to keep it visible.
 
-The window opens with a dark or light background to match the OS theme, so it
-never flashes white before the page paints.
+### Chart
 
-> Data comes from Yahoo Finance's public chart, search (symbols and news) and quoteSummary
-> endpoints, and logos come from [Elbstream](https://elbstream.com/logos)'s
-> logo API (formerly Parqet). Yahoo's endpoints are not an official API and can
-> change or rate-limit without notice. Quotes may be delayed. Not investment
-> advice.
+- **Symbol and range:** search to change the symbol, pick a range from 1D to
+  Max and switch between line and candles. 1D, 5D and 1M charts reload about
+  once a minute.
+- **Tooltip:** hover the chart, or use ← and →, for time, open, high, low,
+  close and volume.
+- **Event dots** along the bottom of the chart; hover the candle for details:
+
+  | Dot | Marks |
+  | --- | --- |
+  | Blue | Earnings report: quarter and EPS vs estimate (last four quarters) |
+  | Orange | Analyst initiation, upgrade or downgrade: firm, ratings, new target |
+  | Yellow | One of the 20 latest headlines |
+  | Green | Ex-dividend date and amount (6M to Max) |
+  | Purple | Stock split and ratio (6M to Max) |
+
+  Dots stack when a candle has more than one. Earnings, news and rating dots
+  can be turned off in Settings.
+- **Exports:** hover the chart for two buttons at its top left. One copies
+  the chart as a PNG image, the other its candles as CSV (time in UTC, open,
+  high, low, close, volume). A button turns green once the copy lands.
+- **Refresh:** the button in the bottom bar fetches the quote and reloads the
+  chart right away.
+
+### Views
+
+Each tab or button below swaps the chart out; click it again, or a range, to
+go back.
+
+- **Technicals:** click **Analyze** to run RSI, moving averages, candlestick
+  patterns and volatility/Fibonacci targets on the candles of the selected
+  range, on your machine (same candles, same result). You get a score from
+  −100 to +100 with a bias and confidence, upside and downside targets for the
+  next 10 bars, an invalidation level and the signals behind the score.
+  Checkboxes toggle the overlays: moving averages, Bollinger bands (20, 2),
+  VWAP, Fibonacci levels, targets, pattern markers and an RSI pane. VWAP resets
+  each day on 1D, 5D and 1M and is anchored to the first candle on longer
+  ranges. Under 200 candles shows a "Limited data" warning. Not investment
+  advice.
+- **Analysts:** the rating (Strong buy to Sell), average 12-month target and
+  its upside also sit under the price on the left. The tab adds the target
+  range against the current price and the count of each rating. Cached for 12
+  hours; ETFs, indices and crypto have no coverage.
+- **Earnings:** the next report date (confirmed or estimated) with EPS and
+  revenue estimates, and the last four quarters with estimate, actual and
+  surprise % (green beat, red miss).
+- **Stats:** key statistics in Valuation, Trading, Dividends & splits, Shares
+  & short interest, Profitability and Financials. ETFs get a Fund section and
+  crypto a Crypto section. Changes, growth and returns are green or red.
+- **News:** the 20 latest headlines, newest first, with publisher, time and a
+  Positive / Negative / Neutral pill. The sentiment is guessed on your machine
+  from the headline's words, so take it as a hint. Click one to open it in
+  your browser.
+- **Market:** the S&P 500, Nasdaq, Dow, Russell 2000 and VIX; the 10-year
+  yield, crude oil, gold, the dollar index and Bitcoin; the 11 S&P sector ETFs
+  by day change; and the day's top 5 gainers and losers. Click a row to chart
+  it.
+
+### Watchlist
+
+Click the star next to the ticker to add or remove it. The star in the bottom
+bar shows starred stocks as cards, refreshed every minute: price and percent
+move for the session now trading (pre-market or after-hours when there is
+one), biggest gain first. Click a card to chart it.
+
+**Groups** split the watchlist into tabs such as "Tech" or "Crypto"; **All**
+always shows every starred stock. Click **+** and type a name to add a group.
+In a group tab, **Edit** shows every starred stock: click cards to add or
+remove them, rename the group, or **Delete** it. Unstarring a stock removes it
+from every group.
+
+### Settings and keybinds
+
+The gear at the bottom left opens Settings: the global hotkey (click the field
+and press a new combination; **Reset** restores the default), in-window
+keybinds and the chart dot toggles. Esc or a click outside closes it.
+
+Click a keybind and press a new key to rebind it (an action already on that
+key takes the old one), or Backspace to unbind it. Keybinds are ignored while
+typing in a text field.
 
 ## Files
 
