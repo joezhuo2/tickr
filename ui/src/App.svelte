@@ -32,6 +32,7 @@
     type RatingChange,
     type StatSection,
   } from "./lib/types";
+  import { actionFor, bindKey } from "./lib/keybinds";
 
   // Injected before load, so the first frame already has real content.
   const boot = window.__TICKR_INIT__ ?? null;
@@ -46,6 +47,7 @@
   let keybinds = $state<Keybinds>() as Keybinds;
   let dots = $state<Dots>() as Dots;
   let settingsOpen = $state(false);
+  let search: Search | undefined = $state();
   let qs = $state<QuoteState>({ quote: null, error: null, updated_at: 0 });
   let chart = $state<Chart | null>(null);
   let chartError = $state<string | null>(null);
@@ -316,6 +318,39 @@
     invoke("set_chart_mode", { mode: m }).catch(console.warn);
   }
 
+  function onKey(e: KeyboardEvent) {
+    if (!ready || settingsOpen || e.defaultPrevented) return;
+    if (e.target instanceof Element && e.target.closest("input, textarea, select, [contenteditable]")) return;
+    const key = bindKey(e);
+    const action = key && actionFor(keybinds, key);
+    if (!action) return;
+    e.preventDefault();
+    switch (action) {
+      case "chart_mode":
+        setMode(mode === "line" ? "candles" : "line");
+        break;
+      case "refresh":
+        refresh();
+        break;
+      case "range":
+        setRange(RANGES[(RANGES.findIndex((r) => r.id === range) + 1) % RANGES.length].id);
+        break;
+      case "technicals":
+      case "analysts":
+      case "earnings":
+        view = view === action ? "chart" : action;
+        break;
+      case "watchlist": {
+        const next = watchlist[(watchlist.indexOf(symbol) + 1) % watchlist.length];
+        if (next && next !== symbol) pickSymbol(next);
+        break;
+      }
+      case "search":
+        search?.focus();
+        break;
+    }
+  }
+
   onMount(() => {
     if (!boot) invoke<Init>("get_init").then(apply);
     // Reveal after the first frame. A hidden window may throttle rAF, so a
@@ -341,6 +376,8 @@
   });
 </script>
 
+<svelte:window onkeydown={onKey} />
+
 {#if ready}
   <div class="app">
     <main>
@@ -355,7 +392,7 @@
       />
       <section>
         <div class="toolbar">
-          <Search onpick={pickSymbol} />
+          <Search bind:this={search} onpick={pickSymbol} />
           <div class="views">
             <div class="seg">
               <button class:on={view === "market"} aria-pressed={view === "market"} onclick={toggleMarket}>Market</button>
