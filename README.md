@@ -175,6 +175,17 @@ Click a keybind and press a new key to rebind it (an action already on that
 key takes the old one), or Backspace to unbind it. Keybinds are ignored while
 typing in a text field.
 
+| Key | Action |
+| --- | --- |
+| `C` | Switch line / candles |
+| `R` | Refresh |
+| `V` | Cycle date range |
+| `T` | Open Technicals |
+| `A` | Open Analysts |
+| `E` | Open Earnings |
+| `X` | Next watchlist stock |
+| `S` | Focus search |
+
 ## Files
 
 | What | Windows | macOS |
