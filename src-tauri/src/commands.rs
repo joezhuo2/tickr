@@ -14,7 +14,7 @@ use crate::market::Market;
 use crate::stats::Section;
 use crate::news::Article;
 use crate::quote::{self, Chart, Quote, SearchHit};
-use crate::settings::{ChartMode, Dots, Keybinds, DEFAULT_HOTKEY};
+use crate::settings::{ChartMode, Dots, Group, Keybinds, DEFAULT_HOTKEY};
 use crate::state::{lock, now_secs, QuoteState, Shared};
 
 #[derive(Serialize)]
@@ -237,6 +237,20 @@ fn clean_symbols(symbols: Vec<String>) -> Vec<String> {
         if !s.is_empty() && !out.contains(&s) {
             out.push(s);
         }
+    }
+    out
+}
+
+/// Trims and dedupes group names, and keeps only starred symbols in each.
+fn clean_groups(groups: Vec<Group>, watchlist: &[String]) -> Vec<Group> {
+    let mut out: Vec<Group> = Vec::with_capacity(groups.len());
+    for g in groups {
+        let name = g.name.trim().to_string();
+        if name.is_empty() || out.iter().any(|o| o.name.eq_ignore_ascii_case(&name)) {
+            continue;
+        }
+        let symbols = clean_symbols(g.symbols).into_iter().filter(|s| watchlist.contains(s)).collect();
+        out.push(Group { name, symbols });
     }
     out
 }
