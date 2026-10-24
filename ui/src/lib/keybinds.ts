@@ -24,6 +24,7 @@ export function bindKey(e: { key: string; ctrlKey: boolean; altKey: boolean; met
 }
 
 export function actionFor(binds: Keybinds, key: string): Action | null {
+  if (!key) return null;
   return ACTIONS.find((a) => binds[a.id] === key)?.id ?? null;
 }
 
