@@ -664,7 +664,14 @@
   onkeydown={onKey}
 >
   <canvas bind:this={canvas} style:width="{width}px" style:height="{height}px"></canvas>
-  <div class="exports">
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="exports"
+    onpointermove={(e) => {
+      e.stopPropagation();
+      hover = null;
+    }}
+  >
     <button title="Copy chart image" aria-label="Copy chart image" onclick={copyImage}>
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="M21 16l-5-5-8 8" /></svg>
     </button>
