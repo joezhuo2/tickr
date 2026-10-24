@@ -56,6 +56,13 @@ impl Default for Keybinds {
     }
 }
 
+/// A named subset of the watchlist, shown as a tab.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Group {
+    pub name: String,
+    pub symbols: Vec<String>,
+}
+
 /// Which event dots the chart draws.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -91,6 +98,8 @@ pub struct Settings {
     pub autostart: Option<bool>,
     /// Starred symbols, in the user's order.
     pub watchlist: Vec<String>,
+    /// Watchlist groups, in tab order.
+    pub groups: Vec<Group>,
     /// Look for new releases in the background.
     pub auto_update: bool,
     pub keybinds: Keybinds,
@@ -113,6 +122,7 @@ impl Default for Settings {
             show_tray_title: true,
             autostart: None,
             watchlist: Vec::new(),
+            groups: Vec::new(),
             auto_update: true,
             keybinds: Keybinds::default(),
             dots: Dots::default(),
@@ -176,6 +186,7 @@ mod tests {
         assert_eq!(s.symbol, "NVDA");
         assert_eq!(s.chart_mode, ChartMode::Candles);
         assert!(s.unload_on_minimize);
+        assert!(s.groups.is_empty());
         assert!(s.auto_update);
     }
 
@@ -189,5 +200,18 @@ mod tests {
         assert_eq!(s.keybinds.chart_mode, "c");
         assert!(!s.dots.news);
         assert!(s.dots.earnings && s.dots.analysts);
+    }
+
+    #[test]
+    fn groups_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        let s = Settings {
+            watchlist: vec!["AAPL".into(), "BTC-USD".into()],
+            groups: vec![Group { name: "Crypto".into(), symbols: vec!["BTC-USD".into()] }],
+            ..Settings::default()
+        };
+        s.save(&p).unwrap();
+        assert_eq!(Settings::load(&p), s);
     }
 }

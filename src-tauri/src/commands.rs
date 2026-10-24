@@ -14,7 +14,7 @@ use crate::market::Market;
 use crate::stats::Section;
 use crate::news::Article;
 use crate::quote::{self, Chart, Quote, SearchHit};
-use crate::settings::{ChartMode, Dots, Keybinds, DEFAULT_HOTKEY};
+use crate::settings::{ChartMode, Dots, Group, Keybinds, DEFAULT_HOTKEY};
 use crate::state::{lock, now_secs, QuoteState, Shared};
 
 #[derive(Serialize)]
@@ -37,6 +37,7 @@ pub struct Init {
     analyst_known: bool,
     /// Starred symbols, in order.
     watchlist: Vec<String>,
+    groups: Vec<Group>,
     keybinds: Keybinds,
     dots: Dots,
 }
@@ -68,6 +69,7 @@ pub fn init_payload(shared: &Shared) -> Init {
         analyst_known: analyst.is_some(),
         analyst: analyst.flatten(),
         watchlist: s.watchlist,
+        groups: s.groups,
         keybinds: s.keybinds,
         dots: s.dots,
     }
@@ -241,12 +243,35 @@ fn clean_symbols(symbols: Vec<String>) -> Vec<String> {
     out
 }
 
+/// Trims and dedupes group names, and keeps only starred symbols in each.
+fn clean_groups(groups: Vec<Group>, watchlist: &[String]) -> Vec<Group> {
+    let mut out: Vec<Group> = Vec::with_capacity(groups.len());
+    for g in groups {
+        let name = g.name.trim().to_string();
+        if name.is_empty() || out.iter().any(|o| o.name.eq_ignore_ascii_case(&name)) {
+            continue;
+        }
+        let symbols = clean_symbols(g.symbols).into_iter().filter(|s| watchlist.contains(s)).collect();
+        out.push(Group { name, symbols });
+    }
+    out
+}
+
 /// Replaces the watchlist (star, unstar and reorder all send the full list).
 #[tauri::command]
 pub fn set_watchlist(shared: State<'_, Arc<Shared>>, symbols: Vec<String>) -> Vec<String> {
     let symbols = clean_symbols(symbols);
-    shared.update_settings(|s| s.watchlist = symbols.clone());
+    shared.update_settings(|s| {
+        s.watchlist = symbols.clone();
+        s.groups = clean_groups(std::mem::take(&mut s.groups), &s.watchlist);
+    });
     symbols
+}
+
+/// Replaces the watchlist groups (add, rename, delete and edit all send the full list).
+#[tauri::command]
+pub fn set_groups(shared: State<'_, Arc<Shared>>, groups: Vec<Group>) -> Vec<Group> {
+    shared.update_settings(|s| s.groups = clean_groups(groups, &s.watchlist)).groups
 }
 
 #[derive(Serialize)]
@@ -285,5 +310,13 @@ mod tests {
     fn clean_symbols_dedupes_and_normalizes() {
         let got = clean_symbols(vec![" aapl ".into(), "MSFT".into(), "".into(), "AAPL".into(), "brk-b".into()]);
         assert_eq!(got, ["AAPL", "MSFT", "BRK-B"]);
+    }
+
+    #[test]
+    fn clean_groups_trims_dedupes_and_drops_unstarred() {
+        let g = |name: &str, symbols: &[&str]| Group { name: name.into(), symbols: symbols.iter().map(|s| s.to_string()).collect() };
+        let watchlist = vec!["AAPL".to_string(), "NVDA".to_string()];
+        let got = clean_groups(vec![g(" Tech ", &["aapl", "TSLA", "NVDA"]), g("tech", &["AAPL"]), g("  ", &["AAPL"]), g("Empty", &[])], &watchlist);
+        assert_eq!(got, [g("Tech", &["AAPL", "NVDA"]), g("Empty", &[])]);
     }
 }

@@ -4,6 +4,16 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.2] - 2026-10-24
+
+### Added
+
+- **Watchlist groups** ([#40](https://github.com/joezhuo2/tickr/issues/40)):
+  tabs above the watchlist cards, with **All** first. **+** adds a group;
+  **Edit** in a group tab picks its stocks from the starred ones and lets
+  you rename or delete it. Groups are saved with the settings, and
+  unstarring a stock drops it from every group.
+
 ## [0.8.1] - 2026-10-24
 
 ### Added

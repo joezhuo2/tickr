@@ -168,6 +168,12 @@ update themselves: install v0.5.1 once from Releases.
   trading: the pre-market or after-hours price and move when there is one,
   otherwise the regular day. Cards are sorted from biggest gain to biggest
   loss; stocks without a quote go last. Click a card to chart it.
+  **Groups** ([#40](https://github.com/joezhuo2/tickr/issues/40)) split the
+  watchlist into tabs such as "Tech" or "Crypto"; **All** always shows every
+  starred stock. Click **+** and type a name to add a group. In a group tab,
+  **Edit** shows every starred stock: click cards to add or remove them,
+  rename the group in the field, or **Delete** it. Unstarring a stock removes
+  it from every group.
 - **Unload when minimized** (on by default): minimizing destroys the web view,
   so the app drops to one process using about 7 MB. The hotkey reopens it
   already painted, with the last chart and quote, then refreshes in the
@@ -231,8 +237,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.8.1
-git push origin v0.8.1
+git tag v0.8.2
+git push origin v0.8.2
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
@@ -306,7 +312,7 @@ the Apple values as repository secrets (plus `APPLE_CERTIFICATE`, the base64
 ## Tests
 
 ```bash
-cd src-tauri && cargo test # technical analysis (indicators, patterns, Fibonacci, scoring), quote, analyst, earnings, rating change, stats, market and news parsing, headline sentiment, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols, update menu labels
+cd src-tauri && cargo test # technical analysis (indicators, patterns, Fibonacci, scoring), quote, analyst, earnings, rating change, stats, market and news parsing, headline sentiment, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols and groups, update menu labels
 cd src-tauri && cargo test -- --ignored live   # analyst and market fetches against Yahoo (network)
 npm test                   # formatters, watchlist sort, hotkey recording and display, keybinds
 npm run check              # svelte-check

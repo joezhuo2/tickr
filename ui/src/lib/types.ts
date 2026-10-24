@@ -119,8 +119,15 @@ export interface Init {
   analyst_known: boolean;
   /** Starred symbols, in the user's order. */
   watchlist: string[];
+  groups: Group[];
   keybinds: Keybinds;
   dots: Dots;
+}
+
+/** A named subset of the watchlist, shown as a tab. */
+export interface Group {
+  name: string;
+  symbols: string[];
 }
 
 /** In-window shortcuts from settings.rs: one key each, "" when unbound. */
