@@ -146,40 +146,47 @@
       <button class="edit" class:on={editing} aria-pressed={editing} onclick={() => (editing = !editing)}>{editing ? "Done" : "Edit"}</button>
     {/if}
   </div>
-  <div class="grid" class:editing>
-    {#each order as symbol (symbol)}
-      {@const w = quotes[symbol]}
-      {@const q = w?.quote}
-      <button
-        class="card"
-        class:current={symbol === current && !editing}
-        class:in={editing && group?.symbols.includes(symbol)}
-        aria-pressed={editing ? !!group?.symbols.includes(symbol) : undefined}
-        title={w?.error && !q ? w.error : q?.name || symbol}
-        onclick={() => (editing ? toggle(symbol) : onopen(symbol))}
-      >
-        <span class="top">
-          <span class="sym">{symbol}</span>
-          {#if q}<span class="dot {q.session}"></span>{/if}
-        </span>
-        {#if q}
-          <span class="name">{q.name || q.exchange || "—"}</span>
-          {@const m = moves[symbol]}
-          <span class="line">
-            <span class="px">{price(m.price, q.currency)}</span>
-            <span class="bar">|</span>
-            <span class="chg {direction(m.pct)}">{m.pct == null ? "—" : `${signed(m.pct)}%`}</span>
+  {#if !shown.length}
+    <div class="empty">
+      <p>No stocks in {group?.name} yet.</p>
+      <p class="hint">Click Edit to pick some from your starred stocks.</p>
+    </div>
+  {:else}
+    <div class="grid" class:editing>
+      {#each order as symbol (symbol)}
+        {@const w = quotes[symbol]}
+        {@const q = w?.quote}
+        <button
+          class="card"
+          class:current={symbol === current && !editing}
+          class:in={editing && group?.symbols.includes(symbol)}
+          aria-pressed={editing ? !!group?.symbols.includes(symbol) : undefined}
+          title={w?.error && !q ? w.error : q?.name || symbol}
+          onclick={() => (editing ? toggle(symbol) : onopen(symbol))}
+        >
+          <span class="top">
+            <span class="sym">{symbol}</span>
+            {#if q}<span class="dot {q.session}"></span>{/if}
           </span>
-        {:else if w?.error}
-          <span class="name">Unavailable</span>
-          <span class="line"><span class="px">—</span></span>
-        {:else}
-          <span class="sk" style="width: 70%; height: 11px; margin-top: 3px"></span>
-          <span class="sk" style="width: 80%; height: 16px; margin-top: auto"></span>
-        {/if}
-      </button>
-    {/each}
-  </div>
+          {#if q}
+            <span class="name">{q.name || q.exchange || "—"}</span>
+            {@const m = moves[symbol]}
+            <span class="line">
+              <span class="px">{price(m.price, q.currency)}</span>
+              <span class="bar">|</span>
+              <span class="chg {direction(m.pct)}">{m.pct == null ? "—" : `${signed(m.pct)}%`}</span>
+            </span>
+          {:else if w?.error}
+            <span class="name">Unavailable</span>
+            <span class="line"><span class="px">—</span></span>
+          {:else}
+            <span class="sk" style="width: 70%; height: 11px; margin-top: 3px"></span>
+            <span class="sk" style="width: 80%; height: 16px; margin-top: auto"></span>
+          {/if}
+        </button>
+      {/each}
+    </div>
+  {/if}
 {/if}
 
 <style>
