@@ -186,6 +186,7 @@ mod tests {
         assert_eq!(s.symbol, "NVDA");
         assert_eq!(s.chart_mode, ChartMode::Candles);
         assert!(s.unload_on_minimize);
+        assert!(s.groups.is_empty());
         assert!(s.auto_update);
     }
 
@@ -199,5 +200,18 @@ mod tests {
         assert_eq!(s.keybinds.chart_mode, "c");
         assert!(!s.dots.news);
         assert!(s.dots.earnings && s.dots.analysts);
+    }
+
+    #[test]
+    fn groups_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        let s = Settings {
+            watchlist: vec!["AAPL".into(), "BTC-USD".into()],
+            groups: vec![Group { name: "Crypto".into(), symbols: vec!["BTC-USD".into()] }],
+            ..Settings::default()
+        };
+        s.save(&p).unwrap();
+        assert_eq!(Settings::load(&p), s);
     }
 }
