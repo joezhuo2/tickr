@@ -103,6 +103,32 @@
 {/if}
 
 <style>
+  .tabs {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-top: 6px;
+    overflow-x: auto;
+    flex: none;
+  }
+  .tabs button {
+    border: 0;
+    background: none;
+    padding: 3px 9px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .tabs button:hover {
+    color: var(--text);
+  }
+  .tabs button.on {
+    background: var(--surface);
+    color: var(--text);
+  }
   .grid {
     --gap: 8px;
     flex: 1;
