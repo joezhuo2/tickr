@@ -56,6 +56,21 @@ impl Default for Keybinds {
     }
 }
 
+/// Which event dots the chart draws.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Dots {
+    pub earnings: bool,
+    pub news: bool,
+    pub analysts: bool,
+}
+
+impl Default for Dots {
+    fn default() -> Self {
+        Self { earnings: true, news: true, analysts: true }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -79,6 +94,7 @@ pub struct Settings {
     /// Look for new releases in the background.
     pub auto_update: bool,
     pub keybinds: Keybinds,
+    pub dots: Dots,
 }
 
 impl Default for Settings {
@@ -99,6 +115,7 @@ impl Default for Settings {
             watchlist: Vec::new(),
             auto_update: true,
             keybinds: Keybinds::default(),
+            dots: Dots::default(),
         }
     }
 }
