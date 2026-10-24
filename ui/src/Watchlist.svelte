@@ -9,12 +9,14 @@
     groups,
     current,
     onopen,
+    ongroups,
   }: {
     symbols: string[];
     groups: Group[];
     /** The symbol shown in the chart, highlighted. */
     current: string;
     onopen: (symbol: string) => void;
+    ongroups: (groups: Group[]) => void;
   } = $props();
 
   const REFRESH_MS = 60_000;
@@ -26,6 +28,17 @@
   /** Name of the group tab shown; null for All. */
   let tab = $state<string | null>(null);
   const group = $derived(groups.find((g) => g.name === tab) ?? null);
+  /** Name typed for a new group; null when the field is closed. */
+  let draft = $state<string | null>(null);
+
+  function addGroup() {
+    const name = draft?.trim() ?? "";
+    draft = null;
+    if (!name || groups.some((g) => g.name.toLowerCase() === name.toLowerCase())) return;
+    ongroups([...groups, { name, symbols: [] }]);
+    tab = name;
+  }
+
   const shown = $derived(group ? group.symbols : symbols);
   // Biggest gain first, by the move of the session now trading.
   const order = $derived(byGain(shown, (s) => moves[s]?.pct));
@@ -67,6 +80,24 @@
     {#each groups as g (g.name)}
       <button role="tab" aria-selected={group === g} class:on={group === g} onclick={() => (tab = g.name)}>{g.name}</button>
     {/each}
+    {#if draft != null}
+      <!-- svelte-ignore a11y_autofocus -->
+      <input
+        class="new"
+        placeholder="Group name"
+        aria-label="New group name"
+        maxlength="24"
+        autofocus
+        bind:value={draft}
+        onblur={addGroup}
+        onkeydown={(e) => {
+          if (e.key === "Enter") addGroup();
+          else if (e.key === "Escape") draft = null;
+        }}
+      />
+    {:else}
+      <button class="add" title="New group" aria-label="New group" onclick={() => (draft = "")}>+</button>
+    {/if}
   </div>
   <div class="grid">
     {#each order as symbol (symbol)}
@@ -124,6 +155,16 @@
   }
   .tabs button:hover {
     color: var(--text);
+  }
+  .new {
+    width: 110px;
+    padding: 2px 7px;
+    border: 1px solid var(--faint);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
   }
   .tabs button.on {
     background: var(--surface);
