@@ -1,63 +1,37 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { accelerator, display } from "./lib/hotkey";
 
   let {
-    hotkey = $bindable(),
-    error = $bindable(null),
-    defaultHotkey,
+    error = null,
     status,
+    settingsOn,
+    onsettings,
     watchlistOn,
     onwatchlist,
     refreshing,
     onrefresh,
   }: {
-    hotkey: string;
     /** Set by the backend when the saved hotkey could not be registered. */
     error?: string | null;
-    defaultHotkey: string;
     status: { kind: "live" | "stale" | "offline" | "loading"; text: string };
+    settingsOn: boolean;
+    onsettings: () => void;
     watchlistOn: boolean;
     onwatchlist: () => void;
     refreshing: boolean;
     onrefresh: () => void;
   } = $props();
-
-  let recording = $state(false);
-
-  async function save(next: string) {
-    recording = false;
-    try {
-      hotkey = await invoke<string>("set_hotkey", { hotkey: next });
-      error = null;
-    } catch (e) {
-      error = String(e);
-    }
-  }
-
-  function onKey(e: KeyboardEvent) {
-    if (!recording) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.key === "Escape") {
-      recording = false;
-      return;
-    }
-    const accel = accelerator(e);
-    if (accel) save(accel);
-  }
 </script>
 
-<svelte:window onkeydown={onKey} />
-
 <footer>
-  <span class="label">Hotkey</span>
-  <button class="key" class:recording onclick={() => (recording = !recording)} onblur={() => (recording = false)}>
-    {recording ? "Press keys… (Esc to cancel)" : display(hotkey)}
+  <button class="gear" class:on={settingsOn} aria-pressed={settingsOn} title="Settings" aria-label="Settings" onclick={onsettings}>
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path
+        d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"
+      />
+    </svg>
   </button>
-  {#if hotkey !== defaultHotkey}
-    <button class="link" onclick={() => save(defaultHotkey)}>Reset</button>
-  {/if}
   <span class="sep"></span>
   <button class="watch" class:on={watchlistOn} aria-pressed={watchlistOn} title="Watchlist" aria-label="Watchlist" onclick={onwatchlist}>
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" /></svg>
@@ -81,22 +55,29 @@
     font-size: 12px;
     flex: none;
   }
-  .label {
-    color: var(--muted);
-  }
-  .key {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    padding: 2px 8px;
+  .gear {
+    width: 22px;
+    height: 22px;
+    padding: 3px;
+    border: 0;
     border-radius: 5px;
-    border: 1px solid var(--faint);
-    background: var(--bg);
+    background: none;
+    color: var(--muted);
     cursor: pointer;
-    min-width: 90px;
   }
-  .key.recording {
-    border-color: var(--accent);
-    color: var(--accent);
+  .gear:hover,
+  .gear.on {
+    background: var(--bg);
+    color: var(--text);
+  }
+  .gear svg {
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   .link {
     background: none;

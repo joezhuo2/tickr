@@ -6,12 +6,13 @@
   import ChartView from "./Chart.svelte";
   import ChartSkeleton from "./ChartSkeleton.svelte";
   import EarningsView from "./Earnings.svelte";
-  import HotkeyBar from "./HotkeyBar.svelte";
+  import Footer from "./Footer.svelte";
   import MarketView from "./Market.svelte";
   import StatsView from "./Stats.svelte";
   import Left from "./Left.svelte";
   import News from "./News.svelte";
   import Search from "./Search.svelte";
+  import Settings from "./Settings.svelte";
   import Technicals from "./Technicals.svelte";
   import Watchlist from "./Watchlist.svelte";
   import {
@@ -22,8 +23,10 @@
     type ChartMode,
     type Market,
     type Consensus,
+    type Dots,
     type Earnings,
     type Init,
+    type Keybinds,
     type Overlays,
     type QuoteState,
     type RatingChange,
@@ -40,6 +43,9 @@
   let hotkey = $state("");
   let defaultHotkey = $state("");
   let hotkeyError = $state<string | null>(null);
+  let keybinds = $state<Keybinds>() as Keybinds;
+  let dots = $state<Dots>() as Dots;
+  let settingsOpen = $state(false);
   let qs = $state<QuoteState>({ quote: null, error: null, updated_at: 0 });
   let chart = $state<Chart | null>(null);
   let chartError = $state<string | null>(null);
@@ -92,6 +98,8 @@
     hotkey = init.hotkey;
     defaultHotkey = init.default_hotkey;
     hotkeyError = init.hotkey_error;
+    keybinds = init.keybinds;
+    dots = init.dots;
     qs = init.quote;
     watchlist = init.watchlist ?? [];
     if (init.logo_known) logo = init.logo;
@@ -437,16 +445,19 @@
         {/if}
       </section>
     </main>
-    <HotkeyBar
-      bind:hotkey
-      bind:error={hotkeyError}
-      {defaultHotkey}
+    <Footer
+      error={hotkeyError}
       {status}
+      settingsOn={settingsOpen}
+      onsettings={() => (settingsOpen = !settingsOpen)}
       watchlistOn={view === "watchlist"}
       onwatchlist={() => (view = view === "watchlist" ? "chart" : "watchlist")}
       {refreshing}
       onrefresh={refresh}
     />
+    {#if settingsOpen}
+      <Settings bind:hotkey bind:error={hotkeyError} {defaultHotkey} bind:keybinds bind:dots onclose={() => (settingsOpen = false)} />
+    {/if}
   </div>
 {/if}
 
