@@ -25,6 +25,7 @@
   let width = $state(0);
   let height = $state(0);
   let hover = $state<number | null>(null);
+  let copied = $state<"image" | "csv" | null>(null);
 
   const PAD = { l: 6, r: 62, t: 10, b: 22 };
 
@@ -622,8 +623,13 @@
     e.preventDefault();
   }
 
+  function flash(kind: "image" | "csv") {
+    copied = kind;
+    setTimeout(() => (copied = null), 1200);
+  }
+
   function copyCsv() {
-    navigator.clipboard.writeText(candlesCsv(candles)).catch(console.warn);
+    navigator.clipboard.writeText(candlesCsv(candles)).then(() => flash("csv"), console.warn);
   }
 
   function copyImage() {
@@ -638,7 +644,7 @@
     ctx.fillRect(0, 0, out.width, out.height);
     ctx.drawImage(canvas, 0, 0);
     const png = new Promise<Blob>((ok, fail) => out.toBlob((b) => (b ? ok(b) : fail(new Error("toBlob failed")))));
-    navigator.clipboard.write([new ClipboardItem({ "image/png": png })]).catch(console.warn);
+    navigator.clipboard.write([new ClipboardItem({ "image/png": png })]).then(() => flash("image"), console.warn);
   }
 
   const tip = $derived.by(() => {
@@ -673,10 +679,10 @@
         hover = null;
       }}
     >
-      <button title="Copy chart image" aria-label="Copy chart image" onclick={copyImage}>
+      <button class:done={copied === "image"} title="Copy chart image" aria-label="Copy chart image" onclick={copyImage}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="M21 16l-5-5-8 8" /></svg>
       </button>
-      <button title="Copy candles as CSV" aria-label="Copy candles as CSV" onclick={copyCsv}>
+      <button class:done={copied === "csv"} title="Copy candles as CSV" aria-label="Copy candles as CSV" onclick={copyCsv}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6M8 13h8M8 17h8" /></svg>
       </button>
     </div>
@@ -761,6 +767,10 @@
     background: none;
     color: var(--muted);
     cursor: pointer;
+  }
+  .exports button.done,
+  .exports button.done:hover {
+    color: var(--up);
   }
   .exports button:hover {
     background: var(--surface);
