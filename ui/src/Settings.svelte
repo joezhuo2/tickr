@@ -80,7 +80,7 @@
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 <div class="backdrop" onclick={onclose}>
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div class="panel" role="dialog" aria-modal="true" aria-label="Settings" onclick={(e) => e.stopPropagation()}>
+  <div class="panel" role="dialog" tabindex="-1" aria-modal="true" aria-label="Settings" onclick={(e) => e.stopPropagation()}>
     <header>
       <h2>Settings</h2>
       <button class="close" aria-label="Close" onclick={onclose}>×</button>
