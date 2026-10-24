@@ -186,6 +186,15 @@ typing in a text field.
 | `X` | Next watchlist stock |
 | `S` | Focus search |
 
+## Screenshots
+
+| | |
+| :---: | :---: |
+| <img src="assets/screenshots/technicals.webp" alt="Technicals view with overlays, score and targets"><br>**Technicals** | <img src="assets/screenshots/market.png" alt="Market overview"><br>**Market** |
+| <img src="assets/screenshots/news.png" alt="News headlines with sentiment pills"><br>**News** | <img src="assets/screenshots/analysts.png" alt="Analyst price target and consensus"><br>**Analysts** |
+| <img src="assets/screenshots/earnings.png" alt="Next and past earnings reports"><br>**Earnings** | <img src="assets/screenshots/stats.png" alt="Key statistics"><br>**Stats** |
+| <img src="assets/screenshots/settings.png" alt="Settings with hotkey, keybinds and chart dots" width="70%"><br>**Settings** | <img src="assets/screenshots/chart.png" alt="Candle chart with tooltip and event dots"><br>**Chart** |
+
 ## Data
 
 Quotes, charts, news and fundamentals come from Yahoo Finance's public chart,
