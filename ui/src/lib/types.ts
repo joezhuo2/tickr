@@ -119,6 +119,27 @@ export interface Init {
   analyst_known: boolean;
   /** Starred symbols, in the user's order. */
   watchlist: string[];
+  keybinds: Keybinds;
+  dots: Dots;
+}
+
+/** In-window shortcuts from settings.rs: one key each, "" when unbound. */
+export interface Keybinds {
+  chart_mode: string;
+  refresh: string;
+  range: string;
+  technicals: string;
+  analysts: string;
+  earnings: string;
+  watchlist: string;
+  search: string;
+}
+
+/** Which event dots the chart draws. */
+export interface Dots {
+  earnings: boolean;
+  news: boolean;
+  analysts: boolean;
 }
 
 /** Tone of a headline, from sentiment.rs. */
