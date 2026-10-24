@@ -664,21 +664,23 @@
   onkeydown={onKey}
 >
   <canvas bind:this={canvas} style:width="{width}px" style:height="{height}px"></canvas>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="exports"
-    onpointermove={(e) => {
-      e.stopPropagation();
-      hover = null;
-    }}
-  >
-    <button title="Copy chart image" aria-label="Copy chart image" onclick={copyImage}>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="M21 16l-5-5-8 8" /></svg>
-    </button>
-    <button title="Copy candles as CSV" aria-label="Copy candles as CSV" onclick={copyCsv}>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6M8 13h8M8 17h8" /></svg>
-    </button>
-  </div>
+  {#if candles.length}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="exports"
+      onpointermove={(e) => {
+        e.stopPropagation();
+        hover = null;
+      }}
+    >
+      <button title="Copy chart image" aria-label="Copy chart image" onclick={copyImage}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="M21 16l-5-5-8 8" /></svg>
+      </button>
+      <button title="Copy candles as CSV" aria-label="Copy candles as CSV" onclick={copyCsv}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6M8 13h8M8 17h8" /></svg>
+      </button>
+    </div>
+  {/if}
   {#if tip && chart}
     <div
       class="tip"
