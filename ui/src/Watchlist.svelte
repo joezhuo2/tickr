@@ -2,14 +2,16 @@
   import { invoke } from "@tauri-apps/api/core";
   import { untrack } from "svelte";
   import { byGain, direction, price, sessionMove, signed } from "./lib/format";
-  import type { WatchQuote } from "./lib/types";
+  import type { Group, WatchQuote } from "./lib/types";
 
   let {
     symbols,
+    groups,
     current,
     onopen,
   }: {
     symbols: string[];
+    groups: Group[];
     /** The symbol shown in the chart, highlighted. */
     current: string;
     onopen: (symbol: string) => void;
@@ -21,8 +23,12 @@
   const moves = $derived(
     Object.fromEntries(Object.values(quotes).flatMap((w) => (w.quote ? [[w.symbol, sessionMove(w.quote)]] : []))),
   );
+  /** Name of the group tab shown; null for All. */
+  let tab = $state<string | null>(null);
+  const group = $derived(groups.find((g) => g.name === tab) ?? null);
+  const shown = $derived(group ? group.symbols : symbols);
   // Biggest gain first, by the move of the session now trading.
-  const order = $derived(byGain(symbols, (s) => moves[s]?.pct));
+  const order = $derived(byGain(shown, (s) => moves[s]?.pct));
 
   async function load(list: string[]) {
     if (!list.length) return;
@@ -56,6 +62,12 @@
     <p class="hint">Click the star next to a ticker to add it here.</p>
   </div>
 {:else}
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected={!group} class:on={!group} onclick={() => (tab = null)}>All</button>
+    {#each groups as g (g.name)}
+      <button role="tab" aria-selected={group === g} class:on={group === g} onclick={() => (tab = g.name)}>{g.name}</button>
+    {/each}
+  </div>
   <div class="grid">
     {#each order as symbol (symbol)}
       {@const w = quotes[symbol]}

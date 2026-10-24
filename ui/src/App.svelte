@@ -446,7 +446,7 @@
             ></span>{/if}
         </div>
         {#if view === "watchlist"}
-          <Watchlist symbols={watchlist} current={symbol} onopen={openWatched} />
+          <Watchlist symbols={watchlist} {groups} current={symbol} onopen={openWatched} />
         {:else if view === "analysts"}
           <Analysts {symbol} {quote} {analyst} />
         {:else if view === "earnings"}
