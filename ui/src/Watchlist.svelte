@@ -111,7 +111,7 @@
   <div class="tabs" role="tablist">
     <button role="tab" aria-selected={!group} class:on={!group} onclick={() => pick(null)}>All</button>
     {#each groups as g (g.name)}
-      <button role="tab" aria-selected={group === g} class:on={group === g} onclick={() => pick(g)}>{g.name}</button>
+      <button role="tab" aria-selected={tab === g.name} class:on={tab === g.name} onclick={() => pick(g)}>{g.name}</button>
     {/each}
     {#if draft != null}
       <!-- svelte-ignore a11y_autofocus -->
