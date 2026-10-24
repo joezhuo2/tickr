@@ -12,6 +12,11 @@
   let error = $state<string | null>(null);
   let seq = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let input: HTMLInputElement | undefined = $state();
+
+  export function focus() {
+    input?.focus();
+  }
 
   /** Drops the pending debounce and any in-flight search, so a late result can't reopen the list. */
   function cancelSearch() {
@@ -74,6 +79,7 @@
 
 <div class="search">
   <input
+    bind:this={input}
     placeholder="Change symbol…"
     spellcheck="false"
     autocomplete="off"
