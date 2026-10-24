@@ -56,6 +56,13 @@ impl Default for Keybinds {
     }
 }
 
+/// A named subset of the watchlist, shown as a tab.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Group {
+    pub name: String,
+    pub symbols: Vec<String>,
+}
+
 /// Which event dots the chart draws.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -91,6 +98,8 @@ pub struct Settings {
     pub autostart: Option<bool>,
     /// Starred symbols, in the user's order.
     pub watchlist: Vec<String>,
+    /// Watchlist groups, in tab order.
+    pub groups: Vec<Group>,
     /// Look for new releases in the background.
     pub auto_update: bool,
     pub keybinds: Keybinds,
@@ -113,6 +122,7 @@ impl Default for Settings {
             show_tray_title: true,
             autostart: None,
             watchlist: Vec::new(),
+            groups: Vec::new(),
             auto_update: true,
             keybinds: Keybinds::default(),
             dots: Dots::default(),
