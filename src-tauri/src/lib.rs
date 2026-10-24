@@ -90,6 +90,7 @@ pub fn run() {
             commands::get_stats,
             commands::get_market,
             commands::set_watchlist,
+            commands::set_groups,
             commands::get_watch_quotes,
             commands::get_news,
             commands::open_news,

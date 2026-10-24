@@ -263,6 +263,12 @@ pub fn set_watchlist(shared: State<'_, Arc<Shared>>, symbols: Vec<String>) -> Ve
     symbols
 }
 
+/// Replaces the watchlist groups (add, rename, delete and edit all send the full list).
+#[tauri::command]
+pub fn set_groups(shared: State<'_, Arc<Shared>>, groups: Vec<Group>) -> Vec<Group> {
+    shared.update_settings(|s| s.groups = clean_groups(groups, &s.watchlist)).groups
+}
+
 #[derive(Serialize)]
 pub struct WatchQuote {
     symbol: String,
