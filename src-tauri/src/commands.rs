@@ -259,7 +259,10 @@ fn clean_groups(groups: Vec<Group>, watchlist: &[String]) -> Vec<Group> {
 #[tauri::command]
 pub fn set_watchlist(shared: State<'_, Arc<Shared>>, symbols: Vec<String>) -> Vec<String> {
     let symbols = clean_symbols(symbols);
-    shared.update_settings(|s| s.watchlist = symbols.clone());
+    shared.update_settings(|s| {
+        s.watchlist = symbols.clone();
+        s.groups = clean_groups(std::mem::take(&mut s.groups), &s.watchlist);
+    });
     symbols
 }
 
