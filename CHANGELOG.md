@@ -4,6 +4,14 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.4] - 2026-10-26
+
+### Added
+
+- Configurable **Toggle Watchlist** shortcut, defaulting to `W`
+  ([#46](https://github.com/joezhuo2/tickr/issues/46)). Press it again to
+  return to the chart. `X` still cycles through watchlist stocks.
+
 ## [0.8.3] - 2026-10-24
 
 ### Added

@@ -40,6 +40,7 @@ pub struct Keybinds {
     pub watchlist: String,
     pub search: String,
     pub settings: String,
+    pub toggle_watchlist: String,
 }
 
 impl Default for Keybinds {
@@ -54,6 +55,7 @@ impl Default for Keybinds {
             watchlist: "x".into(),
             search: "s".into(),
             settings: ",".into(),
+            toggle_watchlist: "w".into(),
         }
     }
 }
@@ -201,6 +203,8 @@ mod tests {
         assert_eq!(s.keybinds.refresh, "F5");
         assert_eq!(s.keybinds.chart_mode, "c");
         assert_eq!(s.keybinds.settings, ",");
+        assert_eq!(s.keybinds.toggle_watchlist, "w");
+        assert_eq!(s.keybinds.watchlist, "x");
         assert!(!s.dots.news);
         assert!(s.dots.earnings && s.dots.analysts);
     }

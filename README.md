@@ -198,6 +198,7 @@ typing in a text field.
 | `X` | Next watchlist stock |
 | `S` | Focus search |
 | `,` | Toggle Settings |
+| `W` | Toggle Watchlist |
 
 ## Screenshots
 
