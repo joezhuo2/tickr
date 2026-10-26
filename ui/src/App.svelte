@@ -3,6 +3,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
   import Analysts from "./Analysts.svelte";
+  import Alerts from "./Alerts.svelte";
   import ChartView from "./Chart.svelte";
   import ChartSkeleton from "./ChartSkeleton.svelte";
   import EarningsView from "./Earnings.svelte";
@@ -30,6 +31,7 @@
     type Keybinds,
     type Overlays,
     type QuoteState,
+    type PriceAlert,
     type RatingChange,
     type StatSection,
   } from "./lib/types";
@@ -63,7 +65,7 @@
   let market = $state<Market | undefined>(undefined);
   let marketError = $state<string | null>(null);
   let marketLoading = $state(false);
-  let view = $state<"chart" | "technicals" | "analysts" | "earnings" | "stats" | "market" | "news" | "watchlist">(
+  let view = $state<"chart" | "alerts" | "technicals" | "analysts" | "earnings" | "stats" | "market" | "news" | "watchlist">(
     "chart",
   );
   // Technical analysis: computed only when the user clicks Analyze, and
@@ -82,6 +84,7 @@
   let newsLoading = $state(false);
   let watchlist = $state<string[]>([]);
   let groups = $state<Group[]>([]);
+  let alerts = $state<PriceAlert[]>([]);
   let now = $state(Date.now() / 1000);
   let refreshing = $state(false);
 
@@ -107,6 +110,7 @@
     qs = init.quote;
     watchlist = init.watchlist ?? [];
     groups = init.groups ?? [];
+    alerts = init.alerts ?? [];
     if (init.logo_known) logo = init.logo;
     if (init.analyst_known) analyst = init.analyst;
     // Shown at once, refreshed by loadChart (at = 0 marks it stale).
@@ -384,8 +388,10 @@
       if (/^\d+m$/.test(chart?.interval ?? "") && Date.now() - chartAt > FRESH_MS) loadChart(true);
     });
     const tick = setInterval(() => (now = Date.now() / 1000), 15_000);
+    const unAlerts = listen<PriceAlert[]>("alerts", (e) => (alerts = e.payload));
     return () => {
       un.then((f) => f());
+      unAlerts.then((f) => f());
       clearInterval(tick);
     };
   });
@@ -429,6 +435,9 @@
             </button>
           {/each}
           <span class="sep"></span>
+          <button role="tab" aria-selected={view === "alerts"} class:on={view === "alerts"} onclick={() => (view = view === "alerts" ? "chart" : "alerts")}>
+            Alerts
+          </button>
           <button
             role="tab"
             aria-selected={view === "technicals"}
@@ -453,6 +462,8 @@
         </div>
         {#if view === "watchlist"}
           <Watchlist symbols={watchlist} {groups} current={symbol} onopen={openWatched} ongroups={saveGroups} />
+        {:else if view === "alerts"}
+          <Alerts {symbol} {quote} {alerts} onchange={(next) => (alerts = next)} />
         {:else if view === "analysts"}
           <Analysts {symbol} {quote} {analyst} />
         {:else if view === "earnings"}

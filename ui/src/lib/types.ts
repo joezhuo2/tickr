@@ -122,6 +122,16 @@ export interface Init {
   groups: Group[];
   keybinds: Keybinds;
   dots: Dots;
+  alerts: PriceAlert[];
+}
+
+export interface PriceAlert {
+  id: number;
+  symbol: string;
+  direction: "above" | "below";
+  level: number;
+  enabled: boolean;
+  triggered_at: number | null;
 }
 
 /** A named subset of the watchlist, shown as a tab. */

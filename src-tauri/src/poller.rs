@@ -42,6 +42,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
         loop {
             let symbol = shared.symbol();
             let result = quote::fetch_quote(&shared.http, &symbol, now_secs()).await;
+            let fresh = result.as_ref().ok().cloned();
             // The symbol may have changed while fetching; drop stale results.
             if shared.symbol() != symbol {
                 continue;
@@ -66,8 +67,14 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
             refresh_logo(&shared, &symbol).await;
             crate::tray::update(&app, &shared);
             emit(&app, &shared);
+            crate::alerts::poll(&app, &shared, &symbol, fresh.as_ref()).await;
 
             let delay = if failures > 0 { backoff(failures) } else { interval(session) };
+            let delay = if lock(&shared.settings).alerts.iter().any(|a| a.enabled) {
+                delay.min(Duration::from_secs(15))
+            } else {
+                delay
+            };
             tokio::select! {
                 _ = tokio::time::sleep(delay) => {}
                 _ = shared.wake.notified() => {}

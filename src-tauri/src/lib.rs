@@ -1,6 +1,7 @@
 //! tickr: a tray stock ticker with a chart window behind a global hotkey.
 
 pub mod analysis;
+pub mod alerts;
 pub mod analyst;
 pub mod autostart;
 pub mod commands;
@@ -68,6 +69,7 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--autostarted"])))
         .plugin(hotkey::plugin())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .manage(shared.clone())
         .invoke_handler(tauri::generate_handler![
             commands::get_init,
@@ -82,6 +84,9 @@ pub fn run() {
             commands::set_hotkey,
             commands::set_keybinds,
             commands::set_dots,
+            commands::add_alert,
+            commands::set_alert_enabled,
+            commands::delete_alert,
             commands::get_logo,
             commands::open_logo_credit,
             commands::get_analyst,

@@ -1,6 +1,7 @@
 //! Shared app state.
 
 use std::path::PathBuf;
+use std::collections::HashMap;
 use std::sync::{Mutex, MutexGuard};
 
 use serde::Serialize;
@@ -40,6 +41,8 @@ pub struct Shared {
     pub quote: Mutex<QuoteState>,
     /// Wakes the poller early (symbol changed).
     pub wake: Notify,
+    /// Last successful price per armed alert; reset when paused or rearmed.
+    pub alert_prices: Mutex<HashMap<u32, f64>>,
     /// Logo PNG for the current symbol: (symbol, bytes). None bytes = no logo.
     pub logo: Mutex<Option<(String, Option<Vec<u8>>)>>,
     /// Last known window geometry while it was not minimized.
@@ -66,6 +69,7 @@ impl Shared {
             analysts: Analysts::new(),
             quote: Mutex::new(QuoteState::default()),
             wake: Notify::new(),
+            alert_prices: Mutex::new(HashMap::new()),
             logo: Mutex::new(None),
             geometry: Mutex::new(geometry),
             last_chart: Mutex::new(None),
