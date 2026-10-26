@@ -338,6 +338,9 @@
       case "settings":
         if (!e.repeat) settingsOpen = true;
         break;
+      case "toggle_watchlist":
+        if (!e.repeat) view = view === "watchlist" ? "chart" : "watchlist";
+        break;
       case "chart_mode":
         setMode(mode === "line" ? "candles" : "line");
         break;

@@ -14,6 +14,7 @@ export const ACTIONS: { id: Action; label: string }[] = [
   { id: "watchlist", label: "Next watchlist stock" },
   { id: "search", label: "Focus search" },
   { id: "settings", label: "Toggle Settings" },
+  { id: "toggle_watchlist", label: "Toggle Watchlist" },
 ];
 
 const RESERVED = new Set(["Shift", "Control", "Alt", "Meta", "Escape", "Tab", "Enter", " ", "CapsLock", "Dead", "Unidentified"]);

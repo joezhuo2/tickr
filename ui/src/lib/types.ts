@@ -141,6 +141,7 @@ export interface Keybinds {
   watchlist: string;
   search: string;
   settings: string;
+  toggle_watchlist: string;
 }
 
 /** Which event dots the chart draws. */

@@ -12,6 +12,7 @@ const DEFAULTS: Keybinds = {
   watchlist: "x",
   search: "s",
   settings: ",",
+  toggle_watchlist: "w",
 };
 
 const down = (key: string, mods: Partial<Record<"ctrlKey" | "altKey" | "metaKey", boolean>> = {}) => ({
@@ -38,6 +39,8 @@ describe("actionFor", () => {
   it("finds the action on a key", () => {
     expect(actionFor(DEFAULTS, "t")).toBe("technicals");
     expect(actionFor(DEFAULTS, ",")).toBe("settings");
+    expect(actionFor(DEFAULTS, "w")).toBe("toggle_watchlist");
+    expect(actionFor(DEFAULTS, "x")).toBe("watchlist");
     expect(actionFor(DEFAULTS, "q")).toBeNull();
     expect(actionFor({ ...DEFAULTS, search: "" }, "")).toBeNull();
   });
@@ -57,6 +60,12 @@ describe("rebind", () => {
     expect(next.settings).toBe("s");
     expect(next.search).toBe(",");
     expect(actionFor({ ...next, settings: "" }, "s")).toBeNull();
+  });
+  it("keeps Watchlist toggling separate from cycling stocks when rebound", () => {
+    const next = rebind(DEFAULTS, "toggle_watchlist", "x");
+    expect(actionFor(next, "x")).toBe("toggle_watchlist");
+    expect(actionFor(next, "w")).toBe("watchlist");
+    expect(actionFor({ ...next, toggle_watchlist: "" }, "x")).toBeNull();
   });
 });
 
