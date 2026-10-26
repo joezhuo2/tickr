@@ -11,6 +11,7 @@ const DEFAULTS: Keybinds = {
   earnings: "e",
   watchlist: "x",
   search: "s",
+  settings: ",",
 };
 
 const down = (key: string, mods: Partial<Record<"ctrlKey" | "altKey" | "metaKey", boolean>> = {}) => ({
@@ -36,6 +37,7 @@ describe("bindKey", () => {
 describe("actionFor", () => {
   it("finds the action on a key", () => {
     expect(actionFor(DEFAULTS, "t")).toBe("technicals");
+    expect(actionFor(DEFAULTS, ",")).toBe("settings");
     expect(actionFor(DEFAULTS, "q")).toBeNull();
     expect(actionFor({ ...DEFAULTS, search: "" }, "")).toBeNull();
   });
@@ -49,6 +51,12 @@ describe("rebind", () => {
   });
   it("leaves others alone on a free key", () => {
     expect(rebind(DEFAULTS, "refresh", "F5")).toEqual({ ...DEFAULTS, refresh: "F5" });
+  });
+  it("swaps the Settings shortcut and allows it to be unbound", () => {
+    const next = rebind(DEFAULTS, "settings", "s");
+    expect(next.settings).toBe("s");
+    expect(next.search).toBe(",");
+    expect(actionFor({ ...next, settings: "" }, "s")).toBeNull();
   });
 });
 

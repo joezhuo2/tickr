@@ -197,6 +197,7 @@ typing in a text field.
 | `E` | Open Earnings |
 | `X` | Next watchlist stock |
 | `S` | Focus search |
+| `,` | Toggle Settings |
 
 ## Screenshots
 

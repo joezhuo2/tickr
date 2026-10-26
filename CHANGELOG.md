@@ -6,6 +6,12 @@ All notable changes to tickr are listed here. The format follows
 
 ## [0.8.3] - 2026-10-24
 
+### Added
+
+- Configurable **Toggle Settings** shortcut, defaulting to `,`
+  ([#47](https://github.com/joezhuo2/tickr/issues/47)). Press it again to
+  close Settings; recording a binding takes priority over toggling.
+
 ### Changed
 
 - README reorganized: badges, a one-line quick navigation bar, screenshots
