@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { accelerator, display } from "./lib/hotkey";
-  import { ACTIONS, bindKey, keyLabel, rebind, type Action } from "./lib/keybinds";
+  import { ACTIONS, actionFor, bindKey, keyLabel, rebind, type Action } from "./lib/keybinds";
   import type { Dots, Keybinds } from "./lib/types";
 
   let {
@@ -52,7 +52,18 @@
 
   function onKey(e: KeyboardEvent) {
     if (!recording) {
-      if (e.key === "Escape") onclose();
+      if (e.defaultPrevented || e.repeat) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onclose();
+        return;
+      }
+      if (e.target instanceof Element && e.target.closest("input, textarea, select, [contenteditable]")) return;
+      const key = bindKey(e);
+      if (key && actionFor(keybinds, key) === "settings") {
+        e.preventDefault();
+        onclose();
+      }
       return;
     }
     e.preventDefault();

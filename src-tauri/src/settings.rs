@@ -39,6 +39,7 @@ pub struct Keybinds {
     pub earnings: String,
     pub watchlist: String,
     pub search: String,
+    pub settings: String,
 }
 
 impl Default for Keybinds {
@@ -52,6 +53,7 @@ impl Default for Keybinds {
             earnings: "e".into(),
             watchlist: "x".into(),
             search: "s".into(),
+            settings: ",".into(),
         }
     }
 }
@@ -198,6 +200,7 @@ mod tests {
         let s = Settings::load(&p);
         assert_eq!(s.keybinds.refresh, "F5");
         assert_eq!(s.keybinds.chart_mode, "c");
+        assert_eq!(s.keybinds.settings, ",");
         assert!(!s.dots.news);
         assert!(s.dots.earnings && s.dots.analysts);
     }

@@ -140,6 +140,7 @@ export interface Keybinds {
   earnings: string;
   watchlist: string;
   search: string;
+  settings: string;
 }
 
 /** Which event dots the chart draws. */

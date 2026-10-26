@@ -335,6 +335,9 @@
     if (!action) return;
     e.preventDefault();
     switch (action) {
+      case "settings":
+        if (!e.repeat) settingsOpen = true;
+        break;
       case "chart_mode":
         setMode(mode === "line" ? "candles" : "line");
         break;
