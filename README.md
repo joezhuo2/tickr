@@ -177,6 +177,22 @@ In a group tab, **Edit** shows every starred stock: click cards to add or
 remove them, rename the group, or **Delete** it. Unstarring a stock removes it
 from every group.
 
+### Price alerts
+
+Open **Alerts**, to the left of Technicals, to add an **At or above** or
+**At or below** level for the selected symbol, in its trading currency.
+The list includes alerts for every symbol. **Pause**, **Rearm** and **Delete**
+manage them; each alert fires once and then shows **Triggered**.
+
+Armed symbols are checked about every 15 seconds while tickr is running,
+including with the window closed and when viewing a different stock. The
+first successful price after arming or restarting establishes a baseline;
+the next crossing sends a native desktop notification. Extended-hours prices
+are used when available. Alerts and their triggered state are saved across
+restarts. Allow tickr notifications in your OS settings; on Windows, use an
+installed build for notifications. Quotes can be delayed and crossings between
+polls can be missed.
+
 ### Settings and keybinds
 
 The gear at the bottom left opens Settings: the global hotkey (click the field

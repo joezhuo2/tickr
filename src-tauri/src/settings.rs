@@ -108,6 +108,7 @@ pub struct Settings {
     pub auto_update: bool,
     pub keybinds: Keybinds,
     pub dots: Dots,
+    pub alerts: Vec<crate::alerts::PriceAlert>,
 }
 
 impl Default for Settings {
@@ -130,6 +131,7 @@ impl Default for Settings {
             auto_update: true,
             keybinds: Keybinds::default(),
             dots: Dots::default(),
+            alerts: Vec::new(),
         }
     }
 }
@@ -192,6 +194,7 @@ mod tests {
         assert!(s.unload_on_minimize);
         assert!(s.groups.is_empty());
         assert!(s.auto_update);
+        assert!(s.alerts.is_empty());
     }
 
     #[test]
@@ -218,6 +221,18 @@ mod tests {
             groups: vec![Group { name: "Crypto".into(), symbols: vec!["BTC-USD".into()] }],
             ..Settings::default()
         };
+        s.save(&p).unwrap();
+        assert_eq!(Settings::load(&p), s);
+    }
+
+    #[test]
+    fn alerts_roundtrip_preserves_armed_and_triggered_state() {
+        use crate::alerts::{Direction, PriceAlert};
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        let mut s = Settings::default();
+        s.alerts.push(PriceAlert { id: 1, symbol: "AAPL".into(), direction: Direction::Above, level: 250.0, enabled: true, triggered_at: None });
+        s.alerts.push(PriceAlert { id: 2, symbol: "BTC-USD".into(), direction: Direction::Below, level: 60000.0, enabled: false, triggered_at: Some(123) });
         s.save(&p).unwrap();
         assert_eq!(Settings::load(&p), s);
     }

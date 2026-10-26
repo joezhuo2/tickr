@@ -4,6 +4,18 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.5] - 2026-10-26
+
+### Added
+
+- **Price alerts** ([#27](https://github.com/joezhuo2/tickr/issues/27)) in
+  an Alerts tab to the left of Technicals. Add above/below levels for the
+  selected symbol, pause, rearm or delete them. All armed symbols are checked
+  in the background, including while the window is closed. A crossing sends
+  a native desktop notification and marks the alert Triggered. Alerts persist
+  across restarts; the first successful price after arming or restarting sets
+  the crossing baseline. Extended-hours prices are used when available.
+
 ## [0.8.4] - 2026-10-26
 
 ### Added

@@ -5,7 +5,9 @@ use std::sync::Arc;
 use base64::Engine;
 use serde::Serialize;
 use tauri::{AppHandle, State};
+use tauri_plugin_notification::NotificationExt;
 
+use crate::alerts::{self, Direction, PriceAlert};
 use crate::analysis::Analysis;
 use crate::analyst::Consensus;
 use crate::earnings::Earnings;
@@ -40,6 +42,7 @@ pub struct Init {
     groups: Vec<Group>,
     keybinds: Keybinds,
     dots: Dots,
+    alerts: Vec<PriceAlert>,
 }
 
 fn data_uri(png: &[u8]) -> String {
@@ -72,6 +75,7 @@ pub fn init_payload(shared: &Shared) -> Init {
         groups: s.groups,
         keybinds: s.keybinds,
         dots: s.dots,
+        alerts: s.alerts,
     }
 }
 
@@ -174,6 +178,72 @@ pub fn set_keybinds(shared: State<'_, Arc<Shared>>, keybinds: Keybinds) {
 #[tauri::command]
 pub fn set_dots(shared: State<'_, Arc<Shared>>, dots: Dots) {
     shared.update_settings(|s| s.dots = dots);
+}
+
+fn notification_permission(app: &AppHandle) -> Result<(), String> {
+    let permission = app.notification().request_permission().map_err(|e| e.to_string())?;
+    if permission != tauri::plugin::PermissionState::Granted {
+        return Err("Allow tickr notifications in your system settings before arming an alert.".into());
+    }
+    Ok(())
+}
+
+/// Save before returning success; a failed disk write must not look like a saved alert.
+fn edit_alerts(shared: &Shared, edit: impl FnOnce(&mut Vec<PriceAlert>) -> Result<(), String>) -> Result<Vec<PriceAlert>, String> {
+    let mut settings = lock(&shared.settings);
+    let mut next = settings.clone();
+    edit(&mut next.alerts)?;
+    next.save(&shared.settings_path).map_err(|e| format!("Could not save alerts: {e}"))?;
+    *settings = next;
+    // Each edit resets baselines only for alerts that are no longer armed.
+    lock(&shared.alert_prices).retain(|id, _| settings.alerts.iter().any(|a| a.id == *id && a.enabled));
+    Ok(settings.alerts.clone())
+}
+
+#[tauri::command]
+pub fn add_alert(app: AppHandle, shared: State<'_, Arc<Shared>>, symbol: String, direction: Direction, level: f64) -> Result<Vec<PriceAlert>, String> {
+    let symbol = alerts::validate(&symbol, level)?;
+    notification_permission(&app)?;
+    let result = edit_alerts(&shared, |alerts| {
+        if alerts.len() >= alerts::MAX_ALERTS {
+            return Err(format!("You can save up to {} alerts. Delete one first.", alerts::MAX_ALERTS));
+        }
+        if alerts.iter().any(|a| a.symbol == symbol && a.direction == direction && a.level == level) {
+            return Err("An alert for this symbol, direction and price already exists.".into());
+        }
+        let id = alerts.iter().map(|a| a.id).max().unwrap_or(0).checked_add(1).ok_or("Alert IDs exhausted.")?;
+        alerts.push(PriceAlert { id, symbol, direction, level, enabled: true, triggered_at: None });
+        Ok(())
+    })?;
+    shared.wake.notify_one();
+    Ok(result)
+}
+
+#[tauri::command]
+pub fn set_alert_enabled(app: AppHandle, shared: State<'_, Arc<Shared>>, id: u32, enabled: bool) -> Result<Vec<PriceAlert>, String> {
+    if enabled {
+        notification_permission(&app)?;
+    }
+    let result = edit_alerts(&shared, |alerts| {
+        let alert = alerts.iter_mut().find(|a| a.id == id).ok_or("Alert no longer exists.")?;
+        alert.enabled = enabled;
+        if enabled {
+            alert.triggered_at = None;
+        }
+        Ok(())
+    })?;
+    shared.wake.notify_one();
+    Ok(result)
+}
+
+#[tauri::command]
+pub fn delete_alert(shared: State<'_, Arc<Shared>>, id: u32) -> Result<Vec<PriceAlert>, String> {
+    let result = edit_alerts(&shared, |alerts| {
+        alerts.retain(|a| a.id != id);
+        Ok(())
+    })?;
+    shared.wake.notify_one();
+    Ok(result)
 }
 
 /// Opens the logo provider's page; its free tier requires the link.
@@ -305,6 +375,39 @@ pub async fn get_watch_quotes(shared: State<'_, Arc<Shared>>, symbols: Vec<Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn alert_edits_save_and_clear_paused_or_deleted_baselines() {
+        let dir = tempfile::tempdir().unwrap();
+        let shared = Shared::new(dir.path().join("settings.json"), Default::default());
+        edit_alerts(&shared, |alerts| {
+            alerts.push(PriceAlert { id: 1, symbol: "AAPL".into(), direction: Direction::Above, level: 100.0, enabled: true, triggered_at: None });
+            Ok(())
+        }).unwrap();
+        lock(&shared.alert_prices).insert(1, 99.0);
+        edit_alerts(&shared, |alerts| { alerts[0].enabled = false; Ok(()) }).unwrap();
+        assert!(lock(&shared.alert_prices).is_empty());
+        assert!(!crate::settings::Settings::load(&shared.settings_path).alerts[0].enabled);
+        edit_alerts(&shared, |alerts| { alerts[0].enabled = true; Ok(()) }).unwrap();
+        assert!(lock(&shared.alert_prices).is_empty());
+        lock(&shared.alert_prices).insert(1, 99.0);
+        edit_alerts(&shared, |alerts| { alerts.clear(); Ok(()) }).unwrap();
+        assert!(lock(&shared.alert_prices).is_empty());
+        assert!(crate::settings::Settings::load(&shared.settings_path).alerts.is_empty());
+    }
+
+    #[test]
+    fn failed_alert_save_does_not_change_live_settings() {
+        let dir = tempfile::tempdir().unwrap();
+        let blocker = dir.path().join("file");
+        std::fs::write(&blocker, "not a directory").unwrap();
+        let shared = Shared::new(blocker.join("settings.json"), Default::default());
+        assert!(edit_alerts(&shared, |alerts| {
+            alerts.push(PriceAlert { id: 1, symbol: "AAPL".into(), direction: Direction::Above, level: 100.0, enabled: true, triggered_at: None });
+            Ok(())
+        }).is_err());
+        assert!(lock(&shared.settings).alerts.is_empty());
+    }
 
     #[test]
     fn clean_symbols_dedupes_and_normalizes() {
