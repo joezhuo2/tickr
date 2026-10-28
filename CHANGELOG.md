@@ -4,6 +4,14 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.7] - 2026-10-28
+
+### Changed
+
+- **Instant open** ([#52](https://github.com/joezhuo2/tickr/issues/52)): the
+  window now opens immediately and shows skeleton loaders while stock data
+  loads, instead of waiting for the first paint before appearing.
+
 ## [0.8.6] - 2026-10-28
 
 ### Added

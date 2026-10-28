@@ -79,12 +79,6 @@ pub fn init_payload(shared: &Shared) -> Init {
     }
 }
 
-/// Called by the page after its first paint; shows the hidden window.
-#[tauri::command]
-pub fn window_ready(window: tauri::WebviewWindow) {
-    crate::window::reveal(&window);
-}
-
 #[tauri::command]
 pub fn get_init(shared: State<'_, Arc<Shared>>) -> Init {
     init_payload(&shared)
