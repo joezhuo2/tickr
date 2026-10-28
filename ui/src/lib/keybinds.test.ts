@@ -13,6 +13,10 @@ const DEFAULTS: Keybinds = {
   search: "s",
   settings: ",",
   toggle_watchlist: "w",
+  alerts: "p",
+  market: "m",
+  news: "n",
+  analyze: "z",
 };
 
 const down = (key: string, mods: Partial<Record<"ctrlKey" | "altKey" | "metaKey", boolean>> = {}) => ({
