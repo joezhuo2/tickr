@@ -357,7 +357,17 @@
       case "technicals":
       case "analysts":
       case "earnings":
+      case "alerts":
         view = view === action ? "chart" : action;
+        break;
+      case "market":
+        if (!e.repeat) toggleMarket();
+        break;
+      case "news":
+        if (!e.repeat) view === "news" ? (view = "chart") : openNews();
+        break;
+      case "analyze":
+        if (!e.repeat && view === "technicals" && !analyzing) runAnalysis();
         break;
       case "watchlist": {
         const next = watchlist[(watchlist.indexOf(symbol) + 1) % watchlist.length];

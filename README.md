@@ -215,6 +215,10 @@ typing in a text field.
 | `S` | Focus search |
 | `,` | Toggle Settings |
 | `W` | Toggle Watchlist |
+| `P` | Open Alerts |
+| `M` | Open Market |
+| `N` | Open News |
+| `Z` | Analyze in Technicals |
 
 ## Screenshots
 

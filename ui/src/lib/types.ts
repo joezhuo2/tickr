@@ -152,6 +152,10 @@ export interface Keybinds {
   search: string;
   settings: string;
   toggle_watchlist: string;
+  alerts: string;
+  market: string;
+  news: string;
+  analyze: string;
 }
 
 /** Which event dots the chart draws. */

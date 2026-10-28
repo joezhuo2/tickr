@@ -41,6 +41,10 @@ pub struct Keybinds {
     pub search: String,
     pub settings: String,
     pub toggle_watchlist: String,
+    pub alerts: String,
+    pub market: String,
+    pub news: String,
+    pub analyze: String,
 }
 
 impl Default for Keybinds {
@@ -56,6 +60,10 @@ impl Default for Keybinds {
             search: "s".into(),
             settings: ",".into(),
             toggle_watchlist: "w".into(),
+            alerts: "p".into(),
+            market: "m".into(),
+            news: "n".into(),
+            analyze: "z".into(),
         }
     }
 }
