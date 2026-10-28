@@ -4,6 +4,14 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.6] - 2026-10-28
+
+### Added
+
+- **Hotkeys** ([#51](https://github.com/joezhuo2/tickr/issues/51)): new
+  rebindable in-window keys for Alerts (`P`), Market (`M`), News (`N`), and
+  Analyze / re-analyze in Technicals (`Z`). Settings already had a key.
+
 ## [0.8.5] - 2026-10-26
 
 ### Added
