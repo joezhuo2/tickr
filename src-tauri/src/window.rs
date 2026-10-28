@@ -97,21 +97,9 @@ fn create(app: &AppHandle) -> tauri::Result<()> {
         }
         None => win.center()?,
     }
-    // The page calls `window_ready` after its first paint, so the window
-    // appears already rendered. Fallback in case the page never reports.
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_millis(800)).await;
-        reveal(&win);
-    });
+    win.show()?;
+    win.set_focus()?;
     Ok(())
-}
-
-/// Shows and focuses a window created hidden. No-op once visible.
-pub fn reveal(win: &WebviewWindow) {
-    if !win.is_visible().unwrap_or(true) {
-        let _ = win.show();
-        let _ = win.set_focus();
-    }
 }
 
 /// Whether the OS is in dark mode (Windows apps theme setting).

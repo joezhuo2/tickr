@@ -382,15 +382,6 @@
 
   onMount(() => {
     if (!boot) invoke<Init>("get_init").then(apply);
-    // Reveal after the first frame. A hidden window may throttle rAF, so a
-    // short timer races it.
-    let revealed = false;
-    const reveal = () => {
-      if (!revealed) invoke("window_ready").catch(console.warn);
-      revealed = true;
-    };
-    requestAnimationFrame(() => requestAnimationFrame(reveal));
-    setTimeout(reveal, 60);
     const un = listen<QuoteState>("quote", (e) => {
       qs = e.payload;
       refreshing = false;
