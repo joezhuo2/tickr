@@ -10,6 +10,7 @@ pub mod grades;
 pub mod hotkey;
 pub mod logo;
 pub mod market;
+pub mod options;
 pub mod news;
 pub mod poller;
 pub mod quote;
