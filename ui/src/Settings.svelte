@@ -2,7 +2,8 @@
   import { invoke } from "@tauri-apps/api/core";
   import { accelerator, display } from "./lib/hotkey";
   import { ACTIONS, actionFor, bindKey, keyLabel, rebind, type Action } from "./lib/keybinds";
-  import type { Dots, Keybinds } from "./lib/types";
+  import { onMount } from "svelte";
+  import type { AiConfig, Dots, Keybinds } from "./lib/types";
 
   let {
     hotkey = $bindable(),
@@ -30,6 +31,26 @@
   function toggleDot(id: keyof Dots) {
     dots = { ...dots, [id]: !dots[id] };
     invoke("set_dots", { dots }).catch(console.warn);
+  }
+
+  let ai = $state<AiConfig>({ enabled: true, base_url: "", model: "", api_key: "" });
+  let aiStatus = $state<{ text: string; ok: boolean } | null>(null);
+  let showKey = $state(false);
+
+  onMount(() => {
+    invoke<AiConfig>("get_ai_config").then((c) => (ai = c)).catch(console.warn);
+  });
+
+  async function saveAi() {
+    try {
+      await invoke("set_ai_config", { prefs: ai });
+      aiStatus = {
+        ok: true,
+        text: !ai.enabled ? "Off: using keyword tone." : ai.base_url.trim() && ai.model.trim() ? "Saved." : "Saved. Base URL and model are needed to use AI.",
+      };
+    } catch (e) {
+      aiStatus = { ok: false, text: String(e) };
+    }
   }
 
   let recording = $state<"hotkey" | Action | null>(null);
@@ -139,6 +160,30 @@
         <input type="checkbox" checked={dots[d.id]} onchange={() => toggleDot(d.id)} />
       </label>
     {/each}
+
+    <h3>AI news analysis</h3>
+    <label class="row">
+      <span>Enabled</span>
+      <input type="checkbox" bind:checked={ai.enabled} onchange={saveAi} />
+    </label>
+    <label class="row">
+      <span>Base URL</span>
+      <input class="field" type="text" placeholder="https://api.openai.com/v1" spellcheck="false" bind:value={ai.base_url} onchange={saveAi} />
+    </label>
+    <label class="row">
+      <span>Model</span>
+      <input class="field" type="text" placeholder="gpt-4o-mini" spellcheck="false" bind:value={ai.model} onchange={saveAi} />
+    </label>
+    <label class="row">
+      <span>API key</span>
+      <span class="keys">
+        <input class="field" type={showKey ? "text" : "password"} autocomplete="off" spellcheck="false" bind:value={ai.api_key} onchange={saveAi} />
+        <button class="link" onclick={(e) => { e.preventDefault(); showKey = !showKey; }}>{showKey ? "Hide" : "Show"}</button>
+      </span>
+    </label>
+    <p class:error={aiStatus && !aiStatus.ok} class="hint">
+      {aiStatus ? aiStatus.text : "Any OpenAI-compatible endpoint. Saved to .env.local; keyword tone is the fallback."}
+    </p>
   </div>
 </div>
 
@@ -220,6 +265,23 @@
     color: var(--accent);
     cursor: pointer;
     padding: 0;
+  }
+  .field {
+    width: 220px;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 5px;
+    border: 1px solid var(--faint);
+    background: var(--surface);
+    color: var(--text);
+  }
+  .hint {
+    margin: 4px 0 0;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .hint.error {
+    color: var(--down);
   }
   .error {
     margin: 4px 0 0;
