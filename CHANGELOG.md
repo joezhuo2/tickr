@@ -6,6 +6,8 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.8.11] - 2026-10-29
+
 ### Added
 
 - **AI news analysis** ([#55](https://github.com/joezhuo2/tickr/issues/55)):
