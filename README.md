@@ -227,6 +227,21 @@ typing in a text field.
 | `N` | Open News |
 | `Z` | Analyze in Technicals |
 
+### AI news analysis
+
+Headline tone (the dots on the chart and the News view) comes from a local
+keyword lexicon by default. Optionally, Settings > AI news analysis sends new
+headlines to any OpenAI-compatible chat-completions endpoint (OpenAI, Ollama,
+LM Studio, ...) to classify them as positive, neutral or negative. Fill in the
+base URL (for example `https://api.openai.com/v1`), the model and, if the
+endpoint needs one, the API key. The key may stay empty for local endpoints.
+
+These are saved to `.env.local` in the settings folder (see [Files](#files)),
+not to `settings.json`, as `TICKR_AI_BASE_URL`, `TICKR_AI_MODEL` and
+`TICKR_AI_API_KEY`; other lines in that file are left alone. Results are cached
+per model and headline in the cache folder, so each headline is sent once. If
+AI is off, not configured or a call fails, the keyword tone is used.
+
 ## Screenshots
 
 Captured with sample data. Quotes, headlines and alert levels are
@@ -255,7 +270,8 @@ requires. Analysis and sentiment run on your machine. Not investment advice.
 | What | Windows | macOS |
 | --- | --- | --- |
 | Settings | `%APPDATA%\tickr\settings.json` | `~/Library/Application Support/tickr/` |
-| Logo cache | `%LOCALAPPDATA%\tickr\` | `~/Library/Caches/tickr/` |
+| AI credentials | `%APPDATA%\tickr\.env.local` | `~/Library/Application Support/tickr/` |
+| Logo and AI tone cache | `%LOCALAPPDATA%\tickr\` | `~/Library/Caches/tickr/` |
 | Logs | `%LOCALAPPDATA%\dev.tickr.desktop\logs\tickr.log` | `~/Library/Logs/dev.tickr.desktop/` |
 
 Logs rotate at 1 MB and keep two old files. Attach `tickr.log` to bug reports.
@@ -295,8 +311,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.8.10
-git push origin v0.8.10
+git tag v0.8.11
+git push origin v0.8.11
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

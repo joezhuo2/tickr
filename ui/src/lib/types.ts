@@ -165,6 +165,14 @@ export interface Dots {
   analysts: boolean;
 }
 
+/** AI news analysis: the toggle from settings.json plus the .env.local credentials. */
+export interface AiConfig {
+  enabled: boolean;
+  base_url: string;
+  model: string;
+  api_key: string;
+}
+
 /** Tone of a headline, from sentiment.rs. */
 export type Sentiment = "positive" | "negative" | "neutral";
 

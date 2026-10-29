@@ -48,6 +48,8 @@ pub struct Shared {
     /// Last known window geometry while it was not minimized.
     pub geometry: Mutex<Option<Geometry>>,
     /// Last chart the window fetched; survives window unloads.
+    /// Headline tones from the AI endpoint; loaded from disk on first use.
+    pub ai_cache: Mutex<Option<crate::ai::SentimentCache>>,
     pub last_chart: Mutex<Option<Chart>>,
     /// Why the saved hotkey is not registered, if it is not.
     pub hotkey_error: Mutex<Option<String>>,
@@ -72,6 +74,7 @@ impl Shared {
             alert_prices: Mutex::new(HashMap::new()),
             logo: Mutex::new(None),
             geometry: Mutex::new(geometry),
+            ai_cache: Mutex::new(None),
             last_chart: Mutex::new(None),
             hotkey_error: Mutex::new(None),
             autostart_error: Mutex::new(None),
