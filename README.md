@@ -29,7 +29,7 @@
 > global hotkey opens a window with a chart, the analyst consensus, earnings and
 > recent news.
 
-<p align="center"><img src="assets/screenshots/chart.png" alt="tickr window: AAPL six-month candle chart with the hover tooltip and event dots" width="85%"></p>
+<p align="center"><img src="assets/screenshots/chart.png" alt="tickr window: AAPL five-year candle chart with the hover tooltip, event dots and PNG/CSV export buttons" width="85%"></p>
 
 ## Download
 
@@ -222,12 +222,17 @@ typing in a text field.
 
 ## Screenshots
 
+Captured with sample data. Quotes, headlines and alert levels are
+illustrative. Click an image to view it at full size.
+
 | | |
 | :---: | :---: |
-| <img src="assets/screenshots/technicals.webp" alt="Technicals view with overlays, score and targets"><br>**Technicals** | <img src="assets/screenshots/market.png" alt="Market overview"><br>**Market** |
-| <img src="assets/screenshots/news.png" alt="News headlines with sentiment pills"><br>**News** | <img src="assets/screenshots/analysts.png" alt="Analyst price target and consensus"><br>**Analysts** |
-| <img src="assets/screenshots/earnings.png" alt="Next and past earnings reports"><br>**Earnings** | <img src="assets/screenshots/stats.png" alt="Key statistics"><br>**Stats** |
-| <img src="assets/screenshots/settings.png" alt="Settings with hotkey, keybinds and chart dots" width="70%"><br>**Settings** | <img src="assets/screenshots/chart.png" alt="Candle chart with tooltip and event dots"><br>**Chart** |
+| <img src="assets/screenshots/alerts.png" alt="Price alerts with above and below thresholds, armed, paused and triggered states"><br>**Price alerts** — set levels and manage alerts across symbols | <img src="assets/screenshots/watchlist.png" alt="All starred stocks sorted by session gain, with named group tabs"><br>**Watchlist** — session prices and moves, biggest gain first |
+| <img src="assets/screenshots/watchlist-groups.png" alt="Tech watchlist group showing only its member stocks"><br>**Watchlist groups** — focus on a named set of stocks | <img src="assets/screenshots/watchlist-edit.png" alt="Editing the Tech group with selected cards, rename field and Delete button"><br>**Group editing** — select members, rename or delete a group |
+| <img src="assets/screenshots/chart.png" alt="AAPL five-year candle chart with OHLC tooltip, event dots and PNG/CSV export buttons"><br>**Chart and exports** — hover for details and copy PNG or CSV | <img src="assets/screenshots/technicals.webp" alt="Technicals with moving averages, Bollinger bands, Fibonacci levels, RSI, score and targets"><br>**Technicals** — local analysis, signals and chart overlays |
+| <img src="assets/screenshots/market.png" alt="Market overview with indices, macro quotes, sector ETFs and top gainers and losers"><br>**Market** — indices, sectors and the day's movers | <img src="assets/screenshots/news.png" alt="News headlines with publisher, time and positive, negative or neutral sentiment pills"><br>**News** — headlines with sentiment hints |
+| <img src="assets/screenshots/analysts.png" alt="Analyst price target range, current price and consensus rating distribution"><br>**Analysts** — target range and rating breakdown | <img src="assets/screenshots/earnings.png" alt="Next earnings date and estimates alongside four quarters of results and surprises"><br>**Earnings** — upcoming report and past results |
+| <img src="assets/screenshots/stats.png" alt="Key statistics grouped by valuation, trading, dividends, shares, profitability and financials"><br>**Stats** — fundamentals with color-coded changes and returns | <img src="assets/screenshots/settings.png" alt="Settings with global hotkey, all fourteen in-window keybinds including Alerts, Market, News and Analyze, and chart dot toggles" width="45%"><br>**Settings** — hotkey, keybinds and chart dots |
 
 ## Data
 
@@ -283,8 +288,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.8.3
-git push origin v0.8.3
+git tag v0.8.8
+git push origin v0.8.8
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

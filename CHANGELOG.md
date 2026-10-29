@@ -4,6 +4,15 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.8] - 2026-10-29
+
+### Changed
+
+- Refreshed every README screenshot to show the current interface, including
+  chart export controls and the complete set of keyboard shortcuts.
+- Added screenshots for price alerts, the watchlist, watchlist groups and
+  group editing, with feature captions and a sample-data note.
+
 ## [0.8.7] - 2026-10-28
 
 ### Changed

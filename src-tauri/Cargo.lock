@@ -4531,7 +4531,7 @@ dependencies = [
 
 [[package]]
 name = "tickr"
-version = "0.8.7"
+version = "0.8.8"
 dependencies = [
  "base64 0.22.1",
  "dirs 6.0.0",
