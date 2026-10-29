@@ -1,5 +1,6 @@
 //! Optional AI headline tone through an OpenAI-compatible chat endpoint.
 
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -183,6 +184,61 @@ pub async fn classify(client: &reqwest::Client, cfg: &AiConfig, symbol: &str, ti
     parse_reply(&body, titles.len())
 }
 
+const CACHE_CAP: usize = 2000;
+
+pub fn cache_key(model: &str, link: &str) -> String {
+    format!("{model}
+{link}")
+}
+
+pub fn cache_path() -> PathBuf {
+    crate::settings::cache_dir().join("ai-sentiment.json")
+}
+
+#[derive(Debug, Default)]
+pub struct SentimentCache {
+    map: HashMap<String, Sentiment>,
+    order: VecDeque<String>,
+}
+
+impl SentimentCache {
+    pub fn load(path: &Path) -> Self {
+        let entries: Vec<(String, Sentiment)> =
+            std::fs::read(path).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+        let mut c = Self::default();
+        c.insert_all(entries);
+        c
+    }
+
+    pub fn get(&self, key: &str) -> Option<Sentiment> {
+        self.map.get(key).copied()
+    }
+
+    pub fn insert_all(&mut self, items: impl IntoIterator<Item = (String, Sentiment)>) {
+        for (k, v) in items {
+            if self.map.insert(k.clone(), v).is_some() {
+                self.order.retain(|o| *o != k);
+            }
+            self.order.push_back(k);
+        }
+        while self.order.len() > CACHE_CAP {
+            if let Some(old) = self.order.pop_front() {
+                self.map.remove(&old);
+            }
+        }
+    }
+
+    pub fn save(&self, path: &Path) -> std::io::Result<()> {
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        let entries: Vec<(&String, Sentiment)> = self.order.iter().map(|k| (k, self.map[k])).collect();
+        let tmp = path.with_extension("json.tmp");
+        std::fs::write(&tmp, serde_json::to_vec(&entries)?)?;
+        std::fs::rename(tmp, path)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -268,5 +324,22 @@ mod tests {
         assert!(parse_reply(&reply("no array"), 1).is_err());
         assert!(parse_reply(b"{}", 1).is_err());
         assert!(parse_reply(b"nope", 1).is_err());
+    }
+
+    #[test]
+    fn cache_roundtrips_and_caps_oldest() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("c/ai.json");
+        let mut c = SentimentCache::load(&p);
+        c.insert_all((0..CACHE_CAP + 5).map(|i| (format!("k{i}"), Sentiment::Positive)));
+        c.insert_all([("k10".to_string(), Sentiment::Negative)]);
+        assert_eq!(c.get("k0"), None);
+        assert_eq!(c.get("k10"), Some(Sentiment::Negative));
+        c.save(&p).unwrap();
+        let back = SentimentCache::load(&p);
+        assert_eq!(back.get("k10"), Some(Sentiment::Negative));
+        assert_eq!(back.get(&format!("k{}", CACHE_CAP + 4)), Some(Sentiment::Positive));
+        assert_eq!(back.map.len(), CACHE_CAP);
+        assert_ne!(cache_key("a", "l"), cache_key("b", "l"));
     }
 }

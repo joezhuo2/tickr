@@ -14,9 +14,9 @@
 //! - A total of at least +0.5 is positive, at most −0.5 negative, otherwise
 //!   neutral.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Sentiment {
     Positive,
