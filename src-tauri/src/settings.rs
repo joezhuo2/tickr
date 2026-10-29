@@ -116,6 +116,8 @@ pub struct Settings {
     pub auto_update: bool,
     pub keybinds: Keybinds,
     pub dots: Dots,
+    /// Classify headline tone with the AI endpoint from .env.local.
+    pub ai_news: bool,
     pub alerts: Vec<crate::alerts::PriceAlert>,
 }
 
@@ -139,6 +141,7 @@ impl Default for Settings {
             auto_update: true,
             keybinds: Keybinds::default(),
             dots: Dots::default(),
+            ai_news: true,
             alerts: Vec::new(),
         }
     }
@@ -203,6 +206,7 @@ mod tests {
         assert!(s.groups.is_empty());
         assert!(s.auto_update);
         assert!(s.alerts.is_empty());
+        assert!(s.ai_news);
     }
 
     #[test]
