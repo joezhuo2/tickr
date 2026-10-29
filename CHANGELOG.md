@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **AI news analysis** ([#55](https://github.com/joezhuo2/tickr/issues/55)):
+  optionally classify headline tone with any OpenAI-compatible endpoint,
+  configured in Settings and stored in `.env.local`. The keyword tone stays as
+  the fallback.
+
 ## [0.8.10] - 2026-10-29
 
 ### Added
