@@ -122,8 +122,10 @@ taskbar to keep it visible.
   | Green | Ex-dividend date and amount (6M to Max) |
   | Purple | Stock split and ratio (6M to Max) |
 
-  Dots stack when a candle has more than one. Earnings, news and rating dots
-  can be turned off in Settings.
+  Dots stack when a candle has more than one. A news dot gets a smaller inner
+  circle: green when that candle's headlines lean positive, red when they lean
+  negative, and plain when neutral. Earnings, news and rating dots can be
+  turned off in Settings.
 - **Exports:** hover the chart for two buttons at its top left. One copies
   the chart as a PNG image, the other its candles as CSV (time in UTC, open,
   high, low, close, volume). A button turns green once the copy lands.
