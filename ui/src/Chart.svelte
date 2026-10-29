@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, niceTicks, num, price, quarterLabel, volume } from "./lib/format";
+  import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, niceTicks, num, price, quarterLabel, volume } from "./lib/format";
   import type { Analysis, Article, Chart, ChartMode, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
 
   let {
@@ -325,8 +325,17 @@
         const k = stacked.get(i) ?? 0;
         stacked.set(i, k + 1);
         ctx.beginPath();
-        ctx.arc(g.x(i), PAD.t + g.priceH - 5 - 10 * k, 4, 0, Math.PI * 2);
+        const y = PAD.t + g.priceH - 5 - 10 * k;
+        ctx.arc(g.x(i), y, 4, 0, Math.PI * 2);
         ctx.fill();
+        const tone = at === newsAt ? netSentiment(newsAt.get(i)!.map((a) => a.sentiment)) : "neutral";
+        if (tone !== "neutral") {
+          ctx.fillStyle = v(tone === "positive" ? "--up" : "--down");
+          ctx.beginPath();
+          ctx.arc(g.x(i), y, 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = v(color);
+        }
       }
     }
 

@@ -4,6 +4,16 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+## [0.8.10] - 2026-10-29
+
+### Added
+
+- **News tone on chart dots** ([#56](https://github.com/joezhuo2/tickr/issues/56)):
+  news dots show a green or red inner circle when that candle's headlines lean
+  positive or negative.
+
 ## [0.8.9] - 2026-10-29
 
 ### Added
