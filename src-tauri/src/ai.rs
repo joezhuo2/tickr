@@ -1,8 +1,12 @@
 //! Optional AI headline tone through an OpenAI-compatible chat endpoint.
 
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+
+use crate::sentiment::Sentiment;
 
 const KEY_BASE_URL: &str = "TICKR_AI_BASE_URL";
 const KEY_MODEL: &str = "TICKR_AI_MODEL";
@@ -121,6 +125,64 @@ pub fn save_config(path: &Path, cfg: &AiConfig) -> std::io::Result<()> {
     std::fs::rename(tmp, path)
 }
 
+const SYSTEM_PROMPT: &str = "You classify stock news headlines. For each numbered headline, judge its likely effect on the named stock's price or tone: \"positive\", \"neutral\" or \"negative\". Reply with only a JSON array of those strings, one per headline, in order. No prose, no code fences.";
+
+pub fn request_body(model: &str, symbol: &str, titles: &[&str]) -> Value {
+    let list: String = titles.iter().enumerate().map(|(i, t)| format!("{}. {t}
+", i + 1)).collect();
+    json!({
+        "model": model,
+        "temperature": 0,
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": format!("Stock: {symbol}
+Headlines:
+{list}")},
+        ],
+    })
+}
+
+pub fn chat_url(base_url: &str) -> String {
+    format!("{}/chat/completions", base_url.trim().trim_end_matches('/'))
+}
+
+pub fn parse_reply(body: &[u8], expected: usize) -> Result<Vec<Sentiment>, String> {
+    let v: Value = serde_json::from_slice(body).map_err(|e| format!("bad response: {e}"))?;
+    let content = v["choices"][0]["message"]["content"].as_str().ok_or("no message in response")?;
+    let (start, end) = content.find('[').zip(content.rfind(']')).filter(|(s, e)| s < e).ok_or("no JSON array in reply")?;
+    let labels: Vec<String> = serde_json::from_str(&content[start..=end]).map_err(|e| format!("bad array: {e}"))?;
+    if labels.len() != expected {
+        return Err(format!("expected {expected} labels, got {}", labels.len()));
+    }
+    labels
+        .iter()
+        .map(|l| match l.trim().to_lowercase().as_str() {
+            "positive" => Ok(Sentiment::Positive),
+            "negative" => Ok(Sentiment::Negative),
+            "neutral" => Ok(Sentiment::Neutral),
+            other => Err(format!("unknown label {other:?}")),
+        })
+        .collect()
+}
+
+pub async fn classify(client: &reqwest::Client, cfg: &AiConfig, symbol: &str, titles: &[&str]) -> Result<Vec<Sentiment>, String> {
+    let mut req = client
+        .post(chat_url(&cfg.base_url))
+        .timeout(Duration::from_secs(20))
+        .header("content-type", "application/json")
+        .body(request_body(cfg.model.trim(), symbol, titles).to_string());
+    if !cfg.api_key.trim().is_empty() {
+        req = req.bearer_auth(cfg.api_key.trim());
+    }
+    let resp = req.send().await.map_err(|e| format!("request failed: {}", e.without_url()))?;
+    let status = resp.status();
+    let body = resp.bytes().await.map_err(|e| format!("read failed: {}", e.without_url()))?;
+    if !status.is_success() {
+        return Err(format!("HTTP {status}"));
+    }
+    parse_reply(&body, titles.len())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -171,5 +233,40 @@ mod tests {
         assert!(text.starts_with("# mine\nOTHER=1\n"));
         assert_eq!(load_config(&p), next);
         assert!(next.configured());
+    }
+
+    fn reply(content: &str) -> Vec<u8> {
+        json!({"choices": [{"message": {"content": content}}]}).to_string().into_bytes()
+    }
+
+    #[test]
+    fn builds_request() {
+        let b = request_body("m", "AAPL", &["Up", "Down"]);
+        assert_eq!(b["model"], "m");
+        assert_eq!(b["temperature"], 0);
+        let user = b["messages"][1]["content"].as_str().unwrap();
+        assert!(user.contains("AAPL") && user.contains("1. Up
+2. Down
+"));
+        assert_eq!(chat_url(" http://h/v1// "), "http://h/v1/chat/completions");
+    }
+
+    #[test]
+    fn parses_fenced_and_chatty_replies() {
+        use Sentiment::*;
+        assert_eq!(parse_reply(&reply("[\"positive\",\"Neutral\"]"), 2).unwrap(), [Positive, Neutral]);
+        assert_eq!(parse_reply(&reply("```json
+[\"negative\"]
+```"), 1).unwrap(), [Negative]);
+        assert_eq!(parse_reply(&reply("Sure: [\"neutral\"] done"), 1).unwrap(), [Neutral]);
+    }
+
+    #[test]
+    fn rejects_bad_replies() {
+        assert!(parse_reply(&reply("[\"positive\"]"), 2).is_err());
+        assert!(parse_reply(&reply("[\"great\"]"), 1).is_err());
+        assert!(parse_reply(&reply("no array"), 1).is_err());
+        assert!(parse_reply(b"{}", 1).is_err());
+        assert!(parse_reply(b"nope", 1).is_err());
     }
 }
