@@ -143,6 +143,12 @@ export function sentimentTone(s: Sentiment): "up" | "down" | "flat" {
   return "flat";
 }
 
+/** Net tone of several headlines: more positive than negative is positive, and the reverse; a tie is neutral. */
+export function netSentiment(tones: Sentiment[]): Sentiment {
+  const net = tones.filter((t) => t === "positive").length - tones.filter((t) => t === "negative").length;
+  return net > 0 ? "positive" : net < 0 ? "negative" : "neutral";
+}
+
 /** Evenly spaced "nice" tick values inside [lo, hi]. */
 export function niceTicks(lo: number, hi: number, count = 4): number[] {
   if (!(hi > lo)) return [lo];

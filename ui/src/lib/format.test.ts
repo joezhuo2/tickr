@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ago, alignTimes, axisTime, biasLabel, biasTone, byGain, candleAt, candlesCsv, change, direction, fullTime, newsDate, niceTicks, price, quarterLabel, ratingLabel, ratingTone, sentimentLabel, sentimentTone, sessionMove, signed, span, statTone, upside, volume } from "./format";
+import { ago, alignTimes, axisTime, biasLabel, biasTone, byGain, candleAt, candlesCsv, change, direction, fullTime, netSentiment, newsDate, niceTicks, price, quarterLabel, ratingLabel, ratingTone, sentimentLabel, sentimentTone, sessionMove, signed, span, statTone, upside, volume } from "./format";
 import { accelerator, display } from "./hotkey";
 
 const key = (code: string, mods: Partial<Record<"ctrlKey" | "altKey" | "shiftKey" | "metaKey", boolean>> = {}) => ({
@@ -173,5 +173,14 @@ describe("exports", () => {
       "time,open,high,low,close,volume\n1970-01-01T00:00:00.000Z,1,2,0.5,1.5,100",
     );
     expect(candlesCsv([])).toBe("time,open,high,low,close,volume");
+  });
+});
+
+describe("netSentiment", () => {
+  it("nets positive against negative", () => {
+    expect(netSentiment(["positive", "neutral"])).toBe("positive");
+    expect(netSentiment(["negative", "negative", "positive"])).toBe("negative");
+    expect(netSentiment(["positive", "negative"])).toBe("neutral");
+    expect(netSentiment([])).toBe("neutral");
   });
 });
