@@ -94,6 +94,7 @@ pub fn run() {
             commands::get_rating_changes,
             commands::get_stats,
             commands::get_market,
+            commands::get_options,
             commands::set_watchlist,
             commands::set_groups,
             commands::get_watch_quotes,
