@@ -1,0 +1,175 @@
+//! Optional AI headline tone through an OpenAI-compatible chat endpoint.
+
+use std::path::{Path, PathBuf};
+
+use serde::{Deserialize, Serialize};
+
+const KEY_BASE_URL: &str = "TICKR_AI_BASE_URL";
+const KEY_MODEL: &str = "TICKR_AI_MODEL";
+const KEY_API_KEY: &str = "TICKR_AI_API_KEY";
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct AiConfig {
+    pub base_url: String,
+    pub model: String,
+    pub api_key: String,
+}
+
+impl AiConfig {
+    /// The API key may stay empty for local endpoints.
+    pub fn configured(&self) -> bool {
+        !self.base_url.trim().is_empty() && !self.model.trim().is_empty()
+    }
+}
+
+pub fn env_path() -> PathBuf {
+    crate::settings::config_dir().join(".env.local")
+}
+
+fn parse_line(line: &str) -> Option<(&str, String)> {
+    let line = line.trim();
+    if line.starts_with('#') {
+        return None;
+    }
+    let line = line.strip_prefix("export ").unwrap_or(line);
+    let (key, value) = line.split_once('=')?;
+    let value = value.trim();
+    let parsed = match value.chars().next() {
+        Some(q @ ('"' | '\'')) => {
+            let inner = &value[1..];
+            let mut out = String::new();
+            let mut chars = inner.chars();
+            while let Some(c) = chars.next() {
+                if c == q {
+                    break;
+                }
+                if c == '\u{5c}' && q == '"' {
+                    match chars.next() {
+                        Some(n @ ('"' | '\u{5c}')) => out.push(n),
+                        Some(n) => {
+                            out.push('\u{5c}');
+                            out.push(n);
+                        }
+                        None => out.push('\u{5c}'),
+                    }
+                } else {
+                    out.push(c);
+                }
+            }
+            out
+        }
+        _ => value.split(" #").next().unwrap_or_default().trim_end().to_string(),
+    };
+    Some((key.trim(), parsed))
+}
+
+pub fn env_get(text: &str, key: &str) -> Option<String> {
+    text.lines().filter_map(parse_line).find(|(k, _)| *k == key).map(|(_, v)| v)
+}
+
+fn format_value(value: &str) -> String {
+    let plain = value.chars().all(|c| !c.is_whitespace() && !matches!(c, '"' | '\'' | '#' | '\u{5c}'));
+    if plain {
+        value.to_string()
+    } else {
+        format!("\"{}\"", value.replace('\u{5c}', "\\\\").replace('"', "\\\""))
+    }
+}
+
+/// Replaces the first line for `key` in place, or appends one; other lines are kept.
+pub fn env_set(text: &str, key: &str, value: &str) -> String {
+    let nl = if text.contains("\r\n") { "\r\n" } else { "\n" };
+    let new_line = format!("{key}={}", format_value(value));
+    let mut out = String::with_capacity(text.len() + new_line.len() + 2);
+    let mut found = false;
+    for raw in text.split_inclusive('\n') {
+        let body = raw.trim_end_matches(['\r', '\n']);
+        if !found && parse_line(body).is_some_and(|(k, _)| k == key) {
+            found = true;
+            out.push_str(&new_line);
+            out.push_str(&raw[body.len()..]);
+        } else {
+            out.push_str(raw);
+        }
+    }
+    if !found {
+        if !out.is_empty() && !out.ends_with('\n') {
+            out.push_str(nl);
+        }
+        out.push_str(&new_line);
+        out.push_str(nl);
+    }
+    out
+}
+
+pub fn load_config(path: &Path) -> AiConfig {
+    let text = std::fs::read_to_string(path).unwrap_or_default();
+    let get = |k| env_get(&text, k).unwrap_or_default();
+    AiConfig { base_url: get(KEY_BASE_URL), model: get(KEY_MODEL), api_key: get(KEY_API_KEY) }
+}
+
+pub fn save_config(path: &Path, cfg: &AiConfig) -> std::io::Result<()> {
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let mut text = std::fs::read_to_string(path).unwrap_or_default();
+    for (k, v) in [(KEY_BASE_URL, &cfg.base_url), (KEY_MODEL, &cfg.model), (KEY_API_KEY, &cfg.api_key)] {
+        text = env_set(&text, k, v.trim());
+    }
+    let tmp = path.with_extension("local.tmp");
+    std::fs::write(&tmp, text)?;
+    std::fs::rename(tmp, path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_plain_quoted_and_crlf_values() {
+        let text = "# c\r\nA=1\r\nexport B = \"x y # z\" \r\nC='q\"r'\r\nD=v # note\r\nE=\"a\\\"b\"\r\n";
+        assert_eq!(env_get(text, "A").as_deref(), Some("1"));
+        assert_eq!(env_get(text, "B").as_deref(), Some("x y # z"));
+        assert_eq!(env_get(text, "C").as_deref(), Some("q\"r"));
+        assert_eq!(env_get(text, "D").as_deref(), Some("v"));
+        assert_eq!(env_get(text, "E").as_deref(), Some("a\"b"));
+        assert_eq!(env_get(text, "#"), None);
+        assert_eq!(env_get(text, "Z"), None);
+    }
+
+    #[test]
+    fn set_updates_in_place_and_keeps_other_lines() {
+        let text = "# keep\nA=1\nB=2\n";
+        assert_eq!(env_set(text, "A", "9"), "# keep\nA=9\nB=2\n");
+        assert_eq!(env_set(text, "C", "3"), "# keep\nA=1\nB=2\nC=3\n");
+        assert_eq!(env_set("A=1", "B", "2"), "A=1\nB=2\n");
+        assert_eq!(env_set("A=1\r\nB=2\r\n", "A", "x"), "A=x\r\nB=2\r\n");
+        assert_eq!(env_set("A=1\r\n", "B", "2"), "A=1\r\nB=2\r\n");
+        assert_eq!(env_set("", "A", "1"), "A=1\n");
+    }
+
+    #[test]
+    fn set_quotes_awkward_values_and_roundtrips() {
+        for v in ["", "a b", "p#q", "say \"hi\"", "back\\slash", "it's"] {
+            let text = env_set("X=1\n", "K", v);
+            assert_eq!(env_get(&text, "K").as_deref(), Some(v), "{v:?}");
+        }
+    }
+
+    #[test]
+    fn config_roundtrip_preserves_foreign_lines() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("sub/.env.local");
+        let cfg = AiConfig { base_url: "http://localhost:11434/v1".into(), model: "llama3".into(), api_key: String::new() };
+        assert!(!load_config(&p).configured());
+        save_config(&p, &cfg).unwrap();
+        assert_eq!(load_config(&p), cfg);
+        std::fs::write(&p, format!("# mine\nOTHER=1\n{}", std::fs::read_to_string(&p).unwrap())).unwrap();
+        let next = AiConfig { model: "gpt".into(), api_key: "sk-1".into(), ..cfg };
+        save_config(&p, &next).unwrap();
+        let text = std::fs::read_to_string(&p).unwrap();
+        assert!(text.starts_with("# mine\nOTHER=1\n"));
+        assert_eq!(load_config(&p), next);
+        assert!(next.configured());
+    }
+}

@@ -1,5 +1,6 @@
 //! tickr: a tray stock ticker with a chart window behind a global hotkey.
 
+pub mod ai;
 pub mod analysis;
 pub mod alerts;
 pub mod analyst;
