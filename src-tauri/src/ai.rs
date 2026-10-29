@@ -7,7 +7,9 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+use crate::news::Article;
 use crate::sentiment::Sentiment;
+use crate::state::{lock, Shared};
 
 const KEY_BASE_URL: &str = "TICKR_AI_BASE_URL";
 const KEY_MODEL: &str = "TICKR_AI_MODEL";
@@ -236,6 +238,52 @@ impl SentimentCache {
         let tmp = path.with_extension("json.tmp");
         std::fs::write(&tmp, serde_json::to_vec(&entries)?)?;
         std::fs::rename(tmp, path)
+    }
+}
+
+/// Replaces keyword tones with AI tones for `articles`; any failure leaves them as they are.
+pub async fn apply(shared: &Shared, symbol: &str, articles: &mut [Article]) {
+    if !lock(&shared.settings).ai_news {
+        return;
+    }
+    let cfg = load_config(&env_path());
+    if !cfg.configured() {
+        return;
+    }
+    let model = cfg.model.trim().to_string();
+    let mut missing = Vec::new();
+    {
+        let mut guard = lock(&shared.ai_cache);
+        let cache = guard.get_or_insert_with(|| SentimentCache::load(&cache_path()));
+        for (i, a) in articles.iter_mut().enumerate() {
+            match cache.get(&cache_key(&model, &a.link)) {
+                Some(s) => a.sentiment = s,
+                None => missing.push(i),
+            }
+        }
+    }
+    if missing.is_empty() {
+        return;
+    }
+    let titles: Vec<&str> = missing.iter().map(|&i| articles[i].title.as_str()).collect();
+    let tones = match classify(&shared.http, &cfg, symbol, &titles).await {
+        Ok(t) => t,
+        Err(e) => {
+            log::warn!("ai news {symbol}: {e}");
+            return;
+        }
+    };
+    let mut entries = Vec::with_capacity(missing.len());
+    for (&i, tone) in missing.iter().zip(tones) {
+        articles[i].sentiment = tone;
+        entries.push((cache_key(&model, &articles[i].link), tone));
+    }
+    let mut guard = lock(&shared.ai_cache);
+    if let Some(cache) = guard.as_mut() {
+        cache.insert_all(entries);
+        if let Err(e) = cache.save(&cache_path()) {
+            log::warn!("save ai cache: {e}");
+        }
     }
 }
 

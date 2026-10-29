@@ -3,10 +3,11 @@
 use std::sync::Arc;
 
 use base64::Engine;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 use tauri_plugin_notification::NotificationExt;
 
+use crate::ai::AiConfig;
 use crate::alerts::{self, Direction, PriceAlert};
 use crate::analysis::Analysis;
 use crate::analyst::Consensus;
@@ -175,6 +176,25 @@ pub fn set_dots(shared: State<'_, Arc<Shared>>, dots: Dots) {
     shared.update_settings(|s| s.dots = dots);
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct AiPrefs {
+    pub enabled: bool,
+    #[serde(flatten)]
+    pub config: AiConfig,
+}
+
+#[tauri::command]
+pub fn get_ai_config(shared: State<'_, Arc<Shared>>) -> AiPrefs {
+    AiPrefs { enabled: lock(&shared.settings).ai_news, config: crate::ai::load_config(&crate::ai::env_path()) }
+}
+
+#[tauri::command]
+pub fn set_ai_config(shared: State<'_, Arc<Shared>>, prefs: AiPrefs) -> Result<(), String> {
+    crate::ai::save_config(&crate::ai::env_path(), &prefs.config).map_err(|e| format!("Could not save AI settings: {e}"))?;
+    shared.update_settings(|s| s.ai_news = prefs.enabled);
+    Ok(())
+}
+
 fn notification_permission(app: &AppHandle) -> Result<(), String> {
     let permission = app.notification().request_permission().map_err(|e| e.to_string())?;
     if permission != tauri::plugin::PermissionState::Granted {
@@ -288,7 +308,9 @@ pub async fn get_options(shared: State<'_, Arc<Shared>>, symbol: String, date: O
 /// Recent headlines for the symbol, newest first.
 #[tauri::command]
 pub async fn get_news(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<Vec<Article>, String> {
-    crate::news::fetch(&shared.http, &symbol).await.inspect_err(|e| log::warn!("news {symbol}: {e}"))
+    let mut list = crate::news::fetch(&shared.http, &symbol).await.inspect_err(|e| log::warn!("news {symbol}: {e}"))?;
+    crate::ai::apply(&shared, symbol.trim(), &mut list).await;
+    Ok(list)
 }
 
 /// Opens a headline in the default browser.
