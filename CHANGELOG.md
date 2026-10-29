@@ -4,6 +4,14 @@ All notable changes to tickr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Options tab** ([#57](https://github.com/joezhuo2/tickr/issues/57)): view
+  calls or puts for any expiry, with the current price as a divider and
+  in-the-money rows marked.
+
 ## [0.8.8] - 2026-10-29
 
 ### Changed

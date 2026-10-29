@@ -163,6 +163,11 @@ go back.
   yield, crude oil, gold, the dollar index and Bitcoin; the 11 S&P sector ETFs
   by day change; and the day's top 5 gainers and losers. Click a row to chart
   it.
+- **Options:** the option chain for the current symbol, calls or puts one
+  side at a time, for any expiry (type a YYYY-MM-DD date or pick from the
+  list). Strikes sit above or below the current price, in-the-money rows are
+  tagged, and each row shows last, bid/ask, change, volume, open interest,
+  implied volatility and last trade time.
 
 ### Watchlist
 
