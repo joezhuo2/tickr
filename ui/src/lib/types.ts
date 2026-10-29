@@ -216,6 +216,29 @@ export interface Market {
   losers: Mover[];
 }
 
+export interface OptionContract {
+  symbol: string;
+  strike: number;
+  last: number | null;
+  bid: number | null;
+  ask: number | null;
+  change: number | null;
+  change_pct: number | null;
+  volume: number | null;
+  open_interest: number | null;
+  iv: number | null;
+  last_trade: number | null;
+  itm: boolean;
+}
+
+export interface Options {
+  price: number | null;
+  expirations: number[];
+  expiry: number | null;
+  calls: OptionContract[];
+  puts: OptionContract[];
+}
+
 export interface StatSection {
   title: string;
   rows: [string, string][];
