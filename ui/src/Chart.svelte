@@ -2,7 +2,7 @@
   import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, niceTicks, num, price, quarterLabel, volume } from "./lib/format";
   import type { Analysis, Article, Chart, ChartMode, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
   import { untrack } from "svelte";
-  import { follow, full, isFull, pan, visible, zoom, type View } from "./lib/viewport";
+  import { follow, full, isFull, pan, reveal, visible, zoom, type View } from "./lib/viewport";
 
   let {
     chart,
@@ -694,12 +694,18 @@
   }
 
   function onKey(e: KeyboardEvent) {
-    if (geo.n === 0) return;
-    if (e.key === "ArrowLeft") hover = hover == null ? geo.n - 1 : Math.max(0, hover - 1);
-    else if (e.key === "ArrowRight") hover = hover == null ? 0 : Math.min(geo.n - 1, hover + 1);
+    if (geo.n === 0 || e.ctrlKey || e.altKey || e.metaKey) return;
+    const anchor = hover == null ? 1 : (hover + 0.5 - view.start) / view.count;
+    if (e.key === "ArrowLeft") hover = hover == null ? geo.i1 : Math.max(0, hover - 1);
+    else if (e.key === "ArrowRight") hover = hover == null ? geo.i0 : Math.min(geo.n - 1, hover + 1);
     else if (e.key === "Escape") hover = null;
+    else if (e.key === "+" || e.key === "=") view = zoom(view, geo.n, 1 / 1.25, anchor);
+    else if (e.key === "-") view = zoom(view, geo.n, 1.25, anchor);
+    else if (e.key === "0") resetView();
     else return;
+    if (hover != null) view = reveal(view, geo.n, hover);
     e.preventDefault();
+    if (/^[-+=0]$/.test(e.key)) e.stopPropagation();
   }
 
   let flashTimer: ReturnType<typeof setTimeout> | undefined;
