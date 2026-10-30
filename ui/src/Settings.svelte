@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { accelerator, display } from "./lib/hotkey";
-  import { ACTIONS, actionFor, bindKey, keyLabel, rebind, type Action } from "./lib/keybinds";
+  import { actionFor, bindKey, groupActions, keyLabel, rebind, type Action } from "./lib/keybinds";
   import { backdrop, dialog } from "./lib/motion";
   import { onMount } from "svelte";
   import type { AiConfig, Dots, Keybinds } from "./lib/types";
@@ -139,19 +139,22 @@
     {#if error}<p class="error">{error}</p>{/if}
 
     <h3>Keybinds</h3>
-    {#each ACTIONS as a (a.id)}
-      <div class="row">
-        <span>{a.label}</span>
-        <button
-          class="key"
-          class:recording={recording === a.id}
-          title="Backspace to unbind"
-          onclick={() => (recording = recording === a.id ? null : a.id)}
-          onblur={() => (recording = null)}
-        >
-          {recording === a.id ? "Press a key…" : keyLabel(keybinds[a.id])}
-        </button>
-      </div>
+    {#each groupActions() as g (g.id)}
+      <h4>{g.label}</h4>
+      {#each g.actions as a (a.id)}
+        <div class="row">
+          <span>{a.label}</span>
+          <button
+            class="key"
+            class:recording={recording === a.id}
+            title="Backspace to unbind"
+            onclick={() => (recording = recording === a.id ? null : a.id)}
+            onblur={() => (recording = null)}
+          >
+            {recording === a.id ? "Press a key…" : keyLabel(keybinds[a.id])}
+          </button>
+        </div>
+      {/each}
     {/each}
 
     <h3>Chart dots</h3>
