@@ -23,7 +23,7 @@ export function paneIn(node: Element, { y = 6, speed = "base" }: { y?: number; s
 }
 
 export function backdrop(node: Element) {
-  return fade(node, { duration: duration("fast") });
+  return fade(node, { duration: duration("base") });
 }
 
 export function dialog(node: Element) {

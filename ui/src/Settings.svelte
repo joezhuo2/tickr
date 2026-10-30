@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { accelerator, display } from "./lib/hotkey";
   import { ACTIONS, actionFor, bindKey, keyLabel, rebind, type Action } from "./lib/keybinds";
+  import { backdrop, dialog } from "./lib/motion";
   import { onMount } from "svelte";
   import type { AiConfig, Dots, Keybinds } from "./lib/types";
 
@@ -110,9 +111,9 @@
 <svelte:window onkeydown={onKey} />
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<div class="backdrop" onclick={onclose}>
+<div class="backdrop" onclick={onclose} transition:backdrop>
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div class="panel" role="dialog" tabindex="-1" aria-modal="true" aria-label="Settings" onclick={(e) => e.stopPropagation()}>
+  <div class="panel" role="dialog" tabindex="-1" aria-modal="true" aria-label="Settings" onclick={(e) => e.stopPropagation()} transition:dialog>
     <header>
       <h2>Settings</h2>
       <button class="close" aria-label="Close" onclick={onclose}>×</button>
