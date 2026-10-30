@@ -1,6 +1,7 @@
 <script lang="ts">
   import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, niceTicks, num, price, quarterLabel, volume } from "./lib/format";
   import type { Analysis, Article, Chart, ChartMode, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
+  import { full, visible, type View } from "./lib/viewport";
 
   let {
     chart,
@@ -26,6 +27,7 @@
   let height = $state(0);
   let hover = $state<number | null>(null);
   let copied = $state<"image" | "csv" | null>(null);
+  let view = $state<View>(full(0));
 
   const PAD = { l: 6, r: 62, t: 10, b: 22 };
 
@@ -129,10 +131,12 @@
     const volH = rsiOn ? plotH * 0.12 : plotH - (volTop - PAD.t);
     const rsiTop = PAD.t + plotH * 0.78;
     const rsiH = plotH - (rsiTop - PAD.t);
+    const [i0, i1] = visible(view, n);
     let lo = Infinity;
     let hi = -Infinity;
     let vmax = 0;
-    for (const c of candles) {
+    for (let i = i0; i <= i1; i++) {
+      const c = candles[i];
       lo = Math.min(lo, mode === "candles" ? c.l : c.c);
       hi = Math.max(hi, mode === "candles" ? c.h : c.c);
       vmax = Math.max(vmax, c.v);
@@ -149,7 +153,7 @@
         ...(show.vwap ? [analysis.series.vwap] : []),
       ];
       for (const line of fit) {
-        for (let i = 0; i < n; i++) {
+        for (let i = i0; i <= i1; i++) {
           const v = valueAt(line, i);
           if (v != null) {
             lo = Math.min(lo, v);
@@ -169,9 +173,12 @@
     const pad = (hi - lo) * 0.06;
     lo -= pad;
     hi += pad;
-    const step = plotW / Math.max(n, 1);
+    const step = plotW / Math.max(view.count, 1);
+    const start = view.start;
     return {
       n,
+      i0,
+      i1,
       step,
       lo,
       hi,
@@ -182,7 +189,7 @@
       volH,
       rsiTop,
       rsiH,
-      x: (i: number) => PAD.l + step * (i + 0.5),
+      x: (i: number) => PAD.l + step * (i - start + 0.5),
       y: (v: number) => PAD.t + (1 - (v - lo) / (hi - lo)) * priceH,
       vy: (v: number) => volTop + volH - (vmax > 0 ? (v / vmax) * volH : 0),
       ry: (v: number) => rsiTop + (1 - v / 100) * rsiH,
@@ -218,10 +225,12 @@
 
     // Extended-hours shading.
     if (isDay) {
+      clipPlot(ctx);
       ctx.fillStyle = v("--ext-shade");
       candles.forEach((c, i) => {
         if (isExtended(c.t)) ctx.fillRect(g.x(i) - g.step / 2, PAD.t, g.step + 0.5, bottom - PAD.t);
       });
+      ctx.restore();
     }
 
     // Grid and price axis.
@@ -245,13 +254,17 @@
     ctx.textBaseline = "alphabetic";
     ctx.fillStyle = v("--muted");
     if (g.n > 0 && chart) {
-      const every = Math.max(1, Math.ceil(g.n / Math.max(1, Math.floor((width - PAD.l - PAD.r) / 110))));
-      for (let i = Math.floor(every / 2); i < g.n; i += every) {
-        ctx.fillText(axisTime(candles[i].t, chart.meta.gmtoffset, chart.range), g.x(i), height - 6);
+      const every = Math.max(1, Math.ceil(view.count / Math.max(1, Math.floor(g.plotW / 110))));
+      const off = Math.floor(every / 2);
+      for (let i = off + Math.ceil((g.i0 - off) / every) * every; i <= g.i1; i += every) {
+        const x = g.x(i);
+        if (x < PAD.l || x > width - PAD.r) continue;
+        ctx.fillText(axisTime(candles[i].t, chart.meta.gmtoffset, chart.range), x, height - 6);
       }
     }
 
     // Volume.
+    clipPlot(ctx);
     const bw = Math.max(1, g.step * 0.65);
     candles.forEach((c, i) => {
       ctx.fillStyle = c.c >= c.o ? up : down;
@@ -309,9 +322,11 @@
       ctx.fill();
       ctx.globalAlpha = 1;
     }
+    ctx.restore();
 
     if (show && analysis) drawOverlays(ctx, g, v);
 
+    clipPlot(ctx);
     const stacked = new Map<number, number>();
     for (const [color, at] of [
       ["--accent", earningsAt],
@@ -338,6 +353,7 @@
         }
       }
     }
+    ctx.restore();
 
     // Crosshair.
     if (hover != null && candles[hover]) {
@@ -372,6 +388,13 @@
   }
 
   type Geo = typeof geo;
+
+  function clipPlot(ctx: CanvasRenderingContext2D) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(PAD.l - 4, 0, geo.plotW + 8, height);
+    ctx.clip();
+  }
 
   /** Strokes a series in two parts: dashed during warm-up, solid after. */
   function strokeLine(ctx: CanvasRenderingContext2D, line: Line, y: (v: number) => number, g: Geo) {
@@ -613,6 +636,10 @@
     hover = null;
   });
 
+  $effect(() => {
+    view = full(candles.length);
+  });
+
   function onMove(e: PointerEvent) {
     const r = wrap!.getBoundingClientRect();
     const x = e.clientX - r.left;
@@ -620,7 +647,7 @@
       hover = null;
       return;
     }
-    hover = Math.max(0, Math.min(geo.n - 1, Math.floor((x - PAD.l) / geo.step)));
+    hover = Math.max(geo.i0, Math.min(geo.i1, Math.floor(view.start + (x - PAD.l) / geo.step)));
   }
 
   function onKey(e: KeyboardEvent) {
