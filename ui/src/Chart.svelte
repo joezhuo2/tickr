@@ -28,6 +28,7 @@
   let hover = $state<number | null>(null);
   let copied = $state<"image" | "csv" | null>(null);
   let view = $state<View>(full(0));
+  let dragX = $state<number | null>(null);
 
   const PAD = { l: 6, r: 62, t: 10, b: 22 };
 
@@ -658,7 +659,19 @@
     onMove(e);
   }
 
+  function onDown(e: PointerEvent) {
+    if (e.button !== 0 || geo.n === 0 || (e.target as Element).closest(".exports")) return;
+    dragX = e.clientX;
+    wrap!.setPointerCapture(e.pointerId);
+  }
+
   function onMove(e: MouseEvent) {
+    if (dragX != null) {
+      view = pan(view, geo.n, (dragX - e.clientX) / geo.step);
+      dragX = e.clientX;
+      hover = null;
+      return;
+    }
     const r = wrap!.getBoundingClientRect();
     const x = e.clientX - r.left;
     if (geo.n === 0 || x < PAD.l || x > width - PAD.r) {
@@ -717,11 +730,15 @@
 <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
 <div
   class="chart"
+  class:dragging={dragX != null}
   bind:this={wrap}
   tabindex="0"
   role="img"
   aria-label={chart ? `${chart.meta.symbol} ${chart.range} chart` : "chart"}
+  onpointerdown={onDown}
   onpointermove={onMove}
+  onpointerup={() => (dragX = null)}
+  onpointercancel={() => (dragX = null)}
   onpointerleave={() => (hover = null)}
   onkeydown={onKey}
 >
@@ -791,6 +808,11 @@
     min-height: 0;
     outline: none;
     cursor: crosshair;
+    touch-action: none;
+    user-select: none;
+  }
+  .chart.dragging {
+    cursor: grabbing;
   }
   .chart:focus-visible {
     box-shadow: inset 0 0 0 2px var(--accent);
