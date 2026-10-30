@@ -213,26 +213,26 @@ The gear at the bottom left opens Settings: the global hotkey (click the field
 and press a new combination; **Reset** restores the default), in-window
 keybinds and the chart dot toggles. Esc or a click outside closes it.
 
-Click a keybind and press a new key to rebind it (an action already on that
+Keybinds are grouped by category. Click a keybind and press a new key to rebind it (an action already on that
 key takes the old one), or Backspace to unbind it. Keybinds are ignored while
 typing in a text field.
 
-| Key | Action |
-| --- | --- |
-| `C` | Switch line / candles |
-| `R` | Refresh |
-| `V` | Cycle date range |
-| `T` | Open Technicals |
-| `A` | Open Analysts |
-| `E` | Open Earnings |
-| `X` | Next watchlist stock |
-| `S` | Focus search |
-| `,` | Toggle Settings |
-| `W` | Toggle Watchlist |
-| `P` | Open Alerts |
-| `M` | Open Market |
-| `N` | Open News |
-| `Z` | Analyze in Technicals |
+| Category | Key | Action |
+| --- | --- | --- |
+| Chart | `C` | Switch line / candles |
+| | `V` | Cycle date range |
+| | `R` | Refresh |
+| Panels | `T` | Open Technicals |
+| | `Z` | Analyze / re-analyze |
+| | `A` | Open Analysts |
+| | `E` | Open Earnings |
+| | `P` | Open Alerts |
+| | `M` | Open Market |
+| | `N` | Open News |
+| Watchlist | `W` | Toggle Watchlist |
+| | `X` | Next watchlist stock |
+| General | `S` | Focus search |
+| | `,` | Toggle Settings |
 
 ### AI news analysis
 
