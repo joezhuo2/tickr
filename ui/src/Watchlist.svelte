@@ -274,7 +274,7 @@
     cursor: pointer;
     overflow: hidden;
     font-variant-numeric: tabular-nums;
-    transition: border-color 0.12s;
+    transition: border-color var(--motion-fast) var(--ease-out);
   }
   .card:hover {
     border-color: var(--muted);

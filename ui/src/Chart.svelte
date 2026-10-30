@@ -863,7 +863,7 @@
     gap: 2px;
     cursor: default;
     opacity: 0;
-    transition: opacity 0.15s;
+    transition: opacity var(--motion-fast) var(--ease-out);
   }
   .chart:hover .exports,
   .exports:focus-within {
