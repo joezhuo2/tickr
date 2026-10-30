@@ -494,7 +494,7 @@
             ></span>{/if}
         </div>
         {#key view}
-          <div class="pane" in:paneIn>
+          <div class="pane" in:paneIn={view === "watchlist" ? { y: 16, speed: "slow" } : {}}>
             {#if view === "watchlist"}
               <Watchlist symbols={watchlist} {groups} current={symbol} onopen={openWatched} ongroups={saveGroups} />
             {:else if view === "alerts"}

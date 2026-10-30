@@ -18,12 +18,8 @@ export function duration(speed: Speed): number {
   return ms(token(`--motion-${speed}`));
 }
 
-export function paneIn(node: Element) {
-  return fly(node, { y: 6, duration: duration("base"), easing: cubicOut });
-}
-
-export function sheetIn(node: Element) {
-  return fly(node, { y: 16, duration: duration("slow"), easing: cubicOut });
+export function paneIn(node: Element, { y = 6, speed = "base" }: { y?: number; speed?: Speed } = {}) {
+  return fly(node, { y, duration: duration(speed), easing: cubicOut });
 }
 
 export function backdrop(node: Element) {
