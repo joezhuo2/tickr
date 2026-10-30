@@ -6,6 +6,8 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.8.15] - 2026-10-30
+
 ### Changed
 
 - **Hotkey categories** ([#63](https://github.com/joezhuo2/tickr/issues/63)):
