@@ -4,22 +4,35 @@ import type { Keybinds } from "./types";
 
 export type Action = keyof Keybinds;
 
-export const ACTIONS: { id: Action; label: string }[] = [
-  { id: "chart_mode", label: "Switch line / candles" },
-  { id: "refresh", label: "Refresh" },
-  { id: "range", label: "Cycle date range" },
-  { id: "technicals", label: "Open Technicals" },
-  { id: "analysts", label: "Open Analysts" },
-  { id: "earnings", label: "Open Earnings" },
-  { id: "watchlist", label: "Next watchlist stock" },
-  { id: "search", label: "Focus search" },
-  { id: "settings", label: "Toggle Settings" },
-  { id: "toggle_watchlist", label: "Toggle Watchlist" },
-  { id: "alerts", label: "Open Alerts" },
-  { id: "market", label: "Open Market" },
-  { id: "news", label: "Open News" },
-  { id: "analyze", label: "Analyze / re-analyze" },
+export type Category = "chart" | "panels" | "watchlist" | "general";
+
+export const CATEGORIES: { id: Category; label: string }[] = [
+  { id: "chart", label: "Chart" },
+  { id: "panels", label: "Panels" },
+  { id: "watchlist", label: "Watchlist" },
+  { id: "general", label: "General" },
 ];
+
+export const ACTIONS: { id: Action; label: string; category: Category }[] = [
+  { id: "chart_mode", label: "Switch line / candles", category: "chart" },
+  { id: "range", label: "Cycle date range", category: "chart" },
+  { id: "refresh", label: "Refresh", category: "chart" },
+  { id: "technicals", label: "Open Technicals", category: "panels" },
+  { id: "analyze", label: "Analyze / re-analyze", category: "panels" },
+  { id: "analysts", label: "Open Analysts", category: "panels" },
+  { id: "earnings", label: "Open Earnings", category: "panels" },
+  { id: "alerts", label: "Open Alerts", category: "panels" },
+  { id: "market", label: "Open Market", category: "panels" },
+  { id: "news", label: "Open News", category: "panels" },
+  { id: "toggle_watchlist", label: "Toggle Watchlist", category: "watchlist" },
+  { id: "watchlist", label: "Next watchlist stock", category: "watchlist" },
+  { id: "search", label: "Focus search", category: "general" },
+  { id: "settings", label: "Toggle Settings", category: "general" },
+];
+
+export function groupActions(): { id: Category; label: string; actions: typeof ACTIONS }[] {
+  return CATEGORIES.map((c) => ({ ...c, actions: ACTIONS.filter((a) => a.category === c.id) })).filter((g) => g.actions.length);
+}
 
 const RESERVED = new Set(["Shift", "Control", "Alt", "Meta", "Escape", "Tab", "Enter", " ", "CapsLock", "Dead", "Unidentified"]);
 
