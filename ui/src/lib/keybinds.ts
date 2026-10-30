@@ -4,11 +4,12 @@ import type { Keybinds } from "./types";
 
 export type Action = keyof Keybinds;
 
-export type Category = "chart" | "panels" | "watchlist" | "general";
+export type Category = "chart" | "panels" | "options" | "watchlist" | "general";
 
 export const CATEGORIES: { id: Category; label: string }[] = [
   { id: "chart", label: "Chart" },
   { id: "panels", label: "Panels" },
+  { id: "options", label: "Options" },
   { id: "watchlist", label: "Watchlist" },
   { id: "general", label: "General" },
 ];
@@ -24,8 +25,12 @@ export const ACTIONS: { id: Action; label: string; category: Category }[] = [
   { id: "alerts", label: "Open Alerts", category: "panels" },
   { id: "market", label: "Open Market", category: "panels" },
   { id: "news", label: "Open News", category: "panels" },
+  { id: "options", label: "Open Options", category: "panels" },
+  { id: "options_side", label: "Switch calls / puts", category: "options" },
+  { id: "options_expiry", label: "Next expiry date", category: "options" },
   { id: "toggle_watchlist", label: "Toggle Watchlist", category: "watchlist" },
   { id: "watchlist", label: "Next watchlist stock", category: "watchlist" },
+  { id: "add_watchlist", label: "Add stock to Watchlist", category: "watchlist" },
   { id: "search", label: "Focus search", category: "general" },
   { id: "settings", label: "Toggle Settings", category: "general" },
 ];

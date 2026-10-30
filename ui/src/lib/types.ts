@@ -156,6 +156,10 @@ export interface Keybinds {
   market: string;
   news: string;
   analyze: string;
+  options: string;
+  options_side: string;
+  options_expiry: string;
+  add_watchlist: string;
 }
 
 /** Which event dots the chart draws. */
