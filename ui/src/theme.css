@@ -125,6 +125,11 @@ button {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+    --motion-slow: 0ms;
+  }
   .sk {
     animation: none;
   }
