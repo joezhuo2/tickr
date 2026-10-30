@@ -17,6 +17,10 @@ const DEFAULTS: Keybinds = {
   market: "m",
   news: "n",
   analyze: "z",
+  options: "o",
+  options_side: "u",
+  options_expiry: "d",
+  add_watchlist: "f",
 };
 
 const down = (key: string, mods: Partial<Record<"ctrlKey" | "altKey" | "metaKey", boolean>> = {}) => ({
@@ -91,6 +95,14 @@ describe("groupActions", () => {
   });
   it("keeps actions in their declared order within a group", () => {
     const panels = groupActions().find((g) => g.id === "panels")!;
-    expect(panels.actions.map((a) => a.id)).toEqual(["technicals", "analyze", "analysts", "earnings", "alerts", "market", "news"]);
+    expect(panels.actions.map((a) => a.id)).toEqual(["technicals", "analyze", "analysts", "earnings", "alerts", "market", "news", "options"]);
+  });
+  it("puts the options actions in their own group", () => {
+    const options = groupActions().find((g) => g.id === "options")!;
+    expect(options.actions.map((a) => a.id)).toEqual(["options_side", "options_expiry"]);
+  });
+  it("gives every default a distinct key", () => {
+    const keys = Object.values(DEFAULTS);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });

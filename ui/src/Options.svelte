@@ -8,14 +8,15 @@
     error,
     onretry,
     onexpiry,
+    side = $bindable("calls"),
   }: {
     options: Options | undefined;
     error: string | null;
     onretry: () => void;
     onexpiry: (date: number) => void;
+    side?: "calls" | "puts";
   } = $props();
 
-  let side = $state<"calls" | "puts">("calls");
   let text = $state("");
   let wrap = $state<HTMLDivElement>();
   let mid = $state<HTMLElement>();

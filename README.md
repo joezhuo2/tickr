@@ -229,8 +229,12 @@ typing in a text field.
 | | `P` | Open Alerts |
 | | `M` | Open Market |
 | | `N` | Open News |
+| | `O` | Open Options |
+| Options | `U` | Switch calls / puts |
+| | `D` | Next expiry date (wraps around) |
 | Watchlist | `W` | Toggle Watchlist |
 | | `X` | Next watchlist stock |
+| | `F` | Add stock to Watchlist |
 | General | `S` | Focus search |
 | | `,` | Toggle Settings |
 
@@ -261,7 +265,7 @@ illustrative. Click an image to view it at full size.
 | <img src="assets/screenshots/chart.png" alt="AAPL five-year candle chart with OHLC tooltip, event dots and PNG/CSV export buttons"><br>**Chart and exports** — hover for details and copy PNG or CSV | <img src="assets/screenshots/technicals.webp" alt="Technicals with moving averages, Bollinger bands, Fibonacci levels, RSI, score and targets"><br>**Technicals** — local analysis, signals and chart overlays |
 | <img src="assets/screenshots/market.png" alt="Market overview with indices, macro quotes, sector ETFs and top gainers and losers"><br>**Market** — indices, sectors and the day's movers | <img src="assets/screenshots/news.png" alt="News headlines with publisher, time and positive, negative or neutral sentiment pills"><br>**News** — headlines with sentiment hints |
 | <img src="assets/screenshots/analysts.png" alt="Analyst price target range, current price and consensus rating distribution"><br>**Analysts** — target range and rating breakdown | <img src="assets/screenshots/earnings.png" alt="Next earnings date and estimates alongside four quarters of results and surprises"><br>**Earnings** — upcoming report and past results |
-| <img src="assets/screenshots/stats.png" alt="Key statistics grouped by valuation, trading, dividends, shares, profitability and financials"><br>**Stats** — fundamentals with color-coded changes and returns | <img src="assets/screenshots/settings.png" alt="Settings with global hotkey, all fourteen in-window keybinds including Alerts, Market, News and Analyze, and chart dot toggles" width="45%"><br>**Settings** — hotkey, keybinds and chart dots |
+| <img src="assets/screenshots/stats.png" alt="Key statistics grouped by valuation, trading, dividends, shares, profitability and financials"><br>**Stats** — fundamentals with color-coded changes and returns | <img src="assets/screenshots/settings.png" alt="Settings with global hotkey, all eighteen in-window keybinds including Alerts, Market, News and Analyze, and chart dot toggles" width="45%"><br>**Settings** — hotkey, keybinds and chart dots |
 
 ## Data
 
@@ -318,8 +322,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.8.15
-git push origin v0.8.15
+git tag v0.8.16
+git push origin v0.8.16
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

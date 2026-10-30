@@ -6,6 +6,16 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.8.16] - 2026-10-30
+
+### Added
+
+- **New hotkeys** ([#62](https://github.com/joezhuo2/tickr/issues/62)): `O`
+  opens Options, `U` switches calls / puts, `D` jumps to the next expiry
+  (wrapping around) and `F` adds the current stock to the Watchlist. The
+  options keys only act while the Options view is loaded. Saved keybinds are
+  unchanged.
+
 ## [0.8.15] - 2026-10-30
 
 ### Changed

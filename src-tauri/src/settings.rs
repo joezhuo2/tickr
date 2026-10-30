@@ -45,6 +45,10 @@ pub struct Keybinds {
     pub market: String,
     pub news: String,
     pub analyze: String,
+    pub options: String,
+    pub options_side: String,
+    pub options_expiry: String,
+    pub add_watchlist: String,
 }
 
 impl Default for Keybinds {
@@ -64,6 +68,10 @@ impl Default for Keybinds {
             market: "m".into(),
             news: "n".into(),
             analyze: "z".into(),
+            options: "o".into(),
+            options_side: "u".into(),
+            options_expiry: "d".into(),
+            add_watchlist: "f".into(),
         }
     }
 }
@@ -220,6 +228,10 @@ mod tests {
         assert_eq!(s.keybinds.settings, ",");
         assert_eq!(s.keybinds.toggle_watchlist, "w");
         assert_eq!(s.keybinds.watchlist, "x");
+        assert_eq!(s.keybinds.options, "o");
+        assert_eq!(s.keybinds.options_side, "u");
+        assert_eq!(s.keybinds.options_expiry, "d");
+        assert_eq!(s.keybinds.add_watchlist, "f");
         assert!(!s.dots.news);
         assert!(s.dots.earnings && s.dots.analysts);
     }
