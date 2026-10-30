@@ -1,7 +1,7 @@
 <script lang="ts">
   import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, niceTicks, num, price, quarterLabel, volume } from "./lib/format";
   import type { Analysis, Article, Chart, ChartMode, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
-  import { full, visible, zoom, type View } from "./lib/viewport";
+  import { full, pan, visible, zoom, type View } from "./lib/viewport";
 
   let {
     chart,
@@ -651,8 +651,10 @@
     if (geo.n === 0) return;
     e.preventDefault();
     const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? width : 1;
+    const dx = e.deltaX || (e.shiftKey ? e.deltaY : 0);
     const r = wrap!.getBoundingClientRect();
-    view = zoom(view, geo.n, Math.exp(e.deltaY * unit * (e.ctrlKey ? 0.01 : 0.0015)), (e.clientX - r.left - PAD.l) / geo.plotW);
+    if (!e.ctrlKey && (e.shiftKey || Math.abs(dx) >= Math.abs(e.deltaY))) view = pan(view, geo.n, (dx * unit) / geo.step);
+    else view = zoom(view, geo.n, Math.exp(e.deltaY * unit * (e.ctrlKey ? 0.01 : 0.0015)), (e.clientX - r.left - PAD.l) / geo.plotW);
     onMove(e);
   }
 
