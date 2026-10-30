@@ -152,6 +152,7 @@
     flex: 1;
     min-height: 0;
     overflow: auto;
+    overscroll-behavior: contain;
     padding: 0 4px;
   }
   table {

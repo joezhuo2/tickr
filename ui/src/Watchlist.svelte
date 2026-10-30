@@ -196,6 +196,7 @@
     gap: 2px;
     margin-top: 6px;
     overflow-x: auto;
+    overscroll-behavior: contain;
     flex: none;
   }
   .tabs button {
@@ -251,6 +252,7 @@
     min-height: 0;
     margin-top: 6px;
     overflow-y: auto;
+    overscroll-behavior: contain;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     /* Four rows fill the view; more scroll. */

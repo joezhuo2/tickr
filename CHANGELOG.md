@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.8.12] - 2026-10-30
+
+### Fixed
+
+- **Overscroll** ([#66](https://github.com/joezhuo2/tickr/issues/66)):
+  scrollable panels and the page no longer overscroll or chain scrolling.
+
 ## [0.8.11] - 2026-10-29
 
 ### Added

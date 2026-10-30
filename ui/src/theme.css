@@ -84,6 +84,7 @@ body {
   color: var(--text);
   font: 13px/1.4 var(--font);
   overflow: hidden;
+  overscroll-behavior: none;
   user-select: none;
 }
 #app {

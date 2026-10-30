@@ -44,6 +44,7 @@
     gap: 18px 28px;
     padding: 14px 10px 8px 4px;
     overflow: auto;
+    overscroll-behavior: contain;
   }
   section {
     display: flex;

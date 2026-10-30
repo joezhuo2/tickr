@@ -89,7 +89,7 @@
 </div>
 
 <style>
-  .alerts { flex: 1; min-height: 0; overflow: auto; padding: 14px 10px 8px 4px; }
+  .alerts { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 14px 10px 8px 4px; }
   h2 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
   p { margin: 0; color: var(--muted); }
   form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0 10px; }

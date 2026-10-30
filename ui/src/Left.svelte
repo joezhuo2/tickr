@@ -126,6 +126,7 @@
     border-right: 1px solid var(--faint);
     background: var(--surface);
     overflow: hidden auto;
+    overscroll-behavior: contain;
     scrollbar-width: none;
     display: flex;
     flex-direction: column;

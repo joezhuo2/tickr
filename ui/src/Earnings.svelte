@@ -85,6 +85,7 @@
     gap: 28px;
     padding: 14px 10px 8px 4px;
     overflow: auto;
+    overscroll-behavior: contain;
   }
   .col {
     display: flex;
