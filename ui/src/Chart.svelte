@@ -2,6 +2,7 @@
   import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, niceTicks, num, price, quarterLabel, volume } from "./lib/format";
   import type { Analysis, Article, Chart, ChartMode, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
   import { untrack } from "svelte";
+  import { fadeIn } from "./lib/motion";
   import { follow, full, isFull, pan, reveal, visible, zoom, type View } from "./lib/viewport";
 
   let {
@@ -632,6 +633,12 @@
     };
   });
 
+  let shownMode: ChartMode | null = null;
+  $effect(() => {
+    if (shownMode && shownMode !== mode) fadeIn(canvas);
+    shownMode = mode;
+  });
+
   // Reset hover when the data changes.
   $effect(() => {
     void chart;
@@ -856,7 +863,7 @@
     gap: 2px;
     cursor: default;
     opacity: 0;
-    transition: opacity 0.15s;
+    transition: opacity var(--motion-fast) var(--ease-out);
   }
   .chart:hover .exports,
   .exports:focus-within {

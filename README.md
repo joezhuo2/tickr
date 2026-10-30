@@ -140,6 +140,9 @@ taskbar to keep it visible.
 
 Each tab or button below swaps the chart out; click it again, or a range, to
 go back.
+Views fade in, the watchlist slides up, Settings scales open and switching
+line / candles fades the chart. With the OS reduced-motion setting on, all of
+it is instant.
 
 - **Technicals:** click **Analyze** to run RSI, moving averages, candlestick
   patterns and volatility/Fibonacci targets on the candles of the selected
@@ -315,8 +318,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.8.13
-git push origin v0.8.13
+git tag v0.8.14
+git push origin v0.8.14
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

@@ -64,11 +64,17 @@
     background: none;
     color: var(--muted);
     cursor: pointer;
+    transition:
+      background-color var(--motion-fast) var(--ease-out),
+      color var(--motion-fast) var(--ease-out);
   }
   .gear:hover,
   .gear.on {
     background: var(--bg);
     color: var(--text);
+  }
+  .gear.on svg {
+    transform: rotate(45deg);
   }
   .gear svg {
     width: 100%;
@@ -78,6 +84,7 @@
     stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
+    transition: transform var(--motion-slow) var(--ease-out);
   }
   .link {
     background: none;
@@ -109,6 +116,9 @@
     background: none;
     color: var(--muted);
     cursor: pointer;
+    transition:
+      background-color var(--motion-fast) var(--ease-out),
+      color var(--motion-fast) var(--ease-out);
   }
   .watch:hover {
     background: var(--bg);
@@ -121,6 +131,7 @@
     stroke: currentColor;
     stroke-width: 2;
     stroke-linejoin: round;
+    transition: fill var(--motion-fast) var(--ease-out);
   }
   .watch.on {
     color: #f5b301;

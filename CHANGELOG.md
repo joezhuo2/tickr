@@ -6,6 +6,17 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.8.14] - 2026-10-30
+
+### Added
+
+- **Animations** ([#64](https://github.com/joezhuo2/tickr/issues/64)):
+  views fade in when switching panels, the watchlist slides up from the
+  footer, Settings fades and scales open and closed, and switching line and
+  candles fades the chart. Toggle buttons ease their highlight. Durations and
+  easing come from shared theme tokens, and the OS reduced-motion setting turns
+  all of it off.
+
 ## [0.8.13] - 2026-10-30
 
 ### Added

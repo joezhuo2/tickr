@@ -38,6 +38,7 @@
     type StatSection,
   } from "./lib/types";
   import { actionFor, bindKey } from "./lib/keybinds";
+  import { paneIn } from "./lib/motion";
 
   // Injected before load, so the first frame already has real content.
   const boot = window.__TICKR_INIT__ ?? null;
@@ -492,26 +493,48 @@
               aria-label="Loading"
             ></span>{/if}
         </div>
-        {#if view === "watchlist"}
-          <Watchlist symbols={watchlist} {groups} current={symbol} onopen={openWatched} ongroups={saveGroups} />
-        {:else if view === "alerts"}
-          <Alerts {symbol} {quote} {alerts} onchange={(next) => (alerts = next)} />
-        {:else if view === "analysts"}
-          <Analysts {symbol} {quote} {analyst} />
-        {:else if view === "earnings"}
-          <EarningsView {symbol} {earnings} />
-        {:else if view === "stats"}
-          <StatsView {symbol} {stats} />
-        {:else if view === "market"}
-          <MarketView {market} error={marketError} onretry={loadMarket} onopen={openWatched} />
-        {:else if view === "options"}
-          <OptionsView {options} error={optionsError} onretry={() => loadOptions(options?.expiry ?? undefined)} onexpiry={loadOptions} />
-        {:else if view === "news"}
-          <News {symbol} articles={news} error={newsError} {now} onretry={loadNews} />
-        {:else if view === "technicals"}
-          <div class="split">
-            {#if chart}
-              <ChartView {chart} {mode} analysis={activeAnalysis} {overlays} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
+        {#key view}
+          <div class="pane" in:paneIn={view === "watchlist" ? { y: 16, speed: "slow" } : {}}>
+            {#if view === "watchlist"}
+              <Watchlist symbols={watchlist} {groups} current={symbol} onopen={openWatched} ongroups={saveGroups} />
+            {:else if view === "alerts"}
+              <Alerts {symbol} {quote} {alerts} onchange={(next) => (alerts = next)} />
+            {:else if view === "analysts"}
+              <Analysts {symbol} {quote} {analyst} />
+            {:else if view === "earnings"}
+              <EarningsView {symbol} {earnings} />
+            {:else if view === "stats"}
+              <StatsView {symbol} {stats} />
+            {:else if view === "market"}
+              <MarketView {market} error={marketError} onretry={loadMarket} onopen={openWatched} />
+            {:else if view === "options"}
+              <OptionsView {options} error={optionsError} onretry={() => loadOptions(options?.expiry ?? undefined)} onexpiry={loadOptions} />
+            {:else if view === "news"}
+              <News {symbol} articles={news} error={newsError} {now} onretry={loadNews} />
+            {:else if view === "technicals"}
+              <div class="split">
+                {#if chart}
+                  <ChartView {chart} {mode} analysis={activeAnalysis} {overlays} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
+                {:else if chartError}
+                  <div class="msg">
+                    {chartError}
+                    <button class="retry" onclick={() => loadChart(true)}>Retry</button>
+                  </div>
+                {:else}
+                  <ChartSkeleton />
+                {/if}
+                <Technicals
+                  analysis={activeAnalysis}
+                  loading={analyzing}
+                  error={analysisError}
+                  bars={chart?.candles.length ?? 0}
+                  gmtoffset={chart?.meta.gmtoffset ?? 0}
+                  bind:overlays
+                  onanalyze={runAnalysis}
+                />
+              </div>
+            {:else if chart}
+              <ChartView {chart} {mode} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
             {:else if chartError}
               <div class="msg">
                 {chartError}
@@ -520,26 +543,8 @@
             {:else}
               <ChartSkeleton />
             {/if}
-            <Technicals
-              analysis={activeAnalysis}
-              loading={analyzing}
-              error={analysisError}
-              bars={chart?.candles.length ?? 0}
-              gmtoffset={chart?.meta.gmtoffset ?? 0}
-              bind:overlays
-              onanalyze={runAnalysis}
-            />
           </div>
-        {:else if chart}
-          <ChartView {chart} {mode} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
-        {:else if chartError}
-          <div class="msg">
-            {chartError}
-            <button class="retry" onclick={() => loadChart(true)}>Retry</button>
-          </div>
-        {:else}
-          <ChartSkeleton />
-        {/if}
+        {/key}
       </section>
     </main>
     <Footer
@@ -576,6 +581,7 @@
     flex-direction: column;
     padding: 12px 12px 6px 14px;
   }
+  .pane,
   .split {
     flex: 1;
     min-height: 0;
@@ -606,6 +612,10 @@
     border-radius: 5px;
     cursor: pointer;
     color: var(--muted);
+    transition:
+      background-color var(--motion-fast) var(--ease-out),
+      color var(--motion-fast) var(--ease-out),
+      box-shadow var(--motion-fast) var(--ease-out);
   }
   .seg button.on {
     background: var(--bg);
@@ -627,6 +637,9 @@
     color: var(--muted);
     font-weight: 600;
     font-size: 12px;
+    transition:
+      background-color var(--motion-fast) var(--ease-out),
+      color var(--motion-fast) var(--ease-out);
   }
   .ranges button:hover {
     color: var(--text);

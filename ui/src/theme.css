@@ -34,6 +34,11 @@
   --split: #8e44ad;
   --warn-bg: #fff6e0;
   --warn-text: #7a5200;
+  /* Motion. */
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 240ms;
+  --ease-out: cubic-bezier(0.33, 1, 0.68, 1);
   color-scheme: light;
 }
 
@@ -120,6 +125,11 @@ button {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+    --motion-slow: 0ms;
+  }
   .sk {
     animation: none;
   }
