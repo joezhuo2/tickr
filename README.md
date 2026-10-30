@@ -112,6 +112,10 @@ taskbar to keep it visible.
   once a minute.
 - **Tooltip:** hover the chart, or use ← and →, for time, open, high, low,
   close and volume.
+- **Zoom and pan:** scroll or pinch to zoom at the cursor (down to 10 bars),
+  drag or scroll sideways to pan, and double-click to see the whole range
+  again. With the chart focused, + and - zoom and 0 resets. The price axis
+  fits the visible bars, and a zoomed view follows new bars at the right edge.
 - **Event dots** along the bottom of the chart; hover the candle for details:
 
   | Dot | Marks |
