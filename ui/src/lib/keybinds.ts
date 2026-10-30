@@ -30,6 +30,10 @@ export const ACTIONS: { id: Action; label: string; category: Category }[] = [
   { id: "settings", label: "Toggle Settings", category: "general" },
 ];
 
+export function groupActions(): { id: Category; label: string; actions: typeof ACTIONS }[] {
+  return CATEGORIES.map((c) => ({ ...c, actions: ACTIONS.filter((a) => a.category === c.id) })).filter((g) => g.actions.length);
+}
+
 const RESERVED = new Set(["Shift", "Control", "Alt", "Meta", "Escape", "Tab", "Enter", " ", "CapsLock", "Dead", "Unidentified"]);
 
 /** The binding for a keydown: a lowercase character or a key name ("F5"), or null when it can't be bound. */
