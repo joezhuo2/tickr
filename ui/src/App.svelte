@@ -72,6 +72,7 @@
   let optionsError = $state<string | null>(null);
   let optionsLoading = $state(false);
   let optionsSeq = 0;
+  let optionsSide = $state<"calls" | "puts">("calls");
   let view = $state<"chart" | "alerts" | "technicals" | "analysts" | "earnings" | "stats" | "options" | "market" | "news" | "watchlist">(
     "chart",
   );
@@ -392,6 +393,21 @@
       case "market":
         if (!e.repeat) toggleMarket();
         break;
+      case "options":
+        if (!e.repeat) toggleOptions();
+        break;
+      case "options_side":
+        if (!e.repeat && view === "options" && options) optionsSide = optionsSide === "calls" ? "puts" : "calls";
+        break;
+      case "options_expiry":
+        if (view === "options" && options?.expiry != null && options.expirations.length) {
+          const i = options.expirations.indexOf(options.expiry);
+          loadOptions(options.expirations[(i + 1) % options.expirations.length]);
+        }
+        break;
+      case "add_watchlist":
+        if (!e.repeat && symbol && !watchlist.includes(symbol)) toggleStar();
+        break;
       case "news":
         if (!e.repeat) view === "news" ? (view = "chart") : openNews();
         break;
@@ -508,7 +524,7 @@
             {:else if view === "market"}
               <MarketView {market} error={marketError} onretry={loadMarket} onopen={openWatched} />
             {:else if view === "options"}
-              <OptionsView {options} error={optionsError} onretry={() => loadOptions(options?.expiry ?? undefined)} onexpiry={loadOptions} />
+              <OptionsView {options} error={optionsError} onretry={() => loadOptions(options?.expiry ?? undefined)} onexpiry={loadOptions} bind:side={optionsSide} />
             {:else if view === "news"}
               <News {symbol} articles={news} error={newsError} {now} onretry={loadNews} />
             {:else if view === "technicals"}
