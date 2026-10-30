@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { actionFor, bindKey, keyLabel, rebind } from "./keybinds";
+import { ACTIONS, CATEGORIES, actionFor, groupActions, bindKey, keyLabel, rebind } from "./keybinds";
 import type { Keybinds } from "./types";
 
 const DEFAULTS: Keybinds = {
@@ -78,5 +78,19 @@ describe("keyLabel", () => {
     expect(keyLabel("c")).toBe("C");
     expect(keyLabel("F5")).toBe("F5");
     expect(keyLabel("")).toBe("—");
+  });
+});
+
+describe("groupActions", () => {
+  it("lists every action once, in category order", () => {
+    const groups = groupActions();
+    expect(groups.map((g) => g.id)).toEqual(CATEGORIES.map((c) => c.id));
+    const ids = groups.flatMap((g) => g.actions.map((a) => a.id));
+    expect(ids).toHaveLength(ACTIONS.length);
+    expect(new Set(ids)).toEqual(new Set(Object.keys(DEFAULTS)));
+  });
+  it("keeps actions in their declared order within a group", () => {
+    const panels = groupActions().find((g) => g.id === "panels")!;
+    expect(panels.actions.map((a) => a.id)).toEqual(["technicals", "analyze", "analysts", "earnings", "alerts", "market", "news"]);
   });
 });
