@@ -170,6 +170,7 @@
     max-height: 52%;
     min-height: 92px;
     overflow: auto;
+    overscroll-behavior: contain;
     border-top: 1px solid var(--faint);
     padding: 8px 4px 2px;
     font-size: 12px;
