@@ -1,6 +1,8 @@
 <script lang="ts">
   import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, niceTicks, num, price, quarterLabel, volume } from "./lib/format";
   import type { Analysis, Article, Chart, ChartMode, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
+  import { untrack } from "svelte";
+  import { follow, full, isFull, pan, reveal, visible, zoom, type View } from "./lib/viewport";
 
   let {
     chart,
@@ -26,6 +28,8 @@
   let height = $state(0);
   let hover = $state<number | null>(null);
   let copied = $state<"image" | "csv" | null>(null);
+  let view = $state<View>(full(0));
+  let dragX = $state<number | null>(null);
 
   const PAD = { l: 6, r: 62, t: 10, b: 22 };
 
@@ -129,10 +133,12 @@
     const volH = rsiOn ? plotH * 0.12 : plotH - (volTop - PAD.t);
     const rsiTop = PAD.t + plotH * 0.78;
     const rsiH = plotH - (rsiTop - PAD.t);
+    const [i0, i1] = visible(view, n);
     let lo = Infinity;
     let hi = -Infinity;
     let vmax = 0;
-    for (const c of candles) {
+    for (let i = i0; i <= i1; i++) {
+      const c = candles[i];
       lo = Math.min(lo, mode === "candles" ? c.l : c.c);
       hi = Math.max(hi, mode === "candles" ? c.h : c.c);
       vmax = Math.max(vmax, c.v);
@@ -149,7 +155,7 @@
         ...(show.vwap ? [analysis.series.vwap] : []),
       ];
       for (const line of fit) {
-        for (let i = 0; i < n; i++) {
+        for (let i = i0; i <= i1; i++) {
           const v = valueAt(line, i);
           if (v != null) {
             lo = Math.min(lo, v);
@@ -169,9 +175,12 @@
     const pad = (hi - lo) * 0.06;
     lo -= pad;
     hi += pad;
-    const step = plotW / Math.max(n, 1);
+    const step = plotW / Math.max(view.count, 1);
+    const start = view.start;
     return {
       n,
+      i0,
+      i1,
       step,
       lo,
       hi,
@@ -182,7 +191,7 @@
       volH,
       rsiTop,
       rsiH,
-      x: (i: number) => PAD.l + step * (i + 0.5),
+      x: (i: number) => PAD.l + step * (i - start + 0.5),
       y: (v: number) => PAD.t + (1 - (v - lo) / (hi - lo)) * priceH,
       vy: (v: number) => volTop + volH - (vmax > 0 ? (v / vmax) * volH : 0),
       ry: (v: number) => rsiTop + (1 - v / 100) * rsiH,
@@ -218,10 +227,12 @@
 
     // Extended-hours shading.
     if (isDay) {
+      clipPlot(ctx);
       ctx.fillStyle = v("--ext-shade");
       candles.forEach((c, i) => {
         if (isExtended(c.t)) ctx.fillRect(g.x(i) - g.step / 2, PAD.t, g.step + 0.5, bottom - PAD.t);
       });
+      ctx.restore();
     }
 
     // Grid and price axis.
@@ -245,13 +256,17 @@
     ctx.textBaseline = "alphabetic";
     ctx.fillStyle = v("--muted");
     if (g.n > 0 && chart) {
-      const every = Math.max(1, Math.ceil(g.n / Math.max(1, Math.floor((width - PAD.l - PAD.r) / 110))));
-      for (let i = Math.floor(every / 2); i < g.n; i += every) {
-        ctx.fillText(axisTime(candles[i].t, chart.meta.gmtoffset, chart.range), g.x(i), height - 6);
+      const every = Math.max(1, Math.ceil(view.count / Math.max(1, Math.floor(g.plotW / 110))));
+      const off = Math.floor(every / 2);
+      for (let i = off + Math.ceil((g.i0 - off) / every) * every; i <= g.i1; i += every) {
+        const x = g.x(i);
+        if (x < PAD.l || x > width - PAD.r) continue;
+        ctx.fillText(axisTime(candles[i].t, chart.meta.gmtoffset, chart.range), x, height - 6);
       }
     }
 
     // Volume.
+    clipPlot(ctx);
     const bw = Math.max(1, g.step * 0.65);
     candles.forEach((c, i) => {
       ctx.fillStyle = c.c >= c.o ? up : down;
@@ -309,9 +324,11 @@
       ctx.fill();
       ctx.globalAlpha = 1;
     }
+    ctx.restore();
 
     if (show && analysis) drawOverlays(ctx, g, v);
 
+    clipPlot(ctx);
     const stacked = new Map<number, number>();
     for (const [color, at] of [
       ["--accent", earningsAt],
@@ -338,6 +355,7 @@
         }
       }
     }
+    ctx.restore();
 
     // Crosshair.
     if (hover != null && candles[hover]) {
@@ -372,6 +390,13 @@
   }
 
   type Geo = typeof geo;
+
+  function clipPlot(ctx: CanvasRenderingContext2D) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(PAD.l - 4, 0, geo.plotW + 8, height);
+    ctx.clip();
+  }
 
   /** Strokes a series in two parts: dashed during warm-up, solid after. */
   function strokeLine(ctx: CanvasRenderingContext2D, line: Line, y: (v: number) => number, g: Geo) {
@@ -613,23 +638,74 @@
     hover = null;
   });
 
-  function onMove(e: PointerEvent) {
+  let viewKey = "";
+  let viewN = 0;
+  $effect(() => {
+    const key = chart ? `${chart.meta.symbol} ${chart.range}` : "";
+    const n = candles.length;
+    view = key === viewKey ? follow(untrack(() => view), viewN, n) : full(n);
+    viewKey = key;
+    viewN = n;
+  });
+
+  $effect(() => {
+    const el = wrap;
+    if (!el) return;
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  });
+
+  function onWheel(e: WheelEvent) {
+    if (geo.n === 0) return;
+    e.preventDefault();
+    const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? width : 1;
+    const dx = e.deltaX || (e.shiftKey ? e.deltaY : 0);
+    const r = wrap!.getBoundingClientRect();
+    if (!e.ctrlKey && (e.shiftKey || Math.abs(dx) >= Math.abs(e.deltaY))) view = pan(view, geo.n, (dx * unit) / geo.step);
+    else view = zoom(view, geo.n, Math.exp(e.deltaY * unit * (e.ctrlKey ? 0.01 : 0.0015)), (e.clientX - r.left - PAD.l) / geo.plotW);
+    onMove(e);
+  }
+
+  function resetView() {
+    view = full(candles.length);
+    hover = null;
+  }
+
+  function onDown(e: PointerEvent) {
+    if (e.button !== 0 || geo.n === 0 || (e.target as Element).closest(".exports")) return;
+    dragX = e.clientX;
+    wrap!.setPointerCapture(e.pointerId);
+  }
+
+  function onMove(e: MouseEvent) {
+    if (dragX != null) {
+      view = pan(view, geo.n, (dragX - e.clientX) / geo.step);
+      dragX = e.clientX;
+      hover = null;
+      return;
+    }
     const r = wrap!.getBoundingClientRect();
     const x = e.clientX - r.left;
     if (geo.n === 0 || x < PAD.l || x > width - PAD.r) {
       hover = null;
       return;
     }
-    hover = Math.max(0, Math.min(geo.n - 1, Math.floor((x - PAD.l) / geo.step)));
+    hover = Math.max(geo.i0, Math.min(geo.i1, Math.floor(view.start + (x - PAD.l) / geo.step)));
   }
 
   function onKey(e: KeyboardEvent) {
-    if (geo.n === 0) return;
-    if (e.key === "ArrowLeft") hover = hover == null ? geo.n - 1 : Math.max(0, hover - 1);
-    else if (e.key === "ArrowRight") hover = hover == null ? 0 : Math.min(geo.n - 1, hover + 1);
+    if (geo.n === 0 || e.ctrlKey || e.altKey || e.metaKey) return;
+    const anchor = hover == null ? 1 : (hover + 0.5 - view.start) / view.count;
+    if (e.key === "ArrowLeft") hover = hover == null ? geo.i1 : Math.max(0, hover - 1);
+    else if (e.key === "ArrowRight") hover = hover == null ? geo.i0 : Math.min(geo.n - 1, hover + 1);
     else if (e.key === "Escape") hover = null;
+    else if (e.key === "+" || e.key === "=") view = zoom(view, geo.n, 1 / 1.25, anchor);
+    else if (e.key === "-") view = zoom(view, geo.n, 1.25, anchor);
+    else if (e.key === "0") resetView();
     else return;
+    if (hover != null) view = reveal(view, geo.n, hover);
     e.preventDefault();
+    if (/^[-+=0]$/.test(e.key)) e.stopPropagation();
   }
 
   let flashTimer: ReturnType<typeof setTimeout> | undefined;
@@ -672,12 +748,19 @@
 <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
 <div
   class="chart"
+  class:dragging={dragX != null}
   bind:this={wrap}
   tabindex="0"
   role="img"
   aria-label={chart ? `${chart.meta.symbol} ${chart.range} chart` : "chart"}
+  onpointerdown={onDown}
   onpointermove={onMove}
+  onpointerup={() => (dragX = null)}
+  onpointercancel={() => (dragX = null)}
   onpointerleave={() => (hover = null)}
+  ondblclick={(e) => {
+    if (!(e.target as Element).closest(".exports")) resetView();
+  }}
   onkeydown={onKey}
 >
   <canvas bind:this={canvas} style:width="{width}px" style:height="{height}px"></canvas>
@@ -696,6 +779,11 @@
       <button class:done={copied === "csv"} title="Copy candles as CSV" aria-label="Copy candles as CSV" onclick={copyCsv}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6M8 13h8M8 17h8" /></svg>
       </button>
+      {#if !isFull(view, candles.length)}
+        <button title="Reset zoom (double-click)" aria-label="Reset zoom" onclick={resetView}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+        </button>
+      {/if}
     </div>
   {/if}
   {#if tip && chart}
@@ -746,6 +834,11 @@
     min-height: 0;
     outline: none;
     cursor: crosshair;
+    touch-action: none;
+    user-select: none;
+  }
+  .chart.dragging {
+    cursor: grabbing;
   }
   .chart:focus-visible {
     box-shadow: inset 0 0 0 2px var(--accent);

@@ -6,6 +6,16 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.8.13] - 2026-10-30
+
+### Added
+
+- **Chart zoom and pan** ([#65](https://github.com/joezhuo2/tickr/issues/65)):
+  scroll or pinch to zoom at the cursor, drag or scroll sideways to pan, and
+  double-click or the reset button to see the whole range again. With the
+  chart focused, + and - zoom and 0 resets. The price axis fits the visible
+  bars.
+
 ## [0.8.12] - 2026-10-30
 
 ### Fixed
