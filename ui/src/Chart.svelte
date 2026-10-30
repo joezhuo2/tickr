@@ -2,6 +2,7 @@
   import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, niceTicks, num, price, quarterLabel, volume } from "./lib/format";
   import type { Analysis, Article, Chart, ChartMode, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
   import { untrack } from "svelte";
+  import { fadeIn } from "./lib/motion";
   import { follow, full, isFull, pan, reveal, visible, zoom, type View } from "./lib/viewport";
 
   let {
@@ -630,6 +631,12 @@
       ro.disconnect();
       mq.removeEventListener("change", redraw);
     };
+  });
+
+  let shownMode: ChartMode | null = null;
+  $effect(() => {
+    if (shownMode && shownMode !== mode) fadeIn(canvas);
+    shownMode = mode;
   });
 
   // Reset hover when the data changes.
