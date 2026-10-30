@@ -1,7 +1,8 @@
 <script lang="ts">
   import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, niceTicks, num, price, quarterLabel, volume } from "./lib/format";
   import type { Analysis, Article, Chart, ChartMode, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
-  import { full, pan, visible, zoom, type View } from "./lib/viewport";
+  import { untrack } from "svelte";
+  import { follow, full, pan, visible, zoom, type View } from "./lib/viewport";
 
   let {
     chart,
@@ -637,8 +638,14 @@
     hover = null;
   });
 
+  let viewKey = "";
+  let viewN = 0;
   $effect(() => {
-    view = full(candles.length);
+    const key = chart ? `${chart.meta.symbol} ${chart.range}` : "";
+    const n = candles.length;
+    view = key === viewKey ? follow(untrack(() => view), viewN, n) : full(n);
+    viewKey = key;
+    viewN = n;
   });
 
   $effect(() => {
