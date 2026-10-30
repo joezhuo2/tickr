@@ -140,6 +140,9 @@ taskbar to keep it visible.
 
 Each tab or button below swaps the chart out; click it again, or a range, to
 go back.
+Views fade in, the watchlist slides up, Settings scales open and switching
+line / candles fades the chart. With the OS reduced-motion setting on, all of
+it is instant.
 
 - **Technicals:** click **Analyze** to run RSI, moving averages, candlestick
   patterns and volatility/Fibonacci targets on the candles of the selected
