@@ -71,6 +71,7 @@
     padding: 0 6px 0 0;
     list-style: none;
     overflow: auto;
+    overscroll-behavior: contain;
   }
   .row {
     display: flex;
