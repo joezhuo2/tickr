@@ -2,7 +2,7 @@
   import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, niceTicks, num, price, quarterLabel, volume } from "./lib/format";
   import type { Analysis, Article, Chart, ChartMode, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
   import { untrack } from "svelte";
-  import { follow, full, pan, visible, zoom, type View } from "./lib/viewport";
+  import { follow, full, isFull, pan, visible, zoom, type View } from "./lib/viewport";
 
   let {
     chart,
@@ -666,6 +666,11 @@
     onMove(e);
   }
 
+  function resetView() {
+    view = full(candles.length);
+    hover = null;
+  }
+
   function onDown(e: PointerEvent) {
     if (e.button !== 0 || geo.n === 0 || (e.target as Element).closest(".exports")) return;
     dragX = e.clientX;
@@ -747,6 +752,9 @@
   onpointerup={() => (dragX = null)}
   onpointercancel={() => (dragX = null)}
   onpointerleave={() => (hover = null)}
+  ondblclick={(e) => {
+    if (!(e.target as Element).closest(".exports")) resetView();
+  }}
   onkeydown={onKey}
 >
   <canvas bind:this={canvas} style:width="{width}px" style:height="{height}px"></canvas>
@@ -765,6 +773,11 @@
       <button class:done={copied === "csv"} title="Copy candles as CSV" aria-label="Copy candles as CSV" onclick={copyCsv}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6M8 13h8M8 17h8" /></svg>
       </button>
+      {#if !isFull(view, candles.length)}
+        <button title="Reset zoom (double-click)" aria-label="Reset zoom" onclick={resetView}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+        </button>
+      {/if}
     </div>
   {/if}
   {#if tip && chart}
