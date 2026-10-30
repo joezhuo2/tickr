@@ -227,6 +227,12 @@
     letter-spacing: 0.04em;
     color: var(--muted);
   }
+  h4 {
+    margin: 10px 0 2px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text);
+  }
   .close {
     border: 0;
     background: none;
