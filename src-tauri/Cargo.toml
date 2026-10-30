@@ -1,6 +1,6 @@
 [package]
 name = "tickr"
-version = "0.8.12"
+version = "0.8.13"
 edition = "2021"
 license = "MIT"
 description = "Stock watcher for the Windows tray and the macOS menu bar"

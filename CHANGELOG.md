@@ -6,6 +6,8 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.8.13] - 2026-10-30
+
 ### Added
 
 - **Chart zoom and pan** ([#65](https://github.com/joezhuo2/tickr/issues/65)):
