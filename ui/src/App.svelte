@@ -612,6 +612,10 @@
     border-radius: 5px;
     cursor: pointer;
     color: var(--muted);
+    transition:
+      background-color var(--motion-fast) var(--ease-out),
+      color var(--motion-fast) var(--ease-out),
+      box-shadow var(--motion-fast) var(--ease-out);
   }
   .seg button.on {
     background: var(--bg);
@@ -633,6 +637,9 @@
     color: var(--muted);
     font-weight: 600;
     font-size: 12px;
+    transition:
+      background-color var(--motion-fast) var(--ease-out),
+      color var(--motion-fast) var(--ease-out);
   }
   .ranges button:hover {
     color: var(--text);
