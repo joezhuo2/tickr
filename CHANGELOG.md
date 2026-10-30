@@ -6,6 +6,12 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Hotkey categories** ([#63](https://github.com/joezhuo2/tickr/issues/63)):
+  keybinds in Settings are grouped under Chart, Panels, Watchlist and General
+  headers. Saved keybinds are unchanged.
+
 ## [0.8.14] - 2026-10-30
 
 ### Added
