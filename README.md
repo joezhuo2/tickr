@@ -243,15 +243,20 @@ typing in a text field.
 ### AI news analysis
 
 Headline tone (the dots on the chart and the News view) comes from a local
-keyword lexicon by default. Optionally, Settings > AI news analysis sends new
+keyword lexicon by default. Optionally, Settings > AI > News analysis sends new
 headlines to any OpenAI-compatible chat-completions endpoint (OpenAI, Ollama,
 LM Studio, ...) to classify them as positive, neutral or negative. Fill in the
 base URL (for example `https://api.openai.com/v1`), the model and, if the
 endpoint needs one, the API key. The key may stay empty for local endpoints.
 
+Model is the master model. To use a different one for a feature, fill in News
+model (headline tone) or Events model (event analysis); a blank field uses
+Model.
+
 These are saved to `.env.local` in the settings folder (see [Files](#files)),
-not to `settings.json`, as `TICKR_AI_BASE_URL`, `TICKR_AI_MODEL` and
-`TICKR_AI_API_KEY`; other lines in that file are left alone. Results are cached
+not to `settings.json`, as `TICKR_AI_BASE_URL`, `TICKR_AI_MODEL`,
+`TICKR_AI_NEWS_MODEL`, `TICKR_AI_EVENTS_MODEL` and `TICKR_AI_API_KEY`; other
+lines in that file are left alone. Results are cached
 per model and headline in the cache folder, so each headline is sent once. If
 AI is off, not configured or a call fails, the keyword tone is used.
 
@@ -263,7 +268,8 @@ release time and, where Yahoo has them, the actual, expected and prior figures.
 The list needs no AI and is refreshed every 15 minutes or with the Refresh
 button.
 
-Clicking an event asks the AI configured in Settings, as above, to analyze that
+Clicking an event asks the AI configured in Settings, as above, using the
+Events model or else Model, to analyze that
 one release: a summary and the affected stocks and sectors, each with a score,
 confidence and reasoning. Only the opened event is sent, along with its figures
 and a few current Yahoo headlines about it. Analyses are cached for 6 hours per
@@ -338,8 +344,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.9.2
-git push origin v0.9.2
+git tag v0.9.3
+git push origin v0.9.3
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

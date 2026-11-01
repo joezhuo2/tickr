@@ -208,11 +208,14 @@ export interface Dots {
   analysts: boolean;
 }
 
-/** AI news analysis: the toggle from settings.json plus the .env.local credentials. */
+/** AI settings: the news toggle from settings.json plus the .env.local credentials and models. */
 export interface AiConfig {
   enabled: boolean;
   base_url: string;
+  /** The master model, used where a feature's own model is blank. */
   model: string;
+  news_model: string;
+  events_model: string;
   api_key: string;
 }
 

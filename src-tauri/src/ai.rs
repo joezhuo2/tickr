@@ -13,19 +13,45 @@ use crate::state::{lock, Shared};
 
 const KEY_BASE_URL: &str = "TICKR_AI_BASE_URL";
 const KEY_MODEL: &str = "TICKR_AI_MODEL";
+const KEY_NEWS_MODEL: &str = "TICKR_AI_NEWS_MODEL";
+const KEY_EVENTS_MODEL: &str = "TICKR_AI_EVENTS_MODEL";
 const KEY_API_KEY: &str = "TICKR_AI_API_KEY";
+
+/// The features that call the AI endpoint, each with its own optional model.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Feature {
+    News,
+    Events,
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct AiConfig {
     pub base_url: String,
+    /// The master model, used by every feature whose own model is blank.
     pub model: String,
+    #[serde(default)]
+    pub news_model: String,
+    #[serde(default)]
+    pub events_model: String,
     pub api_key: String,
 }
 
 impl AiConfig {
+    /// The feature's own model, or the master model when that is blank.
+    pub fn model_for(&self, feature: Feature) -> &str {
+        let own = match feature {
+            Feature::News => &self.news_model,
+            Feature::Events => &self.events_model,
+        };
+        match own.trim() {
+            "" => self.model.trim(),
+            m => m,
+        }
+    }
+
     /// The API key may stay empty for local endpoints.
-    pub fn configured(&self) -> bool {
-        !self.base_url.trim().is_empty() && !self.model.trim().is_empty()
+    pub fn configured(&self, feature: Feature) -> bool {
+        !self.base_url.trim().is_empty() && !self.model_for(feature).is_empty()
     }
 }
 
@@ -112,7 +138,13 @@ pub fn env_set(text: &str, key: &str, value: &str) -> String {
 pub fn load_config(path: &Path) -> AiConfig {
     let text = std::fs::read_to_string(path).unwrap_or_default();
     let get = |k| env_get(&text, k).unwrap_or_default();
-    AiConfig { base_url: get(KEY_BASE_URL), model: get(KEY_MODEL), api_key: get(KEY_API_KEY) }
+    AiConfig {
+        base_url: get(KEY_BASE_URL),
+        model: get(KEY_MODEL),
+        news_model: get(KEY_NEWS_MODEL),
+        events_model: get(KEY_EVENTS_MODEL),
+        api_key: get(KEY_API_KEY),
+    }
 }
 
 pub fn save_config(path: &Path, cfg: &AiConfig) -> std::io::Result<()> {
@@ -120,7 +152,13 @@ pub fn save_config(path: &Path, cfg: &AiConfig) -> std::io::Result<()> {
         std::fs::create_dir_all(dir)?;
     }
     let mut text = std::fs::read_to_string(path).unwrap_or_default();
-    for (k, v) in [(KEY_BASE_URL, &cfg.base_url), (KEY_MODEL, &cfg.model), (KEY_API_KEY, &cfg.api_key)] {
+    for (k, v) in [
+        (KEY_BASE_URL, &cfg.base_url),
+        (KEY_MODEL, &cfg.model),
+        (KEY_NEWS_MODEL, &cfg.news_model),
+        (KEY_EVENTS_MODEL, &cfg.events_model),
+        (KEY_API_KEY, &cfg.api_key),
+    ] {
         text = env_set(&text, k, v.trim());
     }
     let tmp = path.with_extension("local.tmp");
@@ -192,7 +230,7 @@ pub fn reply_content(body: &[u8]) -> Result<String, String> {
 }
 
 pub async fn classify(client: &reqwest::Client, cfg: &AiConfig, symbol: &str, titles: &[&str]) -> Result<Vec<Sentiment>, String> {
-    let body = chat(client, cfg, request_body(cfg.model.trim(), symbol, titles), Duration::from_secs(20)).await?;
+    let body = chat(client, cfg, request_body(cfg.model_for(Feature::News), symbol, titles), Duration::from_secs(20)).await?;
     parse_reply(&body, titles.len())
 }
 
@@ -257,10 +295,10 @@ pub async fn apply(shared: &Shared, symbol: &str, articles: &mut [Article]) {
         return;
     }
     let cfg = load_config(&env_path());
-    if !cfg.configured() {
+    if !cfg.configured(Feature::News) {
         return;
     }
-    let model = cfg.model.trim().to_string();
+    let model = cfg.model_for(Feature::News).to_string();
     let mut missing = Vec::new();
     {
         let mut guard = lock(&shared.ai_cache);
@@ -336,8 +374,8 @@ mod tests {
     fn config_roundtrip_preserves_foreign_lines() {
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("sub/.env.local");
-        let cfg = AiConfig { base_url: "http://localhost:11434/v1".into(), model: "llama3".into(), api_key: String::new() };
-        assert!(!load_config(&p).configured());
+        let cfg = AiConfig { base_url: "http://localhost:11434/v1".into(), model: "llama3".into(), events_model: "qwen3".into(), ..Default::default() };
+        assert!(!load_config(&p).configured(Feature::News));
         save_config(&p, &cfg).unwrap();
         assert_eq!(load_config(&p), cfg);
         std::fs::write(&p, format!("# mine\nOTHER=1\n{}", std::fs::read_to_string(&p).unwrap())).unwrap();
@@ -346,7 +384,21 @@ mod tests {
         let text = std::fs::read_to_string(&p).unwrap();
         assert!(text.starts_with("# mine\nOTHER=1\n"));
         assert_eq!(load_config(&p), next);
-        assert!(next.configured());
+        assert!(next.configured(Feature::News));
+    }
+
+    #[test]
+    fn feature_model_falls_back_to_master() {
+        let mut cfg = AiConfig { base_url: "http://h/v1".into(), model: " gpt ".into(), news_model: "  ".into(), ..Default::default() };
+        assert_eq!(cfg.model_for(Feature::News), "gpt");
+        assert_eq!(cfg.model_for(Feature::Events), "gpt");
+        cfg.events_model = " big ".into();
+        assert_eq!(cfg.model_for(Feature::Events), "big");
+        cfg.model.clear();
+        assert!(!cfg.configured(Feature::News));
+        assert!(cfg.configured(Feature::Events));
+        cfg.base_url.clear();
+        assert!(!cfg.configured(Feature::Events));
     }
 
     fn reply(content: &str) -> Vec<u8> {
