@@ -228,6 +228,7 @@ typing in a text field.
 | | `E` | Open Earnings |
 | | `P` | Open Alerts |
 | | `M` | Open Market |
+| | `K` | Open Events |
 | | `N` | Open News |
 | | `O` | Open Options |
 | Options | `U` | Switch calls / puts |
@@ -252,6 +253,13 @@ not to `settings.json`, as `TICKR_AI_BASE_URL`, `TICKR_AI_MODEL` and
 `TICKR_AI_API_KEY`; other lines in that file are left alone. Results are cached
 per model and headline in the cache folder, so each headline is sent once. If
 AI is off, not configured or a call fails, the keyword tone is used.
+
+### Market events
+
+The Events panel (header button or `K`) lists market-moving events for the next
+7 days. It needs AI configured in Settings, as above, and builds the list from
+current Yahoo market headlines. Results are cached for 6 hours; the Refresh
+button forces a new run.
 
 ## Screenshots
 
