@@ -257,10 +257,17 @@ AI is off, not configured or a call fails, the keyword tone is used.
 
 ### Market events
 
-The Events panel (header button or `K`) lists market-moving events for the next
-7 days. It needs AI configured in Settings, as above, and builds the list from
-current Yahoo market headlines. Results are cached for 6 hours; the Refresh
-button forces a new run.
+The Events panel (header button or `K`) lists the next 7 days of US economic
+releases from Yahoo's economic calendar, grouped by day, each with its local
+release time and, where Yahoo has them, the actual, expected and prior figures.
+The list needs no AI and is refreshed every 15 minutes or with the Refresh
+button.
+
+Clicking an event asks the AI configured in Settings, as above, to analyze that
+one release: a summary and the affected stocks and sectors, each with a score,
+confidence and reasoning. Only the opened event is sent, along with its figures
+and a few current Yahoo headlines about it. Analyses are cached for 6 hours per
+model, and a new one is made once the actual figure is out.
 
 ## Screenshots
 
@@ -291,7 +298,7 @@ requires. Analysis and sentiment run on your machine. Not investment advice.
 | --- | --- | --- |
 | Settings | `%APPDATA%\tickr\settings.json` | `~/Library/Application Support/tickr/` |
 | AI credentials | `%APPDATA%\tickr\.env.local` | `~/Library/Application Support/tickr/` |
-| Logo and AI tone cache | `%LOCALAPPDATA%\tickr\` | `~/Library/Caches/tickr/` |
+| Logo, AI tone and event analysis cache | `%LOCALAPPDATA%\tickr\` | `~/Library/Caches/tickr/` |
 | Logs | `%LOCALAPPDATA%\dev.tickr.desktop\logs\tickr.log` | `~/Library/Logs/dev.tickr.desktop/` |
 
 Logs rotate at 1 MB and keep two old files. Attach `tickr.log` to bug reports.
@@ -331,8 +338,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.9.1
-git push origin v0.9.1
+git tag v0.9.2
+git push origin v0.9.2
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
@@ -420,6 +427,7 @@ src-tauri/src/
   analysis/     local technical analysis: indicators (RSI, SMA/EMA, ATR, σ), patterns, Fibonacci swing, score and targets
   analyst.rs    Yahoo quoteSummary: cookie/crumb session, consensus and price targets, 12 h cache
   earnings.rs   Yahoo quoteSummary: past EPS reports and next report date
+  events.rs     Yahoo economic calendar: next 7 days of US releases; AI analysis of one event on demand, 6 h cache
   grades.rs     Yahoo quoteSummary: analyst upgrades, downgrades and initiations
   stats.rs      Yahoo quoteSummary: key statistics in labeled sections
   market.rs     Yahoo batch quotes and screeners: indices, macro, sectors, top movers

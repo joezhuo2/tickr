@@ -313,10 +313,16 @@ pub async fn get_news(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<
     Ok(list)
 }
 
-/// Upcoming market events for the next week, cached for six hours unless `force`.
+/// US economic events for the next week from Yahoo's calendar, cached for 15 minutes unless `force`.
 #[tauri::command]
 pub async fn get_events(shared: State<'_, Arc<Shared>>, force: bool) -> Result<crate::events::EventsReport, String> {
-    crate::events::fetch(&shared.http, force).await.inspect_err(|e| log::warn!("events: {e}"))
+    crate::events::fetch(&shared.analysts, force).await.inspect_err(|e| log::warn!("events: {e}"))
+}
+
+/// AI analysis of one event, run when the user opens it.
+#[tauri::command]
+pub async fn analyze_event(shared: State<'_, Arc<Shared>>, event: crate::events::MarketEvent) -> Result<crate::events::EventAnalysis, String> {
+    crate::events::analyze(&shared.http, &event).await.inspect_err(|e| log::warn!("event analysis {}: {e}", event.name))
 }
 
 /// Opens a headline in the default browser.

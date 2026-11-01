@@ -172,19 +172,33 @@ export interface Impact {
   reasoning: string;
 }
 
+/** A scheduled US economic release from Yahoo's calendar. */
 export interface MarketEvent {
   id: string;
   name: string;
-  date: string;
-  time: string | null;
-  tone: "positive" | "negative" | "neutral";
-  summary: string;
-  impacts: Impact[];
+  /** Release time, Unix seconds. */
+  at: number;
+  /** What the figure covers, like "Oct" or "Q3". */
+  period: string | null;
+  actual: string | null;
+  expected: string | null;
+  prior: string | null;
+  /** The prior figure as first reported, when it was revised since. */
+  revised: string | null;
 }
 
 export interface EventsReport {
-  generated: number;
+  /** Unix seconds. */
+  fetched: number;
   events: MarketEvent[];
+}
+
+/** AI read of one event, run when it is opened. */
+export interface EventAnalysis {
+  generated: number;
+  tone: "positive" | "negative" | "neutral";
+  summary: string;
+  impacts: Impact[];
 }
 
 /** Which event dots the chart draws. */

@@ -105,6 +105,7 @@ pub fn run() {
             commands::get_news,
             commands::open_news,
             commands::get_events,
+            commands::analyze_event,
         ])
         .on_window_event(window::on_event)
         .setup(move |app| {

@@ -175,11 +175,22 @@ impl Analysts {
     }
 
     pub async fn request(&self, url: &str, query: &[(&str, &str)]) -> Result<Vec<u8>, String> {
+        self.send(url, query, None).await
+    }
+
+    /// POSTs a JSON body, with the same session handling as `request`.
+    pub async fn post(&self, url: &str, query: &[(&str, &str)], body: &Value) -> Result<Vec<u8>, String> {
+        self.send(url, query, Some(body)).await
+    }
+
+    async fn send(&self, url: &str, query: &[(&str, &str)], body: Option<&Value>) -> Result<Vec<u8>, String> {
         for renew in [false, true] {
             let crumb = self.crumb(renew).await?;
-            let res = self
-                .client
-                .get(url)
+            let req = match body {
+                Some(b) => self.client.post(url).header("content-type", "application/json").body(b.to_string()),
+                None => self.client.get(url),
+            };
+            let res = req
                 .query(query)
                 .query(&[("crumb", crumb.as_str())])
                 .send()
