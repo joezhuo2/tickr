@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { invoke } from "@tauri-apps/api/core";
   import { ago, direction, sentimentLabel, sentimentTone, signed } from "./lib/format";
-  import type { EventsReport, MarketEvent } from "./lib/types";
+  import type { EventAnalysis, EventsReport, MarketEvent } from "./lib/types";
 
   // report: undefined while loading with nothing cached.
   let {
@@ -18,68 +19,132 @@
     onrefresh: () => void;
   } = $props();
 
-  let selectedId = $state<string | null>(null);
+  let selected = $state<MarketEvent | null>(null);
   let summaryOpen = $state(false);
   let reasonOpen = $state<Record<string, boolean>>({});
+  // The AI analysis runs only for the opened event.
+  let analysis = $state<EventAnalysis | null>(null);
+  let analysisError = $state<string | null>(null);
+  let analyzing = $state(false);
+  let analysisSeq = 0;
 
-  const selected = $derived(report?.events.find((e) => e.id === selectedId) ?? null);
-
-  function open(e: MarketEvent) {
-    selectedId = e.id;
-    summaryOpen = false;
-    reasonOpen = {};
+  async function analyze(e: MarketEvent) {
+    const mine = ++analysisSeq;
+    analysis = null;
+    analysisError = null;
+    analyzing = true;
+    try {
+      const a = await invoke<EventAnalysis>("analyze_event", { event: e });
+      if (mine === analysisSeq) analysis = a;
+    } catch (err) {
+      if (mine === analysisSeq) analysisError = String(err);
+    } finally {
+      if (mine === analysisSeq) analyzing = false;
+    }
   }
 
-  const day = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  function open(e: MarketEvent) {
+    selected = e;
+    summaryOpen = false;
+    reasonOpen = {};
+    analyze(e);
+  }
+
+  function back() {
+    selected = null;
+    analysisSeq++;
+    analyzing = false;
+  }
+
+  const dayKey = (t: number) => new Date(t * 1000).toDateString();
+  const day = (t: number) => new Date(t * 1000).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  const time = (t: number) => new Date(t * 1000).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+
+  /** Events grouped by local day, in time order. */
+  const days = $derived.by(() => {
+    const out: { key: string; label: string; events: MarketEvent[] }[] = [];
+    for (const e of report?.events ?? []) {
+      const key = dayKey(e.at);
+      if (out.at(-1)?.key !== key) out.push({ key, label: day(e.at), events: [] });
+      out[out.length - 1].events.push(e);
+    }
+    return out;
+  });
 </script>
+
+{#snippet figures(e: MarketEvent)}
+  {#if e.actual}<span>Actual <b>{e.actual}</b></span>{/if}
+  {#if e.expected}<span>Expected <b>{e.expected}</b></span>{/if}
+  {#if e.prior}<span>Prior <b>{e.prior}</b>{#if e.revised}<span class="muted"> (from {e.revised})</span>{/if}</span>{/if}
+{/snippet}
 
 {#if selected}
   {@const ev = selected}
   <div class="detail">
     <div class="bar">
-      <button class="btn" onclick={() => (selectedId = null)}>← Back</button>
+      <button class="btn" onclick={back}>← Back</button>
     </div>
     <div class="scroll">
       <h2>{ev.name}</h2>
       <div class="meta">
-        {day(ev.date)}{#if ev.time}
-          · {ev.time}{/if}
-        <span class="pill {sentimentTone(ev.tone)}">{sentimentLabel(ev.tone)}</span>
+        {day(ev.at)} · {time(ev.at)}{#if ev.period}
+          · For {ev.period}{/if}
+        {#if analysis}<span class="pill {sentimentTone(analysis.tone)}">{sentimentLabel(analysis.tone)}</span>{/if}
       </div>
-      <h3>Details</h3>
-      <p class="summary" class:clamp={!summaryOpen}>{ev.summary}</p>
-      <button class="more" aria-expanded={summaryOpen} aria-label={summaryOpen ? "Show less" : "Show full details"} onclick={() => (summaryOpen = !summaryOpen)}>…</button>
-      <h3>Affected</h3>
-      {#if ev.impacts.length === 0}
-        <p class="muted">No affected stocks or sectors listed</p>
-      {:else}
-        <ul class="impacts">
-          {#each ev.impacts as im, i (i)}
-            <li>
-              <div class="irow">
-                <span class="iname">{im.name}</span>
-                <span class="muted">{im.kind}</span>
-                <span class="score {direction(im.score)}" title="Impact score, −100 to +100">{signed(im.score, 0)}</span>
-                <span class="muted" title="How sure the estimate is">
-                  Confidence <b class="conf-{im.confidence_label}">{im.confidence_label}</b> {im.confidence}%
-                </span>
-                <button
-                  class="more"
-                  aria-expanded={!!reasonOpen[i]}
-                  aria-label={reasonOpen[i] ? "Hide reasoning" : "Show reasoning"}
-                  onclick={() => (reasonOpen[i] = !reasonOpen[i])}>…</button
-                >
-              </div>
-              {#if reasonOpen[i]}<p class="reason">{im.reasoning}</p>{/if}
-            </li>
+      {#if ev.actual || ev.expected || ev.prior}
+        <div class="figs">{@render figures(ev)}</div>
+      {/if}
+      {#if analyzing}
+        <div aria-busy="true" aria-label="Analyzing event">
+          <h3>Details</h3>
+          <span class="sk" style="width: 92%; height: 12px"></span>
+          <span class="sk" style="width: 70%; height: 12px; margin-top: 6px"></span>
+          <h3>Affected</h3>
+          {#each [0, 1, 2] as i (i)}
+            <span class="sk" style="width: {55 + i * 12}%; height: 12px; margin-top: 8px"></span>
           {/each}
-        </ul>
+        </div>
+      {:else if analysisError}
+        <div class="msg">
+          Could not analyze this event: {analysisError}
+          <button class="btn" onclick={() => analyze(ev)}>Retry</button>
+        </div>
+      {:else if analysis}
+        <h3>Details</h3>
+        <p class="summary" class:clamp={!summaryOpen}>{analysis.summary}</p>
+        <button class="more" aria-expanded={summaryOpen} aria-label={summaryOpen ? "Show less" : "Show full details"} onclick={() => (summaryOpen = !summaryOpen)}>…</button>
+        <h3>Affected</h3>
+        {#if analysis.impacts.length === 0}
+          <p class="muted">No affected stocks or sectors listed</p>
+        {:else}
+          <ul class="impacts">
+            {#each analysis.impacts as im, i (i)}
+              <li>
+                <div class="irow">
+                  <span class="iname">{im.name}</span>
+                  <span class="muted">{im.kind}</span>
+                  <span class="score {direction(im.score)}" title="Impact score, −100 to +100">{signed(im.score, 0)}</span>
+                  <span class="muted" title="How sure the estimate is">
+                    Confidence <b class="conf-{im.confidence_label}">{im.confidence_label}</b> {im.confidence}%
+                  </span>
+                  <button
+                    class="more"
+                    aria-expanded={!!reasonOpen[i]}
+                    aria-label={reasonOpen[i] ? "Hide reasoning" : "Show reasoning"}
+                    onclick={() => (reasonOpen[i] = !reasonOpen[i])}>…</button
+                  >
+                </div>
+                {#if reasonOpen[i]}<p class="reason">{im.reasoning}</p>{/if}
+              </li>
+            {/each}
+          </ul>
+        {/if}
       {/if}
     </div>
   </div>
 {:else}
   <div class="bar">
-    <span class="muted">{report ? `Generated ${ago(report.generated, now)}` : ""}</span>
+    <span class="muted">{report ? `US economic calendar · updated ${ago(report.fetched, now)}` : ""}</span>
     <button class="btn" onclick={onrefresh} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</button>
   </div>
   {#if report === undefined && error}
@@ -99,22 +164,27 @@
   {:else}
     {#if error}<p class="err" role="alert">{error}</p>{/if}
     {#if report.events.length === 0}
-      <div class="msg">No significant events in the next 7 days</div>
+      <div class="msg">No US economic events in the next 7 days</div>
     {:else}
-      <ul class="list">
-        {#each report.events as e (e.id)}
-          <li>
-            <button class="row" onclick={() => open(e)}>
-              <span class="title">{e.name}</span>
-              <span class="meta">
-                {day(e.date)}{#if e.time}
-                  · {e.time}{/if}
-                <span class="pill {sentimentTone(e.tone)}">{sentimentLabel(e.tone)}</span>
-              </span>
-            </button>
-          </li>
+      <div class="list">
+        {#each days as d (d.key)}
+          <h3 class="day">{d.label}</h3>
+          <ul>
+            {#each d.events as e (e.id)}
+              <li>
+                <button class="row" onclick={() => open(e)}>
+                  <span class="title">{e.name}</span>
+                  <span class="meta">
+                    {time(e.at)}{#if e.period}
+                      · For {e.period}{/if}
+                    {@render figures(e)}
+                  </span>
+                </button>
+              </li>
+            {/each}
+          </ul>
         {/each}
-      </ul>
+      </div>
     {/if}
   {/if}
 {/if}
@@ -180,8 +250,38 @@
   button.row:focus-visible {
     background: var(--surface);
   }
+  .list ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
   li + li {
     border-top: 1px solid var(--faint);
+  }
+  h3.day {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin: 0;
+    padding: 8px 8px 4px;
+    background: var(--bg);
+  }
+  .meta > span:not(.pill) {
+    margin-left: 10px;
+  }
+  .meta b,
+  .figs b {
+    color: var(--text);
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+  }
+  .figs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 14px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--muted);
   }
   .title {
     font-weight: 600;
