@@ -319,6 +319,12 @@ pub async fn get_events(shared: State<'_, Arc<Shared>>, force: bool) -> Result<c
     crate::events::fetch(&shared.analysts, force).await.inspect_err(|e| log::warn!("events: {e}"))
 }
 
+/// AI analysis of one event, run when the user opens it.
+#[tauri::command]
+pub async fn analyze_event(shared: State<'_, Arc<Shared>>, event: crate::events::MarketEvent) -> Result<crate::events::EventAnalysis, String> {
+    crate::events::analyze(&shared.http, &event).await.inspect_err(|e| log::warn!("event analysis {}: {e}", event.name))
+}
+
 /// Opens a headline in the default browser.
 #[tauri::command]
 pub fn open_news(url: String) -> Result<(), String> {
