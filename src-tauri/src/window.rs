@@ -1,7 +1,8 @@
 //! The main window: create on demand, destroy on minimize (when enabled),
 //! and remember position and size across re-creations.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use tauri::window::Color;
 use tauri::{
@@ -13,6 +14,12 @@ use crate::settings::Geometry;
 use crate::state::{lock, Shared};
 
 pub const LABEL: &str = "main";
+
+/// When the window last lost focus. Clicking the Windows tray icon activates
+/// the taskbar first, so the window is no longer focused when the click lands.
+static BLURRED_AT: Mutex<Option<Instant>> = Mutex::new(None);
+/// A focus loss this recent still counts as focused for a tray click.
+const TRAY_GRACE: Duration = Duration::from_millis(500);
 
 /// Software compositing; the GPU process costs ~100 MB for a static chart.
 #[cfg(windows)]
@@ -38,15 +45,26 @@ pub fn open(app: &AppHandle) {
 /// Hotkey action: minimize when focused, otherwise open.
 pub fn toggle(app: &AppHandle) {
     match get(app) {
-        Some(w)
-            if w.is_focused().unwrap_or(false)
-                && !w.is_minimized().unwrap_or(false)
-                && w.is_visible().unwrap_or(false) =>
-        {
-            dismiss(&w);
-        }
+        Some(w) if shown(&w) && w.is_focused().unwrap_or(false) => dismiss(&w),
         _ => open(app),
     }
+}
+
+/// Tray left-click: like the hotkey, but a window that lost focus to the
+/// click itself still counts as focused.
+pub fn tray_toggle(app: &AppHandle) {
+    match get(app) {
+        Some(w) if shown(&w) && (w.is_focused().unwrap_or(false) || recently_blurred()) => dismiss(&w),
+        _ => open(app),
+    }
+}
+
+fn shown(w: &WebviewWindow) -> bool {
+    !w.is_minimized().unwrap_or(false) && w.is_visible().unwrap_or(false)
+}
+
+fn recently_blurred() -> bool {
+    lock(&BLURRED_AT).is_some_and(|t| t.elapsed() < TRAY_GRACE)
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -176,6 +194,7 @@ pub fn on_event(win: &Window, ev: &WindowEvent) {
     let shared = win.state::<Arc<Shared>>().inner().clone();
     match ev {
         WindowEvent::Moved(_) => record_geometry(win, &shared),
+        WindowEvent::Focused(false) => *lock(&BLURRED_AT) = Some(Instant::now()),
         WindowEvent::Resized(_) => {
             if win.is_minimized().unwrap_or(false) {
                 if lock(&shared.settings).unload_on_minimize {

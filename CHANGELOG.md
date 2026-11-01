@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-01
+
+### Changed
+- **Tray icon toggles the window** ([#76](https://github.com/joezhuo2/tickr/issues/76)):
+  left-clicking the tray icon while the window is open and focused now closes
+  it the same way the hotkey does (minimize, or hide/unload on macOS). If the
+  window is open but behind other windows, the click brings it to the front.
+
 ## [0.9.0] - 2026-11-01
 
 ### Added

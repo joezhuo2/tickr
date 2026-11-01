@@ -81,7 +81,8 @@ update themselves: install v0.5.1 once from Releases.
 ### Tray and hotkey
 
 - **Tray icon:** the company logo with an up/down badge. Hover for the
-  quote, left-click to open the window. Right-click holds every on/off
+  quote, left-click to open the window, or to close it again the way the
+  hotkey does if it's already open and focused. Right-click holds every on/off
   setting: show pre-market/after-hours, show change as % or $, always on top,
   unload window when minimized, start hidden, launch at login, check for
   updates automatically and, on macOS, show price in menu bar. If something
@@ -330,8 +331,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.9.0
-git push origin v0.9.0
+git tag v0.9.1
+git push origin v0.9.1
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
