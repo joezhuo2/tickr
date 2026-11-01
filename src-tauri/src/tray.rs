@@ -150,7 +150,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(on_menu)
         .on_tray_icon_event(|tray, ev| {
             if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = ev {
-                crate::window::open(tray.app_handle());
+                crate::window::tray_toggle(tray.app_handle());
             }
         })
         .build(app)?;
