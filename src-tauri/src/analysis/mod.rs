@@ -14,7 +14,7 @@ pub mod fib;
 pub mod indicators;
 pub mod patterns;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::quote::{Candle, Chart};
 use fib::Swing;
@@ -113,7 +113,7 @@ impl Bias {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Confidence {
     Low,
