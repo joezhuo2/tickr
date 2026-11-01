@@ -6,6 +6,16 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-11-01
+
+### Added
+- **A model per AI feature** ([#75](https://github.com/joezhuo2/tickr/issues/75)):
+  Settings > AI has optional News model and Events model fields, saved to
+  `.env.local` as `TICKR_AI_NEWS_MODEL` and `TICKR_AI_EVENTS_MODEL`. A blank
+  field uses Model, which now acts as the master model, so existing setups work
+  unchanged. Setting only a feature's model is enough to turn AI on for that
+  feature.
+
 ## [0.9.2] - 2026-11-01
 
 ### Changed
