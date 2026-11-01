@@ -359,10 +359,10 @@ fn store(cache: &mut AnalysisCache, key: String, a: EventAnalysis, now: i64) {
 pub async fn analyze(client: &reqwest::Client, event: &MarketEvent) -> Result<EventAnalysis, String> {
     let now = now_secs();
     let cfg = ai::load_config(&ai::env_path());
-    if !cfg.configured() {
+    if !cfg.configured(ai::Feature::Events) {
         return Err("AI not configured — set it in Settings".into());
     }
-    let model = cfg.model.trim();
+    let model = cfg.model_for(ai::Feature::Events);
     let key = analysis_key(model, event);
     let path = analysis_path();
     if let Some(a) = lookup(&load_cache(&path), &key, now) {
