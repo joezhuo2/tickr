@@ -6,6 +6,8 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-01
+
 ## [0.8.16] - 2026-10-30
 
 ### Added
