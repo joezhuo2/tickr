@@ -150,8 +150,7 @@ pub fn chat_url(base_url: &str) -> String {
 }
 
 pub fn parse_reply(body: &[u8], expected: usize) -> Result<Vec<Sentiment>, String> {
-    let v: Value = serde_json::from_slice(body).map_err(|e| format!("bad response: {e}"))?;
-    let content = v["choices"][0]["message"]["content"].as_str().ok_or("no message in response")?;
+    let content = reply_content(body)?;
     let (start, end) = content.find('[').zip(content.rfind(']')).filter(|(s, e)| s < e).ok_or("no JSON array in reply")?;
     let labels: Vec<String> = serde_json::from_str(&content[start..=end]).map_err(|e| format!("bad array: {e}"))?;
     if labels.len() != expected {
@@ -168,12 +167,13 @@ pub fn parse_reply(body: &[u8], expected: usize) -> Result<Vec<Sentiment>, Strin
         .collect()
 }
 
-pub async fn classify(client: &reqwest::Client, cfg: &AiConfig, symbol: &str, titles: &[&str]) -> Result<Vec<Sentiment>, String> {
+/// Posts a chat request and returns the raw response body.
+pub async fn chat(client: &reqwest::Client, cfg: &AiConfig, body: Value, timeout: Duration) -> Result<Vec<u8>, String> {
     let mut req = client
         .post(chat_url(&cfg.base_url))
-        .timeout(Duration::from_secs(20))
+        .timeout(timeout)
         .header("content-type", "application/json")
-        .body(request_body(cfg.model.trim(), symbol, titles).to_string());
+        .body(body.to_string());
     if !cfg.api_key.trim().is_empty() {
         req = req.bearer_auth(cfg.api_key.trim());
     }
@@ -183,6 +183,16 @@ pub async fn classify(client: &reqwest::Client, cfg: &AiConfig, symbol: &str, ti
     if !status.is_success() {
         return Err(format!("HTTP {status}"));
     }
+    Ok(body.to_vec())
+}
+
+pub fn reply_content(body: &[u8]) -> Result<String, String> {
+    let v: Value = serde_json::from_slice(body).map_err(|e| format!("bad response: {e}"))?;
+    v["choices"][0]["message"]["content"].as_str().map(str::to_string).ok_or_else(|| "no message in response".into())
+}
+
+pub async fn classify(client: &reqwest::Client, cfg: &AiConfig, symbol: &str, titles: &[&str]) -> Result<Vec<Sentiment>, String> {
+    let body = chat(client, cfg, request_body(cfg.model.trim(), symbol, titles), Duration::from_secs(20)).await?;
     parse_reply(&body, titles.len())
 }
 
