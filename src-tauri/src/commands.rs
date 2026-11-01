@@ -313,6 +313,12 @@ pub async fn get_news(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<
     Ok(list)
 }
 
+/// Upcoming market events for the next week, cached for six hours unless `force`.
+#[tauri::command]
+pub async fn get_events(shared: State<'_, Arc<Shared>>, force: bool) -> Result<crate::events::EventsReport, String> {
+    crate::events::fetch(&shared.http, force).await.inspect_err(|e| log::warn!("events: {e}"))
+}
+
 /// Opens a headline in the default browser.
 #[tauri::command]
 pub fn open_news(url: String) -> Result<(), String> {

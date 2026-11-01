@@ -24,6 +24,7 @@ export const ACTIONS: { id: Action; label: string; category: Category }[] = [
   { id: "earnings", label: "Open Earnings", category: "panels" },
   { id: "alerts", label: "Open Alerts", category: "panels" },
   { id: "market", label: "Open Market", category: "panels" },
+  { id: "events", label: "Open Events", category: "panels" },
   { id: "news", label: "Open News", category: "panels" },
   { id: "options", label: "Open Options", category: "panels" },
   { id: "options_side", label: "Switch calls / puts", category: "options" },

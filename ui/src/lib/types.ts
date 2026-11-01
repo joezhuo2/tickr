@@ -160,6 +160,31 @@ export interface Keybinds {
   options_side: string;
   options_expiry: string;
   add_watchlist: string;
+  events: string;
+}
+
+export interface Impact {
+  name: string;
+  kind: "stock" | "sector";
+  score: number;
+  confidence: number;
+  confidence_label: "low" | "medium" | "high";
+  reasoning: string;
+}
+
+export interface MarketEvent {
+  id: string;
+  name: string;
+  date: string;
+  time: string | null;
+  tone: "positive" | "negative" | "neutral";
+  summary: string;
+  impacts: Impact[];
+}
+
+export interface EventsReport {
+  generated: number;
+  events: MarketEvent[];
 }
 
 /** Which event dots the chart draws. */

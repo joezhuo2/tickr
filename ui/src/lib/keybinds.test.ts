@@ -21,6 +21,7 @@ const DEFAULTS: Keybinds = {
   options_side: "u",
   options_expiry: "d",
   add_watchlist: "f",
+  events: "k",
 };
 
 const down = (key: string, mods: Partial<Record<"ctrlKey" | "altKey" | "metaKey", boolean>> = {}) => ({
@@ -95,7 +96,7 @@ describe("groupActions", () => {
   });
   it("keeps actions in their declared order within a group", () => {
     const panels = groupActions().find((g) => g.id === "panels")!;
-    expect(panels.actions.map((a) => a.id)).toEqual(["technicals", "analyze", "analysts", "earnings", "alerts", "market", "news", "options"]);
+    expect(panels.actions.map((a) => a.id)).toEqual(["technicals", "analyze", "analysts", "earnings", "alerts", "market", "events", "news", "options"]);
   });
   it("puts the options actions in their own group", () => {
     const options = groupActions().find((g) => g.id === "options")!;

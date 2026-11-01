@@ -7,6 +7,7 @@
   import ChartView from "./Chart.svelte";
   import ChartSkeleton from "./ChartSkeleton.svelte";
   import EarningsView from "./Earnings.svelte";
+  import EventsView from "./Events.svelte";
   import Footer from "./Footer.svelte";
   import MarketView from "./Market.svelte";
   import OptionsView from "./Options.svelte";
@@ -28,6 +29,7 @@
     type Consensus,
     type Dots,
     type Earnings,
+    type EventsReport,
     type Group,
     type Init,
     type Keybinds,
@@ -68,12 +70,16 @@
   let market = $state<Market | undefined>(undefined);
   let marketError = $state<string | null>(null);
   let marketLoading = $state(false);
+  let events = $state<EventsReport | undefined>(undefined);
+  let eventsError = $state<string | null>(null);
+  let eventsLoading = $state(false);
+  let eventsSeq = 0;
   let options = $state<Options | undefined>(undefined);
   let optionsError = $state<string | null>(null);
   let optionsLoading = $state(false);
   let optionsSeq = 0;
   let optionsSide = $state<"calls" | "puts">("calls");
-  let view = $state<"chart" | "alerts" | "technicals" | "analysts" | "earnings" | "stats" | "options" | "market" | "news" | "watchlist">(
+  let view = $state<"chart" | "alerts" | "technicals" | "analysts" | "earnings" | "stats" | "options" | "market" | "events" | "news" | "watchlist">(
     "chart",
   );
   // Technical analysis: computed only when the user clicks Analyze, and
@@ -320,6 +326,25 @@
     }
   }
 
+  async function loadEvents(force = false) {
+    const mine = ++eventsSeq;
+    eventsError = null;
+    eventsLoading = true;
+    try {
+      const r = await invoke<EventsReport>("get_events", { force });
+      if (mine === eventsSeq) events = r;
+    } catch (e) {
+      if (mine === eventsSeq) eventsError = String(e);
+    } finally {
+      if (mine === eventsSeq) eventsLoading = false;
+    }
+  }
+
+  function toggleEvents() {
+    view = view === "events" ? "chart" : "events";
+    if (view === "events") loadEvents();
+  }
+
   async function loadOptions(date?: number) {
     const mine = ++optionsSeq;
     optionsError = null;
@@ -392,6 +417,9 @@
         break;
       case "market":
         if (!e.repeat) toggleMarket();
+        break;
+      case "events":
+        if (!e.repeat) toggleEvents();
         break;
       case "options":
         if (!e.repeat) toggleOptions();
@@ -468,11 +496,14 @@
               <button class:on={view === "market"} aria-pressed={view === "market"} onclick={toggleMarket}>Market</button>
             </div>
             <div class="seg">
+              <button class:on={view === "events"} aria-pressed={view === "events"} onclick={toggleEvents}>Events</button>
+            </div>
+            <div class="seg">
               <button class:on={view === "news"} aria-pressed={view === "news"} onclick={openNews}>News</button>
             </div>
             <div class="seg" role="group" aria-label="Chart type">
-              <button class:on={view !== "news" && view !== "market" && view !== "options" && mode === "line"} onclick={() => setMode("line")}>Line</button>
-              <button class:on={view !== "news" && view !== "market" && view !== "options" && mode === "candles"} onclick={() => setMode("candles")}>Candles</button>
+              <button class:on={view !== "news" && view !== "market" && view !== "events" && view !== "options" && mode === "line"} onclick={() => setMode("line")}>Line</button>
+              <button class:on={view !== "news" && view !== "market" && view !== "events" && view !== "options" && mode === "candles"} onclick={() => setMode("candles")}>Candles</button>
             </div>
           </div>
         </div>
@@ -504,7 +535,7 @@
           <button role="tab" aria-selected={view === "stats"} class:on={view === "stats"} onclick={() => (view = view === "stats" ? "chart" : "stats")}>
             Stats
           </button>
-          {#if view === "news" ? newsLoading : view === "market" ? marketLoading : view === "options" ? optionsLoading : loading || (view === "technicals" && analyzing)}<span
+          {#if view === "news" ? newsLoading : view === "market" ? marketLoading : view === "events" ? eventsLoading : view === "options" ? optionsLoading : loading || (view === "technicals" && analyzing)}<span
               class="spin"
               aria-label="Loading"
             ></span>{/if}
@@ -523,6 +554,8 @@
               <StatsView {symbol} {stats} />
             {:else if view === "market"}
               <MarketView {market} error={marketError} onretry={loadMarket} onopen={openWatched} />
+            {:else if view === "events"}
+              <EventsView report={events} error={eventsError} loading={eventsLoading} {now} onrefresh={() => loadEvents(true)} />
             {:else if view === "options"}
               <OptionsView {options} error={optionsError} onretry={() => loadOptions(options?.expiry ?? undefined)} onexpiry={loadOptions} bind:side={optionsSide} />
             {:else if view === "news"}

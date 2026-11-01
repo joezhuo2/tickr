@@ -49,6 +49,7 @@ pub struct Keybinds {
     pub options_side: String,
     pub options_expiry: String,
     pub add_watchlist: String,
+    pub events: String,
 }
 
 impl Default for Keybinds {
@@ -72,6 +73,7 @@ impl Default for Keybinds {
             options_side: "u".into(),
             options_expiry: "d".into(),
             add_watchlist: "f".into(),
+            events: "k".into(),
         }
     }
 }
