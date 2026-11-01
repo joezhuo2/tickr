@@ -6,6 +6,17 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-11-01
+
+### Changed
+- **Events from Yahoo, analyzed on click** ([#74](https://github.com/joezhuo2/tickr/issues/74)):
+  the Events panel now lists the next 7 days of US economic releases straight
+  from Yahoo's economic calendar, grouped by day with the actual, expected and
+  prior figures. Opening it no longer needs or calls AI. Clicking an event
+  runs the AI analysis for that event only (summary, plus affected stocks and
+  sectors with score, confidence and reasoning), cached for 6 hours and redone
+  once the actual figure is released.
+
 ## [0.9.1] - 2026-11-01
 
 ### Changed
