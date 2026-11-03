@@ -6,6 +6,15 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.9.7] - 2026-11-03
+
+### Added
+- **Independent candle intervals** ([#85](https://github.com/joezhuo2/tickr/issues/85)):
+  a picker beside the range tabs sets candle resolution separately from the
+  visible period, limited to combinations Yahoo supports. Auto keeps the old
+  default for each range, and a saved interval resets to Auto when a range does
+  not support it.
+
 ## [0.9.6] - 2026-11-03
 
 ### Added
