@@ -245,6 +245,10 @@ export interface Article {
   sentiment: Sentiment;
 }
 
+export interface FeedArticle extends Article {
+  symbols: string[];
+}
+
 export interface EarningsReport {
   quarter: string;
   reported: number;
