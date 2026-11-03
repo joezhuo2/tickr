@@ -6,6 +6,16 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.9.8] - 2026-11-03
+
+### Added
+- **Configurable indicators** ([#88](https://github.com/joezhuo2/tickr/issues/88)):
+  moving averages, Bollinger Bands, VWAP and RSI now have editable lengths,
+  colors and visibility, saved across restarts and in named presets. MACD joins
+  as an optional lower pane. Shown analysis recalculates when candles refresh,
+  and "Keep analysis on" runs it automatically. The composite score still uses
+  the standard lengths, so display edits never change it.
+
 ## [0.9.7] - 2026-11-03
 
 ### Added
