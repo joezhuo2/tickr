@@ -1,6 +1,8 @@
 <script lang="ts">
   import { biasLabel, biasTone, direction, fullTime, num, price, signed, upside } from "./lib/format";
-  import type { Analysis, Direction, Overlays, Target } from "./lib/types";
+  import type { Analysis, Direction, Overlays, Target, IndicatorConfig, IndicatorPreset } from "./lib/types";
+
+  import { toggleOverlay } from "./lib/indicators";
 
   let {
     analysis,
@@ -8,7 +10,7 @@
     error,
     bars,
     gmtoffset,
-    overlays = $bindable(),
+    overlays, config, presets, onsave, onsavepreset, ondeletepreset,
     onanalyze,
   }: {
     analysis: Analysis | null;
@@ -17,7 +19,12 @@
     /** Candles in the chart on screen. */
     bars: number;
     gmtoffset: number;
-    overlays: Overlays;
+    overlays: Overlays | null;
+    config: IndicatorConfig;
+    presets: IndicatorPreset[];
+    onsave: (config: IndicatorConfig) => Promise<void>;
+    onsavepreset: (name: string) => Promise<void>;
+    ondeletepreset: (name: string) => Promise<void>;
     onanalyze: () => void;
   } = $props();
 
@@ -47,7 +54,26 @@
     { key: "targets", label: "Targets" },
     { key: "patterns", label: "Patterns" },
     { key: "rsi", label: "RSI pane" },
+    { key: "macd", label: "MACD pane" },
   ];
+  let settingsError = $state<string | null>(null);
+  let saving = $state(false);
+  let presetName = $state("");
+  let selectedPreset = $state("");
+
+  async function edit(action: () => Promise<void>) {
+    saving = true;
+    settingsError = null;
+    try { await action(); }
+    catch (e) { settingsError = String(e); }
+    finally { saving = false; }
+  }
+
+  function change(editConfig: (next: IndicatorConfig) => void) {
+    const next: IndicatorConfig = JSON.parse(JSON.stringify(config));
+    editConfig(next);
+    void edit(() => onsave(next));
+  }
 </script>
 
 <div class="tech" aria-busy={loading}>
@@ -55,7 +81,7 @@
     <div class="start">
       <p>
         Runs RSI, moving averages, candlestick patterns and volatility/Fibonacci targets on the {bars} candles in this chart.
-        Computed locally; nothing runs until you ask.
+        Computed locally; refreshes with the chart once enabled.
       </p>
       <button class="primary" onclick={onanalyze} disabled={loading || bars === 0}>
         {loading ? "Analyzing…" : "Analyze"}
@@ -156,15 +182,72 @@
       <fieldset>
         <legend class="sr">Chart overlays</legend>
         {#each TOGGLES as o (o.key)}
-          <label><input type="checkbox" bind:checked={overlays[o.key]} /> {o.label}</label>
+          <label><input type="checkbox" checked={overlays?.[o.key] ?? false} disabled={saving} onchange={(e) => edit(() => onsave(toggleOverlay(config, o.key, e.currentTarget.checked)))} /> {o.label}</label>
         {/each}
       </fieldset>
       <span class="muted">Deterministic, computed on this device. Not investment advice.</span>
     </div>
   {/if}
+  <details class="indicator-settings">
+    <summary>Indicator settings</summary>
+    <fieldset disabled={saving}>
+      <legend class="sr">Indicator settings</legend>
+      {#each ["sma", "ema"] as kind}
+        {@const group = kind as "sma" | "ema"}
+        {#each config[group] as line, i}
+          <div class="indicator-row">
+            <label>{group.toUpperCase()} {i + 1} length <input type="number" min="1" max="500" value={line.length} onchange={(e) => change((c) => c[group][i].length = e.currentTarget.valueAsNumber)} /></label>
+            <label>Color <input type="color" aria-label={`${group.toUpperCase()} ${i + 1} color`} value={line.color || "#808080"} onchange={(e) => change((c) => c[group][i].color = e.currentTarget.value)} /></label>
+            <button aria-label={`Reset ${group.toUpperCase()} ${i + 1} color to theme`} onclick={() => change((c) => c[group][i].color = "")}>Theme</button>
+            <label><input type="checkbox" aria-label={`${group.toUpperCase()} ${i + 1} visible`} checked={line.visible} onchange={(e) => change((c) => c[group][i].visible = e.currentTarget.checked)} /> Visible</label>
+            <button aria-label={`Remove ${group.toUpperCase()} ${i + 1}`} onclick={() => change((c) => c[group].splice(i, 1))}>Remove</button>
+          </div>
+        {/each}
+        <button disabled={config[group].length >= 8} onclick={() => change((c) => c[group].push({ length: 20, color: "", visible: true }))}>Add {group.toUpperCase()}</button>
+      {/each}
+      {#each ["bollinger", "vwap", "rsi", "macd"] as kind}
+        {@const group = kind as "bollinger" | "vwap" | "rsi" | "macd"}
+        <div class="indicator-row">
+          <b>{group.toUpperCase()}</b>
+          {#if group === "bollinger" || group === "rsi"}
+            <label>Length <input type="number" aria-label={`${group} length`} min="1" max="500" value={config[group].length} onchange={(e) => change((c) => c[group].length = e.currentTarget.valueAsNumber)} /></label>
+          {/if}
+          {#if group === "bollinger"}
+            <label>Multiplier <input type="number" min="0.5" max="5" step="0.1" value={config.bollinger.k} onchange={(e) => change((c) => c.bollinger.k = e.currentTarget.valueAsNumber)} /></label>
+          {/if}
+          {#if group === "macd"}
+            {#each ["fast", "slow", "signal"] as field}
+              {@const key = field as "fast" | "slow" | "signal"}
+              <label>{field} <input type="number" aria-label={`MACD ${field} length`} min="1" max="500" value={config.macd[key]} onchange={(e) => change((c) => c.macd[key] = e.currentTarget.valueAsNumber)} /></label>
+            {/each}
+            <label>Signal color <input type="color" value={config.macd.signal_color || "#808080"} onchange={(e) => change((c) => c.macd.signal_color = e.currentTarget.value)} /></label>
+            <button onclick={() => change((c) => c.macd.signal_color = "")}>Signal theme</button>
+          {/if}
+          <label>Color <input type="color" aria-label={`${group} color`} value={config[group].color || "#808080"} onchange={(e) => change((c) => c[group].color = e.currentTarget.value)} /></label>
+          <button aria-label={`Reset ${group} color to theme`} onclick={() => change((c) => c[group].color = "")}>Theme</button>
+          <label><input type="checkbox" aria-label={`${group} visible`} checked={config[group].visible} onchange={(e) => change((c) => c[group].visible = e.currentTarget.checked)} /> Visible</label>
+        </div>
+      {/each}
+      <div class="indicator-row">
+        <label>Preset <select bind:value={selectedPreset}><option value="">Select preset</option>{#each presets as p (p.name)}<option value={p.name}>{p.name}</option>{/each}</select></label>
+        <button disabled={!presets.some((p) => p.name === selectedPreset)} onclick={() => edit(() => onsave(presets.find((p) => p.name === selectedPreset)!.config))}>Apply</button>
+        <button disabled={!selectedPreset} onclick={() => edit(() => ondeletepreset(selectedPreset))}>Delete</button>
+        <label>Preset name <input bind:value={presetName} /></label>
+        <button onclick={() => edit(() => onsavepreset(presetName))}>Save</button>
+        <label><input type="checkbox" checked={config.keep_analysis} onchange={(e) => change((c) => c.keep_analysis = e.currentTarget.checked)} /> Keep analysis on</label>
+      </div>
+    </fieldset>
+    {#if settingsError}<p class="err" role="alert">{settingsError}</p>{/if}
+  </details>
 </div>
 
 <style>
+  .indicator-settings { margin-top: 6px; }
+  .indicator-settings fieldset { display: block; }
+  .indicator-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0; }
+  input[type="number"] { width: 64px; }
+  input[type="color"] { width: 28px; height: 22px; padding: 0; }
+
   .tech {
     flex: 0 1 auto;
     max-height: 52%;

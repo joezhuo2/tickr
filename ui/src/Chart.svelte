@@ -1,6 +1,7 @@
 <script lang="ts">
   import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, niceTicks, num, price, quarterLabel, volume } from "./lib/format";
   import type { Analysis, Article, Chart, ChartMode, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
+  import { paneLayout } from "./lib/indicators";
   import { untrack } from "svelte";
   import { fadeIn } from "./lib/motion";
   import { follow, full, isFull, pan, reveal, visible, zoom, type View } from "./lib/viewport";
@@ -41,6 +42,7 @@
   // Analysis overlays: only when there is an analysis and a toggle set.
   const show = $derived(analysis && overlays ? overlays : null);
   const rsiOn = $derived(!!show?.rsi);
+  const macdOn = $derived(!!show?.macd);
   /** Series index for each candle on screen (-1 for candles newer than the analysis). */
   const align = $derived(
     analysis ? alignTimes(
@@ -128,12 +130,11 @@
     const n = candles.length;
     const plotW = Math.max(1, width - PAD.l - PAD.r);
     const plotH = Math.max(1, height - PAD.t - PAD.b);
-    // With the RSI pane: price 60%, volume 62-74%, RSI 78-100%.
-    const priceH = plotH * (rsiOn ? 0.6 : 0.8);
-    const volTop = PAD.t + plotH * (rsiOn ? 0.62 : 0.84);
-    const volH = rsiOn ? plotH * 0.12 : plotH - (volTop - PAD.t);
-    const rsiTop = PAD.t + plotH * 0.78;
-    const rsiH = plotH - (rsiTop - PAD.t);
+    const panes = paneLayout(plotH, rsiOn, macdOn);
+    const { priceH, volH, rsiH, macdH } = panes;
+    const volTop = PAD.t + panes.volTop;
+    const rsiTop = PAD.t + panes.rsiTop;
+    const macdTop = PAD.t + panes.macdTop;
     const [i0, i1] = visible(view, n);
     let lo = Infinity;
     let hi = -Infinity;
@@ -155,7 +156,7 @@
         ...(show.bollinger ? analysis.series.bollinger : []),
         ...(show.vwap ? [analysis.series.vwap] : []),
       ];
-      for (const line of fit) {
+      for (const line of fit.filter((l) => l.visible)) {
         for (let i = i0; i <= i1; i++) {
           const v = valueAt(line, i);
           if (v != null) {
@@ -192,6 +193,8 @@
       volH,
       rsiTop,
       rsiH,
+      macdTop,
+      macdH,
       x: (i: number) => PAD.l + step * (i - start + 0.5),
       y: (v: number) => PAD.t + (1 - (v - lo) / (hi - lo)) * priceH,
       vy: (v: number) => volTop + volH - (vmax > 0 ? (v / vmax) * volH : 0),
@@ -492,18 +495,19 @@
         ctx.beginPath();
         band.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
         ctx.closePath();
-        ctx.fillStyle = v("--bb-fill");
+        ctx.fillStyle = up.color ? `${up.color}18` : v("--bb-fill");
         ctx.fill();
       }
       ctx.lineWidth = 1;
-      ctx.strokeStyle = v("--bb");
+      ctx.strokeStyle = mid.color || v("--bb");
       for (const line of [up, mid, lo]) strokeLine(ctx, line, g.y, g);
-      legend(mid.label, v("--bb"));
+      legend(mid.label, mid.color || v("--bb"));
     }
     if (s.mas) {
       ctx.lineWidth = 1.2;
       a.series.mas.forEach((line, k) => {
-        const col = v(`--ma-${k + 1}`);
+        if (!line.visible) return;
+        const col = line.color || v(`--ma-${k % 5 + 1}`);
         ctx.strokeStyle = col;
         strokeLine(ctx, line, g.y, g);
         legend(line.label, col);
@@ -511,9 +515,9 @@
     }
     if (s.vwap) {
       ctx.lineWidth = 1.4;
-      ctx.strokeStyle = v("--vwap");
+      ctx.strokeStyle = (a.series.vwap.color || v("--vwap"));
       strokeLine(ctx, a.series.vwap, g.y, g);
-      legend(a.series.vwap.label, v("--vwap"));
+      legend(a.series.vwap.label, (a.series.vwap.color || v("--vwap")));
     }
 
     // Targets: full-width levels, labeled inside the plot.
@@ -599,14 +603,55 @@
       ctx.beginPath();
       ctx.rect(PAD.l, top, g.plotW, g.rsiH);
       ctx.clip();
-      ctx.strokeStyle = v("--rsi");
+      ctx.strokeStyle = (a.series.rsi.color || v("--rsi"));
       ctx.lineWidth = 1.3;
       strokeLine(ctx, a.series.rsi, g.ry, g);
       ctx.restore();
       const lastRsi = a.series.rsi.values[a.series.rsi.values.length - 1];
-      ctx.fillStyle = v("--rsi");
+      ctx.fillStyle = (a.series.rsi.color || v("--rsi"));
       ctx.textBaseline = "top";
       ctx.fillText(`${a.series.rsi.label}${lastRsi != null ? `  ${num(lastRsi, 1)}` : ""}`, PAD.l + 4, top + 2);
+    }
+    if (s.macd) {
+      const [line, signal, histogram] = a.series.macd;
+      let extent = 1e-9;
+      for (const l of a.series.macd) {
+        for (let i = g.i0; i <= g.i1; i++) extent = Math.max(extent, Math.abs(valueAt(l, i) ?? 0));
+      }
+      const y = (value: number) => g.macdTop + g.macdH * (0.5 - value / (extent * 2.4));
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(PAD.l, g.macdTop, g.plotW, g.macdH);
+      ctx.clip();
+      ctx.strokeStyle = v("--grid");
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(PAD.l, g.macdTop);
+      ctx.lineTo(right, g.macdTop);
+      ctx.moveTo(PAD.l, y(0));
+      ctx.lineTo(right, y(0));
+      ctx.stroke();
+      for (let i = g.i0; i <= g.i1; i++) {
+        const value = valueAt(histogram, i);
+        if (value == null) continue;
+        ctx.fillStyle = histogram.color || v(value >= 0 ? "--up" : "--down");
+        ctx.globalAlpha = 0.5;
+        ctx.fillRect(g.x(i) - g.step * 0.3, Math.min(y(value), y(0)), Math.max(1, g.step * 0.6), Math.abs(y(value) - y(0)));
+      }
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 1.3;
+      ctx.strokeStyle = line.color || v("--rsi");
+      strokeLine(ctx, line, y, g);
+      ctx.strokeStyle = signal.color || v("--ma-2");
+      strokeLine(ctx, signal, y, g);
+      ctx.fillStyle = line.color || v("--rsi");
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText(line.label, PAD.l + 4, g.macdTop + 2);
+      ctx.restore();
+      ctx.fillStyle = v("--muted");
+      ctx.textBaseline = "middle";
+      ctx.fillText("0", right + 8, y(0));
     }
     ctx.font = `11px ${v("--font")}`;
   }
@@ -746,9 +791,10 @@
     const c = candles[hover];
     const x = geo.x(hover);
     const left = x > width / 2;
-    const rsi = show && analysis ? valueAt(analysis.series.rsi, hover) : null;
+    const rsi = show?.rsi && analysis ? valueAt(analysis.series.rsi, hover) : null;
+    const macd = show?.macd && analysis ? analysis.series.macd.map((line) => ({ label: line.label, value: valueAt(line, hover!) })) : [];
     const pats = show?.patterns ? (patternsAt.get(hover) ?? []) : [];
-    return { c, x, left, ext: isExtended(c.t), rsi, pats, earn: earningsAt.get(hover), grades: ratingsAt.get(hover) ?? [], heads: newsAt.get(hover) ?? [], div: dividendsAt.get(hover), split: splitsAt.get(hover) };
+    return { c, x, left, ext: isExtended(c.t), rsi, macd, pats, earn: earningsAt.get(hover), grades: ratingsAt.get(hover) ?? [], heads: newsAt.get(hover) ?? [], div: dividendsAt.get(hover), split: splitsAt.get(hover) };
   });
 </script>
 
@@ -809,6 +855,7 @@
         <dt>Close</dt><dd class={tip.c.c >= tip.c.o ? "up" : "down"}>{price(tip.c.c, chart.meta.currency)}</dd>
         <dt>Volume</dt><dd>{volume(tip.c.v)}</dd>
         {#if tip.rsi != null}<dt>RSI</dt><dd>{num(tip.rsi, 1)}</dd>{/if}
+        {#each tip.macd as line}{#if line.value != null}<dt>{line.label}</dt><dd>{num(line.value, 2)}</dd>{/if}{/each}
       </dl>
       {#if tip.earn}
         <div class="earn">
