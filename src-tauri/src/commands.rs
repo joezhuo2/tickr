@@ -25,13 +25,14 @@ use crate::state::{lock, now_secs, QuoteState, Shared};
 pub struct Init {
     symbol: String,
     range: String,
+    interval: String,
     chart_mode: ChartMode,
     hotkey: String,
     default_hotkey: &'static str,
     /// Why the hotkey is not registered, if it is not.
     hotkey_error: Option<String>,
     quote: QuoteState,
-    /// Last chart viewed, when it matches the current symbol and range.
+    /// Last chart viewed, when it matches the current symbol, range and interval.
     chart: Option<Chart>,
     /// Logo data URI; only meaningful when `logo_known`.
     logo: Option<String>,
@@ -57,12 +58,14 @@ pub fn init_payload(shared: &Shared) -> Init {
     let s = lock(&shared.settings).clone();
     let chart = lock(&shared.last_chart)
         .clone()
-        .filter(|c| c.meta.symbol.eq_ignore_ascii_case(&s.symbol) && c.range == s.range);
+        .filter(|c| c.meta.symbol.eq_ignore_ascii_case(&s.symbol) && c.range == s.range
+            && quote::resolve_interval(&s.range, &s.interval).is_some_and(|(i, _)| c.interval == i));
     let logo = lock(&shared.logo).clone().filter(|(sym, _)| *sym == s.symbol);
     let analyst = shared.analysts.cached(&s.symbol, now_secs());
     Init {
         symbol: s.symbol,
         range: s.range,
+        interval: s.interval,
         chart_mode: s.chart_mode,
         hotkey: s.hotkey,
         default_hotkey: DEFAULT_HOTKEY,
@@ -87,8 +90,8 @@ pub fn get_init(shared: State<'_, Arc<Shared>>) -> Init {
 }
 
 #[tauri::command]
-pub async fn get_chart(shared: State<'_, Arc<Shared>>, symbol: String, range: String) -> Result<Chart, String> {
-    let chart = quote::fetch_chart(&shared.http, &symbol, &range).await?;
+pub async fn get_chart(shared: State<'_, Arc<Shared>>, symbol: String, range: String, interval: String) -> Result<Chart, String> {
+    let chart = quote::fetch_chart(&shared.http, &symbol, &range, &interval).await?;
     *lock(&shared.last_chart) = Some(chart.clone());
     Ok(chart)
 }
@@ -97,14 +100,15 @@ pub async fn get_chart(shared: State<'_, Arc<Shared>>, symbol: String, range: St
 /// Reuses the last fetched chart when it matches, so the analysis covers the
 /// same candles the window shows; fetches otherwise.
 #[tauri::command]
-pub async fn analyze(shared: State<'_, Arc<Shared>>, symbol: String, range: String) -> Result<Analysis, String> {
+pub async fn analyze(shared: State<'_, Arc<Shared>>, symbol: String, range: String, interval: String) -> Result<Analysis, String> {
     let cached = lock(&shared.last_chart)
         .clone()
-        .filter(|c| c.meta.symbol.eq_ignore_ascii_case(symbol.trim()) && c.range == range);
+        .filter(|c| c.meta.symbol.eq_ignore_ascii_case(symbol.trim()) && c.range == range
+            && quote::resolve_interval(&range, &interval).is_some_and(|(i, _)| c.interval == i));
     let chart = match cached {
         Some(c) => c,
         None => {
-            let c = quote::fetch_chart(&shared.http, &symbol, &range).await?;
+            let c = quote::fetch_chart(&shared.http, &symbol, &range, &interval).await?;
             *lock(&shared.last_chart) = Some(c.clone());
             c
         }
@@ -147,7 +151,21 @@ pub fn set_range(shared: State<'_, Arc<Shared>>, range: String) -> Result<(), St
     if quote::interval_for(&range).is_none() {
         return Err(format!("unknown range {range}"));
     }
-    shared.update_settings(|s| s.range = range);
+    shared.update_settings(|s| {
+        if !quote::intervals_for(&range).contains(&s.interval.as_str()) {
+            s.interval = "auto".into();
+        }
+        s.range = range;
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_interval(shared: State<'_, Arc<Shared>>, interval: String) -> Result<(), String> {
+    if interval != "auto" && !quote::intervals_for(&lock(&shared.settings).range).contains(&interval.as_str()) {
+        return Err(format!("unknown interval {interval}"));
+    }
+    shared.update_settings(|s| s.interval = interval);
     Ok(())
 }
 
@@ -414,6 +432,20 @@ pub async fn get_watch_quotes(shared: State<'_, Arc<Shared>>, symbols: Vec<Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn init_chart_matches_resolved_interval() {
+        let dir = tempfile::tempdir().unwrap();
+        let shared = Shared::new(dir.path().join("settings.json"), Default::default());
+        let chart = quote::parse_chart(include_bytes!("../../fixtures/chart-1d-post.json"), "1d", "5m").unwrap();
+        *lock(&shared.last_chart) = Some(chart);
+        for interval in ["auto", "5m", "invalid"] {
+            lock(&shared.settings).interval = interval.into();
+            assert!(init_payload(&shared).chart.is_some());
+        }
+        lock(&shared.settings).interval = "60m".into();
+        assert!(init_payload(&shared).chart.is_none());
+    }
 
     #[test]
     fn alert_edits_save_and_clear_paused_or_deleted_baselines() {

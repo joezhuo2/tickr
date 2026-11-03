@@ -107,6 +107,7 @@ impl Default for Dots {
 pub struct Settings {
     pub symbol: String,
     pub range: String,
+    pub interval: String,
     pub chart_mode: ChartMode,
     pub hotkey: String,
     pub geometry: Option<Geometry>,
@@ -138,6 +139,7 @@ impl Default for Settings {
         Self {
             symbol: "AAPL".into(),
             range: "1d".into(),
+            interval: "auto".into(),
             chart_mode: ChartMode::Line,
             hotkey: DEFAULT_HOTKEY.into(),
             geometry: None,
@@ -214,6 +216,7 @@ mod tests {
         let s = Settings::load(&p);
         assert_eq!(s.symbol, "NVDA");
         assert_eq!(s.chart_mode, ChartMode::Candles);
+        assert_eq!(s.interval, "auto");
         assert!(s.unload_on_minimize);
         assert!(s.groups.is_empty());
         assert!(s.auto_update);
