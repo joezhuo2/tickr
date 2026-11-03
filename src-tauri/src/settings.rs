@@ -256,12 +256,12 @@ mod tests {
 
     #[test]
     fn alerts_roundtrip_preserves_armed_and_triggered_state() {
-        use crate::alerts::{Direction, PriceAlert};
+        use crate::alerts::{AlertKind, Direction, PriceAlert};
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("settings.json");
         let mut s = Settings::default();
-        s.alerts.push(PriceAlert { id: 1, symbol: "AAPL".into(), direction: Direction::Above, level: 250.0, enabled: true, triggered_at: None });
-        s.alerts.push(PriceAlert { id: 2, symbol: "BTC-USD".into(), direction: Direction::Below, level: 60000.0, enabled: false, triggered_at: Some(123) });
+        s.alerts.push(PriceAlert { id: 1, symbol: "AAPL".into(), direction: Direction::Above, level: 250.0, enabled: true, triggered_at: None, kind: AlertKind::TrailPercent, reference: Some(251.5), recurring: true, cooldown_mins: 30, regular_only: true });
+        s.alerts.push(PriceAlert { id: 2, symbol: "BTC-USD".into(), direction: Direction::Below, level: 60000.0, enabled: false, triggered_at: Some(123), kind: AlertKind::Price, reference: None, recurring: false, cooldown_mins: 15, regular_only: false });
         s.save(&p).unwrap();
         assert_eq!(Settings::load(&p), s);
     }

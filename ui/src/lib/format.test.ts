@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ago, alignTimes, axisTime, biasLabel, biasTone, byGain, candleAt, candlesCsv, change, direction, fullTime, netSentiment, newsDate, niceTicks, price, quarterLabel, ratingLabel, ratingTone, sentimentLabel, sentimentTone, sessionMove, signed, span, statTone, upside, volume } from "./format";
+import { ago, alertSummary, alignTimes, axisTime, biasLabel, biasTone, byGain, candleAt, candlesCsv, change, direction, fullTime, netSentiment, newsDate, niceTicks, price, quarterLabel, ratingLabel, ratingTone, sentimentLabel, sentimentTone, sessionMove, signed, span, statTone, upside, volume } from "./format";
 import { accelerator, display } from "./hotkey";
 
 const key = (code: string, mods: Partial<Record<"ctrlKey" | "altKey" | "shiftKey" | "metaKey", boolean>> = {}) => ({
@@ -182,5 +182,20 @@ describe("netSentiment", () => {
     expect(netSentiment(["negative", "negative", "positive"])).toBe("negative");
     expect(netSentiment(["positive", "negative"])).toBe("neutral");
     expect(netSentiment([])).toBe("neutral");
+  });
+});
+
+describe("alertSummary", () => {
+  const base = { direction: "below" as const, level: 5, reference: null };
+  it("describes each kind", () => {
+    expect(alertSummary({ ...base, kind: "price", level: 1500.5 })).toBe("At or below 1,500.5");
+    expect(alertSummary({ ...base, kind: "price", direction: "above" })).toBe("At or above 5");
+    expect(alertSummary({ ...base, kind: "day_percent" })).toBe("Down 5% today");
+    expect(alertSummary({ ...base, kind: "day_percent", direction: "above" })).toBe("Up 5% today");
+    expect(alertSummary({ ...base, kind: "armed_percent" })).toBe("Down 5% since armed");
+    expect(alertSummary({ ...base, kind: "armed_percent", reference: 100 })).toBe("Down 5% since armed at 100");
+    expect(alertSummary({ ...base, kind: "trail_percent", level: 3, reference: 198.1 })).toBe("Falls 3% from high 198.1");
+    expect(alertSummary({ ...base, kind: "trail_percent", direction: "above" })).toBe("Rises 5% from low");
+    expect(alertSummary({ ...base, kind: "trail_amount", level: 2, reference: 50 })).toBe("Falls 2 from high 50");
   });
 });

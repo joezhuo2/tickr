@@ -6,6 +6,15 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.9.6] - 2026-11-03
+
+### Added
+- **Richer alerts** ([#81](https://github.com/joezhuo2/tickr/issues/81)):
+  alerts can follow a day move %, a move since armed %, or a trailing
+  percentage or amount from the high or low since arming. They can also be
+  recurring with a cooldown, and limited to the regular session. Existing
+  alerts keep working as one-shot price alerts.
+
 ## [0.9.5] - 2026-11-03
 
 ### Fixed

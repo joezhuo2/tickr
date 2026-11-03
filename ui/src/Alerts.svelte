@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import type { PriceAlert, Quote } from "./lib/types";
+  import { alertSummary } from "./lib/format";
+  import type { AlertKind, PriceAlert, Quote } from "./lib/types";
 
   let { symbol, quote, alerts, onchange }: {
     symbol: string;
@@ -10,9 +11,22 @@
   } = $props();
 
   let direction = $state<"above" | "below">("above");
+  let kind = $state<AlertKind>("price");
   let level = $state<number | undefined>(undefined);
+  let recurring = $state(false);
+  let cooldownMins = $state<number | undefined>(15);
+  let regularOnly = $state(false);
   let busy = $state(false);
   let error = $state<string | null>(null);
+
+  const labels: Record<AlertKind, [string, string]> = {
+    price: ["At or above", "At or below"],
+    day_percent: ["Up", "Down"],
+    armed_percent: ["Up", "Down"],
+    trail_percent: ["Rises from low", "Falls from high"],
+    trail_amount: ["Rises from low", "Falls from high"],
+  };
+  const noun = $derived(kind === "price" ? "Price" : kind === "trail_amount" ? "Amount" : "Percent");
 
   async function save(command: string, args: Record<string, unknown>) {
     if (busy) return;
@@ -31,36 +45,62 @@
   function add(e: SubmitEvent) {
     e.preventDefault();
     if (level === undefined || !Number.isFinite(level) || level <= 0) {
-      error = "Enter a price greater than zero.";
+      error = `Enter a ${noun.toLowerCase()} greater than zero.`;
       return;
     }
-    save("add_alert", { symbol, direction, level });
+    const cooldown = recurring ? cooldownMins : 15;
+    if (cooldown === undefined || !Number.isInteger(cooldown) || cooldown < 0) {
+      error = "Enter a whole number of cooldown minutes.";
+      return;
+    }
+    save("add_alert", { symbol, kind, direction, level, recurring, cooldownMins: cooldown, regularOnly });
   }
 </script>
 
 <div class="alerts">
   <header>
     <h2>Price alerts</h2>
-    <p>Set a level for {symbol}. Alerts fire once when the price crosses the level; rearm to use one again.</p>
+    <p>Set an alert for {symbol}. One-shot alerts fire once when crossed; rearm to use one again. Recurring alerts stay armed and fire again after a fresh crossing and the cooldown.</p>
   </header>
   <form onsubmit={add}>
     <span class="symbol">{symbol}</span>
     <label>
+      <span class="sr-only">Alert kind</span>
+      <select bind:value={kind} disabled={busy}>
+        <option value="price">Price</option>
+        <option value="day_percent">Day move %</option>
+        <option value="armed_percent">Move since armed %</option>
+        <option value="trail_percent">Trailing %</option>
+        <option value="trail_amount">Trailing amount</option>
+      </select>
+    </label>
+    <label>
       <span class="sr-only">Alert direction</span>
       <select bind:value={direction} disabled={busy}>
-        <option value="above">At or above</option>
-        <option value="below">At or below</option>
+        <option value="above">{labels[kind][0]}</option>
+        <option value="below">{labels[kind][1]}</option>
       </select>
     </label>
     <label class="level">
-      <span class="sr-only">Alert price</span>
-      <input type="number" min="0" step="any" placeholder="Price" required bind:value={level} disabled={busy} />
+      <span class="sr-only">Alert {noun.toLowerCase()}</span>
+      <input type="number" min="0" step="any" placeholder={noun} required bind:value={level} disabled={busy} />
     </label>
-    {#if quote?.currency}<span class="currency">{quote.currency}</span>{/if}
+    {#if kind === "price" || kind === "trail_amount"}
+      {#if quote?.currency}<span class="currency">{quote.currency}</span>{/if}
+    {:else}
+      <span class="currency">%</span>
+    {/if}
+    <label class="check"><input type="checkbox" bind:checked={recurring} disabled={busy} /> Recurring</label>
+    {#if recurring}
+      <label class="check">
+        <input class="cooldown" type="number" min="0" step="1" aria-label="Cooldown minutes" bind:value={cooldownMins} disabled={busy} /> min cooldown
+      </label>
+    {/if}
+    <label class="check"><input type="checkbox" bind:checked={regularOnly} disabled={busy} /> Regular session only</label>
     <button class="add" type="submit" disabled={busy}>Add alert</button>
   </form>
   {#if error}<p class="error" role="alert">{error}</p>{/if}
-  <p class="hint">Armed symbols are checked about every 15 seconds while tickr is running, even with the window closed. The first price after arming or restarting establishes a baseline. Allow tickr notifications in your system settings.</p>
+  <p class="hint">Armed symbols are checked about every 15 seconds while tickr is running, even with the window closed. The first price after arming or restarting establishes a baseline; trailing alerts check a stop reached while tickr was closed. Allow tickr notifications in your system settings.</p>
   {#if !alerts.length}
     <div class="empty">No price alerts yet.</div>
   {:else}
@@ -69,18 +109,22 @@
         <li>
           <div class="details">
             <strong>{alert.symbol}</strong>
-            <span>{alert.direction === "above" ? "At or above" : "At or below"} {alert.level.toLocaleString("en-US", { maximumFractionDigits: 12 })}</span>
+            <span>{alertSummary(alert)}</span>
+            {#if alert.recurring}<span class="tag">Recurring, {alert.cooldown_mins} min cooldown</span>{/if}
+            {#if alert.regular_only}<span class="tag">Regular only</span>{/if}
             <span class="status" title={alert.triggered_at ? new Date(alert.triggered_at * 1000).toLocaleString() : undefined}>
-              {alert.enabled ? "Armed" : alert.triggered_at ? "Triggered" : "Paused"}
+              {alert.enabled
+                ? alert.recurring && alert.triggered_at ? `Armed, last fired ${new Date(alert.triggered_at * 1000).toLocaleString()}` : "Armed"
+                : alert.triggered_at ? "Triggered" : "Paused"}
             </span>
           </div>
           <div class="actions">
             <button disabled={busy} onclick={() => save("set_alert_enabled", { id: alert.id, enabled: !alert.enabled })}
-              aria-label={`${alert.enabled ? "Pause" : "Rearm"} ${alert.symbol} ${alert.direction} ${alert.level} alert`}>
+              aria-label={`${alert.enabled ? "Pause" : "Rearm"} ${alert.symbol} ${alertSummary(alert)} alert`}>
               {alert.enabled ? "Pause" : "Rearm"}
             </button>
             <button disabled={busy} onclick={() => save("delete_alert", { id: alert.id })}
-              aria-label={`Delete ${alert.symbol} ${alert.direction} ${alert.level} alert`}>Delete</button>
+              aria-label={`Delete ${alert.symbol} ${alertSummary(alert)} alert`}>Delete</button>
           </div>
         </li>
       {/each}
@@ -94,7 +138,10 @@
   p { margin: 0; color: var(--muted); }
   form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0 10px; }
   .symbol { font-weight: 600; }
-  .currency, .hint, .status { color: var(--muted); font-size: 12px; }
+  .currency, .hint, .status, .tag { color: var(--muted); font-size: 12px; }
+  .check { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+  .check input { width: auto; }
+  .check .cooldown { width: 60px; }
   .level { flex: 1; min-width: 90px; max-width: 180px; }
   input { width: 100%; }
   input, select, button { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--faint); border-radius: 6px; padding: 6px 9px; }

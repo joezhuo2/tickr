@@ -195,17 +195,27 @@ Watchlist if it is closed).
 
 ### Price alerts
 
-Open **Alerts**, to the left of Technicals, to add an **At or above** or
-**At or below** level for the selected symbol, in its trading currency.
-The list includes alerts for every symbol. **Pause**, **Rearm** and **Delete**
-manage them; each alert fires once and then shows **Triggered**.
+Open **Alerts**, to the left of Technicals, to add an alert for the selected
+symbol. Pick a kind: **Price** (at or above or below a level, in the trading
+currency), **Day move %** (up or down X% from yesterday's close), **Move since
+armed %** (up or down X% from the price when armed), **Trailing %** or
+**Trailing amount** (falls by that much from the high since arming, or rises
+from the low). The list includes alerts for every symbol. **Pause**, **Rearm**
+and **Delete** manage them. By default an alert fires once and then shows
+**Triggered**; tick **Recurring** to keep it armed, with a cooldown in minutes
+(default 15) during which it stays quiet. A recurring alert needs a fresh
+crossing to fire again. **Regular session only** ignores extended-hours
+prices and checks nothing outside the regular session.
 
 Armed symbols are checked about every 15 seconds while tickr is running,
 including with the window closed and when viewing a different stock. The
 first successful price after arming or restarting establishes a baseline;
-the next crossing sends a native desktop notification. Extended-hours prices
-are used when available. Alerts and their triggered state are saved across
-restarts. Allow tickr notifications in your OS settings; on Windows, use an
+the next crossing sends a native desktop notification. Move-since-armed and
+trailing alerts take their reference price from the first price after arming
+and save it, so a trailing stop breached while tickr was closed fires on the
+first price after restart. Extended-hours prices are used when available.
+Alerts and their triggered state are saved across restarts. Allow tickr
+notifications in your OS settings; on Windows, use an
 installed build for notifications. Quotes can be delayed and crossings between
 polls can be missed.
 
@@ -346,8 +356,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.9.5
-git push origin v0.9.5
+git tag v0.9.6
+git push origin v0.9.6
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
