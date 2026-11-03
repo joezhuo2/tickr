@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-11-03
+
+### Added
+- **Watchlist group hotkey** ([#84](https://github.com/joezhuo2/tickr/issues/84)):
+  `G` (rebindable in Settings) cycles the Watchlist tabs, All then each group
+  in order, then back to All. It opens the Watchlist if it is closed.
+
 ## [0.9.3] - 2026-11-01
 
 ### Added

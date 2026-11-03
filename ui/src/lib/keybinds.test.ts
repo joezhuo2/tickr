@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ACTIONS, CATEGORIES, actionFor, groupActions, bindKey, keyLabel, rebind } from "./keybinds";
+import { ACTIONS, CATEGORIES, actionFor, groupActions, bindKey, keyLabel, nextGroupTab, rebind } from "./keybinds";
 import type { Keybinds } from "./types";
 
 const DEFAULTS: Keybinds = {
@@ -22,6 +22,7 @@ const DEFAULTS: Keybinds = {
   options_expiry: "d",
   add_watchlist: "f",
   events: "k",
+  next_group: "g",
 };
 
 const down = (key: string, mods: Partial<Record<"ctrlKey" | "altKey" | "metaKey", boolean>> = {}) => ({
@@ -105,5 +106,20 @@ describe("groupActions", () => {
   it("gives every default a distinct key", () => {
     const keys = Object.values(DEFAULTS);
     expect(new Set(keys).size).toBe(keys.length);
+  });
+});
+
+describe("nextGroupTab", () => {
+  it("goes from All through each group and back to All", () => {
+    expect(nextGroupTab(["Tech", "Bank"], null)).toBe("Tech");
+    expect(nextGroupTab(["Tech", "Bank"], "Tech")).toBe("Bank");
+    expect(nextGroupTab(["Tech", "Bank"], "Bank")).toBeNull();
+  });
+  it("goes to the first group when the current one is gone", () => {
+    expect(nextGroupTab(["Tech"], "Old")).toBe("Tech");
+  });
+  it("stays on All with no groups", () => {
+    expect(nextGroupTab([], null)).toBeNull();
+    expect(nextGroupTab([], "Old")).toBeNull();
   });
 });

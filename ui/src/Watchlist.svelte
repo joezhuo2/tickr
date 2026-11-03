@@ -8,6 +8,7 @@
     symbols,
     groups,
     current,
+    tab = $bindable(),
     onopen,
     ongroups,
   }: {
@@ -15,6 +16,7 @@
     groups: Group[];
     /** The symbol shown in the chart, highlighted. */
     current: string;
+    tab: string | null;
     onopen: (symbol: string) => void;
     ongroups: (groups: Group[]) => void;
   } = $props();
@@ -25,8 +27,6 @@
   const moves = $derived(
     Object.fromEntries(Object.values(quotes).flatMap((w) => (w.quote ? [[w.symbol, sessionMove(w.quote)]] : []))),
   );
-  /** Name of the group tab shown; null for All. */
-  let tab = $state<string | null>(null);
   const group = $derived(groups.find((g) => g.name === tab) ?? null);
   /** Name typed for a new group; null when the field is closed. */
   let draft = $state<string | null>(null);
@@ -36,16 +36,22 @@
     draft = null;
     if (!name || groups.some((g) => g.name.toLowerCase() === name.toLowerCase())) return;
     ongroups([...groups, { name, symbols: [] }]);
-    tab = name;
+    tab = shownTab = name;
     editing = true;
   }
 
   /** In a group tab: show every starred stock and toggle membership on click. */
   let editing = $state(false);
+  let shownTab = tab;
+  $effect(() => {
+    if (tab === shownTab) return;
+    shownTab = tab;
+    editing = false;
+  });
   const shown = $derived(group && !editing ? group.symbols : symbols);
 
   function pick(g: Group | null) {
-    tab = g?.name ?? null;
+    tab = shownTab = g?.name ?? null;
     editing = false;
   }
 
@@ -58,7 +64,7 @@
       return;
     }
     ongroups(groups.map((g) => (g.name === group.name ? { ...g, name } : g)));
-    tab = name;
+    tab = shownTab = name;
   }
 
   function remove() {

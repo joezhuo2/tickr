@@ -39,7 +39,7 @@
     type RatingChange,
     type StatSection,
   } from "./lib/types";
-  import { actionFor, bindKey } from "./lib/keybinds";
+  import { actionFor, bindKey, nextGroupTab } from "./lib/keybinds";
   import { paneIn } from "./lib/motion";
 
   // Injected before load, so the first frame already has real content.
@@ -98,6 +98,7 @@
   let newsLoading = $state(false);
   let watchlist = $state<string[]>([]);
   let groups = $state<Group[]>([]);
+  let groupTab = $state<string | null>(null);
   let alerts = $state<PriceAlert[]>([]);
   let now = $state(Date.now() / 1000);
   let refreshing = $state(false);
@@ -400,6 +401,12 @@
       case "toggle_watchlist":
         if (!e.repeat) view = view === "watchlist" ? "chart" : "watchlist";
         break;
+      case "next_group":
+        if (!e.repeat) {
+          view = "watchlist";
+          groupTab = nextGroupTab(groups.map((g) => g.name), groupTab);
+        }
+        break;
       case "chart_mode":
         setMode(mode === "line" ? "candles" : "line");
         break;
@@ -543,7 +550,7 @@
         {#key view}
           <div class="pane" in:paneIn={view === "watchlist" ? { y: 16, speed: "slow" } : {}}>
             {#if view === "watchlist"}
-              <Watchlist symbols={watchlist} {groups} current={symbol} onopen={openWatched} ongroups={saveGroups} />
+              <Watchlist symbols={watchlist} {groups} current={symbol} bind:tab={groupTab} onopen={openWatched} ongroups={saveGroups} />
             {:else if view === "alerts"}
               <Alerts {symbol} {quote} {alerts} onchange={(next) => (alerts = next)} />
             {:else if view === "analysts"}
