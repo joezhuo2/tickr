@@ -18,7 +18,7 @@ use crate::options::Options;
 use crate::stats::Section;
 use crate::news::Article;
 use crate::quote::{self, Chart, Quote, SearchHit};
-use crate::settings::{ChartMode, Dots, Group, Keybinds, DEFAULT_HOTKEY};
+use crate::settings::{ChartMode, Dots, Group, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
 use crate::state::{lock, now_secs, QuoteState, Shared};
 
 #[derive(Serialize)]
@@ -45,6 +45,8 @@ pub struct Init {
     groups: Vec<Group>,
     keybinds: Keybinds,
     dots: Dots,
+    indicators: IndicatorConfig,
+    indicator_presets: Vec<IndicatorPreset>,
     alerts: Vec<PriceAlert>,
 }
 
@@ -80,6 +82,8 @@ pub fn init_payload(shared: &Shared) -> Init {
         groups: s.groups,
         keybinds: s.keybinds,
         dots: s.dots,
+        indicators: s.indicators,
+        indicator_presets: s.indicator_presets,
         alerts: s.alerts,
     }
 }
@@ -96,7 +100,7 @@ pub async fn get_chart(shared: State<'_, Arc<Shared>>, symbol: String, range: St
     Ok(chart)
 }
 
-/// Technical analysis of the chart on screen. Runs only when the user asks.
+/// Technical analysis of the chart on screen.
 /// Reuses the last fetched chart when it matches, so the analysis covers the
 /// same candles the window shows; fetches otherwise.
 #[tauri::command]
@@ -113,7 +117,7 @@ pub async fn analyze(shared: State<'_, Arc<Shared>>, symbol: String, range: Stri
             c
         }
     };
-    crate::analysis::analyze(&chart).inspect_err(|e| log::info!("analyze {symbol} {range}: {e}"))
+    crate::analysis::analyze_with_config(&chart, &lock(&shared.settings).indicators).inspect_err(|e| log::info!("analyze {symbol} {range}: {e}"))
 }
 
 #[tauri::command]
@@ -429,9 +433,55 @@ pub async fn get_watch_quotes(shared: State<'_, Arc<Shared>>, symbols: Vec<Strin
     Ok(out)
 }
 
+fn edit_indicators(shared: &Shared, edit: impl FnOnce(&mut Settings) -> Result<(), String>) -> Result<Settings, String> {
+    let mut settings = lock(&shared.settings);
+    let mut next = settings.clone();
+    edit(&mut next)?;
+    validate_indicators(&next.indicators, &next.indicator_presets)?;
+    next.save(&shared.settings_path).map_err(|e| format!("Could not save indicators: {e}"))?;
+    *settings = next.clone();
+    Ok(next)
+}
+
+#[tauri::command]
+pub fn set_indicators(shared: State<'_, Arc<Shared>>, config: IndicatorConfig) -> Result<IndicatorConfig, String> {
+    Ok(edit_indicators(&shared, |s| { s.indicators = config; Ok(()) })?.indicators)
+}
+
+#[tauri::command]
+pub fn save_indicator_preset(shared: State<'_, Arc<Shared>>, name: String) -> Result<Vec<IndicatorPreset>, String> {
+    Ok(edit_indicators(&shared, |s| s.save_indicator_preset(&name))?.indicator_presets)
+}
+
+#[tauri::command]
+pub fn delete_indicator_preset(shared: State<'_, Arc<Shared>>, name: String) -> Result<Vec<IndicatorPreset>, String> {
+    Ok(edit_indicators(&shared, |s| s.delete_indicator_preset(&name))?.indicator_presets)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn indicator_edits_persist_and_rejections_leave_settings_unchanged() {
+        let dir = tempfile::tempdir().unwrap();
+        let shared = Shared::new(dir.path().join("settings.json"), Default::default());
+        edit_indicators(&shared, |s| { s.indicators.rsi.length = 7; s.save_indicator_preset("Custom") }).unwrap();
+        let saved = Settings::load(&shared.settings_path);
+        assert_eq!(saved.indicators.rsi.length, 7);
+        assert_eq!(init_payload(&shared).indicators, saved.indicators);
+        assert_eq!(init_payload(&shared).indicator_presets, saved.indicator_presets);
+        assert!(edit_indicators(&shared, |s| { s.indicators.rsi.length = 0; Ok(()) }).is_err());
+        assert_eq!(*lock(&shared.settings), saved);
+        assert_eq!(Settings::load(&shared.settings_path), saved);
+        edit_indicators(&shared, |s| s.delete_indicator_preset("Custom")).unwrap();
+        assert!(Settings::load(&shared.settings_path).indicator_presets.is_empty());
+        let blocker = dir.path().join("file");
+        std::fs::write(&blocker, "not a directory").unwrap();
+        let shared = Shared::new(blocker.join("settings.json"), Default::default());
+        assert!(edit_indicators(&shared, |s| { s.indicators.rsi.length = 7; Ok(()) }).is_err());
+        assert_eq!(lock(&shared.settings).indicators, IndicatorConfig::default());
+    }
 
     #[test]
     fn init_chart_matches_resolved_interval() {

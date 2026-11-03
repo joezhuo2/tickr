@@ -103,8 +103,104 @@ impl Default for Dots {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct IndicatorStyle {
+    pub color: String,
+    pub visible: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LengthIndicator {
+    pub length: usize,
+    pub color: String,
+    pub visible: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BollingerConfig {
+    pub length: usize,
+    pub k: f64,
+    pub color: String,
+    pub visible: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MacdConfig {
+    pub fast: usize,
+    pub slow: usize,
+    pub signal: usize,
+    pub color: String,
+    pub signal_color: String,
+    pub visible: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct IndicatorConfig {
+    pub sma: Vec<LengthIndicator>,
+    pub ema: Vec<LengthIndicator>,
+    pub bollinger: BollingerConfig,
+    pub vwap: IndicatorStyle,
+    pub rsi: LengthIndicator,
+    pub macd: MacdConfig,
+    pub fib: bool,
+    pub targets: bool,
+    pub patterns: bool,
+    pub keep_analysis: bool,
+}
+
+impl Default for IndicatorConfig {
+    fn default() -> Self {
+        let line = |length| LengthIndicator { length, color: String::new(), visible: true };
+        Self {
+            sma: [20, 50, 200].into_iter().map(line).collect(),
+            ema: [9, 21].into_iter().map(line).collect(),
+            bollinger: BollingerConfig { length: 20, k: 2.0, color: String::new(), visible: true },
+            vwap: IndicatorStyle { color: String::new(), visible: true },
+            rsi: line(14),
+            macd: MacdConfig { fast: 12, slow: 26, signal: 9, color: String::new(), signal_color: String::new(), visible: false },
+            fib: true, targets: true, patterns: true, keep_analysis: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct IndicatorPreset {
+    pub name: String,
+    pub config: IndicatorConfig,
+}
+
+pub fn validate_indicators(config: &IndicatorConfig, presets: &[IndicatorPreset]) -> Result<(), String> {
+    if presets.len() > 50 { return Err("At most 50 indicator presets are allowed".into()); }
+    for c in std::iter::once(config).chain(presets.iter().map(|p| &p.config)) {
+        if c.sma.len() > 8 || c.ema.len() > 8 { return Err("At most 8 SMA and 8 EMA lines are allowed".into()); }
+        for length in c.sma.iter().chain(&c.ema).map(|l| l.length)
+            .chain([c.bollinger.length, c.rsi.length, c.macd.fast, c.macd.slow, c.macd.signal]) {
+            if !(1..=500).contains(&length) { return Err("Indicator lengths must be from 1 to 500".into()); }
+        }
+        if c.macd.fast >= c.macd.slow { return Err("MACD fast must be less than slow".into()); }
+        if !c.bollinger.k.is_finite() || !(0.5..=5.0).contains(&c.bollinger.k) { return Err("Bollinger k must be from 0.5 to 5.0".into()); }
+        for color in c.sma.iter().chain(&c.ema).map(|l| l.color.as_str())
+            .chain([c.bollinger.color.as_str(), &c.vwap.color, &c.rsi.color, &c.macd.color, &c.macd.signal_color]) {
+            if !color.is_empty() && !(color.len() == 7 && color.starts_with('#') && color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)) {
+                return Err("Colors must be empty or #rrggbb".into());
+            }
+        }
+    }
+    for p in presets { validate_preset_name(&p.name)?; }
+    Ok(())
+}
+
+fn validate_preset_name(name: &str) -> Result<String, String> {
+    let name = name.trim();
+    if !(1..=40).contains(&name.chars().count()) { return Err("Preset names must contain 1 to 40 characters".into()); }
+    Ok(name.into())
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
+    pub indicators: IndicatorConfig,
+    pub indicator_presets: Vec<IndicatorPreset>,
     pub symbol: String,
     pub range: String,
     pub interval: String,
@@ -137,6 +233,8 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            indicators: IndicatorConfig::default(),
+            indicator_presets: Vec::new(),
             symbol: "AAPL".into(),
             range: "1d".into(),
             interval: "auto".into(),
@@ -174,6 +272,23 @@ pub fn settings_path() -> PathBuf {
 }
 
 impl Settings {
+    pub fn save_indicator_preset(&mut self, name: &str) -> Result<(), String> {
+        let name = validate_preset_name(name)?;
+        let mut presets = self.indicator_presets.clone();
+        let preset = IndicatorPreset { name: name.clone(), config: self.indicators.clone() };
+        if let Some(p) = presets.iter_mut().find(|p| p.name == name) { *p = preset; }
+        else { presets.push(preset); }
+        validate_indicators(&self.indicators, &presets)?;
+        self.indicator_presets = presets;
+        Ok(())
+    }
+
+    pub fn delete_indicator_preset(&mut self, name: &str) -> Result<(), String> {
+        let name = validate_preset_name(name)?;
+        self.indicator_presets.retain(|p| p.name != name);
+        Ok(())
+    }
+
     /// Missing or unreadable files give defaults.
     pub fn load(path: &Path) -> Self {
         std::fs::read(path)
@@ -197,6 +312,71 @@ mod tests {
     use super::*;
 
     #[test]
+    fn indicator_validation() {
+        let defaults = IndicatorConfig::default();
+        assert!(validate_indicators(&defaults, &[]).is_ok());
+        let invalid: Vec<fn(&mut IndicatorConfig)> = vec![
+            |c| c.sma[0].length = 0, |c| c.sma[0].length = 501,
+            |c| c.ema[0].length = 0, |c| c.ema[0].length = 501,
+            |c| c.rsi.length = 0, |c| c.rsi.length = 501,
+            |c| c.bollinger.length = 0, |c| c.bollinger.length = 501,
+            |c| c.macd.fast = 0, |c| c.macd.fast = 501,
+            |c| c.macd.slow = 0, |c| c.macd.slow = 501,
+            |c| c.macd.signal = 0, |c| c.macd.signal = 501,
+            |c| c.macd.fast = c.macd.slow, |c| c.macd.fast = c.macd.slow + 1,
+            |c| c.bollinger.k = 0.49, |c| c.bollinger.k = 5.01,
+            |c| c.bollinger.k = f64::NAN, |c| c.bollinger.k = f64::INFINITY,
+            |c| c.sma = vec![c.sma[0].clone(); 9], |c| c.ema = vec![c.ema[0].clone(); 9],
+        ];
+        for edit in invalid {
+            let mut c = defaults.clone(); edit(&mut c);
+            assert!(validate_indicators(&c, &[]).is_err(), "{c:?}");
+        }
+        for color in ["red", "ffffff", "#fff", "#1234567", "#gg1234", "#???"] {
+            for field in 0..7 {
+                let mut c = defaults.clone();
+                let dest = match field { 0 => &mut c.sma[0].color, 1 => &mut c.ema[0].color,
+                    2 => &mut c.bollinger.color, 3 => &mut c.vwap.color, 4 => &mut c.rsi.color,
+                    5 => &mut c.macd.color, _ => &mut c.macd.signal_color };
+                *dest = color.into();
+                assert!(validate_indicators(&c, &[]).is_err());
+            }
+        }
+        let mut c = defaults.clone();
+        c.sma = vec![LengthIndicator { length: 500, color: "#aB09fF".into(), visible: false }; 8];
+        c.ema.clear(); c.rsi.length = 1; c.bollinger.k = 0.5;
+        assert!(validate_indicators(&c, &[]).is_ok());
+        c.bollinger.k = 5.0;
+        assert!(validate_indicators(&c, &[]).is_ok());
+    }
+
+    #[test]
+    fn indicator_presets_overwrite_delete_and_limits() {
+        let mut s = Settings::default();
+        s.save_indicator_preset("  Daily  ").unwrap();
+        s.indicators.rsi.length = 7;
+        s.save_indicator_preset("Daily").unwrap();
+        assert_eq!(s.indicator_presets.len(), 1);
+        assert_eq!(s.indicator_presets[0].config.rsi.length, 7);
+        assert_eq!(s.indicator_presets[0].name, "Daily");
+        s.delete_indicator_preset(" Daily ").unwrap();
+        assert!(s.indicator_presets.is_empty());
+        for name in [" ".to_string(), "x".repeat(41)] { assert!(s.save_indicator_preset(&name).is_err()); }
+        s.save_indicator_preset(&"?".repeat(40)).unwrap();
+        for n in 1..50 { s.save_indicator_preset(&n.to_string()).unwrap(); }
+        assert!(s.save_indicator_preset("overflow").is_err());
+        assert_eq!(s.indicator_presets.len(), 50);
+        s.save_indicator_preset("1").unwrap();
+        let mut too_many = s.indicator_presets.clone();
+        too_many.push(too_many[0].clone());
+        assert!(validate_indicators(&s.indicators, &too_many).is_err());
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        s.save(&p).unwrap();
+        assert_eq!(Settings::load(&p), s);
+    }
+
+    #[test]
     fn defaults_and_roundtrip() {
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("sub/settings.json");
@@ -217,6 +397,8 @@ mod tests {
         assert_eq!(s.symbol, "NVDA");
         assert_eq!(s.chart_mode, ChartMode::Candles);
         assert_eq!(s.interval, "auto");
+        assert_eq!(s.indicators, IndicatorConfig::default());
+        assert!(s.indicator_presets.is_empty());
         assert!(s.unload_on_minimize);
         assert!(s.groups.is_empty());
         assert!(s.auto_update);

@@ -126,6 +126,8 @@ pub enum Confidence {
 pub struct Line {
     pub key: &'static str,
     pub label: String,
+    pub color: String,
+    pub visible: bool,
     pub period: usize,
     pub values: Vec<Option<f64>>,
     /// First index with a full window; earlier values are warm-up estimates.
@@ -138,6 +140,7 @@ pub struct Series {
     pub t: Vec<i64>,
     pub mas: Vec<Line>,
     pub rsi: Line,
+    pub macd: Vec<Line>,
     pub bollinger: Vec<Line>,
     pub vwap: Line,
 }
@@ -325,7 +328,13 @@ fn snap(raw: f64, above: bool, close: f64, atr: f64, swing: Option<&Swing>) -> T
     }
 }
 
+#[cfg(test)]
 pub fn analyze(chart: &Chart) -> Result<Analysis, String> {
+    analyze_with_config(chart, &crate::settings::IndicatorConfig::default())
+}
+
+pub fn analyze_with_config(chart: &Chart, config: &crate::settings::IndicatorConfig) -> Result<Analysis, String> {
+    crate::settings::validate_indicators(config, &[])?;
     let c = &chart.candles;
     let n = c.len();
     if n < MIN_BARS {
@@ -340,7 +349,7 @@ pub fn analyze(chart: &Chart) -> Result<Analysis, String> {
     let rsi_s = indicators::rsi(&closes, RSI_LEN);
     let sigma = indicators::stdev_returns(&closes, STDEV_LEN);
     let mas = mas(&closes);
-    let (bb_mid, bb_up, bb_lo) = indicators::bollinger(&closes, BB_LEN, BB_K);
+    let (_, bb_up, bb_lo) = indicators::bollinger(&closes, BB_LEN, BB_K);
     let intraday = chart.interval.ends_with('m') && !chart.interval.ends_with("mo");
     let gmt = chart.meta.gmtoffset;
     let vwap_s = indicators::vwap(c, |t| if intraday { (t + gmt).div_euclid(86_400) } else { 0 });
@@ -513,32 +522,35 @@ pub fn analyze(chart: &Chart) -> Result<Analysis, String> {
     }
     readings.push(Reading { key: "vwap", label: vwap_label.into(), value: vwap_s[last], needed: 1, limited: false });
 
-    let band = |key, label: &str, values: &[f64]| Line {
-        key,
-        label: label.to_string(),
-        period: BB_LEN,
-        values: values.iter().map(|&v| Some(v)).collect(),
-        full_from: BB_LEN - 1,
+    let line = |key, label: String, period: usize, values: Vec<Option<f64>>, color: &str, visible| Line {
+        key, label, period, values, color: color.into(), visible, full_from: period - 1,
     };
+    let mut display_mas = Vec::new();
+    for (kind, entries) in [("sma", &config.sma), ("ema", &config.ema)] {
+        for entry in entries {
+            let values = if kind == "sma" { indicators::sma(&closes, entry.length) } else { indicators::ema(&closes, entry.length) };
+            display_mas.push(line(kind, format!("{} {}", kind.to_uppercase(), entry.length), entry.length,
+                values.into_iter().map(Some).collect(), &entry.color, entry.visible));
+        }
+    }
+    let bb = &config.bollinger;
+    let (mid, up, lo) = indicators::bollinger(&closes, bb.length, bb.k);
+    let mc = &config.macd;
+    let (ml, ms, mh) = indicators::macd(&closes, mc.fast, mc.slow, mc.signal);
+    let mut rsi = line("rsi", format!("RSI {}", config.rsi.length), config.rsi.length,
+        indicators::rsi(&closes, config.rsi.length), &config.rsi.color, config.rsi.visible);
+    rsi.full_from = config.rsi.length;
     let series = Series {
         t: c.iter().map(|k| k.t).collect(),
-        mas: mas
-            .iter()
-            .map(|m| Line {
-                key: m.key,
-                label: m.label.clone(),
-                period: m.period,
-                values: m.values.iter().map(|&v| Some(v)).collect(),
-                full_from: m.period - 1,
-            })
-            .collect(),
-        rsi: Line { key: "rsi", label: format!("RSI {RSI_LEN}"), period: RSI_LEN, values: rsi_s, full_from: RSI_LEN },
-        bollinger: vec![
-            band("bb_upper", "BB upper", &bb_up),
-            band("bb_mid", &format!("BB {BB_LEN}, {BB_K}"), &bb_mid),
-            band("bb_lower", "BB lower", &bb_lo),
-        ],
-        vwap: Line { key: "vwap", label: vwap_label.into(), period: 1, values: vwap_s, full_from: 0 },
+        mas: display_mas,
+        rsi,
+        macd: [("macd", format!("MACD {}/{}/{}", mc.fast, mc.slow, mc.signal), ml, &mc.color, mc.slow),
+            ("signal", format!("Signal {}", mc.signal), ms, &mc.signal_color, mc.slow + mc.signal - 1),
+            ("histogram", "Histogram".into(), mh, &mc.color, mc.slow + mc.signal - 1)]
+            .into_iter().map(|(key, label, values, color, period)| line(key, label, period, values.into_iter().map(Some).collect(), color, mc.visible)).collect(),
+        bollinger: [("bb_upper", "BB upper".into(), up), ("bb_mid", format!("BB {}, {}", bb.length, bb.k), mid), ("bb_lower", "BB lower".into(), lo)]
+            .into_iter().map(|(key, label, values)| line(key, label, bb.length, values.into_iter().map(Some).collect(), &bb.color, bb.visible)).collect(),
+        vwap: line("vwap", vwap_label.into(), 1, vwap_s, &config.vwap.color, config.vwap.visible),
     };
 
     Ok(Analysis {
@@ -610,6 +622,42 @@ mod tests {
 
     fn wave(i: usize) -> f64 {
         2.0 * (i as f64 * 0.7).sin()
+    }
+
+    #[test]
+    fn display_config_does_not_change_scoring() {
+        let c = chart((0..250).map(|i| 100.0 + 0.5 * i as f64 + wave(i)));
+        let original = analyze(&c).unwrap();
+        let mut config = crate::settings::IndicatorConfig::default();
+        config.sma[0].length = 3;
+        config.ema.clear();
+        config.rsi.length = 2;
+        config.bollinger.length = 7;
+        config.bollinger.k = 4.0;
+        config.macd.fast = 3;
+        config.macd.visible = true;
+        let changed = analyze_with_config(&c, &config).unwrap();
+        assert_ne!(original.series, changed.series);
+        assert_eq!(original, Analysis { series: original.series.clone(), ..changed });
+    }
+
+    #[test]
+    fn default_display_series_match_fixed_indicators() {
+        let c = chart((0..250).map(|i| 100.0 + wave(i)));
+        let a = analyze(&c).unwrap();
+        let closes: Vec<_> = c.candles.iter().map(|c| c.c).collect();
+        for (line, fixed) in a.series.mas.iter().zip(mas(&closes)) {
+            assert_eq!(line.label, fixed.label);
+            assert_eq!(line.values, fixed.values.into_iter().map(Some).collect::<Vec<_>>());
+            assert_eq!(line.full_from, fixed.period - 1);
+            assert!(line.color.is_empty() && line.visible);
+        }
+        assert_eq!(a.series.rsi.values, indicators::rsi(&closes, RSI_LEN));
+        let (mid, up, lo) = indicators::bollinger(&closes, BB_LEN, BB_K);
+        for (line, values) in a.series.bollinger.iter().zip([up, mid, lo]) {
+            assert_eq!(line.values, values.into_iter().map(Some).collect::<Vec<_>>());
+        }
+        assert_eq!(a.series.vwap.values, indicators::vwap(&c.candles, |_| 0));
     }
 
     #[test]

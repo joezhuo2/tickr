@@ -153,11 +153,21 @@ it is instant.
   range, on your machine (same candles, same result). You get a score from
   −100 to +100 with a bias and confidence, upside and downside targets for the
   next 10 bars, an invalidation level and the signals behind the score.
-  Checkboxes toggle the overlays: moving averages, Bollinger bands (20, 2),
-  VWAP, Fibonacci levels, targets, pattern markers and an RSI pane. VWAP resets
-  each day on 1D, 5D and 1M and is anchored to the first candle on longer
-  ranges. Under 200 candles shows a "Limited data" warning. Not investment
-  advice.
+  Checkboxes toggle moving averages, Bollinger bands, VWAP, Fibonacci levels,
+  targets, pattern markers, RSI and MACD panes. Indicator settings let you edit
+  lengths, colors (or reset to the theme), and individual line visibility, with
+  up to eight SMA and eight EMA lines. MACD defaults to 12/26/9 and starts hidden.
+  Settings and up to 50 named presets persist across launches; saving an existing
+  name replaces that preset. Display settings never change the score, signals,
+  or targets, which retain their fixed indicator lengths.
+  Analysis refreshes when new candles arrive. Enable **Keep analysis on** to
+  also run it at startup and after symbol, range or interval changes; otherwise
+  those changes clear the results until you click Analyze again. Overlay
+  visibility is preserved. VWAP resets each day on intraday charts and is
+  anchored to the first candle on daily and longer intervals. Short histories
+  show warm-up estimates and reduced confidence. Computed locally; not
+  investment advice.
+
 - **Analysts:** the rating (Strong buy to Sell), average 12-month target and
   its upside also sit under the price on the left. The tab adds the target
   range against the current price and the count of each rating. Cached for 12
@@ -359,8 +369,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.9.7
-git push origin v0.9.7
+git tag v0.9.8
+git push origin v0.9.8
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

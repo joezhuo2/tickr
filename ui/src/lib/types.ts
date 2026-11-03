@@ -123,6 +123,8 @@ export interface Init {
   groups: Group[];
   keybinds: Keybinds;
   dots: Dots;
+  indicators: IndicatorConfig;
+  indicator_presets: IndicatorPreset[];
   alerts: PriceAlert[];
 }
 
@@ -329,6 +331,8 @@ export type Direction = "bullish" | "bearish" | "neutral";
 export type Bias = "strong_bearish" | "bearish" | "neutral" | "bullish" | "strong_bullish";
 
 export interface Line {
+  color: string;
+  visible: boolean;
   key: string;
   label: string;
   period: number;
@@ -432,7 +436,7 @@ export interface Analysis {
   };
   fib: Swing | null;
   patterns: Pattern[];
-  series: { t: number[]; mas: Line[]; rsi: Line; bollinger: Line[]; vwap: Line };
+  series: { t: number[]; mas: Line[]; rsi: Line; macd: Line[]; bollinger: Line[]; vwap: Line };
 }
 
 /** Which analysis layers the chart draws. */
@@ -444,6 +448,7 @@ export interface Overlays {
   targets: boolean;
   patterns: boolean;
   rsi: boolean;
+  macd: boolean;
 }
 
 declare global {
@@ -488,3 +493,19 @@ export function validInterval(range: string, interval: string): string {
 }
 
 export const INTERVAL_LABELS: Record<string, string> = { "60m": "1h", "1d": "1D", "1wk": "1W", "1mo": "1M" };
+
+export interface IndicatorStyle { color: string; visible: boolean }
+export interface LengthIndicator extends IndicatorStyle { length: number }
+export interface IndicatorConfig {
+  sma: LengthIndicator[];
+  ema: LengthIndicator[];
+  bollinger: LengthIndicator & { k: number };
+  vwap: IndicatorStyle;
+  rsi: LengthIndicator;
+  macd: IndicatorStyle & { fast: number; slow: number; signal: number; signal_color: string };
+  fib: boolean;
+  targets: boolean;
+  patterns: boolean;
+  keep_analysis: boolean;
+}
+export interface IndicatorPreset { name: string; config: IndicatorConfig }

@@ -78,6 +78,13 @@ pub fn ema(src: &[f64], n: usize) -> Vec<f64> {
     smoothed(src, n, 2.0 / (n.max(1) as f64 + 1.0))
 }
 
+pub fn macd(closes: &[f64], fast: usize, slow: usize, signal: usize) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+    let line: Vec<f64> = ema(closes, fast).iter().zip(ema(closes, slow)).map(|(f, s)| f - s).collect();
+    let signal = ema(&line, signal);
+    let histogram = line.iter().zip(&signal).map(|(l, s)| l - s).collect();
+    (line, signal, histogram)
+}
+
 /// Wilder's moving average (RMA), alpha = 1 / n.
 pub fn rma(src: &[f64], n: usize) -> Vec<f64> {
     smoothed(src, n, 1.0 / n.max(1) as f64)
@@ -189,6 +196,18 @@ pub(crate) mod tests {
 
     fn close_enough(a: f64, b: f64, tol: f64) -> bool {
         (a - b).abs() <= tol
+    }
+
+    #[test]
+    fn macd_matches_hand_computed_values() {
+        let (line, signal, histogram) = macd(&[1.0, 2.0, 3.0, 4.0, 2.0], 2, 3, 2);
+        for (got, want) in [(&line, [0.0, 0.0, 0.5, 0.5, 0.0]),
+            (&signal, [0.0, 0.0, 1.0 / 3.0, 4.0 / 9.0, 4.0 / 27.0]),
+            (&histogram, [0.0, 0.0, 1.0 / 6.0, 1.0 / 18.0, -4.0 / 27.0])] {
+            for (a, b) in got.iter().zip(want) { assert!(close_enough(*a, b, 1e-12), "{a} != {b}"); }
+        }
+        assert_eq!(macd(&[], 12, 26, 9), (vec![], vec![], vec![]));
+        assert_eq!(macd(&[5.0; 30], 12, 26, 9), (vec![0.0; 30], vec![0.0; 30], vec![0.0; 30]));
     }
 
     #[test]

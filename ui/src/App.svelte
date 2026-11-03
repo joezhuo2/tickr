@@ -36,13 +36,15 @@
     type Group,
     type Init,
     type Keybinds,
-    type Overlays,
+    type IndicatorConfig,
+    type IndicatorPreset,
     type QuoteState,
     type PriceAlert,
     type RatingChange,
     type StatSection,
   } from "./lib/types";
   import { actionFor, bindKey, nextGroupTab } from "./lib/keybinds";
+  import { overlayVisibility, shouldAnalyze } from "./lib/indicators";
   import { paneIn } from "./lib/motion";
 
   // Injected before load, so the first frame already has real content.
@@ -86,15 +88,14 @@
   let view = $state<"chart" | "alerts" | "technicals" | "analysts" | "earnings" | "stats" | "options" | "market" | "events" | "news" | "watchlist">(
     "chart",
   );
-  // Technical analysis: computed only when the user clicks Analyze, and
-  // cleared when the symbol, range or interval changes. A chart refresh keeps it.
-  const ALL_OVERLAYS: Overlays = { mas: true, bollinger: true, vwap: true, fib: true, targets: true, patterns: true, rsi: true };
   let analysis = $state<Analysis | null>(null);
   /** cacheKey() the analysis belongs to. */
   let analysisKey = $state("");
   let analyzing = $state(false);
   let analysisError = $state<string | null>(null);
-  let overlays = $state<Overlays>({ ...ALL_OVERLAYS });
+  let indicators = $state<IndicatorConfig>();
+  let indicatorPresets = $state<IndicatorPreset[]>([]);
+  const overlays = $derived(indicators ? overlayVisibility(indicators) : null);
   let analysisSeq = 0;
   // undefined while loading with nothing cached for the symbol.
   let news = $state<Article[] | undefined>(undefined);
@@ -128,6 +129,8 @@
     hotkeyError = init.hotkey_error;
     keybinds = init.keybinds;
     dots = init.dots;
+    indicators = init.indicators;
+    indicatorPresets = init.indicator_presets;
     qs = init.quote;
     watchlist = init.watchlist ?? [];
     groups = init.groups ?? [];
@@ -164,7 +167,7 @@
     const hit = cache.get(key);
     chart = hit?.chart ?? null;
     chartError = null;
-    if (hit && !force && Date.now() - hit.at < FRESH_MS) {
+    if (hit && !force && !shouldAnalyze(!!analysis, indicators?.keep_analysis ?? false) && Date.now() - hit.at < FRESH_MS) {
       loading = false;
       chartAt = hit.at;
       return;
@@ -176,6 +179,8 @@
       if (mine !== chartSeq) return;
       chart = c;
       chartAt = Date.now();
+      loading = false;
+      if (shouldAnalyze(!!analysis, indicators?.keep_analysis ?? false)) void runAnalysis(true);
     } catch (e) {
       if (mine === chartSeq) chartError = String(e);
     } finally {
@@ -239,10 +244,11 @@
   const activeAnalysis = $derived(analysis && analysisKey === cacheKey() ? analysis : null);
 
   /** Runs the local technical analysis on the chart on screen. */
-  async function runAnalysis() {
+  async function runAnalysis(background = false) {
+    if (!chart || (background && loading)) return;
     const mine = ++analysisSeq;
     const key = cacheKey();
-    analyzing = true;
+    analyzing = !background;
     analysisError = null;
     try {
       const a = await invoke<Analysis>("analyze", { symbol, range, interval });
@@ -256,14 +262,26 @@
     }
   }
 
-  /** Drops results and overlays; the Analyze button shows again. */
+  /** Drops results; the Analyze button shows again. */
   function clearAnalysis() {
     analysisSeq++;
     analysis = null;
     analysisKey = "";
     analyzing = false;
     analysisError = null;
-    overlays = { ...ALL_OVERLAYS };
+  }
+
+  async function saveIndicators(config: IndicatorConfig) {
+    indicators = await invoke<IndicatorConfig>("set_indicators", { config });
+    if (chart && !loading && shouldAnalyze(!!analysis, indicators.keep_analysis)) void runAnalysis(true);
+  }
+
+  async function savePreset(name: string) {
+    indicatorPresets = await invoke<IndicatorPreset[]>("save_indicator_preset", { name });
+  }
+
+  async function deletePreset(name: string) {
+    indicatorPresets = await invoke<IndicatorPreset[]>("delete_indicator_preset", { name });
   }
 
   async function pickSymbol(next: string): Promise<string | null> {
@@ -613,8 +631,13 @@
                   error={analysisError}
                   bars={chart?.candles.length ?? 0}
                   gmtoffset={chart?.meta.gmtoffset ?? 0}
-                  bind:overlays
-                  onanalyze={runAnalysis}
+                  {overlays}
+                  config={indicators!}
+                  presets={indicatorPresets}
+                  onsave={saveIndicators}
+                  onsavepreset={savePreset}
+                  ondeletepreset={deletePreset}
+                  onanalyze={() => runAnalysis()}
                 />
               </div>
             {:else if chart}
