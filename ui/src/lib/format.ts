@@ -1,4 +1,4 @@
-import type { Candle, Sentiment } from "./types";
+import type { Candle, PriceAlert, Sentiment } from "./types";
 
 const SYMBOLS: Record<string, string> = { USD: "$", EUR: "€", GBP: "£", JPY: "¥" };
 
@@ -232,4 +232,22 @@ export function statTone(label: string, value: string): "up" | "down" | "flat" {
 export function candlesCsv(candles: Candle[]): string {
   const rows = candles.map((c) => [new Date(c.t * 1000).toISOString(), c.o, c.h, c.l, c.c, c.v].join(","));
   return ["time,open,high,low,close,volume", ...rows].join("\n");
+}
+
+export function alertSummary(a: Pick<PriceAlert, "kind" | "direction" | "level" | "reference">): string {
+  const up = a.direction === "above";
+  const n = (v: number) => v.toLocaleString("en-US", { maximumFractionDigits: 12 });
+  const ref = a.reference == null ? "" : ` ${n(a.reference)}`;
+  switch (a.kind) {
+    case "day_percent":
+      return `${up ? "Up" : "Down"} ${n(a.level)}% today`;
+    case "armed_percent":
+      return `${up ? "Up" : "Down"} ${n(a.level)}% since armed${ref ? ` at${ref}` : ""}`;
+    case "trail_percent":
+      return `${up ? "Rises" : "Falls"} ${n(a.level)}% from ${up ? "low" : "high"}${ref}`;
+    case "trail_amount":
+      return `${up ? "Rises" : "Falls"} ${n(a.level)} from ${up ? "low" : "high"}${ref}`;
+    default:
+      return `${up ? "At or above" : "At or below"} ${n(a.level)}`;
+  }
 }

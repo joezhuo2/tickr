@@ -132,7 +132,14 @@ export interface PriceAlert {
   level: number;
   enabled: boolean;
   triggered_at: number | null;
+  kind: AlertKind;
+  reference: number | null;
+  recurring: boolean;
+  cooldown_mins: number;
+  regular_only: boolean;
 }
+
+export type AlertKind = "price" | "day_percent" | "armed_percent" | "trail_percent" | "trail_amount";
 
 /** A named subset of the watchlist, shown as a tab. */
 export interface Group {
