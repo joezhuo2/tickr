@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, niceTicks, num, price, quarterLabel, volume } from "./lib/format";
-  import type { Analysis, Article, Chart, ChartMode, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
+  import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, num, price, quarterLabel, volume } from "./lib/format";
+  import type { Analysis, Article, Chart, ChartMode, ChartScale, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
+  import { fitScale, forward, scaleLabel, scaleTicks } from "./lib/scale";
   import { paneLayout } from "./lib/indicators";
   import { untrack } from "svelte";
   import { fadeIn } from "./lib/motion";
@@ -9,6 +10,7 @@
   let {
     chart,
     mode,
+    scale = "linear",
     analysis = null,
     overlays = null,
     earnings = [],
@@ -17,6 +19,7 @@
   }: {
     chart: Chart | null;
     mode: ChartMode;
+    scale?: ChartScale;
     analysis?: Analysis | null;
     overlays?: Overlays | null;
     earnings?: EarningsReport[];
@@ -136,18 +139,16 @@
     const rsiTop = PAD.t + panes.rsiTop;
     const macdTop = PAD.t + panes.macdTop;
     const [i0, i1] = visible(view, n);
-    let lo = Infinity;
-    let hi = -Infinity;
+    const prices: number[] = [];
+    const fitValues: number[] = [];
     let vmax = 0;
     for (let i = i0; i <= i1; i++) {
       const c = candles[i];
-      lo = Math.min(lo, mode === "candles" ? c.l : c.c);
-      hi = Math.max(hi, mode === "candles" ? c.h : c.c);
+      prices.push(...(mode === "candles" ? [c.l, c.h, c.o, c.c] : [c.c]));
       vmax = Math.max(vmax, c.v);
     }
     if (prevClose != null) {
-      lo = Math.min(lo, prevClose);
-      hi = Math.max(hi, prevClose);
+      fitValues.push(prevClose);
     }
     // Keep overlays in view.
     if (analysis && show) {
@@ -160,23 +161,14 @@
         for (let i = i0; i <= i1; i++) {
           const v = valueAt(line, i);
           if (v != null) {
-            lo = Math.min(lo, v);
-            hi = Math.max(hi, v);
+            fitValues.push(v);
           }
         }
       }
     }
-    for (const t of targetLevels) {
-      lo = Math.min(lo, t.price);
-      hi = Math.max(hi, t.price);
-    }
-    if (!(hi > lo)) {
-      hi = lo + 1;
-      lo = lo - 1;
-    }
-    const pad = (hi - lo) * 0.06;
-    lo -= pad;
-    hi += pad;
+    for (const t of targetLevels) fitValues.push(t.price);
+    const base = candles[i0]?.c ?? 0;
+    const { lo, hi, scale: activeScale } = fitScale(prices, fitValues, scale, base);
     const step = plotW / Math.max(view.count, 1);
     const start = view.start;
     return {
@@ -187,6 +179,9 @@
       lo,
       hi,
       vmax,
+      scale: activeScale,
+      base,
+      label: (v: number) => scaleLabel(v, activeScale, base),
       plotW,
       priceH,
       volTop,
@@ -196,7 +191,7 @@
       macdTop,
       macdH,
       x: (i: number) => PAD.l + step * (i - start + 0.5),
-      y: (v: number) => PAD.t + (1 - (v - lo) / (hi - lo)) * priceH,
+      y: (v: number) => PAD.t + (1 - forward(v, lo, hi, activeScale)) * priceH,
       vy: (v: number) => volTop + volH - (vmax > 0 ? (v / vmax) * volH : 0),
       ry: (v: number) => rsiTop + (1 - v / 100) * rsiH,
     };
@@ -242,7 +237,7 @@
     // Grid and price axis.
     ctx.textBaseline = "middle";
     ctx.textAlign = "left";
-    for (const t of niceTicks(g.lo, g.hi, 4)) {
+    for (const t of scaleTicks(g.lo, g.hi, g.scale, g.base, 4)) {
       const y = Math.round(g.y(t)) + 0.5;
       if (y < PAD.t || y > g.volTop) continue;
       ctx.strokeStyle = v("--grid");
@@ -252,7 +247,7 @@
       ctx.lineTo(width - PAD.r, y);
       ctx.stroke();
       ctx.fillStyle = v("--muted");
-      ctx.fillText(num(t), width - PAD.r + 8, y);
+      ctx.fillText(g.label(t), width - PAD.r + 8, y);
     }
 
     // Time axis: about one label per 110 px.
@@ -279,6 +274,24 @@
       ctx.fillRect(g.x(i) - bw / 2, y, bw, g.volTop + g.volH - y);
     });
     ctx.globalAlpha = 1;
+
+    if (g.scale === "log") {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(PAD.l - 4, PAD.t, g.plotW + 8, g.priceH);
+      ctx.clip();
+    }
+
+    if (g.scale === "percent") {
+      const y = Math.round(g.y(g.base)) + 0.5;
+      ctx.strokeStyle = v("--muted");
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath();
+      ctx.moveTo(PAD.l, y);
+      ctx.lineTo(width - PAD.r, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
 
     // Previous close.
     if (prevClose != null) {
@@ -330,6 +343,8 @@
     }
     ctx.restore();
 
+    if (g.scale === "log") ctx.restore();
+
     if (show && analysis) drawOverlays(ctx, g, v);
 
     clipPlot(ctx);
@@ -362,7 +377,7 @@
     ctx.restore();
 
     // Crosshair.
-    if (hover != null && candles[hover]) {
+    if (hover != null && candles[hover] && (g.scale !== "log" || candles[hover].c > 0)) {
       const c = candles[hover];
       const x = Math.round(g.x(hover)) + 0.5;
       const y = Math.round(g.y(c.c)) + 0.5;
@@ -383,7 +398,7 @@
         ctx.fill();
       }
       // Price tag on the axis.
-      const label = num(c.c);
+      const label = g.label(c.c);
       ctx.fillStyle = v("--text");
       ctx.fillRect(width - PAD.r + 2, y - 9, PAD.r - 4, 18);
       ctx.fillStyle = v("--bg");
@@ -411,7 +426,7 @@
       for (let i = 0; i < g.n; i++) {
         const k = align[i];
         const val = valueAt(line, i);
-        if (val == null || (warm ? k > line.full_from : k < line.full_from)) {
+        if (val == null || (y === g.y && g.scale === "log" && val <= 0) || (warm ? k > line.full_from : k < line.full_from)) {
           pen = false;
           continue;
         }
@@ -572,7 +587,7 @@
     ctx.font = `11px ${v("--font")}`;
     for (const t of targetLevels) {
       const y = Math.round(g.y(t.price)) + 0.5;
-      if (y >= PAD.t && y <= priceBottom) axisTag(ctx, y, num(t.price), v(t.color), v("--bg"));
+      if (y >= PAD.t && y <= priceBottom) axisTag(ctx, y, g.label(t.price), v(t.color), v("--bg"));
     }
 
     // RSI pane: 30/50/70 guides and the line.
