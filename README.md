@@ -190,7 +190,8 @@ one), biggest gain first. Click a card to chart it.
 always shows every starred stock. Click **+** and type a name to add a group.
 In a group tab, **Edit** shows every starred stock: click cards to add or
 remove them, rename the group, or **Delete** it. Unstarring a stock removes it
-from every group.
+from every group. Press `G` to cycle through All and each group (opening the
+Watchlist if it is closed).
 
 ### Price alerts
 
@@ -236,6 +237,7 @@ typing in a text field.
 | | `D` | Next expiry date (wraps around) |
 | Watchlist | `W` | Toggle Watchlist |
 | | `X` | Next watchlist stock |
+| | `G` | Next watchlist group (opens the Watchlist) |
 | | `F` | Add stock to Watchlist |
 | General | `S` | Focus search |
 | | `,` | Toggle Settings |
