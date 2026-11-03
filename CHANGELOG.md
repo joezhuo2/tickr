@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.9.9] - 2026-11-03
+
+### Added
+- **Logarithmic and percentage scales** ([#90](https://github.com/joezhuo2/tickr/issues/90)):
+  a Lin, Log and % control beside Line and Candles changes the price axis. The
+  percentage scale rebases to the first visible candle as you pan and zoom. The
+  choice is saved.
+
 ## [0.9.8] - 2026-11-03
 
 ### Added
