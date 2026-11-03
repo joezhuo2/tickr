@@ -104,6 +104,7 @@ export interface Consensus {
 export interface Init {
   symbol: string;
   range: string;
+  interval: string;
   chart_mode: ChartMode;
   hotkey: string;
   default_hotkey: string;
@@ -462,3 +463,28 @@ export const RANGES: { id: string; label: string }[] = [
   { id: "5y", label: "5Y" },
   { id: "max", label: "Max" },
 ];
+
+export function intervalsFor(range: string): readonly string[] {
+  switch (range) {
+    case "1d":
+    case "5d":
+      return ["1m", "5m", "15m", "30m", "60m"];
+    case "1mo":
+      return ["5m", "15m", "30m", "60m", "1d"];
+    case "6mo":
+    case "ytd":
+    case "1y":
+      return ["60m", "1d", "1wk"];
+    case "5y":
+    case "max":
+      return ["1d", "1wk", "1mo"];
+    default:
+      return [];
+  }
+}
+
+export function validInterval(range: string, interval: string): string {
+  return intervalsFor(range).includes(interval) ? interval : "auto";
+}
+
+export const INTERVAL_LABELS: Record<string, string> = { "60m": "1h", "1d": "1D", "1wk": "1W", "1mo": "1M" };

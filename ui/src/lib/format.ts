@@ -93,8 +93,11 @@ function hm(d: Date): string {
 }
 
 /** Short axis label for a candle time. */
-export function axisTime(t: number, gmtoffset: number, range: string): string {
+export function axisTime(t: number, gmtoffset: number, range: string, interval = "auto"): string {
   const d = local(t, gmtoffset);
+  if (/\dm$/.test(interval) && ["6mo", "ytd", "1y"].includes(range)) {
+    return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()} ${hm(d)}`;
+  }
   switch (range) {
     case "1d":
       return hm(d);

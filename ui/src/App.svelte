@@ -20,6 +20,9 @@
   import Watchlist from "./Watchlist.svelte";
   import {
     RANGES,
+    INTERVAL_LABELS,
+    intervalsFor,
+    validInterval,
     type Analysis,
     type Article,
     type Chart,
@@ -48,6 +51,7 @@
   let ready = $state(false);
   let symbol = $state("");
   let range = $state("1d");
+  let interval = $state("auto");
   let mode = $state<ChartMode>("line");
   let hotkey = $state("");
   let defaultHotkey = $state("");
@@ -83,7 +87,7 @@
     "chart",
   );
   // Technical analysis: computed only when the user clicks Analyze, and
-  // cleared when the symbol or range changes. A chart refresh keeps it.
+  // cleared when the symbol, range or interval changes. A chart refresh keeps it.
   const ALL_OVERLAYS: Overlays = { mas: true, bollinger: true, vwap: true, fib: true, targets: true, patterns: true, rsi: true };
   let analysis = $state<Analysis | null>(null);
   /** cacheKey() the analysis belongs to. */
@@ -104,11 +108,12 @@
   let refreshing = $state(false);
 
   let chartSeq = 0;
+  let chartSettingsWrite = Promise.resolve();
   let chartAt = 0;
-  /** Charts fetched this session, keyed "SYMBOL|range". */
+  /** Charts fetched this session, keyed "SYMBOL|range|interval". */
   const cache = new Map<string, { chart: Chart; at: number }>();
   const FRESH_MS = 60_000;
-  const cacheKey = () => `${symbol}|${range}`;
+  const cacheKey = () => `${symbol}|${range}|${interval}`;
   /** Headlines fetched this session, keyed by symbol. */
   const newsCache = new Map<string, Article[]>();
   let newsSeq = 0;
@@ -116,6 +121,7 @@
   function apply(init: Init) {
     symbol = init.symbol;
     range = init.range;
+    interval = validInterval(range, init.interval);
     mode = init.chart_mode;
     hotkey = init.hotkey;
     defaultHotkey = init.default_hotkey;
@@ -165,7 +171,7 @@
     }
     loading = true;
     try {
-      const c = await invoke<Chart>("get_chart", { symbol, range });
+      const c = await invoke<Chart>("get_chart", { symbol, range, interval });
       cache.set(key, { chart: c, at: Date.now() });
       if (mine !== chartSeq) return;
       chart = c;
@@ -239,7 +245,7 @@
     analyzing = true;
     analysisError = null;
     try {
-      const a = await invoke<Analysis>("analyze", { symbol, range });
+      const a = await invoke<Analysis>("analyze", { symbol, range, interval });
       if (mine !== analysisSeq || key !== cacheKey()) return;
       analysis = a;
       analysisKey = key;
@@ -310,9 +316,23 @@
     if (view !== "technicals") view = "chart";
     if (r === range) return;
     range = r;
+    interval = validInterval(range, interval);
     clearAnalysis();
-    invoke("set_range", { range: r }).catch(console.warn);
+    chartSettingsWrite = chartSettingsWrite
+      .then(() => invoke<void>("set_range", { range: r }))
+      .catch(console.warn);
     loadChart();
+  }
+
+  function changeInterval(next: string) {
+    if (next === interval) return;
+    interval = validInterval(range, next);
+    const saved = interval;
+    clearAnalysis();
+    chartSettingsWrite = chartSettingsWrite
+      .then(() => invoke<void>("set_interval", { interval: saved }))
+      .catch(console.warn);
+    loadChart(true);
   }
 
   async function loadMarket() {
@@ -514,38 +534,46 @@
             </div>
           </div>
         </div>
-        <div class="ranges" role="tablist">
-          {#each RANGES as r (r.id)}
-            {@const on = (view === "chart" || view === "technicals") && range === r.id}
-            <button role="tab" aria-selected={on} class:on onclick={() => setRange(r.id)}>
-              {r.label}
+        <div class="range-controls">
+          <div class="ranges" role="tablist">
+            {#each RANGES as r (r.id)}
+              {@const on = (view === "chart" || view === "technicals") && range === r.id}
+              <button role="tab" aria-selected={on} class:on onclick={() => setRange(r.id)}>
+                {r.label}
+              </button>
+            {/each}
+            <span class="sep"></span>
+            <button role="tab" aria-selected={view === "alerts"} class:on={view === "alerts"} onclick={() => (view = view === "alerts" ? "chart" : "alerts")}>
+              Alerts
             </button>
-          {/each}
-          <span class="sep"></span>
-          <button role="tab" aria-selected={view === "alerts"} class:on={view === "alerts"} onclick={() => (view = view === "alerts" ? "chart" : "alerts")}>
-            Alerts
-          </button>
-          <button
-            role="tab"
-            aria-selected={view === "technicals"}
-            class:on={view === "technicals"}
-            onclick={() => (view = view === "technicals" ? "chart" : "technicals")}
-          >
-            Technicals
-          </button>
-          <button role="tab" aria-selected={view === "analysts"} class:on={view === "analysts"} onclick={() => (view = view === "analysts" ? "chart" : "analysts")}>
-            Analysts
-          </button>
-          <button role="tab" aria-selected={view === "earnings"} class:on={view === "earnings"} onclick={() => (view = view === "earnings" ? "chart" : "earnings")}>
-            Earnings
-          </button>
-          <button role="tab" aria-selected={view === "stats"} class:on={view === "stats"} onclick={() => (view = view === "stats" ? "chart" : "stats")}>
-            Stats
-          </button>
-          {#if view === "news" ? newsLoading : view === "market" ? marketLoading : view === "events" ? eventsLoading : view === "options" ? optionsLoading : loading || (view === "technicals" && analyzing)}<span
-              class="spin"
-              aria-label="Loading"
-            ></span>{/if}
+            <button
+              role="tab"
+              aria-selected={view === "technicals"}
+              class:on={view === "technicals"}
+              onclick={() => (view = view === "technicals" ? "chart" : "technicals")}
+            >
+              Technicals
+            </button>
+            <button role="tab" aria-selected={view === "analysts"} class:on={view === "analysts"} onclick={() => (view = view === "analysts" ? "chart" : "analysts")}>
+              Analysts
+            </button>
+            <button role="tab" aria-selected={view === "earnings"} class:on={view === "earnings"} onclick={() => (view = view === "earnings" ? "chart" : "earnings")}>
+              Earnings
+            </button>
+            <button role="tab" aria-selected={view === "stats"} class:on={view === "stats"} onclick={() => (view = view === "stats" ? "chart" : "stats")}>
+              Stats
+            </button>
+            {#if view === "news" ? newsLoading : view === "market" ? marketLoading : view === "events" ? eventsLoading : view === "options" ? optionsLoading : loading || (view === "technicals" && analyzing)}<span
+                class="spin"
+                aria-label="Loading"
+              ></span>{/if}
+          </div>
+          <select aria-label="Candle interval" value={interval} onchange={(event) => changeInterval(event.currentTarget.value)}>
+            <option value="auto">Auto</option>
+            {#each intervalsFor(range) as i (i)}
+              <option value={i}>{INTERVAL_LABELS[i] ?? i}</option>
+            {/each}
+          </select>
         </div>
         {#key view}
           <div class="pane" in:paneIn={view === "watchlist" ? { y: 16, speed: "slow" } : {}}>
@@ -677,6 +705,20 @@
     background: var(--bg);
     color: var(--text);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  }
+  .range-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .range-controls select {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--faint);
+    border-radius: 6px;
+    padding: 3px;
+    font-size: 12px;
   }
   .ranges {
     display: flex;
