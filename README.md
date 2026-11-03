@@ -111,6 +111,9 @@ taskbar to keep it visible.
 - **Symbol and range:** search to change the symbol, pick a range from 1D to
   Max and switch between line and candles. 1D, 5D and 1M charts reload about
   once a minute.
+- **Candle interval:** choose Auto to keep the default resolution for each
+  range, or select a supported interval independently. The choice is saved
+  and resets to Auto when switching to a range that does not support it.
 - **Tooltip:** hover the chart, or use ← and →, for time, open, high, low,
   close and volume.
 - **Zoom and pan:** scroll or pinch to zoom at the cursor (down to 10 bars),
@@ -356,8 +359,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.9.6
-git push origin v0.9.6
+git tag v0.9.7
+git push origin v0.9.7
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

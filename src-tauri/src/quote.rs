@@ -24,6 +24,24 @@ pub fn interval_for(range: &str) -> Option<(&'static str, bool)> {
     })
 }
 
+pub fn intervals_for(range: &str) -> &'static [&'static str] {
+    match range {
+        "1d" | "5d" => &["1m", "5m", "15m", "30m", "60m"],
+        "1mo" => &["5m", "15m", "30m", "60m", "1d"],
+        "6mo" | "ytd" | "1y" => &["60m", "1d", "1wk"],
+        "5y" | "max" => &["1d", "1wk", "1mo"],
+        _ => &[],
+    }
+}
+
+pub fn resolve_interval(range: &str, interval: &str) -> Option<(&'static str, bool)> {
+    let default = interval_for(range)?;
+    Some(match intervals_for(range).iter().find(|&&i| i == interval) {
+        Some(&i) => (i, range == "1d" && i.ends_with('m')),
+        None => default,
+    })
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct Candle {
     pub t: i64,
@@ -331,8 +349,8 @@ pub(crate) async fn get(client: &reqwest::Client, url: &str, query: &[(&str, &st
     }
 }
 
-pub async fn fetch_chart(client: &reqwest::Client, symbol: &str, range: &str) -> Result<Chart, String> {
-    let (interval, prepost) = interval_for(range).ok_or("unknown range")?;
+pub async fn fetch_chart(client: &reqwest::Client, symbol: &str, range: &str, interval: &str) -> Result<Chart, String> {
+    let (interval, prepost) = resolve_interval(range, interval).ok_or("unknown range")?;
     let url = format!("{CHART_URL}/{}", symbol.trim().to_uppercase());
     let prepost = if prepost { "true" } else { "false" };
     let query = [("range", range), ("interval", interval), ("includePrePost", prepost), ("events", "div,split")];
@@ -457,6 +475,36 @@ mod tests {
         }
         assert_eq!(interval_for("1d"), Some(("5m", true)));
         assert!(interval_for("2h").is_none());
+    }
+
+    #[test]
+    fn supported_intervals() {
+        for range in ["1d", "5d"] {
+            assert_eq!(intervals_for(range), ["1m", "5m", "15m", "30m", "60m"]);
+        }
+        assert_eq!(intervals_for("1mo"), ["5m", "15m", "30m", "60m", "1d"]);
+        for range in ["6mo", "ytd", "1y"] {
+            assert_eq!(intervals_for(range), ["60m", "1d", "1wk"]);
+        }
+        for range in ["5y", "max"] {
+            assert_eq!(intervals_for(range), ["1d", "1wk", "1mo"]);
+        }
+        assert!(intervals_for("2h").is_empty());
+    }
+
+    #[test]
+    fn resolves_intervals_and_falls_back_to_auto() {
+        for (range, expected) in RANGES.into_iter().zip(["5m", "15m", "60m", "1d", "1d", "1d", "1wk", "1mo"]) {
+            assert_eq!(resolve_interval(range, "auto"), Some((expected, range == "1d")));
+            assert_eq!(resolve_interval(range, "invalid"), interval_for(range));
+            for &interval in intervals_for(range) {
+                assert_eq!(resolve_interval(range, interval), Some((interval, range == "1d")));
+            }
+        }
+        assert_eq!(resolve_interval("1y", "5m"), Some(("1d", false)));
+        assert_eq!(resolve_interval("1d", "1d"), Some(("5m", true)));
+        assert_eq!(resolve_interval("2h", "auto"), None);
+        assert_eq!(resolve_interval("2h", "1m"), None);
     }
 
     #[test]

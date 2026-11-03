@@ -82,6 +82,7 @@ pub fn run() {
             commands::set_symbol,
             commands::refresh_quote,
             commands::set_range,
+            commands::set_interval,
             commands::set_chart_mode,
             commands::set_hotkey,
             commands::set_keybinds,

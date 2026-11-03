@@ -262,7 +262,7 @@
       for (let i = off + Math.ceil((g.i0 - off) / every) * every; i <= g.i1; i += every) {
         const x = g.x(i);
         if (x < PAD.l || x > width - PAD.r) continue;
-        ctx.fillText(axisTime(candles[i].t, chart.meta.gmtoffset, chart.range), x, height - 6);
+        ctx.fillText(axisTime(candles[i].t, chart.meta.gmtoffset, chart.range, chart.interval), x, height - 6);
       }
     }
 
@@ -648,7 +648,7 @@
   let viewKey = "";
   let viewN = 0;
   $effect(() => {
-    const key = chart ? `${chart.meta.symbol} ${chart.range}` : "";
+    const key = chart ? `${chart.meta.symbol} ${chart.range} ${chart.interval}` : "";
     const n = candles.length;
     view = key === viewKey ? follow(untrack(() => view), viewN, n) : full(n);
     viewKey = key;

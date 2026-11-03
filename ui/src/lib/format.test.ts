@@ -2,6 +2,15 @@ import { describe, expect, it } from "vitest";
 import { ago, alertSummary, alignTimes, axisTime, biasLabel, biasTone, byGain, candleAt, candlesCsv, change, direction, fullTime, netSentiment, newsDate, niceTicks, price, quarterLabel, ratingLabel, ratingTone, sentimentLabel, sentimentTone, sessionMove, signed, span, statTone, upside, volume } from "./format";
 import { accelerator, display } from "./hotkey";
 
+it("labels hourly bars on long ranges with the date and exchange-local time", () => {
+  const t = Date.UTC(2026, 9, 2, 14, 30) / 1000;
+  for (const range of ["6mo", "ytd", "1y"]) {
+    expect(axisTime(t, -4 * 3600, range, "60m")).toBe("Oct 2 10:30");
+  }
+  expect(axisTime(t, 0, "1y", "1d")).toBe("Oct 2026");
+  expect(axisTime(t, 0, "1d", "60m")).toBe("14:30");
+});
+
 const key = (code: string, mods: Partial<Record<"ctrlKey" | "altKey" | "shiftKey" | "metaKey", boolean>> = {}) => ({
   code,
   ctrlKey: false,
