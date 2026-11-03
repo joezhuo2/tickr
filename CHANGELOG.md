@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-11-03
+
+### Fixed
+- **News tab closes on a second click** ([#80](https://github.com/joezhuo2/tickr/issues/80)):
+  clicking News while News is open returns to the chart, as the `N` key and the
+  Market, Events and Options tabs already do.
+
 ## [0.9.4] - 2026-11-03
 
 ### Added
