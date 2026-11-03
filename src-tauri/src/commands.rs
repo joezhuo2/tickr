@@ -347,6 +347,36 @@ pub async fn get_news(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<
     Ok(list)
 }
 
+#[tauri::command]
+pub async fn get_news_feed(shared: State<'_, Arc<Shared>>, symbols: Vec<String>) -> Result<Vec<crate::news::FeedArticle>, String> {
+    let cleaned = clean_symbols(symbols);
+    if cleaned.len() > 50 {
+        return Err("News feed supports at most 50 symbols".into());
+    }
+    let tasks: Vec<_> = cleaned.into_iter().map(|symbol| {
+        let shared = Arc::clone(shared.inner());
+        tauri::async_runtime::spawn(async move {
+            let mut list = crate::news::fetch(&shared.http, &symbol).await
+                .inspect_err(|e| log::warn!("news {symbol}: {e}"))?;
+            crate::ai::apply(&shared, &symbol, &mut list).await;
+            Ok::<_, String>((symbol, list))
+        })
+    }).collect();
+    let count = tasks.len();
+    let mut lists = Vec::new();
+    for task in tasks {
+        match task.await {
+            Ok(Ok(list)) => lists.push(list),
+            Ok(Err(_)) => {},
+            Err(e) => log::warn!("news feed: {e}"),
+        }
+    }
+    if count > 0 && lists.is_empty() {
+        return Err("Could not load news for any symbol".into());
+    }
+    Ok(crate::news::merge(lists))
+}
+
 /// US economic events for the next week from Yahoo's calendar, cached for 15 minutes unless `force`.
 #[tauri::command]
 pub async fn get_events(shared: State<'_, Arc<Shared>>, force: bool) -> Result<crate::events::EventsReport, String> {

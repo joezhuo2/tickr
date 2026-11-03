@@ -20,6 +20,63 @@ pub struct Article {
     pub sentiment: Sentiment,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct FeedArticle {
+    #[serde(flatten)]
+    pub article: Article,
+    pub symbols: Vec<String>,
+}
+
+fn link_key(link: &str) -> String {
+    let mut url = match reqwest::Url::parse(link) {
+        Ok(url) => url,
+        Err(_) => return link.split(['?', '#']).next().unwrap_or_default().trim_end_matches('/').to_string(),
+    };
+    url.set_query(None);
+    url.set_fragment(None);
+    url.as_str().trim_end_matches('/').to_string()
+}
+
+fn title_key(title: &str) -> String {
+    title.to_lowercase().split(|c: char| !c.is_alphanumeric()).filter(|s| !s.is_empty()).collect::<Vec<_>>().join(" ")
+}
+
+pub fn merge(lists: Vec<(String, Vec<Article>)>) -> Vec<FeedArticle> {
+    let mut out: Vec<(FeedArticle, Vec<String>, Vec<String>)> = Vec::new();
+    let mut symbols = Vec::new();
+    for (symbol, articles) in lists {
+        if !symbols.contains(&symbol) {
+            symbols.push(symbol.clone());
+        }
+        for article in articles {
+            let link = link_key(&article.link);
+            let title = title_key(&article.title);
+            let matches: Vec<_> = out.iter().enumerate()
+                .filter(|(_, (_, links, titles))| links.contains(&link) || titles.contains(&title))
+                .map(|(i, _)| i).collect();
+            if let Some(&first) = matches.first() {
+                for &i in matches.iter().skip(1).rev() {
+                    let (other, links, titles) = out.remove(i);
+                    out[first].0.symbols.extend(other.symbols);
+                    out[first].1.extend(links);
+                    out[first].2.extend(titles);
+                }
+                out[first].0.symbols.push(symbol.clone());
+                out[first].1.push(link);
+                out[first].2.push(title);
+            } else {
+                out.push((FeedArticle { article, symbols: vec![symbol.clone()] }, vec![link], vec![title]));
+            }
+        }
+    }
+    let mut out: Vec<_> = out.into_iter().map(|(mut item, _, _)| {
+        item.symbols = symbols.iter().filter(|s| item.symbols.contains(s)).cloned().collect();
+        item
+    }).collect();
+    out.sort_by_key(|a| std::cmp::Reverse(a.article.published));
+    out
+}
+
 /// Headlines with a title and an http(s) link, newest first.
 pub fn parse(body: &[u8]) -> Result<Vec<Article>, String> {
     let v: Value = serde_json::from_slice(body).map_err(|e| format!("bad response: {e}"))?;
@@ -63,6 +120,46 @@ mod tests {
     use super::*;
 
     const AAPL: &[u8] = include_bytes!("../../fixtures/news-aapl.json");
+
+    #[test]
+    fn merges_links_titles_and_symbols_preserving_first_copy() {
+        let first = parse(br#"{"news":[
+            {"title":"Revenue rises!","publisher":"First","link":"https://EXAMPLE.com/Story/?source=a#top","providerPublishTime":10},
+            {"title":"Newest story","link":"https://example.com/new","providerPublishTime":30}
+        ]}"#).unwrap();
+        let second = parse(br#"{"news":[
+            {"title":"Different title","link":"https://example.com/Story#other","providerPublishTime":20},
+            {"title":"  REVENUE -- rises  ","link":"https://other.com/story","providerPublishTime":40},
+            {"title":"Case sensitive path","link":"https://example.com/story","providerPublishTime":5}
+        ]}"#).unwrap();
+        let got = merge(vec![("AAPL".into(), first), ("MSFT".into(), second.clone()), ("MSFT".into(), second)]);
+        assert_eq!(got.len(), 3);
+        assert_eq!(got[0].article.title, "Newest story");
+        assert_eq!(got[1].article.title, "Revenue rises!");
+        assert_eq!(got[1].article.publisher, "First");
+        assert_eq!(got[1].article.published, 10);
+        assert_eq!(got[1].symbols, ["AAPL", "MSFT"]);
+        assert_eq!(got[2].symbols, ["MSFT"]);
+        let json = serde_json::to_value(&got[1]).unwrap();
+        assert_eq!(json["title"], "Revenue rises!");
+        assert_eq!(json["symbols"], serde_json::json!(["AAPL", "MSFT"]));
+    }
+
+    #[test]
+    fn merges_aliases_and_bridging_stories() {
+        let list = parse(br#"{"news":[
+            {"title":"First title","link":"https://a/one","providerPublishTime":30},
+            {"title":"Second title","link":"https://b/two","providerPublishTime":20},
+            {"title":"Second title","link":"https://a/one?tracking=1","providerPublishTime":10},
+            {"title":"Third title","link":"https://b/two#top","providerPublishTime":5}
+        ]}"#).unwrap();
+        let got = merge(vec![("AAPL".into(), list)]);
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].article.title, "First title");
+        assert_eq!(got[0].symbols, ["AAPL"]);
+        assert!(merge(Vec::new()).is_empty());
+        assert!(merge(vec![("AAPL".into(), Vec::new())]).is_empty());
+    }
 
     #[test]
     fn parses_newest_first() {
