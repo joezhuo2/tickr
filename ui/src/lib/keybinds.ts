@@ -32,6 +32,7 @@ export const ACTIONS: { id: Action; label: string; category: Category }[] = [
   { id: "toggle_watchlist", label: "Toggle Watchlist", category: "watchlist" },
   { id: "watchlist", label: "Next watchlist stock", category: "watchlist" },
   { id: "add_watchlist", label: "Add stock to Watchlist", category: "watchlist" },
+  { id: "next_group", label: "Next watchlist group", category: "watchlist" },
   { id: "search", label: "Focus search", category: "general" },
   { id: "settings", label: "Toggle Settings", category: "general" },
 ];
@@ -64,4 +65,11 @@ export function rebind(binds: Keybinds, id: Action, key: string): Keybinds {
 
 export function keyLabel(key: string): string {
   return key.length === 1 ? key.toUpperCase() : key || "—";
+}
+
+export function nextGroupTab(names: string[], tab: string | null): string | null {
+  if (!names.length) return null;
+  if (tab === null) return names[0];
+  const i = names.indexOf(tab);
+  return i < 0 ? names[0] : (names[i + 1] ?? null);
 }

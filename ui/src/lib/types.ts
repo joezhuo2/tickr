@@ -161,6 +161,7 @@ export interface Keybinds {
   options_expiry: string;
   add_watchlist: string;
   events: string;
+  next_group: string;
 }
 
 export interface Impact {

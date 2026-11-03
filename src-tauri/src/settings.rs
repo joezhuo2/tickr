@@ -50,6 +50,7 @@ pub struct Keybinds {
     pub options_expiry: String,
     pub add_watchlist: String,
     pub events: String,
+    pub next_group: String,
 }
 
 impl Default for Keybinds {
@@ -74,6 +75,7 @@ impl Default for Keybinds {
             options_expiry: "d".into(),
             add_watchlist: "f".into(),
             events: "k".into(),
+            next_group: "g".into(),
         }
     }
 }
@@ -234,6 +236,7 @@ mod tests {
         assert_eq!(s.keybinds.options_side, "u");
         assert_eq!(s.keybinds.options_expiry, "d");
         assert_eq!(s.keybinds.add_watchlist, "f");
+        assert_eq!(s.keybinds.next_group, "g");
         assert!(!s.dots.news);
         assert!(s.dots.earnings && s.dots.analysts);
     }
