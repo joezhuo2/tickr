@@ -225,9 +225,9 @@
     }
   }
 
-  function openNews() {
-    view = "news";
-    loadNews();
+  function toggleNews() {
+    view = view === "news" ? "chart" : "news";
+    if (view === "news") loadNews();
   }
 
   const activeAnalysis = $derived(analysis && analysisKey === cacheKey() ? analysis : null);
@@ -444,7 +444,7 @@
         if (!e.repeat && symbol && !watchlist.includes(symbol)) toggleStar();
         break;
       case "news":
-        if (!e.repeat) view === "news" ? (view = "chart") : openNews();
+        if (!e.repeat) toggleNews();
         break;
       case "analyze":
         if (!e.repeat && view === "technicals" && !analyzing) runAnalysis();
@@ -506,7 +506,7 @@
               <button class:on={view === "events"} aria-pressed={view === "events"} onclick={toggleEvents}>Events</button>
             </div>
             <div class="seg">
-              <button class:on={view === "news"} aria-pressed={view === "news"} onclick={openNews}>News</button>
+              <button class:on={view === "news"} aria-pressed={view === "news"} onclick={toggleNews}>News</button>
             </div>
             <div class="seg" role="group" aria-label="Chart type">
               <button class:on={view !== "news" && view !== "market" && view !== "events" && view !== "options" && mode === "line"} onclick={() => setMode("line")}>Line</button>
