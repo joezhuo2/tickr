@@ -18,6 +18,15 @@ pub enum ChartMode {
     Candles,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ChartScale {
+    #[default]
+    Linear,
+    Log,
+    Percent,
+}
+
 /// Last window position and size, in physical pixels.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Geometry {
@@ -205,6 +214,7 @@ pub struct Settings {
     pub range: String,
     pub interval: String,
     pub chart_mode: ChartMode,
+    pub chart_scale: ChartScale,
     pub hotkey: String,
     pub geometry: Option<Geometry>,
     // Tray menu toggles.
@@ -239,6 +249,7 @@ impl Default for Settings {
             range: "1d".into(),
             interval: "auto".into(),
             chart_mode: ChartMode::Line,
+            chart_scale: ChartScale::Linear,
             hotkey: DEFAULT_HOTKEY.into(),
             geometry: None,
             show_extended: true,
@@ -383,7 +394,7 @@ mod tests {
         let s = Settings::load(&p);
         assert_eq!(s.symbol, "AAPL");
         assert_eq!(s.hotkey, DEFAULT_HOTKEY);
-        let s2 = Settings { symbol: "MSFT".into(), chart_mode: ChartMode::Candles, ..s };
+        let s2 = Settings { symbol: "MSFT".into(), chart_mode: ChartMode::Candles, chart_scale: ChartScale::Log, ..s };
         s2.save(&p).unwrap();
         assert_eq!(Settings::load(&p), s2);
     }
@@ -396,6 +407,7 @@ mod tests {
         let s = Settings::load(&p);
         assert_eq!(s.symbol, "NVDA");
         assert_eq!(s.chart_mode, ChartMode::Candles);
+        assert_eq!(s.chart_scale, ChartScale::Linear);
         assert_eq!(s.interval, "auto");
         assert_eq!(s.indicators, IndicatorConfig::default());
         assert!(s.indicator_presets.is_empty());

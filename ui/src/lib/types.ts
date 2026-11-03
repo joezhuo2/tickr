@@ -2,6 +2,7 @@
 
 export type Session = "pre" | "regular" | "post" | "closed";
 export type ChartMode = "line" | "candles";
+export type ChartScale = "linear" | "log" | "percent";
 
 export interface Candle {
   t: number;
@@ -106,6 +107,7 @@ export interface Init {
   range: string;
   interval: string;
   chart_mode: ChartMode;
+  chart_scale: ChartScale;
   hotkey: string;
   default_hotkey: string;
   /** Why the hotkey is not registered (taken at startup), if it is not. */

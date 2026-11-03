@@ -27,6 +27,7 @@
     type Article,
     type Chart,
     type ChartMode,
+    type ChartScale,
     type Market,
     type Options,
     type Consensus,
@@ -55,6 +56,7 @@
   let range = $state("1d");
   let interval = $state("auto");
   let mode = $state<ChartMode>("line");
+  let scale = $state<ChartScale>("linear");
   let hotkey = $state("");
   let defaultHotkey = $state("");
   let hotkeyError = $state<string | null>(null);
@@ -124,6 +126,7 @@
     range = init.range;
     interval = validInterval(range, init.interval);
     mode = init.chart_mode;
+    scale = init.chart_scale;
     hotkey = init.hotkey;
     defaultHotkey = init.default_hotkey;
     hotkeyError = init.hotkey_error;
@@ -419,6 +422,11 @@
     if (view === "options") loadOptions(options?.expiry ?? undefined);
   }
 
+  function setScale(s: ChartScale) {
+    scale = s;
+    invoke("set_chart_scale", { scale: s }).catch(console.warn);
+  }
+
   function setMode(m: ChartMode) {
     if (view !== "technicals") view = "chart";
     mode = m;
@@ -550,6 +558,11 @@
               <button class:on={view !== "news" && view !== "market" && view !== "events" && view !== "options" && mode === "line"} onclick={() => setMode("line")}>Line</button>
               <button class:on={view !== "news" && view !== "market" && view !== "events" && view !== "options" && mode === "candles"} onclick={() => setMode("candles")}>Candles</button>
             </div>
+            <div class="seg" role="group" aria-label="Price scale">
+              {#each ["linear", "log", "percent"] as s}
+                <button class:on={scale === s} aria-pressed={scale === s} aria-label={`${s} price scale`} onclick={() => setScale(s as ChartScale)}>{s === "linear" ? "Lin" : s === "log" ? "Log" : "%"}</button>
+              {/each}
+            </div>
           </div>
         </div>
         <div class="range-controls">
@@ -616,7 +629,7 @@
             {:else if view === "technicals"}
               <div class="split">
                 {#if chart}
-                  <ChartView {chart} {mode} analysis={activeAnalysis} {overlays} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
+                  <ChartView {chart} {mode} {scale} analysis={activeAnalysis} {overlays} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
                 {:else if chartError}
                   <div class="msg">
                     {chartError}
@@ -641,7 +654,7 @@
                 />
               </div>
             {:else if chart}
-              <ChartView {chart} {mode} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
+              <ChartView {chart} {mode} {scale} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
             {:else if chartError}
               <div class="msg">
                 {chartError}
