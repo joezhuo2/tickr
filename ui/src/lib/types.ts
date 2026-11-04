@@ -248,6 +248,7 @@ export interface AiConfig {
   news_model: string;
   events_model: string;
   api_key: string;
+  has_key: boolean;
 }
 
 /** Tone of a headline, from sentiment.rs. */
