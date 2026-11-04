@@ -6,19 +6,62 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
 use crate::quote::{self, Session};
+use crate::settings::RefreshMode;
 use crate::state::{lock, now_secs, QuoteState, Shared};
 
-fn interval(session: Option<Session>) -> Duration {
-    Duration::from_secs(match session {
-        Some(Session::Regular) => 15,
-        Some(Session::Pre | Session::Post) => 60,
-        Some(Session::Closed) => 15 * 60,
-        None => 60,
-    })
+fn next_delay(mode: RefreshMode, session: Option<Session>, visible: bool, alerts_armed: bool, failures: u32) -> Duration {
+    let low_power = mode == RefreshMode::LowPower && !visible;
+    let seconds = if failures > 0 {
+        (15u64 << failures.min(5)).min(300)
+    } else {
+        match (session, low_power) {
+            (Some(Session::Regular), false) => 15,
+            (Some(Session::Regular), true) => 60,
+            (Some(Session::Pre | Session::Post), false) => 60,
+            (Some(Session::Pre | Session::Post), true) => 300,
+            (Some(Session::Closed), false) => 900,
+            (Some(Session::Closed), true) => 1800,
+            (None, _) => 60,
+        }
+    };
+    Duration::from_secs(if alerts_armed { seconds.min(15) } else { seconds })
 }
 
-fn backoff(failures: u32) -> Duration {
-    Duration::from_secs((15u64 << failures.min(5)).min(300))
+fn woke_from_sleep(now: i64, expected: i64) -> bool {
+    now.saturating_sub(expected) > 30
+}
+
+async fn wait(shared: &Shared, delay: Duration, failures: u32) {
+    let deadline = tokio::time::Instant::now() + delay;
+    let mut probe_at = tokio::time::Instant::now() + Duration::from_secs(15);
+    // A reachable host answering with errors is not a recovery, so keep the backoff.
+    let mut unreachable = false;
+    loop {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        if remaining.is_zero() { return; }
+        let slice = remaining.min(Duration::from_secs(5));
+        let expected = now_secs() + slice.as_secs() as i64;
+        tokio::select! {
+            _ = shared.wake.notified() => return,
+            _ = tokio::time::sleep(slice) => {}
+        }
+        if woke_from_sleep(now_secs(), expected) { return; }
+        let now = tokio::time::Instant::now();
+        if now >= deadline { return; }
+        if failures > 0 && now >= probe_at {
+            probe_at = now + Duration::from_secs(15);
+            let expected = now_secs() + 3;
+            tokio::select! {
+                _ = shared.wake.notified() => return,
+                _ = tokio::time::sleep_until(deadline) => return,
+                response = shared.http.head("https://query1.finance.yahoo.com")
+                    .timeout(Duration::from_secs(3)).send() => {
+                    if (response.is_ok() && unreachable) || woke_from_sleep(now_secs(), expected) { return; }
+                    unreachable = response.is_err();
+                }
+            }
+        }
+    }
 }
 
 /// Sends the current quote state to the window, if it exists.
@@ -76,16 +119,12 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
             emit(&app, &shared);
             crate::alerts::poll(&app, &shared, &symbol, fresh.as_ref()).await;
 
-            let delay = if failures > 0 { backoff(failures) } else { interval(session) };
-            let delay = if lock(&shared.settings).alerts.iter().any(|a| a.enabled) {
-                delay.min(Duration::from_secs(15))
-            } else {
-                delay
+            let visible = crate::window::get(&app).is_some_and(|w| crate::window::shown(&w));
+            let delay = {
+                let settings = lock(&shared.settings);
+                next_delay(settings.refresh_mode, session, visible, settings.alerts.iter().any(|a| a.enabled), failures)
             };
-            tokio::select! {
-                _ = tokio::time::sleep(delay) => {}
-                _ = shared.wake.notified() => {}
-            }
+            wait(&shared, delay, failures).await;
         }
     });
 }
@@ -96,9 +135,32 @@ mod tests {
 
     #[test]
     fn delays() {
-        assert_eq!(interval(Some(Session::Regular)), Duration::from_secs(15));
-        assert_eq!(interval(Some(Session::Closed)), Duration::from_secs(900));
-        assert_eq!(backoff(1), Duration::from_secs(30));
-        assert_eq!(backoff(10), Duration::from_secs(300));
+        for mode in [RefreshMode::Balanced, RefreshMode::LowPower] {
+            for visible in [false, true] {
+                for (session, balanced, low) in [
+                    (Some(Session::Regular), 15, 60),
+                    (Some(Session::Pre), 60, 300),
+                    (Some(Session::Post), 60, 300),
+                    (Some(Session::Closed), 900, 1800),
+                    (None, 60, 60),
+                ] {
+                    for (failures, backoff) in [(0, 0), (1, 30), (2, 60), (3, 120), (4, 240), (5, 300), (10, 300), (u32::MAX, 300)] {
+                        let expected = if failures > 0 { backoff }
+                            else if mode == RefreshMode::LowPower && !visible { low } else { balanced };
+                        assert_eq!(next_delay(mode, session, visible, false, failures), Duration::from_secs(expected));
+                        assert_eq!(next_delay(mode, session, visible, true, failures), Duration::from_secs(15));
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn detects_wall_clock_jump() {
+        assert!(!woke_from_sleep(105, 105));
+        assert!(!woke_from_sleep(135, 105));
+        assert!(woke_from_sleep(136, 105));
+        assert!(woke_from_sleep(3705, 105));
+        assert!(!woke_from_sleep(90, 105));
     }
 }

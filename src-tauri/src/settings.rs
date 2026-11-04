@@ -20,6 +20,14 @@ pub enum ChartMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum RefreshMode {
+    #[default]
+    Balanced,
+    LowPower,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ChartScale {
     #[default]
@@ -255,6 +263,7 @@ pub struct Settings {
     pub range: String,
     pub interval: String,
     pub chart_mode: ChartMode,
+    pub refresh_mode: RefreshMode,
     pub chart_scale: ChartScale,
     pub hotkey: String,
     pub geometry: Option<Geometry>,
@@ -293,6 +302,7 @@ impl Default for Settings {
             range: "1d".into(),
             interval: "auto".into(),
             chart_mode: ChartMode::Line,
+            refresh_mode: RefreshMode::Balanced,
             chart_scale: ChartScale::Linear,
             hotkey: DEFAULT_HOTKEY.into(),
             geometry: None,
@@ -439,7 +449,7 @@ mod tests {
         let s = Settings::load(&p);
         assert_eq!(s.symbol, "AAPL");
         assert_eq!(s.hotkey, DEFAULT_HOTKEY);
-        let s2 = Settings { symbol: "MSFT".into(), chart_mode: ChartMode::Candles, chart_scale: ChartScale::Log, ..s };
+        let s2 = Settings { symbol: "MSFT".into(), chart_mode: ChartMode::Candles, refresh_mode: RefreshMode::LowPower, chart_scale: ChartScale::Log, ..s };
         s2.save(&p).unwrap();
         assert_eq!(Settings::load(&p), s2);
     }
@@ -452,6 +462,7 @@ mod tests {
         let s = Settings::load(&p);
         assert_eq!(s.symbol, "NVDA");
         assert_eq!(s.chart_mode, ChartMode::Candles);
+        assert_eq!(s.refresh_mode, RefreshMode::Balanced);
         assert_eq!(s.chart_scale, ChartScale::Linear);
         assert_eq!(s.interval, "auto");
         assert_eq!(s.indicators, IndicatorConfig::default());

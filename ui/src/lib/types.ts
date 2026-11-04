@@ -1,6 +1,7 @@
 // Mirrors the Rust types in src-tauri/src/quote.rs, analyst.rs, news.rs and state.rs.
 
 export type Session = "pre" | "regular" | "post" | "closed";
+export type RefreshMode = "balanced" | "low_power";
 export type ChartMode = "line" | "candles";
 export type ChartScale = "linear" | "log" | "percent";
 
@@ -114,6 +115,7 @@ export interface Init {
   range: string;
   interval: string;
   chart_mode: ChartMode;
+  refresh_mode: RefreshMode;
   chart_scale: ChartScale;
   hotkey: string;
   default_hotkey: string;
