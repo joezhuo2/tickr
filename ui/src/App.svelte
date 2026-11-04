@@ -23,6 +23,8 @@
     INTERVAL_LABELS,
     intervalsFor,
     validInterval,
+    type DataProvider,
+    type StreamStatus,
     type Analysis,
     type Article,
     type FeedArticle,
@@ -52,6 +54,7 @@
   // Injected before load, so the first frame already has real content.
   const boot = window.__TICKR_INIT__ ?? null;
 
+  let dataProvider = $state<DataProvider>({ provider: "yahoo", feed: "iex", has_keys: false, stream: { kind: "off" } });
   let ready = $state(false);
   let symbol = $state("");
   let range = $state("1d");
@@ -170,6 +173,7 @@
   }
 
   function apply(init: Init) {
+    dataProvider = init.data_provider;
     symbol = init.symbol;
     range = init.range;
     interval = validInterval(range, init.interval);
@@ -226,8 +230,8 @@
     loading = true;
     try {
       const c = await invoke<Chart>("get_chart", { symbol, range, interval });
-      cache.set(key, { chart: c, at: Date.now() });
       if (mine !== chartSeq) return;
+      cache.set(key, { chart: c, at: Date.now() });
       chart = c;
       chartAt = Date.now();
       loading = false;
@@ -563,9 +567,19 @@
       if (/^\d+m$/.test(chart?.interval ?? "") && Date.now() - chartAt > FRESH_MS) loadChart(true);
     });
     const tick = setInterval(() => (now = Date.now() / 1000), 15_000);
+    const unProvider = listen<DataProvider>("data-provider", (e) => {
+      dataProvider = e.payload;
+      cache.clear();
+      clearAnalysis();
+      void loadChart(true);
+    });
+    const unStream = listen<StreamStatus>("stream-status", (e) => (dataProvider.stream = e.payload));
+    invoke<DataProvider>("get_data_provider").then((c) => (dataProvider = c)).catch(console.warn);
     const unAlerts = listen<PriceAlert[]>("alerts", (e) => (alerts = e.payload));
     return () => {
       un.then((f) => f());
+      unProvider.then((f) => f());
+      unStream.then((f) => f());
       unAlerts.then((f) => f());
       clearInterval(tick);
     };
@@ -718,6 +732,8 @@
       </section>
     </main>
     <Footer
+      {quote}
+      {dataProvider}
       error={hotkeyError}
       {status}
       settingsOn={settingsOpen}

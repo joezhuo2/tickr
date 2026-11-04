@@ -1,7 +1,10 @@
 <script lang="ts">
+  import type { DataProvider, Quote } from "./lib/types";
   import { invoke } from "@tauri-apps/api/core";
 
   let {
+    quote,
+    dataProvider,
     error = null,
     status,
     settingsOn,
@@ -13,6 +16,8 @@
   }: {
     /** Set by the backend when the saved hotkey could not be registered. */
     error?: string | null;
+    quote: Quote | null;
+    dataProvider: DataProvider;
     status: { kind: "live" | "stale" | "offline" | "loading"; text: string };
     settingsOn: boolean;
     onsettings: () => void;
@@ -21,6 +26,10 @@
     refreshing: boolean;
     onrefresh: () => void;
   } = $props();
+  const source = $derived(quote?.source ?? "yahoo");
+  const sourceLabel = $derived(source === "yahoo"
+    ? dataProvider.provider === "alpaca" && /^[A-Z]{1,5}$/.test(quote?.symbol ?? "") ? "Yahoo (fallback)" : "Yahoo"
+    : `Alpaca ${source === "alpaca-sip" ? "SIP" : "IEX"} · ${dataProvider.stream.kind}`);
 </script>
 
 <footer>
@@ -41,6 +50,7 @@
   <button class="refresh" class:spinning={refreshing} title="Refresh" aria-label="Refresh" onclick={onrefresh}>
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" /></svg>
   </button>
+  <span class="source" title={dataProvider.stream.message ?? sourceLabel}>{sourceLabel}</span>
   <span class="status {status.kind}" title={status.text}><i></i>{status.text}</span>
 </footer>
 
@@ -178,6 +188,7 @@
       transform: rotate(360deg);
     }
   }
+  .source { color: var(--muted); white-space: nowrap; }
   .status {
     display: flex;
     align-items: center;

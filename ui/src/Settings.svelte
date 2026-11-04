@@ -4,7 +4,7 @@
   import { actionFor, bindKey, groupActions, keyLabel, rebind, type Action } from "./lib/keybinds";
   import { backdrop, dialog } from "./lib/motion";
   import { onMount } from "svelte";
-  import type { AiConfig, Dots, Keybinds } from "./lib/types";
+  import type { AiConfig, DataProvider, Dots, Keybinds } from "./lib/types";
 
   let {
     hotkey = $bindable(),
@@ -37,8 +37,37 @@
   let ai = $state<AiConfig>({ enabled: true, base_url: "", model: "", news_model: "", events_model: "", api_key: "" });
   let aiStatus = $state<{ text: string; ok: boolean } | null>(null);
   let showKey = $state(false);
+  let market = $state<DataProvider>({ provider: "yahoo", feed: "iex", has_keys: false, stream: { kind: "off" } });
+  let keyId = $state("");
+  let secret = $state("");
+  let marketBusy = $state(false);
+  let marketStatus = $state<{ text: string; ok: boolean } | null>(null);
+
+  async function marketAction(action: "save" | "test" | "clear") {
+    marketBusy = true;
+    marketStatus = null;
+    try {
+      if (action === "test") {
+        await invoke("test_alpaca");
+        marketStatus = { text: "Connection successful.", ok: true };
+      } else {
+        market = action === "clear"
+          ? await invoke<DataProvider>("clear_alpaca_keys")
+          : await invoke<DataProvider>("set_data_provider", { provider: market.provider, feed: market.feed, keyId, secret });
+        keyId = "";
+        secret = "";
+        marketStatus = { text: "Saved.", ok: true };
+      }
+    } catch (e) {
+      marketStatus = { text: String(e), ok: false };
+    } finally {
+      marketBusy = false;
+    }
+  }
+
 
   onMount(() => {
+    invoke<DataProvider>("get_data_provider").then((c) => (market = c)).catch((e) => (marketStatus = { text: String(e), ok: false }));
     invoke<AiConfig>("get_ai_config").then((c) => (ai = c)).catch(console.warn);
   });
 
@@ -170,6 +199,28 @@
         <input type="checkbox" checked={dots[d.id]} onchange={() => toggleDot(d.id)} />
       </label>
     {/each}
+
+    <h3>Market data</h3>
+    <label class="row">
+      <span>Provider</span>
+      <select class="field" bind:value={market.provider} disabled={marketBusy}>
+        <option value="yahoo">Yahoo</option><option value="alpaca">Alpaca</option>
+      </select>
+    </label>
+    {#if market.provider === "alpaca"}
+      <label class="row"><span>Feed</span><select class="field" bind:value={market.feed} disabled={marketBusy}>
+        <option value="iex">IEX (free)</option><option value="sip">SIP (paid)</option>
+      </select></label>
+      <label class="row"><span>Key ID</span><input class="field" type="password" autocomplete="off" spellcheck="false" bind:value={keyId} placeholder={market.has_keys ? "Key saved" : ""} disabled={marketBusy} /></label>
+      <label class="row"><span>Secret</span><input class="field" type="password" autocomplete="off" spellcheck="false" bind:value={secret} placeholder={market.has_keys ? "Key saved" : ""} disabled={marketBusy} /></label>
+    {/if}
+    <div class="row">
+      <button class="link" disabled={marketBusy} onclick={() => marketAction("save")}>Save</button>
+      <button class="link" disabled={marketBusy || !market.has_keys} onclick={() => marketAction("test")}>Test connection</button>
+      <button class="link" disabled={marketBusy || !market.has_keys} onclick={() => marketAction("clear")}>Clear keys</button>
+    </div>
+    <p class="hint">Free Alpaca keys give real-time IEX trades for US stocks. Watchlist and alerts still use Yahoo.</p>
+    {#if marketStatus}<p class="hint" class:error={!marketStatus.ok}>{marketStatus.text}</p>{/if}
 
     <h3>AI</h3>
     <label class="row">
