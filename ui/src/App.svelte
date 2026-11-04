@@ -59,6 +59,23 @@
   let symbol = $state("");
   let range = $state("1d");
   let interval = $state("auto");
+  let drawings = $state<import("./lib/types").Init["drawings"]>({});
+  let drawingBusy = $state(false);
+  async function saveDrawings(symbol: string, next: import("./lib/types").Drawing[]) {
+    if (drawingBusy) return false;
+    drawingBusy = true;
+    const previous = drawings[symbol] ?? [];
+    drawings[symbol] = next;
+    try {
+      await invoke("set_drawings", { symbol, drawings: next });
+      return true;
+    } catch (error) {
+      drawings[symbol] = previous;
+      console.warn(error);
+      return false;
+    } finally { drawingBusy = false; }
+  }
+
   let mode = $state<ChartMode>("line");
   let scale = $state<ChartScale>("linear");
   let hotkey = $state("");
@@ -177,6 +194,7 @@
     symbol = init.symbol;
     range = init.range;
     interval = validInterval(range, init.interval);
+    drawings = init.drawings ?? {};
     mode = init.chart_mode;
     scale = init.chart_scale;
     hotkey = init.hotkey;
@@ -693,7 +711,7 @@
             {:else if view === "technicals"}
               <div class="split">
                 {#if chart}
-                  <ChartView {chart} {mode} {scale} analysis={activeAnalysis} {overlays} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
+                  <ChartView {chart} {mode} {scale} {drawings} {drawingBusy} {saveDrawings} analysis={activeAnalysis} {overlays} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
                 {:else if chartError}
                   <div class="msg">
                     {chartError}
@@ -718,7 +736,7 @@
                 />
               </div>
             {:else if chart}
-              <ChartView {chart} {mode} {scale} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
+              <ChartView {chart} {mode} {scale} {drawings} {drawingBusy} {saveDrawings} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
             {:else if chartError}
               <div class="msg">
                 {chartError}
