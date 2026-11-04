@@ -109,6 +109,7 @@
 {:else}
   <ul class="list">
     {#each rows as a (a.link)}
+      {@const toneTitle = a.ai_model ? "AI tone from " + a.ai_model + (a.ai_at == null ? "" : ", generated " + ago(a.ai_at, now)) : "Tone guessed from words in the headline"}
       <li>
         <button class="row" title={a.link} onclick={() => open(a)}>
           <span class="title">{a.title}</span>
@@ -117,9 +118,10 @@
             {#if a.publisher}<span>{a.publisher}</span> ·{/if}
             <time datetime={new Date(a.published * 1000).toISOString()}>{newsDate(a.published, offset)}</time>
             · <span>{ago(a.published, now)}</span>
-            <span class="pill {sentimentTone(a.sentiment)}" title="Tone of the headline, guessed from its words"
+            <span class="pill {sentimentTone(a.sentiment)}" title={toneTitle}
               >{sentimentLabel(a.sentiment)}</span
             >
+            <small title={toneTitle}>{a.ai_model ? "AI" : "Keyword"}</small>
           </span>
         </button>
       </li>

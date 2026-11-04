@@ -231,6 +231,7 @@ export interface EventsReport {
 
 /** AI read of one event, run when it is opened. */
 export interface EventAnalysis {
+  model: string;
   generated: number;
   tone: "positive" | "negative" | "neutral";
   summary: string;
@@ -242,6 +243,13 @@ export interface Dots {
   earnings: boolean;
   news: boolean;
   analysts: boolean;
+}
+
+export interface AiTestResult {
+  model: string;
+  ok: boolean;
+  ms: number;
+  error: string | null;
 }
 
 /** AI settings: the news toggle from settings.json plus the .env.local credentials and models. */
@@ -267,6 +275,8 @@ export interface Article {
   /** Unix seconds. */
   published: number;
   sentiment: Sentiment;
+  ai_model?: string | null;
+  ai_at?: number | null;
 }
 
 export interface FeedArticle extends Article {
