@@ -1,5 +1,6 @@
 //! App settings, stored as JSON in the OS config dir.
 
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -25,6 +26,41 @@ pub enum ChartScale {
     Linear,
     Log,
     Percent,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DrawingPoint {
+    pub t: i64,
+    pub price: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Drawing {
+    pub id: u32,
+    pub kind: String,
+    pub points: Vec<DrawingPoint>,
+    pub text: String,
+}
+
+pub fn validate_drawings(map: &HashMap<String, Vec<Drawing>>) -> Result<(), String> {
+    if map.len() > 500 { return Err("At most 500 symbols can have drawings.".into()); }
+    for (symbol, drawings) in map {
+        if symbol.is_empty() || symbol != &symbol.to_uppercase() { return Err("Invalid drawing symbol.".into()); }
+        if drawings.len() > 200 { return Err("At most 200 drawings per symbol.".into()); }
+        let mut ids = HashSet::new();
+        for d in drawings {
+            let count = match d.kind.as_str() {
+                "hline" | "text" => 1,
+                "trend" => 2,
+                _ => return Err("Unknown drawing kind.".into()),
+            };
+            if d.points.len() != count { return Err("Invalid drawing points.".into()); }
+            if d.points.iter().any(|p| !p.price.is_finite() || p.price <= 0.0) { return Err("Invalid drawing price.".into()); }
+            if d.text.chars().count() > 200 || (if d.kind == "text" { d.text.trim().is_empty() } else { !d.text.is_empty() }) { return Err("Invalid drawing text.".into()); }
+            if !ids.insert(d.id) { return Err("Duplicate drawing ID.".into()); }
+        }
+    }
+    Ok(())
 }
 
 /// Last window position and size, in physical pixels.
@@ -211,6 +247,7 @@ pub struct Settings {
     pub data_provider: String,
     pub alpaca_feed: String,
     pub indicators: IndicatorConfig,
+    pub drawings: HashMap<String, Vec<Drawing>>,
     pub indicator_presets: Vec<IndicatorPreset>,
     pub symbol: String,
     pub range: String,
@@ -248,6 +285,7 @@ impl Default for Settings {
             data_provider: "yahoo".into(),
             alpaca_feed: "iex".into(),
             indicators: IndicatorConfig::default(),
+            drawings: HashMap::new(),
             indicator_presets: Vec::new(),
             symbol: "AAPL".into(),
             range: "1d".into(),
@@ -375,6 +413,7 @@ mod tests {
         assert_eq!(s.indicator_presets[0].config.rsi.length, 7);
         assert_eq!(s.indicator_presets[0].name, "Daily");
         s.delete_indicator_preset(" Daily ").unwrap();
+        assert!(s.drawings.is_empty());
         assert!(s.indicator_presets.is_empty());
         for name in [" ".to_string(), "x".repeat(41)] { assert!(s.save_indicator_preset(&name).is_err()); }
         s.save_indicator_preset(&"?".repeat(40)).unwrap();
@@ -414,6 +453,7 @@ mod tests {
         assert_eq!(s.chart_scale, ChartScale::Linear);
         assert_eq!(s.interval, "auto");
         assert_eq!(s.indicators, IndicatorConfig::default());
+        assert!(s.drawings.is_empty());
         assert!(s.indicator_presets.is_empty());
         assert!(s.unload_on_minimize);
         assert!(s.groups.is_empty());

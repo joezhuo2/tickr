@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-04
+
+### Added
+- **Chart drawings** ([#86](https://github.com/joezhuo2/tickr/issues/86)):
+  a toolbar on the chart places horizontal levels, trendlines and text, and a
+  ruler measures price, percent, bars and time. Drawings are saved per symbol
+  and can be moved, deleted, undone and redone.
+
 ## [0.9.11] - 2026-11-04
 
 ### Added

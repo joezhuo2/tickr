@@ -95,6 +95,7 @@ pub fn run() {
             commands::refresh_quote,
             commands::set_range,
             commands::set_interval,
+            commands::set_drawings,
             commands::set_chart_mode,
             commands::set_chart_scale,
             commands::set_hotkey,

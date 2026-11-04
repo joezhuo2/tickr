@@ -1,7 +1,9 @@
 <script lang="ts">
   import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, num, price, quarterLabel, volume } from "./lib/format";
   import type { Analysis, Article, Chart, ChartMode, ChartScale, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
-  import { fitScale, forward, scaleLabel, scaleTicks } from "./lib/scale";
+  import { fitScale, forward, inverse, scaleLabel, scaleTicks } from "./lib/scale";
+  import type { Drawing, DrawingPoint } from "./lib/types";
+  import { timeToIndex, indexToTime, hitTest, segmentDistance, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
   import { paneLayout } from "./lib/indicators";
   import { untrack } from "svelte";
   import { fadeIn } from "./lib/motion";
@@ -9,6 +11,9 @@
 
   let {
     chart,
+    drawings,
+    drawingBusy,
+    saveDrawings,
     mode,
     scale = "linear",
     analysis = null,
@@ -18,6 +23,9 @@
     news = [],
   }: {
     chart: Chart | null;
+    drawings: Record<string, Drawing[]>;
+    drawingBusy: boolean;
+    saveDrawings: (symbol: string, drawings: Drawing[]) => Promise<boolean>;
     mode: ChartMode;
     scale?: ChartScale;
     analysis?: Analysis | null;
@@ -36,7 +44,7 @@
   let view = $state<View>(full(0));
   let dragX = $state<number | null>(null);
 
-  const PAD = { l: 6, r: 62, t: 10, b: 22 };
+  const PAD = { l: 6, r: 62, t: 38, b: 22 };
 
   const candles = $derived(chart?.candles ?? []);
   const isDay = $derived(chart?.range === "1d");
@@ -376,6 +384,8 @@
     }
     ctx.restore();
 
+    drawDrawings(ctx, v);
+
     // Crosshair.
     if (hover != null && candles[hover] && (g.scale !== "log" || candles[hover].c > 0)) {
       const c = candles[hover];
@@ -673,7 +683,7 @@
 
   $effect(() => {
     // Redraw when any of these change.
-    void [candles, mode, width, height, hover, geo, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt];
+    void [list, preview, selected, tool, candles, mode, width, height, hover, geo, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt];
     draw();
   });
 
@@ -738,13 +748,237 @@
     hover = null;
   }
 
+  type Tool = "cursor" | "hline" | "trend" | "text" | "ruler";
+  const tools: { tool: Tool; label: string }[] = [
+    { tool: "cursor", label: "Cursor" },
+    { tool: "hline", label: "Level" },
+    { tool: "trend", label: "Trend" },
+    { tool: "text", label: "Text" },
+    { tool: "ruler", label: "Ruler" },
+  ];
+  let tool = $state<Tool>("cursor");
+  let selected = $state<number | null>(null);
+  let history = $state<History>({ past: [], present: [], future: [] });
+  let preview = $state<Drawing | null>(null);
+  let editing = $state<{ point: DrawingPoint; x: number; y: number } | null>(null);
+  let inputText = $state("");
+  let gesture: { start: Pixel; original: Drawing | null; endpoint: number; moved: boolean; second: boolean } | null = null;
+  const drawingSymbol = $derived(chart?.meta.symbol.toUpperCase() ?? "");
+  const list = $derived(drawings[drawingSymbol] ?? []);
+  const times = $derived(candles.map((c) => c.t));
+  $effect(() => {
+    void drawingSymbol;
+    untrack(() => {
+      history = { past: [], present: list, future: [] };
+      cancelDrawing();
+      selected = null;
+    });
+  });
+
+  function cancelDrawing() {
+    tool = "cursor";
+    preview = null;
+    editing = null;
+    gesture = null;
+    dragX = null;
+  }
+
+  function chooseTool(next: Tool) {
+    cancelDrawing();
+    tool = next;
+    selected = null;
+    hover = null;
+    wrap?.focus();
+  }
+
+  async function changeDrawings(action: Drawing[] | "undo" | "redo") {
+    if (drawingBusy) return;
+    const symbol = drawingSymbol;
+    const next = undoReducer({ ...history, present: list }, action);
+    if (next.present === list) return;
+    if (await saveDrawings(symbol, next.present) && drawingSymbol === symbol) history = next;
+  }
+
+  function removeDrawing() {
+    if (selected == null || drawingBusy) return;
+    void changeDrawings(list.filter((d) => d.id !== selected));
+    selected = null;
+  }
+
+  function addDrawing(d: Drawing) {
+    if (list.length >= 200) { cancelDrawing(); return; }
+    const ids = new Set(list.map((d) => d.id));
+    let id = 0;
+    while (ids.has(id)) id++;
+    void changeDrawings([...list, { ...d, id }]);
+    cancelDrawing();
+  }
+
+  function pixel(e: MouseEvent): Pixel {
+    const r = wrap!.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+
+  function anchor(p: Pixel): DrawingPoint {
+    return {
+      t: Math.round(indexToTime(times, view.start + (p.x - PAD.l) / geo.step - 0.5)),
+      price: inverse(1 - (p.y - PAD.t) / geo.priceH, geo.lo, geo.hi, geo.scale),
+    };
+  }
+
+  function screen(p: DrawingPoint): Pixel {
+    return { x: geo.x(timeToIndex(times, p.t)), y: geo.y(p.price) };
+  }
+
+  function inPlot(p: Pixel) {
+    return p.x >= PAD.l && p.x <= width - PAD.r && p.y >= PAD.t && p.y <= PAD.t + geo.priceH;
+  }
+
+  function hitDrawing(p: Pixel) {
+    const ctx = canvas?.getContext("2d");
+    if (ctx) ctx.font = `11px ${getComputedStyle(canvas!).getPropertyValue("--font")}`;
+    for (const d of [...list].reverse()) {
+      const a = screen(d.points[0]);
+      if (d.kind === "hline" && hitTest(p, a)) return { drawing: d, endpoint: -1 };
+      if (d.kind === "text" && inPlot(a) && p.x >= a.x - 6 && p.x <= a.x + (ctx?.measureText(d.text).width ?? 0) + 6 && Math.abs(p.y - a.y) <= 12) return { drawing: d, endpoint: -1 };
+      if (d.kind === "trend") {
+        const b = screen(d.points[1]);
+        if (d.id === selected) {
+          for (const [i, point] of [a, b].entries()) if (segmentDistance(p, point, point) <= 6) return { drawing: d, endpoint: i };
+        }
+        if (hitTest(p, a, b)) return { drawing: d, endpoint: -1 };
+      }
+    }
+    return null;
+  }
+
   function onDown(e: PointerEvent) {
-    if (e.button !== 0 || geo.n === 0 || (e.target as Element).closest(".exports")) return;
-    dragX = e.clientX;
+    if (e.button !== 0 || geo.n === 0 || (e.target as Element).closest(".exports, .drawing-tools, input")) return;
+    wrap!.focus();
+    const p = pixel(e);
+    if (!inPlot(p)) {
+      if (tool === "cursor") { dragX = e.clientX; wrap!.setPointerCapture(e.pointerId); }
+      return;
+    }
+    if (drawingBusy) return;
+    if (tool === "cursor") {
+      wrap!.setPointerCapture(e.pointerId);
+      hover = null;
+      const hit = hitDrawing(p);
+      selected = hit?.drawing.id ?? null;
+      if (hit) gesture = { start: p, original: hit.drawing, endpoint: hit.endpoint, moved: false, second: false };
+      else dragX = e.clientX;
+      return;
+    }
+    const point = anchor(p);
+    if (!Number.isFinite(point.price) || point.price <= 0) return;
     wrap!.setPointerCapture(e.pointerId);
+    hover = null;
+    if (tool === "hline") { addDrawing({ id: 0, kind: "hline", points: [point], text: "" }); return; }
+    if (tool === "text") {
+      editing = { point, x: Math.min(p.x, Math.max(PAD.l, width - 220)), y: p.y };
+      inputText = "";
+      return;
+    }
+    if (tool === "trend" || tool === "ruler") {
+      const second = preview != null;
+      if (!preview) preview = { id: 0, kind: "trend", points: [point, point], text: "" };
+      else preview = { ...preview, points: [preview.points[0], point] };
+      gesture = { start: p, original: null, endpoint: -1, moved: false, second };
+      return;
+    }
+  }
+
+  function moveDrawing(e: MouseEvent): boolean {
+    if (!gesture && !preview) return false;
+    const p = pixel(e);
+    const point = anchor(p);
+    if (!Number.isFinite(point.price) || point.price <= 0) return true;
+    if (gesture) gesture.moved ||= Math.hypot(p.x - gesture.start.x, p.y - gesture.start.y) > 3;
+    if (gesture?.original) {
+      if (!gesture.moved) return true;
+      const { original, endpoint, start } = gesture;
+      const points = original.points.map((a, i) => {
+        if (endpoint >= 0) return i === endpoint ? point : a;
+        const old = screen(a);
+        return anchor({ x: old.x + p.x - start.x, y: old.y + p.y - start.y });
+      });
+      if (points.every((a) => a.price > 0 && Number.isFinite(a.price))) preview = { ...original, points };
+    } else if (preview) preview = { ...preview, points: [preview.points[0], point] };
+    hover = null;
+    return true;
+  }
+
+  function onUp(e: PointerEvent) {
+    if (gesture) {
+      moveDrawing(e);
+      if (gesture.original) {
+        if (gesture.moved && preview) void changeDrawings(list.map((d) => d.id === preview!.id ? preview! : d));
+        preview = null;
+      } else if (tool === "ruler") cancelDrawing();
+      else if (preview && (gesture.moved || gesture.second)) addDrawing(preview);
+      gesture = null;
+    }
+    dragX = null;
+    if (wrap?.hasPointerCapture(e.pointerId)) wrap.releasePointerCapture(e.pointerId);
+  }
+
+  function focusInput(input: HTMLInputElement) { input.focus(); }
+
+  function textKey(e: KeyboardEvent) {
+    if (e.key !== "Enter" && e.key !== "Escape") return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === "Enter" && editing && inputText.trim() && Array.from(inputText).length <= 200) addDrawing({ id: 0, kind: "text", points: [editing.point], text: inputText });
+    else if (e.key === "Escape") cancelDrawing();
+    if (!editing) wrap?.focus();
+  }
+
+  function drawDrawings(ctx: CanvasRenderingContext2D, v: (name: string) => string) {
+    ctx.font = `11px ${v("--font")}`;
+    const items = [...list.filter((d) => !preview || !gesture?.original || d.id !== preview.id), ...(preview ? [preview] : [])];
+    for (const d of items) {
+      const a = screen(d.points[0]);
+      const b = d.kind === "trend" ? screen(d.points[1]) : a;
+      const bottom = PAD.t + geo.priceH, right = width - PAD.r;
+      if (Math.max(a.y, b.y) < PAD.t || Math.min(a.y, b.y) > bottom) continue;
+      if (d.kind !== "hline" && (Math.max(a.x, b.x) < PAD.l || Math.min(a.x, b.x) > right)) continue;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(PAD.l, PAD.t, geo.plotW, geo.priceH);
+      ctx.clip();
+      ctx.strokeStyle = v(d.id === selected ? "--text" : "--muted");
+      ctx.fillStyle = v("--text");
+      ctx.lineWidth = d.id === selected ? 2 : 1;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "bottom";
+      if (d.kind === "text") {
+        ctx.fillText(d.text, a.x, a.y);
+        if (d.id === selected) ctx.strokeRect(a.x - 2, a.y - 13, ctx.measureText(d.text).width + 4, 16);
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(d.kind === "hline" ? PAD.l : a.x, a.y);
+        ctx.lineTo(d.kind === "hline" ? right : b.x, b.y);
+        ctx.stroke();
+        if (d.kind === "trend" && d.id === selected) for (const p of [a, b]) { ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill(); }
+      }
+      if (tool === "ruler" && d === preview) {
+        const label = rulerMeasurement(d.points[0], d.points[1], times).label;
+        const x = Math.max(PAD.l + 3, Math.min(b.x, right - ctx.measureText(label).width - 3));
+        const y = Math.max(PAD.t + 16, Math.min(b.y - 6, bottom));
+        ctx.fillStyle = v("--bg");
+        ctx.fillRect(x - 2, y - 14, ctx.measureText(label).width + 4, 16);
+        ctx.fillStyle = v("--text");
+        ctx.fillText(label, x, y);
+      }
+      ctx.restore();
+      if (d.kind === "hline") axisTag(ctx, a.y, geo.label(d.points[0].price), v("--muted"), v("--bg"));
+    }
   }
 
   function onMove(e: MouseEvent) {
+    if (moveDrawing(e)) return;
+    if (tool !== "cursor" || (e.target instanceof Element && e.target.closest(".drawing-tools, input"))) { hover = null; return; }
     if (dragX != null) {
       view = pan(view, geo.n, (dragX - e.clientX) / geo.step);
       dragX = e.clientX;
@@ -761,6 +995,15 @@
   }
 
   function onKey(e: KeyboardEvent) {
+    if ((e.target as Element).closest("input, textarea, select, [contenteditable]")) return;
+    if (!chart) return;
+    let handled = true;
+    if (e.ctrlKey && e.key.toLowerCase() === "z") { cancelDrawing(); void changeDrawings(e.shiftKey ? "redo" : "undo"); }
+    else if ((e.key === "Delete" || e.key === "Backspace") && selected != null) removeDrawing();
+    else if (e.key === "Escape" && (tool !== "cursor" || selected != null)) { cancelDrawing(); selected = null; hover = null; }
+    else handled = false;
+    if (handled) { e.preventDefault(); e.stopPropagation(); return; }
+
     if (geo.n === 0 || e.ctrlKey || e.altKey || e.metaKey) return;
     const anchor = hover == null ? 1 : (hover + 0.5 - view.start) / view.count;
     if (e.key === "ArrowLeft") hover = hover == null ? geo.i1 : Math.max(0, hover - 1);
@@ -823,15 +1066,27 @@
   aria-label={chart ? `${chart.meta.symbol} ${chart.range} chart` : "chart"}
   onpointerdown={onDown}
   onpointermove={onMove}
-  onpointerup={() => (dragX = null)}
-  onpointercancel={() => (dragX = null)}
+  onpointerup={onUp}
+  onpointercancel={cancelDrawing}
   onpointerleave={() => (hover = null)}
   ondblclick={(e) => {
-    if (!(e.target as Element).closest(".exports")) resetView();
+    if (!(e.target as Element).closest(".exports, .drawing-tools, input") && tool === "cursor" && selected == null) resetView();
   }}
   onkeydown={onKey}
 >
   <canvas bind:this={canvas} style:width="{width}px" style:height="{height}px"></canvas>
+  {#if chart}
+    <div class="drawing-tools" role="toolbar" aria-label="Drawing tools">
+      {#each tools as item}
+        <button aria-label={item.label} aria-pressed={tool === item.tool} title={item.label} onclick={() => chooseTool(item.tool)}>{item.label}</button>
+      {/each}
+      <button aria-label="Undo" aria-pressed={false} title="Undo (Ctrl+Z); redo (Ctrl+Shift+Z)" disabled={!history.past.length || drawingBusy} onclick={() => { cancelDrawing(); void changeDrawings("undo"); }}>Undo</button>
+      <button aria-label="Delete" aria-pressed={false} title="Delete (Delete / Backspace)" disabled={selected == null || drawingBusy} onclick={removeDrawing}>Delete</button>
+    </div>
+  {/if}
+  {#if editing}
+    <input class="drawing-input" aria-label="Drawing text" maxlength="200" style:left={`${editing.x}px`} style:top={`${editing.y}px`} bind:value={inputText} onkeydown={textKey} use:focusInput />
+  {/if}
   {#if candles.length}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
@@ -917,10 +1172,29 @@
     position: absolute;
     inset: 0;
   }
+  .drawing-tools {
+    position: absolute;
+    top: 5px;
+    left: 6px;
+    display: flex;
+    gap: 2px;
+    cursor: default;
+  }
+  .drawing-tools button {
+    border: 0;
+    border-radius: 4px;
+    padding: 3px 5px;
+    font-size: 10px;
+    background: var(--bg);
+    color: var(--muted);
+  }
+  .drawing-tools button[aria-pressed="true"] { background: var(--surface); color: var(--text); }
+  .drawing-tools button:disabled { opacity: 0.4; }
+  .drawing-input { position: absolute; width: 200px; z-index: 2; }
   .exports {
     position: absolute;
     top: 8px;
-    left: 8px;
+    right: 8px;
     display: flex;
     gap: 2px;
     cursor: default;
@@ -960,7 +1234,7 @@
   }
   .tip {
     position: absolute;
-    top: 8px;
+    top: 38px;
     pointer-events: none;
     background: var(--tooltip-bg);
     border: 1px solid var(--faint);
