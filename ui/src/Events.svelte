@@ -27,14 +27,16 @@
   let analysisError = $state<string | null>(null);
   let analyzing = $state(false);
   let analysisSeq = 0;
+  let analysisForce = $state(false);
 
-  async function analyze(e: MarketEvent) {
+  async function analyze(e: MarketEvent, force = false) {
+    analysisForce = force;
     const mine = ++analysisSeq;
     analysis = null;
     analysisError = null;
     analyzing = true;
     try {
-      const a = await invoke<EventAnalysis>("analyze_event", { event: e });
+      const a = await invoke<EventAnalysis>("analyze_event", { event: e, force });
       if (mine === analysisSeq) analysis = a;
     } catch (err) {
       if (mine === analysisSeq) analysisError = String(err);
@@ -107,10 +109,14 @@
       {:else if analysisError}
         <div class="msg">
           Could not analyze this event: {analysisError}
-          <button class="btn" onclick={() => analyze(ev)}>Retry</button>
+          <button class="btn" onclick={() => analyze(ev, analysisForce)}>Retry</button>
         </div>
       {:else if analysis}
         <h3>Details</h3>
+        <div class="bar">
+          <span class="muted">AI{#if analysis.model} · {analysis.model}{/if} · generated {ago(analysis.generated, now)}</span>
+          <button class="btn" disabled={analyzing} onclick={() => analyze(ev, true)}>Regenerate</button>
+        </div>
         <p class="summary" class:clamp={!summaryOpen}>{analysis.summary}</p>
         <button class="more" aria-expanded={summaryOpen} aria-label={summaryOpen ? "Show less" : "Show full details"} onclick={() => (summaryOpen = !summaryOpen)}>…</button>
         <h3>Affected</h3>
