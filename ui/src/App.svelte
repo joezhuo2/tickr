@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
-  import { onMount, untrack } from "svelte";
+  import { onMount, tick, untrack } from "svelte";
   import Analysts from "./Analysts.svelte";
   import Alerts from "./Alerts.svelte";
   import ChartView from "./Chart.svelte";
@@ -157,6 +157,7 @@
   let refreshing = $state(false);
   let refreshStatus = $state<ReturnType<typeof refreshOutcome> | null>(null);
   let watchlistView: Watchlist | undefined = $state();
+  let chartView: ChartView | undefined = $state();
   let finishQuote: ((error?: string) => void) | undefined;
   let refreshTimer: ReturnType<typeof setTimeout> | undefined;
   let statusTimer: ReturnType<typeof setTimeout> | undefined;
@@ -630,7 +631,7 @@
     invoke("set_chart_mode", { mode: m }).catch(console.warn);
   }
 
-  function onKey(e: KeyboardEvent) {
+  async function onKey(e: KeyboardEvent) {
     if (!ready || settingsOpen || e.defaultPrevented) return;
     if (e.target instanceof Element && e.target.closest("input, textarea, select, [contenteditable]")) return;
     if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
@@ -664,6 +665,17 @@
       case "chart_interval":
         changeInterval(nextInterval(range, interval));
         break;
+      case "draw_level":
+      case "draw_trend":
+      case "draw_text":
+      case "draw_ruler": {
+        if (e.repeat) break;
+        if (view !== "chart" && view !== "technicals") view = "chart";
+        await tick();
+        const tools = { draw_level: "hline", draw_trend: "trend", draw_text: "text", draw_ruler: "ruler" } as const;
+        chartView?.drawTool(tools[action]);
+        break;
+      }
       case "refresh":
         refresh();
         break;
@@ -872,7 +884,7 @@
             {:else if view === "technicals"}
               <div class="split">
                 {#if chart}
-                  <ChartView redrawKey={displayKey} {chart} {mode} {scale} {drawings} {drawingBusy} {saveDrawings} analysis={activeAnalysis} {overlays} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
+                  <ChartView bind:this={chartView} redrawKey={displayKey} {chart} {mode} {scale} {drawings} {drawingBusy} {saveDrawings} analysis={activeAnalysis} {overlays} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
                 {:else if chartError}
                   <div class="msg">
                     {chartError}
@@ -897,7 +909,7 @@
                 />
               </div>
             {:else if chart}
-              <ChartView redrawKey={displayKey} {chart} {mode} {scale} {drawings} {drawingBusy} {saveDrawings} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
+              <ChartView bind:this={chartView} redrawKey={displayKey} {chart} {mode} {scale} {drawings} {drawingBusy} {saveDrawings} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
             {:else if chartError}
               <div class="msg">
                 {chartError}
