@@ -22,6 +22,7 @@
     RANGES,
     INTERVAL_LABELS,
     intervalsFor,
+    nextInterval,
     validInterval,
     type DataProvider,
     type StreamStatus,
@@ -659,6 +660,9 @@
         break;
       case "chart_scale":
         setScale(scale === "linear" ? "log" : scale === "log" ? "percent" : "linear");
+        break;
+      case "chart_interval":
+        changeInterval(nextInterval(range, interval));
         break;
       case "refresh":
         refresh();
