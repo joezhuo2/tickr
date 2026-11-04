@@ -12,6 +12,7 @@
     watchlistOn,
     onwatchlist,
     refreshing,
+    refreshStatus,
     onrefresh,
   }: {
     /** Set by the backend when the saved hotkey could not be registered. */
@@ -24,6 +25,7 @@
     watchlistOn: boolean;
     onwatchlist: () => void;
     refreshing: boolean;
+    refreshStatus: { text: string; error: boolean } | null;
     onrefresh: () => void;
   } = $props();
   const source = $derived(quote?.source ?? "yahoo");
@@ -47,9 +49,10 @@
   </button>
   <button class="link credit" onclick={() => invoke("open_logo_credit").catch(console.warn)}>Logos by Elbstream</button>
   {#if error}<span class="error" title={error}>{error}</span>{/if}
-  <button class="refresh" class:spinning={refreshing} title="Refresh" aria-label="Refresh" onclick={onrefresh}>
+  <button class="refresh" class:spinning={refreshing} title="Refresh" aria-label="Refresh" disabled={refreshing} onclick={onrefresh}>
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" /></svg>
   </button>
+  {#if refreshStatus}<span role="status" class:error={refreshStatus.error}>{refreshStatus.text}</span>{/if}
   <span class="source" title={dataProvider.stream.message ?? sourceLabel}>{sourceLabel}</span>
   <span class="status {status.kind}" title={status.text}><i></i>{status.text}</span>
 </footer>

@@ -52,6 +52,7 @@
   import { overlayVisibility, shouldAnalyze } from "./lib/indicators";
   import { applyDisplay } from "./lib/display";
   import type { Theme, TextSize, Palette } from "./lib/types";
+  import { refreshOutcome, type RefreshView } from "./lib/refresh";
   import { paneIn } from "./lib/motion";
 
   // Injected before load, so the first frame already has real content.
@@ -122,9 +123,7 @@
   let optionsLoading = $state(false);
   let optionsSeq = 0;
   let optionsSide = $state<"calls" | "puts">("calls");
-  let view = $state<"chart" | "alerts" | "technicals" | "analysts" | "earnings" | "stats" | "options" | "market" | "events" | "news" | "watchlist">(
-    "chart",
-  );
+  let view = $state<RefreshView>("chart");
   let analysis = $state<Analysis | null>(null);
   /** cacheKey() the analysis belongs to. */
   let analysisKey = $state("");
@@ -150,7 +149,25 @@
   let alerts = $state<PriceAlert[]>([]);
   let now = $state(Date.now() / 1000);
   let refreshing = $state(false);
+  let refreshStatus = $state<ReturnType<typeof refreshOutcome> | null>(null);
+  let watchlistView: Watchlist | undefined = $state();
+  let finishQuote: ((error?: string) => void) | undefined;
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  let statusTimer: ReturnType<typeof setTimeout> | undefined;
+  let refreshContext = 0;
+  $effect(() => {
+    view;
+    symbol;
+    newsScope;
+    refreshContext++;
+    refreshStatus = null;
+    clearTimeout(statusTimer);
+  });
 
+  let analystSeq = 0;
+  let earningsSeq = 0;
+  let statsSeq = 0;
+  let ratingChangesSeq = 0;
   let chartSeq = 0;
   let chartSettingsWrite = Promise.resolve();
   let chartAt = 0;
@@ -179,11 +196,11 @@
     if (newsScope.startsWith("group:") && !groups.some((g) => `group:${g.name}` === newsScope)) newsScope = "symbol";
   });
 
-  async function loadFeed(scope = newsScope, symbols = [...feedSymbols]) {
+  async function loadFeed(scope = newsScope, symbols = [...feedSymbols], manual = false) {
     const mine = ++feedSeq;
     const members = JSON.stringify(symbols);
     const cached = feedCache.get(scope);
-    feed = cached?.members === members ? cached.articles : undefined;
+    if (!manual) feed = cached?.members === members ? cached.articles : undefined;
     feedError = null;
     feedLoading = symbols.length > 0;
     if (!symbols.length) {
@@ -197,7 +214,8 @@
         feed = articles;
       }
     } catch (e) {
-      if (mine === feedSeq) feedError = String(e);
+      if ((!manual || !feed) && mine === feedSeq) feedError = String(e);
+      return String(e);
     } finally {
       if (mine === feedSeq) feedLoading = false;
     }
@@ -253,11 +271,11 @@
   });
 
   /** Shows the cached chart (or a skeleton) at once, then fetches if stale. */
-  async function loadChart(force = false) {
+  async function loadChart(force = false, manual = false) {
     const mine = ++chartSeq;
     const key = cacheKey();
     const hit = cache.get(key);
-    chart = hit?.chart ?? null;
+    if (!manual) chart = hit?.chart ?? null;
     chartError = null;
     if (hit && !force && !shouldAnalyze(!!analysis, indicators?.keep_analysis ?? false) && Date.now() - hit.at < FRESH_MS) {
       loading = false;
@@ -274,7 +292,8 @@
       loading = false;
       if (shouldAnalyze(!!analysis, indicators?.keep_analysis ?? false)) void runAnalysis(true);
     } catch (e) {
-      if (mine === chartSeq) chartError = String(e);
+      if ((!manual || !chart) && mine === chartSeq) chartError = String(e);
+      return String(e);
     } finally {
       if (mine === chartSeq) loading = false;
     }
@@ -286,43 +305,68 @@
     if (sym === symbol) logo = l;
   }
 
-  async function loadAnalyst() {
+  async function loadAnalyst(manual = false) {
+    const mine = ++analystSeq;
     const sym = symbol;
-    const a = await invoke<Consensus | null>("get_analyst", { symbol: sym }).catch(() => null);
-    if (sym === symbol) analyst = a;
+    try {
+      const result = await invoke<Consensus | null>("get_analyst", { symbol: sym, force: manual });
+      if (mine === analystSeq && sym === symbol) analyst = result;
+    } catch (e) {
+      if (!manual && mine === analystSeq && sym === symbol) analyst = null;
+      return String(e);
+    }
   }
 
-  async function loadEarnings() {
+  async function loadEarnings(manual = false) {
+    const mine = ++earningsSeq;
     const sym = symbol;
-    const e = await invoke<Earnings | null>("get_earnings", { symbol: sym }).catch(() => null);
-    if (sym === symbol) earnings = e;
+    try {
+      const result = await invoke<Earnings | null>("get_earnings", { symbol: sym });
+      if (mine === earningsSeq && sym === symbol) earnings = result;
+    } catch (e) {
+      if (!manual && mine === earningsSeq && sym === symbol) earnings = null;
+      return String(e);
+    }
   }
 
-  async function loadStats() {
+  async function loadStats(manual = false) {
+    const mine = ++statsSeq;
     const sym = symbol;
-    const s = await invoke<StatSection[]>("get_stats", { symbol: sym }).catch(() => null);
-    if (sym === symbol) stats = s;
+    try {
+      const result = await invoke<StatSection[]>("get_stats", { symbol: sym });
+      if (mine === statsSeq && sym === symbol) stats = result;
+    } catch (e) {
+      if (!manual && mine === statsSeq && sym === symbol) stats = null;
+      return String(e);
+    }
   }
 
-  async function loadRatingChanges() {
+  async function loadRatingChanges(manual = false) {
+    const mine = ++ratingChangesSeq;
     const sym = symbol;
-    const r = await invoke<RatingChange[]>("get_rating_changes", { symbol: sym }).catch(() => []);
-    if (sym === symbol) ratingChanges = r;
+    try {
+      const result = await invoke<RatingChange[]>("get_rating_changes", { symbol: sym });
+      if (mine === ratingChangesSeq && sym === symbol) ratingChanges = result;
+    } catch (e) {
+      if (!manual && mine === ratingChangesSeq && sym === symbol) ratingChanges = [];
+      return String(e);
+    }
   }
 
   /** Shows cached headlines at once, then refetches. Only runs when News opens. */
-  async function loadNews() {
+  async function loadNews(manual = false) {
     const mine = ++newsSeq;
     const sym = symbol;
-    news = newsCache.get(sym);
+    if (!manual) news = newsCache.get(sym);
     newsError = null;
     newsLoading = true;
     try {
       const list = await invoke<Article[]>("get_news", { symbol: sym });
       newsCache.set(sym, list);
-      if (mine === newsSeq) news = list;
+      if (mine === newsSeq && sym === symbol) news = list;
     } catch (e) {
-      if (mine === newsSeq) newsError = String(e);
+      if ((!manual || !news) && mine === newsSeq && sym === symbol) newsError = String(e);
+      return String(e);
     } finally {
       if (mine === newsSeq) newsLoading = false;
     }
@@ -445,19 +489,20 @@
     loadChart(true);
   }
 
-  async function loadMarket() {
+  async function loadMarket(manual = false) {
     marketError = null;
     marketLoading = true;
     try {
       market = await invoke<Market>("get_market");
     } catch (e) {
-      marketError = String(e);
+      if (!manual || !market) marketError = String(e);
+      return String(e);
     } finally {
       marketLoading = false;
     }
   }
 
-  async function loadEvents(force = false) {
+  async function loadEvents(force = false, manual = false) {
     const mine = ++eventsSeq;
     eventsError = null;
     eventsLoading = true;
@@ -465,7 +510,8 @@
       const r = await invoke<EventsReport>("get_events", { force });
       if (mine === eventsSeq) events = r;
     } catch (e) {
-      if (mine === eventsSeq) eventsError = String(e);
+      if ((!manual || !events) && mine === eventsSeq) eventsError = String(e);
+      return String(e);
     } finally {
       if (mine === eventsSeq) eventsLoading = false;
     }
@@ -476,15 +522,17 @@
     if (view === "events") loadEvents();
   }
 
-  async function loadOptions(date?: number) {
+  async function loadOptions(date?: number, manual = false) {
     const mine = ++optionsSeq;
+    const sym = symbol;
     optionsError = null;
     optionsLoading = true;
     try {
-      const o = await invoke<Options>("get_options", { symbol, date: date ?? null });
-      if (mine === optionsSeq) options = o;
+      const o = await invoke<Options>("get_options", { symbol: sym, date: date ?? null });
+      if (mine === optionsSeq && sym === symbol) options = o;
     } catch (e) {
-      if (mine === optionsSeq) optionsError = String(e);
+      if ((!manual || !options) && mine === optionsSeq && sym === symbol) optionsError = String(e);
+      return String(e);
     } finally {
       if (mine === optionsSeq) optionsLoading = false;
     }
@@ -500,15 +548,41 @@
     if (view === "market") loadMarket();
   }
 
-  function refresh() {
+  async function refresh() {
+    if (refreshing) return;
     refreshing = true;
-    invoke("refresh_quote").catch((e) => {
-      console.warn(e);
-      refreshing = false;
+    refreshStatus = null;
+    clearTimeout(statusTimer);
+    const activeView = view;
+    const context = refreshContext;
+    const quoteDone = new Promise<string | undefined>((resolve) => {
+      finishQuote = (error) => {
+        clearTimeout(refreshTimer);
+        finishQuote = undefined;
+        resolve(error);
+      };
+      refreshTimer = setTimeout(() => finishQuote?.("Quote refresh timed out"), 15_000);
     });
-    loadChart(true);
-    if (view === "market") loadMarket();
-    if (view === "options") loadOptions(options?.expiry ?? undefined);
+    invoke("refresh_quote").catch((e) => finishQuote?.(String(e)));
+    const chartDone = loadChart(true, true);
+    let panelDone: Promise<string | void>;
+    switch (activeView) {
+      case "news": panelDone = newsScope === "symbol" ? loadNews(true) : loadFeed(newsScope, [...feedSymbols], true); break;
+      case "earnings": panelDone = loadEarnings(true); break;
+      case "stats": panelDone = loadStats(true); break;
+      case "analysts": panelDone = Promise.all([loadAnalyst(true), loadRatingChanges(true)]).then((errors) => errors.find(Boolean)); break;
+      case "events": panelDone = loadEvents(true, true); break;
+      case "market": panelDone = loadMarket(true); break;
+      case "options": panelDone = loadOptions(options?.expiry ?? undefined, true); break;
+      case "watchlist": panelDone = watchlistView?.refresh() ?? Promise.resolve(); break;
+      case "alerts": panelDone = Promise.resolve(); break;
+      default: panelDone = chartDone;
+    }
+    const panelError = (await Promise.all([panelDone, quoteDone, chartDone]))[0];
+    refreshing = false;
+    if (context !== refreshContext) return;
+    refreshStatus = refreshOutcome(activeView, panelError || undefined);
+    if (!refreshStatus.error) statusTimer = setTimeout(() => (refreshStatus = null), 3_000);
   }
 
   function setScale(s: ChartScale) {
@@ -611,7 +685,7 @@
     if (!boot) invoke<Init>("get_init").then(apply);
     const un = listen<QuoteState>("quote", (e) => {
       qs = e.payload;
-      refreshing = false;
+      finishQuote?.(e.payload.error ?? undefined);
       // Keep intraday-candle charts (1D, 5D, 1M) current; daily ones barely move.
       refreshChart();
     });
@@ -631,6 +705,8 @@
       unStream.then((f) => f());
       unAlerts.then((f) => f());
       clearInterval(tick);
+      clearTimeout(refreshTimer);
+      clearTimeout(statusTimer);
       document.removeEventListener("visibilitychange", onVisible);
     };
   });
@@ -721,7 +797,7 @@
         {#key view}
           <div class="pane" in:paneIn={view === "watchlist" ? { y: 16, speed: "slow" } : {}}>
             {#if view === "watchlist"}
-              <Watchlist {refreshMode} symbols={watchlist} {groups} current={symbol} bind:tab={groupTab} onopen={openWatched} ongroups={saveGroups} />
+              <Watchlist bind:this={watchlistView} {refreshMode} symbols={watchlist} {groups} current={symbol} bind:tab={groupTab} onopen={openWatched} ongroups={saveGroups} />
             {:else if view === "alerts"}
               <Alerts {symbol} {quote} {alerts} onchange={(next) => (alerts = next)} />
             {:else if view === "analysts"}
@@ -731,7 +807,7 @@
             {:else if view === "stats"}
               <StatsView {symbol} {stats} />
             {:else if view === "market"}
-              <MarketView {market} error={marketError} onretry={loadMarket} onopen={openWatched} />
+              <MarketView {market} error={marketError} onretry={() => loadMarket()} onopen={openWatched} />
             {:else if view === "events"}
               <EventsView report={events} error={eventsError} loading={eventsLoading} {now} onrefresh={() => loadEvents(true)} />
             {:else if view === "options"}
@@ -791,6 +867,7 @@
       watchlistOn={view === "watchlist"}
       onwatchlist={() => (view = view === "watchlist" ? "chart" : "watchlist")}
       {refreshing}
+      {refreshStatus}
       onrefresh={refresh}
     />
     {#if settingsOpen}

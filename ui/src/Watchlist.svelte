@@ -87,7 +87,11 @@
   let loadedAt = 0;
   let loading = false;
 
-  async function load(list: string[]) {
+  export function refresh() {
+    return load([...symbols], true);
+  }
+
+  async function load(list: string[], manual = false) {
     if (!list.length) return;
     loading = true;
     try {
@@ -99,8 +103,10 @@
       }
       quotes = next;
       loadedAt = Date.now();
-    } catch {
+      if (manual) return got.find((q) => q.error)?.error ?? undefined;
+    } catch (e) {
       // Offline: cards keep what they have.
+      return String(e);
     } finally {
       loading = false;
     }
