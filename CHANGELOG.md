@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.8] - 2026-11-04
+
+### Added
+- **Drawing hotkeys** ([#129](https://github.com/joezhuo2/tickr/issues/129)):
+  `1` to `4` pick the level, trendline, text and ruler tools, and pressing a
+  tool's key again returns to Cursor. Rebind them in Settings.
+
 ## [0.10.7] - 2026-11-04
 
 ### Added

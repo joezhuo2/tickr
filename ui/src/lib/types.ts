@@ -173,6 +173,10 @@ export interface Keybinds {
   chart_mode: string;
   chart_scale: string;
   chart_interval: string;
+  draw_level: string;
+  draw_trend: string;
+  draw_text: string;
+  draw_ruler: string;
   refresh: string;
   range: string;
   technicals: string;

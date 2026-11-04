@@ -785,6 +785,11 @@
     dragX = null;
   }
 
+  export function drawTool(next: Tool) {
+    if (!chart) return;
+    chooseTool(tool === next ? "cursor" : next);
+  }
+
   function chooseTool(next: Tool) {
     cancelDrawing();
     tool = next;
