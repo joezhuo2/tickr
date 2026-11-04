@@ -146,7 +146,10 @@ taskbar to keep it visible.
   the chart as a PNG image, the other its candles as CSV (time in UTC, open,
   high, low, close, volume). A button turns green once the copy lands.
 - **Refresh:** the button in the bottom bar fetches the quote and reloads the
-  chart right away. **Background refresh** in Settings defaults to **Balanced**:
+  chart right away, then force-reloads the panel on screen (News, Earnings,
+  Stats, Analysts, Events, Market, Options or the Watchlist cards). The bar
+  says "<Panel> refreshed" or shows the error, and a failed refresh keeps what
+  was already shown. **Background refresh** in Settings defaults to **Balanced**:
   quotes update every 15 seconds during regular trading, 60 seconds pre/post-market,
   and 15 minutes when closed. **Low-power** keeps that cadence while visible and
   slows it to 60 seconds, 5 minutes, and 30 minutes while hidden or minimized.
@@ -386,8 +389,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.10.3
-git push origin v0.10.3
+git tag v0.10.4
+git push origin v0.10.4
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

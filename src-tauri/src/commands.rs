@@ -366,8 +366,8 @@ pub async fn get_logo(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<
 
 /// Analyst consensus and 12-month price target, or None without coverage.
 #[tauri::command]
-pub async fn get_analyst(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<Option<Consensus>, String> {
-    shared.analysts.get(&symbol, now_secs()).await.inspect_err(|e| log::warn!("analyst {symbol}: {e}"))
+pub async fn get_analyst(shared: State<'_, Arc<Shared>>, symbol: String, force: Option<bool>) -> Result<Option<Consensus>, String> {
+    shared.analysts.get(&symbol, now_secs(), force.unwrap_or(false)).await.inspect_err(|e| log::warn!("analyst {symbol}: {e}"))
 }
 
 #[tauri::command]

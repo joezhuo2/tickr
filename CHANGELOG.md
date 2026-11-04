@@ -6,6 +6,15 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.4] - 2026-11-04
+
+### Changed
+- **Refresh follows the panel on screen** ([#106](https://github.com/joezhuo2/tickr/issues/106)):
+  Refresh now also reloads News, Earnings, Stats, Analysts, Events, Market,
+  Options or the Watchlist cards when they are open. The bottom bar reports
+  success or the error for that panel, and a failed refresh keeps what was
+  already shown.
+
 ## [0.10.3] - 2026-11-04
 
 ### Added
