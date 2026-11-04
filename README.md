@@ -269,6 +269,7 @@ typing in a text field.
 | --- | --- | --- |
 | Chart | `C` | Switch line / candles |
 | | `L` | Cycle price scale (Lin, Log, %) |
+| | `I` | Cycle candle length (Auto, then the lengths the range allows) |
 | | `V` | Cycle date range |
 | | `R` | Refresh |
 | Panels | `T` | Open Technicals |
@@ -398,8 +399,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.10.6
-git push origin v0.10.6
+git tag v0.10.7
+git push origin v0.10.7
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

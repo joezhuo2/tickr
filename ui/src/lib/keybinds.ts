@@ -17,6 +17,7 @@ export const CATEGORIES: { id: Category; label: string }[] = [
 export const ACTIONS: { id: Action; label: string; category: Category }[] = [
   { id: "chart_mode", label: "Switch line / candles", category: "chart" },
   { id: "chart_scale", label: "Cycle price scale", category: "chart" },
+  { id: "chart_interval", label: "Cycle candle length", category: "chart" },
   { id: "range", label: "Cycle date range", category: "chart" },
   { id: "refresh", label: "Refresh", category: "chart" },
   { id: "technicals", label: "Open Technicals", category: "panels" },

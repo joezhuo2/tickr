@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.7] - 2026-11-04
+
+### Added
+- **Candle length hotkey** ([#130](https://github.com/joezhuo2/tickr/issues/130)):
+  `I` cycles the candle length through Auto and each length the current range
+  allows. Rebind it in Settings.
+
 ## [0.10.6] - 2026-11-04
 
 ### Security
