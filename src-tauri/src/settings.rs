@@ -77,6 +77,7 @@ pub struct Geometry {
 #[serde(default)]
 pub struct Keybinds {
     pub chart_mode: String,
+    pub chart_scale: String,
     pub refresh: String,
     pub range: String,
     pub technicals: String,
@@ -102,6 +103,7 @@ impl Default for Keybinds {
     fn default() -> Self {
         Self {
             chart_mode: "c".into(),
+            chart_scale: "l".into(),
             refresh: "r".into(),
             range: "v".into(),
             technicals: "t".into(),
@@ -470,6 +472,7 @@ mod tests {
         let s = Settings::load(&p);
         assert_eq!(s.keybinds.refresh, "F5");
         assert_eq!(s.keybinds.chart_mode, "c");
+        assert_eq!(s.keybinds.chart_scale, "l");
         assert_eq!(s.keybinds.settings, ",");
         assert_eq!(s.keybinds.toggle_watchlist, "w");
         assert_eq!(s.keybinds.watchlist, "x");

@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-04
+
+### Added
+- **Price scale hotkey** ([#119](https://github.com/joezhuo2/tickr/issues/119)):
+  the `L` key cycles the chart through Lin, Log and %. It can be rebound in
+  Settings.
+
 ## [0.10.0] - 2026-11-04
 
 ### Added

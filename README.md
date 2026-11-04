@@ -112,7 +112,7 @@ taskbar to keep it visible.
   Max and switch between line and candles. 1D, 5D and 1M charts reload about
   once a minute.
 - **Price scales:** linear, logarithmic, or percentage change rebased to the
-  first visible candle as you pan and zoom.
+  first visible candle as you pan and zoom. Press L to cycle scales.
 - **Drawings:** the toolbar places levels, trendlines and text, saved per symbol.
   Drag to move them or adjust trend endpoints, and Delete removes the selection.
   Ctrl+Z undoes, Ctrl+Shift+Z redoes, and Escape returns to Cursor. The ruler
@@ -253,6 +253,7 @@ typing in a text field.
 | Category | Key | Action |
 | --- | --- | --- |
 | Chart | `C` | Switch line / candles |
+| | `L` | Cycle price scale (Lin, Log, %) |
 | | `V` | Cycle date range |
 | | `R` | Refresh |
 | Panels | `T` | Open Technicals |
@@ -377,8 +378,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.10.0
-git push origin v0.10.0
+git tag v0.10.1
+git push origin v0.10.1
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
