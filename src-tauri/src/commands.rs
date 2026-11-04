@@ -48,6 +48,7 @@ pub struct Init {
     keybinds: Keybinds,
     dots: Dots,
     indicators: IndicatorConfig,
+    drawings: std::collections::HashMap<String, Vec<crate::settings::Drawing>>,
     indicator_presets: Vec<IndicatorPreset>,
     alerts: Vec<PriceAlert>,
 }
@@ -87,6 +88,7 @@ pub fn init_payload(shared: &Shared) -> Init {
         keybinds: s.keybinds,
         dots: s.dots,
         indicators: s.indicators,
+        drawings: s.drawings,
         indicator_presets: s.indicator_presets,
         alerts: s.alerts,
     }
@@ -514,6 +516,62 @@ mod tests {
     use super::*;
 
     #[test]
+    fn drawing_edits_validate_and_persist_atomically() {
+        use crate::settings::{Drawing, DrawingPoint};
+        let dir = tempfile::tempdir().unwrap();
+        let shared = Shared::new(dir.path().join("settings.json"), Default::default());
+        let d = Drawing { id: 1, kind: "hline".into(), points: vec![DrawingPoint { t: 100, price: 10.0 }], text: String::new() };
+        edit_drawings(&shared, "aapl".into(), vec![d.clone()]).unwrap();
+        let saved = Settings::load(&shared.settings_path);
+        assert_eq!(saved.drawings["AAPL"], vec![d.clone()]);
+        assert_eq!(init_payload(&shared).drawings, saved.drawings);
+        let mut invalid = Vec::new();
+        let mut bad = d.clone(); bad.kind = "fib".into(); invalid.push(vec![bad]);
+        for kind in ["hline", "text", "trend"] {
+            let mut bad = d.clone(); bad.kind = kind.into(); bad.points.clear(); invalid.push(vec![bad]);
+        }
+        for price in [0.0, -1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let mut bad = d.clone(); bad.points[0].price = price; invalid.push(vec![bad]);
+        }
+        for text in ["".to_string(), " ".into(), "x".repeat(201)] {
+            let mut bad = d.clone(); bad.kind = "text".into(); bad.text = text; invalid.push(vec![bad]);
+        }
+        for kind in ["hline", "trend"] {
+            let mut bad = d.clone(); bad.kind = kind.into(); bad.text = "no".into();
+            if kind == "trend" { bad.points.push(bad.points[0].clone()); }
+            invalid.push(vec![bad]);
+        }
+        invalid.push(vec![d.clone(), d.clone()]);
+        invalid.push((0..201).map(|id| Drawing { id, ..d.clone() }).collect());
+        for drawings in invalid {
+            assert!(edit_drawings(&shared, "AAPL".into(), drawings).is_err());
+            assert_eq!(*lock(&shared.settings), saved);
+            assert_eq!(Settings::load(&shared.settings_path), saved);
+        }
+        assert!(edit_drawings(&shared, " ".into(), vec![]).is_err());
+        let mut text = d.clone(); text.kind = "text".into(); text.text = "?".repeat(200);
+        let mut trend = d.clone(); trend.id = 2; trend.kind = "trend".into(); trend.points.push(trend.points[0].clone());
+        edit_drawings(&shared, "AAPL".into(), vec![text, trend]).unwrap();
+        edit_drawings(&shared, "AAPL".into(), vec![]).unwrap();
+        assert!(Settings::load(&shared.settings_path).drawings.is_empty());
+        {
+            let mut settings = lock(&shared.settings);
+            settings.drawings = (0..500).map(|i| (format!("S{i}"), vec![d.clone()])).collect();
+            settings.save(&shared.settings_path).unwrap();
+        }
+        let saved = Settings::load(&shared.settings_path);
+        assert!(edit_drawings(&shared, "NEW".into(), vec![d.clone()]).is_err());
+        assert_eq!(*lock(&shared.settings), saved);
+        assert_eq!(Settings::load(&shared.settings_path), saved);
+        edit_drawings(&shared, "S0".into(), vec![d.clone()]).unwrap();
+        let blocker = dir.path().join("file");
+        std::fs::write(&blocker, "not a directory").unwrap();
+        let shared = Shared::new(blocker.join("settings.json"), Default::default());
+        assert!(edit_drawings(&shared, "AAPL".into(), vec![d]).is_err());
+        assert!(lock(&shared.settings).drawings.is_empty());
+    }
+
+    #[test]
     fn indicator_edits_persist_and_rejections_leave_settings_unchanged() {
         let dir = tempfile::tempdir().unwrap();
         let shared = Shared::new(dir.path().join("settings.json"), Default::default());
@@ -697,4 +755,22 @@ mod provider_tests {
         for forbidden in ["TESTONLYSECRET", "secret", "key_id", "api_key"] { assert!(!json.contains(forbidden)); }
         assert!(json.contains("has_keys"));
     }
+}
+
+fn edit_drawings(shared: &Shared, symbol: String, drawings: Vec<crate::settings::Drawing>) -> Result<(), String> {
+    let mut settings = lock(&shared.settings);
+    let mut next = settings.clone();
+    let symbol = symbol.trim().to_uppercase();
+    if symbol.is_empty() { return Err("Invalid drawing symbol.".into()); }
+    if drawings.is_empty() { next.drawings.remove(&symbol); }
+    else { next.drawings.insert(symbol, drawings); }
+    crate::settings::validate_drawings(&next.drawings)?;
+    next.save(&shared.settings_path).map_err(|e| format!("Could not save drawings: {e}"))?;
+    *settings = next;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_drawings(shared: State<'_, Arc<Shared>>, symbol: String, drawings: Vec<crate::settings::Drawing>) -> Result<(), String> {
+    edit_drawings(&shared, symbol, drawings)
 }
