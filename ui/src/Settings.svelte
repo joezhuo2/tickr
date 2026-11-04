@@ -4,7 +4,7 @@
   import { actionFor, bindKey, groupActions, keyLabel, rebind, type Action } from "./lib/keybinds";
   import { backdrop, dialog } from "./lib/motion";
   import { onMount } from "svelte";
-  import type { AiConfig, DataProvider, Dots, Keybinds, RefreshMode, Theme, TextSize, Palette } from "./lib/types";
+  import type { AiConfig, AiTestResult, DataProvider, Dots, Keybinds, RefreshMode, Theme, TextSize, Palette } from "./lib/types";
 
   let {
     theme = $bindable(),
@@ -59,7 +59,8 @@
 
   let ai = $state<AiConfig>({ enabled: true, base_url: "", model: "", news_model: "", events_model: "", api_key: "", has_key: false });
   let aiStatus = $state<{ text: string; ok: boolean } | null>(null);
-  let showKey = $state(false);
+  let aiTesting = $state(false);
+  let aiResults = $state<AiTestResult[]>([]);
   let market = $state<DataProvider>({ provider: "yahoo", feed: "iex", has_keys: false, stream: { kind: "off" } });
   let keyId = $state("");
   let secret = $state("");
@@ -120,8 +121,23 @@
               ? "Saved."
               : "Saved. News uses keyword tone.",
       };
+      return true;
     } catch (e) {
       aiStatus = { ok: false, text: String(e) };
+      return false;
+    }
+  }
+
+  async function testAi() {
+    aiTesting = true;
+    aiResults = [];
+    try {
+      if (!await saveAi()) return;
+      aiResults = await invoke<AiTestResult[]>("test_ai");
+    } catch (e) {
+      aiStatus = { ok: false, text: String(e) };
+    } finally {
+      aiTesting = false;
     }
   }
 
@@ -312,11 +328,14 @@
     <label class="row">
       <span>API key</span>
       <span class="keys">
-        <input class="field" type={showKey ? "text" : "password"} autocomplete="off" spellcheck="false" bind:value={ai.api_key} placeholder={ai.has_key ? "Key saved" : ""} onchange={saveAi} />
-        <button class="link" onclick={(e) => { e.preventDefault(); showKey = !showKey; }}>{showKey ? "Hide" : "Show"}</button>
+        <input class="field" type="password" autocomplete="off" spellcheck="false" bind:value={ai.api_key} placeholder={ai.has_key ? "Key saved" : ""} onchange={saveAi} />
         <button class="link" disabled={!ai.has_key} onclick={(e) => { e.preventDefault(); clearAiKey(); }}>Clear</button>
       </span>
     </label>
+    <button class="link" disabled={aiTesting} onclick={testAi}>{aiTesting ? "Testing…" : "Test connection"}</button>
+    {#each aiResults as result (result.model)}
+      <p class="hint" class:error={!result.ok}>{result.model}: {result.ok ? "OK (" + result.ms + " ms)" : result.error}</p>
+    {/each}
     <p class:error={aiStatus && !aiStatus.ok} class="hint">
       {aiStatus ? aiStatus.text : "Any OpenAI-compatible endpoint. Leave a feature's model blank to use Model. Saved to .env.local; keyword tone is the fallback."}
     </p>
