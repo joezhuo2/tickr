@@ -172,6 +172,7 @@ export interface Group {
 export interface Keybinds {
   chart_mode: string;
   chart_scale: string;
+  chart_interval: string;
   refresh: string;
   range: string;
   technicals: string;
@@ -511,6 +512,11 @@ export function intervalsFor(range: string): readonly string[] {
     default:
       return [];
   }
+}
+
+export function nextInterval(range: string, interval: string): string {
+  const intervals = ["auto", ...intervalsFor(range)];
+  return intervals[(intervals.indexOf(interval) + 1) % intervals.length];
 }
 
 export function validInterval(range: string, interval: string): string {
