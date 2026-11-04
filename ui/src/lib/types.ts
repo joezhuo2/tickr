@@ -104,7 +104,11 @@ export interface Consensus {
   ratings: Ratings | null;
 }
 
+export interface DrawingPoint { t: number; price: number }
+export interface Drawing { id: number; kind: "hline" | "trend" | "text"; points: DrawingPoint[]; text: string }
+
 export interface Init {
+  drawings: Record<string, Drawing[]>;
   data_provider: DataProvider;
   symbol: string;
   range: string;
