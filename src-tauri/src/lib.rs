@@ -1,5 +1,8 @@
 //! tickr: a tray stock ticker with a chart window behind a global hotkey.
 
+pub mod alpaca;
+pub mod provider;
+pub mod stream;
 pub mod ai;
 pub mod analysis;
 pub mod alerts;
@@ -42,6 +45,8 @@ fn log_plugin() -> TauriPlugin<Wry> {
         .clear_targets()
         .target(Target::new(TargetKind::LogDir { file_name: None }))
         .level(log::LevelFilter::Info)
+        .level_for("tungstenite", log::LevelFilter::Warn)
+        .level_for("tokio_tungstenite", log::LevelFilter::Warn)
         .max_file_size(1_000_000)
         .rotation_strategy(RotationStrategy::KeepSome(2))
         .timezone_strategy(TimezoneStrategy::UseLocal);
@@ -76,6 +81,10 @@ pub fn run() {
         .manage(shared.clone())
         .invoke_handler(tauri::generate_handler![
             commands::get_init,
+            commands::get_data_provider,
+            commands::set_data_provider,
+            commands::clear_alpaca_keys,
+            commands::test_alpaca,
             commands::get_chart,
             commands::analyze,
             commands::set_indicators,
@@ -130,6 +139,7 @@ pub fn run() {
             autostart::sync(&handle, &shared);
             tray::build(&handle)?;
             poller::spawn(handle.clone(), shared.clone());
+            stream::spawn(handle.clone(), shared.clone());
             updater::spawn(handle.clone(), shared.clone());
 
             if !autostarted && !lock(&shared.settings).start_hidden {

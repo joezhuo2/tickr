@@ -596,6 +596,7 @@ mod tests {
             })
             .collect();
         Chart {
+            source: "yahoo".into(),
             meta: Meta {
                 symbol: "TEST".into(),
                 name: String::new(),

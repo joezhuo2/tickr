@@ -30,6 +30,7 @@ export interface Meta {
 }
 
 export interface Chart {
+  source: string;
   meta: Meta;
   range: string;
   interval: string;
@@ -47,6 +48,7 @@ export interface Extended {
 }
 
 export interface Quote {
+  source: string;
   symbol: string;
   name: string;
   exchange: string;
@@ -103,6 +105,7 @@ export interface Consensus {
 }
 
 export interface Init {
+  data_provider: DataProvider;
   symbol: string;
   range: string;
   interval: string;
@@ -515,3 +518,6 @@ export interface IndicatorConfig {
   keep_analysis: boolean;
 }
 export interface IndicatorPreset { name: string; config: IndicatorConfig }
+
+export interface StreamStatus { kind: "off" | "connecting" | "live" | "retrying" | "error"; message?: string }
+export interface DataProvider { provider: "yahoo" | "alpaca"; feed: "iex" | "sip"; has_keys: boolean; stream: StreamStatus }

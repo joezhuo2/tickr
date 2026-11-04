@@ -148,19 +148,24 @@ pub fn load_config(path: &Path) -> AiConfig {
 }
 
 pub fn save_config(path: &Path, cfg: &AiConfig) -> std::io::Result<()> {
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    let mut text = std::fs::read_to_string(path).unwrap_or_default();
-    for (k, v) in [
-        (KEY_BASE_URL, &cfg.base_url),
-        (KEY_MODEL, &cfg.model),
-        (KEY_NEWS_MODEL, &cfg.news_model),
-        (KEY_EVENTS_MODEL, &cfg.events_model),
-        (KEY_API_KEY, &cfg.api_key),
-    ] {
-        text = env_set(&text, k, v.trim());
-    }
+    save_env(path, &[
+        (KEY_BASE_URL, cfg.base_url.trim()), (KEY_MODEL, cfg.model.trim()),
+        (KEY_NEWS_MODEL, cfg.news_model.trim()), (KEY_EVENTS_MODEL, cfg.events_model.trim()),
+        (KEY_API_KEY, cfg.api_key.trim()),
+    ])
+}
+
+static ENV_WRITE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+pub fn save_env(path: &Path, values: &[(&str, &str)]) -> std::io::Result<()> {
+    let _guard = lock(&ENV_WRITE);
+    if let Some(dir) = path.parent() { std::fs::create_dir_all(dir)?; }
+    let mut text = match std::fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(e),
+    };
+    for (key, value) in values { text = env_set(&text, key, value); }
     let tmp = path.with_extension("local.tmp");
     std::fs::write(&tmp, text)?;
     std::fs::rename(tmp, path)
