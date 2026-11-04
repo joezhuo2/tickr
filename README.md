@@ -113,6 +113,10 @@ taskbar to keep it visible.
   once a minute.
 - **Price scales:** linear, logarithmic, or percentage change rebased to the
   first visible candle as you pan and zoom.
+- **Drawings:** the toolbar places levels, trendlines and text, saved per symbol.
+  Drag to move them or adjust trend endpoints, and Delete removes the selection.
+  Ctrl+Z undoes, Ctrl+Shift+Z redoes, and Escape returns to Cursor. The ruler
+  measures price, percent, bars and elapsed time without saving.
 - **Candle interval:** choose Auto to keep the default resolution for each
   range, or select a supported interval independently. The choice is saved
   and resets to Auto when switching to a range that does not support it.
