@@ -2,6 +2,7 @@
 //! and remember position and size across re-creations.
 
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use tauri::window::Color;
@@ -14,6 +15,8 @@ use crate::settings::Geometry;
 use crate::state::{lock, Shared};
 
 pub const LABEL: &str = "main";
+
+static SHOWN: AtomicBool = AtomicBool::new(false);
 
 /// When the window last lost focus. Clicking the Windows tray icon activates
 /// the taskbar first, so the window is no longer focused when the click lands.
@@ -35,6 +38,7 @@ pub fn open(app: &AppHandle) {
         let _ = w.unminimize();
         let _ = w.show();
         let _ = w.set_focus();
+        visibility_changed(&w.state::<Arc<Shared>>(), shown(&w));
         return;
     }
     if let Err(e) = create(app) {
@@ -59,7 +63,7 @@ pub fn tray_toggle(app: &AppHandle) {
     }
 }
 
-fn shown(w: &WebviewWindow) -> bool {
+pub fn shown(w: &WebviewWindow) -> bool {
     !w.is_minimized().unwrap_or(false) && w.is_visible().unwrap_or(false)
 }
 
@@ -83,6 +87,7 @@ fn dismiss(w: &WebviewWindow) {
         let _ = w.destroy();
     } else {
         let _ = w.hide();
+        visibility_changed(&shared, false);
     }
 }
 
@@ -116,6 +121,7 @@ fn create(app: &AppHandle) -> tauri::Result<()> {
         None => win.center()?,
     }
     win.show()?;
+    visibility_changed(&shared, shown(&win));
     win.set_focus()?;
     Ok(())
 }
@@ -187,11 +193,20 @@ fn persist_geometry(shared: &Shared) {
     }
 }
 
+fn visibility_changed(shared: &Shared, visible: bool) {
+    if !SHOWN.swap(visible, Ordering::Relaxed) && visible {
+        shared.wake.notify_one();
+    }
+}
+
 pub fn on_event(win: &Window, ev: &WindowEvent) {
     if win.label() != LABEL {
         return;
     }
     let shared = win.state::<Arc<Shared>>().inner().clone();
+    let visible = !matches!(ev, WindowEvent::Destroyed)
+        && !win.is_minimized().unwrap_or(false) && win.is_visible().unwrap_or(false);
+    visibility_changed(&shared, visible);
     match ev {
         WindowEvent::Moved(_) => record_geometry(win, &shared),
         WindowEvent::Focused(false) => *lock(&BLURRED_AT) = Some(Instant::now()),

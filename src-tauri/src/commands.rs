@@ -18,7 +18,7 @@ use crate::options::Options;
 use crate::stats::Section;
 use crate::news::Article;
 use crate::quote::{self, Chart, Quote, SearchHit};
-use crate::settings::{ChartMode, ChartScale, Dots, Group, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
+use crate::settings::{RefreshMode, ChartMode, ChartScale, Dots, Group, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
 use crate::state::{lock, now_secs, QuoteState, Shared};
 
 #[derive(Serialize)]
@@ -28,6 +28,7 @@ pub struct Init {
     range: String,
     interval: String,
     chart_mode: ChartMode,
+    refresh_mode: RefreshMode,
     chart_scale: ChartScale,
     hotkey: String,
     default_hotkey: &'static str,
@@ -73,6 +74,7 @@ pub fn init_payload(shared: &Shared) -> Init {
         range: s.range,
         interval: s.interval,
         chart_mode: s.chart_mode,
+        refresh_mode: s.refresh_mode,
         chart_scale: s.chart_scale,
         hotkey: s.hotkey,
         default_hotkey: DEFAULT_HOTKEY,
@@ -194,6 +196,12 @@ pub fn set_interval(shared: State<'_, Arc<Shared>>, interval: String) -> Result<
 #[tauri::command]
 pub fn set_chart_mode(shared: State<'_, Arc<Shared>>, mode: ChartMode) {
     shared.update_settings(|s| s.chart_mode = mode);
+}
+
+#[tauri::command]
+pub fn set_refresh_mode(shared: State<'_, Arc<Shared>>, mode: RefreshMode) {
+    shared.update_settings(|s| s.refresh_mode = mode);
+    shared.wake.notify_one();
 }
 
 #[tauri::command]
