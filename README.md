@@ -269,6 +269,7 @@ typing in a text field.
 | --- | --- | --- |
 | Chart | `C` | Switch line / candles |
 | | `L` | Cycle price scale (Lin, Log, %) |
+| | `I` | Cycle candle length (Auto, then the lengths the range allows) |
 | | `V` | Cycle date range |
 | | `R` | Refresh |
 | Panels | `T` | Open Technicals |
