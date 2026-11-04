@@ -24,6 +24,7 @@ const DEFAULTS: Keybinds = {
   add_watchlist: "f",
   events: "k",
   next_group: "g",
+  previous_symbol: "b",
 };
 
 const down = (key: string, mods: Partial<Record<"ctrlKey" | "altKey" | "metaKey", boolean>> = {}) => ({

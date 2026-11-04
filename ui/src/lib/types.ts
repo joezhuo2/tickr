@@ -143,6 +143,7 @@ export interface Init {
   indicators: IndicatorConfig;
   indicator_presets: IndicatorPreset[];
   alerts: PriceAlert[];
+  recent_symbols: string[];
 }
 
 export interface PriceAlert {
@@ -190,6 +191,7 @@ export interface Keybinds {
   add_watchlist: string;
   events: string;
   next_group: string;
+  previous_symbol: string;
 }
 
 export interface Impact {
