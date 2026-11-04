@@ -300,6 +300,31 @@ pub fn set_ai_config(shared: State<'_, Arc<Shared>>, prefs: AiPrefs) -> Result<(
     Ok(())
 }
 
+#[derive(Serialize)]
+pub struct AiTestResult {
+    model: String,
+    ok: bool,
+    ms: u64,
+    error: Option<String>,
+}
+
+#[tauri::command]
+pub async fn test_ai(shared: State<'_, Arc<Shared>>) -> Result<Vec<AiTestResult>, String> {
+    let cfg = crate::ai::load_config(&crate::ai::env_path());
+    let models = crate::ai::test_models(&cfg);
+    if cfg.base_url.trim().is_empty() || models.is_empty() {
+        return Err("Base URL and a model are needed to test AI.".into());
+    }
+    let mut results = Vec::new();
+    for model in models {
+        let start = std::time::Instant::now();
+        let result = crate::ai::chat(&shared.http, &cfg, crate::ai::test_body(&model), std::time::Duration::from_secs(20))
+            .await.and_then(|body| crate::ai::reply_content(&body));
+        results.push(AiTestResult { model, ok: result.is_ok(), ms: start.elapsed().as_millis() as u64, error: result.err() });
+    }
+    Ok(results)
+}
+
 #[tauri::command]
 pub fn clear_ai_key() -> Result<(), String> {
     let path = crate::ai::env_path();
@@ -468,8 +493,8 @@ pub async fn get_events(shared: State<'_, Arc<Shared>>, force: bool) -> Result<c
 
 /// AI analysis of one event, run when the user opens it.
 #[tauri::command]
-pub async fn analyze_event(shared: State<'_, Arc<Shared>>, event: crate::events::MarketEvent) -> Result<crate::events::EventAnalysis, String> {
-    crate::events::analyze(&shared.http, &event).await.inspect_err(|e| log::warn!("event analysis {}: {e}", event.name))
+pub async fn analyze_event(shared: State<'_, Arc<Shared>>, event: crate::events::MarketEvent, force: Option<bool>) -> Result<crate::events::EventAnalysis, String> {
+    crate::events::analyze(&shared.http, &event, force.unwrap_or(false)).await.inspect_err(|e| log::warn!("event analysis {}: {e}", event.name))
 }
 
 /// Opens a headline in the default browser.

@@ -18,6 +18,10 @@ pub struct Article {
     pub published: i64,
     /// Tone of the title, from sentiment.rs.
     pub sentiment: Sentiment,
+    #[serde(default)]
+    pub ai_model: Option<String>,
+    #[serde(default)]
+    pub ai_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -97,6 +101,8 @@ pub fn parse(body: &[u8]) -> Result<Vec<Article>, String> {
                 link: link.to_string(),
                 published: n["providerPublishTime"].as_i64().unwrap_or(0),
                 sentiment: sentiment::classify(title),
+                ai_model: None,
+                ai_at: None,
             })
         })
         .collect();
@@ -191,6 +197,7 @@ mod tests {
         assert_eq!(tone("Apple Tightens macOS"), Sentiment::Neutral);
         let json = serde_json::to_value(&got[0]).unwrap();
         assert_eq!(json["sentiment"], "negative");
+        assert!(got.iter().all(|a| a.ai_model.is_none() && a.ai_at.is_none()));
     }
 
     #[test]
