@@ -307,7 +307,7 @@ LM Studio, ...) to classify them as positive, neutral or negative. Fill in the
 base URL (for example `https://api.openai.com/v1`), the model and, if the
 endpoint needs one, the API key. The key may stay empty for local endpoints. A saved key is never sent back to
 the page: the field shows "Key saved", leaving it blank keeps the key, and Clear
-removes it.
+removes it. **Test connection** saves the settings and checks each configured model.
 
 Model is the master model. To use a different one for a feature, fill in News
 model (headline tone) or Events model (event analysis); a blank field uses
@@ -319,6 +319,7 @@ not to `settings.json`, as `TICKR_AI_BASE_URL`, `TICKR_AI_MODEL`,
 lines in that file are left alone. Results are cached
 per model and headline in the cache folder, so each headline is sent once. If
 AI is off, not configured or a call fails, the keyword tone is used.
+News labels each tone **AI** or **Keyword**; hover for the model and generation time.
 
 ### Market events
 
@@ -333,7 +334,8 @@ Events model or else Model, to analyze that
 one release: a summary and the affected stocks and sectors, each with a score,
 confidence and reasoning. Only the opened event is sent, along with its figures
 and a few current Yahoo headlines about it. Analyses are cached for 6 hours per
-model, and a new one is made once the actual figure is out.
+model, and a new one is made once the actual figure is out. Details show the model
+and generation time; **Regenerate** requests a fresh analysis for that event.
 
 ## Screenshots
 
