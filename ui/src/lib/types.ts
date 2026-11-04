@@ -555,5 +555,23 @@ export interface IndicatorConfig {
 }
 export interface IndicatorPreset { name: string; config: IndicatorConfig }
 
+export interface ServiceStatus {
+  id: "quote" | "news" | "ai";
+  label: string;
+  state: "ok" | "error" | "unknown" | "off";
+  last_ok: number;
+  last_error: string | null;
+  last_error_at: number;
+}
+
+export interface ConnectionsReport {
+  services: ServiceStatus[];
+  app_version: string;
+  os: string;
+  provider: "yahoo" | "alpaca";
+  stream: string;
+  log_dir: string;
+}
+
 export interface StreamStatus { kind: "off" | "connecting" | "live" | "retrying" | "error"; message?: string }
 export interface DataProvider { provider: "yahoo" | "alpaca"; feed: "iex" | "sip"; has_keys: boolean; stream: StreamStatus }

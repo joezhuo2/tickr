@@ -87,6 +87,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
             let revision = shared.revision();
             let provider = crate::provider::Provider::current(&shared);
             let result = provider.fetch_quote(&shared.http, &symbol, now_secs()).await;
+            lock(&shared.connections).quote.record(&result, now_secs());
             let mut fresh = result.as_ref().ok().cloned();
             if fresh.as_ref().is_some_and(|q| q.source != "yahoo") && lock(&shared.settings).alerts.iter().any(|a| a.enabled && a.symbol == symbol) {
                 fresh = quote::fetch_quote(&shared.http, &symbol, now_secs()).await.ok();

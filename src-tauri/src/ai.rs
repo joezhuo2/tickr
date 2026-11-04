@@ -353,7 +353,9 @@ pub async fn apply(shared: &Shared, symbol: &str, articles: &mut [Article]) {
         return;
     }
     let titles: Vec<&str> = missing.iter().map(|&i| articles[i].title.as_str()).collect();
-    let tones = match classify(&shared.http, &cfg, symbol, &titles).await {
+    let result = classify(&shared.http, &cfg, symbol, &titles).await;
+    lock(&shared.connections).ai.record(&result, now_secs());
+    let tones = match result {
         Ok(t) => t,
         Err(e) => {
             log::warn!("ai news {symbol}: {e}");

@@ -321,6 +321,10 @@ per model and headline in the cache folder, so each headline is sent once. If
 AI is off, not configured or a call fails, the keyword tone is used.
 News labels each tone **AI** or **Keyword**; hover for the model and generation time.
 
+Settings > Connections shows quote, news and AI status, last successes and
+readable errors, with a Retry action for each service. **Copy diagnostics**
+copies app and OS versions and connection details with credentials redacted.
+
 ### Market events
 
 The Events panel (header button or `K`) lists the next 7 days of US economic
@@ -406,8 +410,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.10.9
-git push origin v0.10.9
+git tag v0.10.10
+git push origin v0.10.10
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

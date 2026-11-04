@@ -1,10 +1,11 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { ago } from "./lib/format";
   import { accelerator, display } from "./lib/hotkey";
   import { actionFor, bindKey, groupActions, keyLabel, rebind, type Action } from "./lib/keybinds";
   import { backdrop, dialog } from "./lib/motion";
   import { onMount } from "svelte";
-  import type { AiConfig, AiTestResult, DataProvider, Dots, Keybinds, RefreshMode, Theme, TextSize, Palette } from "./lib/types";
+  import type { ConnectionsReport, ServiceStatus, AiConfig, AiTestResult, DataProvider, Dots, Keybinds, RefreshMode, Theme, TextSize, Palette } from "./lib/types";
 
   let {
     theme = $bindable(),
@@ -90,7 +91,51 @@
   }
 
 
+  let connections = $state<ConnectionsReport | null>(null);
+  let connectionError = $state("");
+  let connectionNow = $state(Math.floor(Date.now() / 1000));
+  let retrying = $state<Record<string, boolean>>({});
+  let copyStatus = $state("");
+  let copyError = $state(false);
+  const connectionStates = { ok: "OK", error: "Error", unknown: "Not checked", off: "Off" };
+
+  async function loadConnections() {
+    try {
+      connections = await invoke<ConnectionsReport>("get_connections");
+      connectionNow = Math.floor(Date.now() / 1000);
+      connectionError = "";
+    } catch (e) {
+      connectionError = String(e);
+    }
+  }
+
+  async function retryConnection(service: ServiceStatus["id"]) {
+    retrying[service] = true;
+    connectionError = "";
+    try {
+      connections = await invoke<ConnectionsReport>("retry_connection", { service });
+      connectionNow = Math.floor(Date.now() / 1000);
+    } catch (e) {
+      connectionError = String(e);
+    } finally {
+      retrying[service] = false;
+    }
+  }
+
+  async function copyDiagnostics() {
+    copyStatus = "";
+    copyError = false;
+    try {
+      await navigator.clipboard.writeText(await invoke<string>("get_diagnostics"));
+      copyStatus = "Copied";
+    } catch (e) {
+      copyStatus = String(e);
+      copyError = true;
+    }
+  }
+
   onMount(() => {
+    loadConnections();
     invoke<DataProvider>("get_data_provider").then((c) => (market = c)).catch((e) => (marketStatus = { text: String(e), ok: false }));
     invoke<AiConfig>("get_ai_config").then((c) => (ai = c)).catch(console.warn);
   });
@@ -121,6 +166,7 @@
               ? "Saved."
               : "Saved. News uses keyword tone.",
       };
+      await loadConnections();
       return true;
     } catch (e) {
       aiStatus = { ok: false, text: String(e) };
@@ -138,6 +184,7 @@
       aiStatus = { ok: false, text: String(e) };
     } finally {
       aiTesting = false;
+      await loadConnections();
     }
   }
 
@@ -339,6 +386,26 @@
     <p class:error={aiStatus && !aiStatus.ok} class="hint">
       {aiStatus ? aiStatus.text : "Any OpenAI-compatible endpoint. Leave a feature's model blank to use Model. Saved to .env.local; keyword tone is the fallback."}
     </p>
+    <h3>Connections</h3>
+    {#if connections}
+      {#each connections.services as service (service.id)}
+        <div class="row">
+          <span>{service.label}</span>
+          <span class="connection-state" class:ok={service.state === "ok"} class:error={service.state === "error"}>{connectionStates[service.state]}</span>
+          {#if service.state !== "off"}
+            <button class="link" disabled={retrying[service.id]} onclick={() => retryConnection(service.id)} aria-label={`Retry ${service.label}`}>{retrying[service.id] ? "Retrying…" : "Retry"}</button>
+          {/if}
+        </div>
+        <p class="hint">{service.last_ok ? `Last success ${ago(service.last_ok, connectionNow)}` : "No success yet"}</p>
+        {#if service.state === "error" && service.last_error}
+          <p class="hint error connection-error">{service.last_error}</p>
+        {/if}
+      {/each}
+      <p class="hint">tickr {connections.app_version} · {connections.os}</p>
+    {/if}
+    {#if connectionError}<p class="hint error" role="status">{connectionError}</p>{/if}
+    <button class="link" onclick={copyDiagnostics}>Copy diagnostics</button>
+    <p class="hint" class:error={copyError} role="status">{copyStatus}</p>
   </div>
 </div>
 
@@ -441,6 +508,19 @@
     margin: 4px 0 0;
     font-size: 11px;
     color: var(--muted);
+  }
+  .connection-state {
+    margin-left: auto;
+    color: var(--muted);
+  }
+  .connection-state.ok {
+    color: var(--up);
+  }
+  .connection-state.error {
+    color: var(--down);
+  }
+  .connection-error {
+    overflow-wrap: anywhere;
   }
   .hint.error {
     color: var(--down);
