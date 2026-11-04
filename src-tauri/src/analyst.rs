@@ -137,9 +137,11 @@ impl Analysts {
             .map(|(_, c)| c.clone())
     }
 
-    pub async fn get(&self, symbol: &str, now: i64) -> Result<Option<Consensus>, String> {
-        if let Some(c) = self.cached(symbol, now) {
-            return Ok(c);
+    pub async fn get(&self, symbol: &str, now: i64, force: bool) -> Result<Option<Consensus>, String> {
+        if !force {
+            if let Some(c) = self.cached(symbol, now) {
+                return Ok(c);
+            }
         }
         let symbol = symbol.trim().to_uppercase();
         let c = self.fetch(&symbol).await?;
