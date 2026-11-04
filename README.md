@@ -78,6 +78,8 @@ update themselves: install v0.5.1 once from Releases.
 
 ## Features
 
+- **Display settings:** choose System, Light or Dark, text size from 100% to 150%, and standard or accessible blue/orange gain and loss colors. Changes apply immediately and are saved.
+
 ### Tray and hotkey
 
 - **Tray icon:** the company logo with an up/down badge. Hover for the
