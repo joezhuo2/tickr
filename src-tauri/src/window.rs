@@ -11,7 +11,7 @@ use tauri::{
     Window, WindowEvent,
 };
 
-use crate::settings::Geometry;
+use crate::settings::{Geometry, Theme};
 use crate::state::{lock, Shared};
 
 pub const LABEL: &str = "main";
@@ -93,12 +93,13 @@ fn dismiss(w: &WebviewWindow) {
 
 fn create(app: &AppHandle) -> tauri::Result<()> {
     let shared = app.state::<Arc<Shared>>().inner().clone();
-    let on_top = lock(&shared.settings).always_on_top;
+    let settings = lock(&shared.settings).clone();
+    let on_top = settings.always_on_top;
     let geometry = *lock(&shared.geometry);
     // The page reads this before its first frame instead of invoking get_init.
     let init = serde_json::to_string(&crate::commands::init_payload(&shared)).unwrap_or_else(|_| "null".into());
     // Match the page background so the window never flashes white.
-    let bg = if os_dark() { Color(17, 17, 19, 255) } else { Color(255, 255, 255, 255) };
+    let bg = background(settings.theme);
 
     let builder = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html".into()));
     #[cfg(windows)]
@@ -113,6 +114,7 @@ fn create(app: &AppHandle) -> tauri::Result<()> {
         .visible(false)
         .build()?;
 
+    win.set_zoom(f64::from(settings.text_size) / 100.0)?;
     match geometry.filter(|g| on_screen(&win, g)) {
         Some(g) => {
             win.set_size(PhysicalSize::new(g.w, g.h))?;
@@ -124,6 +126,18 @@ fn create(app: &AppHandle) -> tauri::Result<()> {
     visibility_changed(&shared, shown(&win));
     win.set_focus()?;
     Ok(())
+}
+
+pub fn is_dark(theme: Theme) -> bool {
+    match theme {
+        Theme::System => os_dark(),
+        Theme::Light => false,
+        Theme::Dark => true,
+    }
+}
+
+pub fn background(theme: Theme) -> Color {
+    if is_dark(theme) { Color(17, 17, 19, 255) } else { Color(255, 255, 255, 255) }
 }
 
 /// Whether the OS is in dark mode (Windows apps theme setting).

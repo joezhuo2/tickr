@@ -10,7 +10,7 @@ use tauri::{AppHandle, Manager, Wry};
 use tauri_plugin_autostart::ManagerExt;
 
 use crate::quote::Session;
-use crate::settings::Settings;
+use crate::settings::{Palette, Settings};
 use crate::state::{lock, QuoteState, Shared};
 use crate::trayicon::{self, Badge};
 
@@ -18,8 +18,16 @@ const TRAY_ID: &str = "main";
 /// Windows truncates tray tooltips at 127 UTF-16 units.
 const TIP_MAX: usize = 127;
 
-/// (symbol, badge, has logo) of the icon currently shown.
-static LAST_ICON: Mutex<Option<(String, Badge, bool)>> = Mutex::new(None);
+#[derive(PartialEq)]
+struct IconKey {
+    symbol: String,
+    badge: Badge,
+    has_logo: bool,
+    palette: Palette,
+    dark: bool,
+}
+
+static LAST_ICON: Mutex<Option<IconKey>> = Mutex::new(None);
 
 pub fn fmt_price(v: f64, currency: &str) -> String {
     let digits = if v.abs() < 1.0 { 4 } else { 2 };
@@ -137,10 +145,8 @@ pub fn badge(q: &QuoteState) -> Badge {
 
 pub fn build(app: &AppHandle) -> tauri::Result<()> {
     let shared = app.state::<Arc<Shared>>().inner().clone();
-    let icon = trayicon::compose(None, Badge::None);
-    // Separate statement: a guard inside the builder chain would still be
-    // held when menu() locks the settings again.
     let settings = lock(&shared.settings).clone();
+    let icon = trayicon::compose(None, Badge::None, settings.palette, crate::window::is_dark(settings.theme));
     let tip = full_tooltip(&shared, &QuoteState::default(), &settings);
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(Image::new_owned(icon, trayicon::SIZE, trayicon::SIZE))
@@ -276,10 +282,13 @@ pub fn update(app: &AppHandle, shared: &Shared) {
         .as_ref()
         .filter(|(sym, _)| *sym == settings.symbol)
         .and_then(|(_, bytes)| bytes.clone());
-    let key = (settings.symbol.clone(), b, logo.is_some());
+    let key = IconKey {
+        symbol: settings.symbol.clone(), badge: b, has_logo: logo.is_some(),
+        palette: settings.palette, dark: crate::window::is_dark(settings.theme),
+    };
     let mut last = lock(&LAST_ICON);
     if last.as_ref() != Some(&key) {
-        let rgba = trayicon::compose(logo.as_deref(), b);
+        let rgba = trayicon::compose(logo.as_deref(), b, key.palette, key.dark);
         let _ = tray.set_icon(Some(Image::new_owned(rgba, trayicon::SIZE, trayicon::SIZE)));
         *last = Some(key);
     }
