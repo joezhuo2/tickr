@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 
 use crate::news::Article;
 use crate::sentiment::Sentiment;
-use crate::state::{lock, Shared};
+use crate::state::{lock, now_secs, Shared};
 
 const KEY_BASE_URL: &str = "TICKR_AI_BASE_URL";
 const KEY_MODEL: &str = "TICKR_AI_MODEL";
@@ -188,6 +188,20 @@ Headlines:
     })
 }
 
+pub fn test_models(cfg: &AiConfig) -> Vec<String> {
+    let mut models = Vec::new();
+    for model in [cfg.model_for(Feature::News), cfg.model_for(Feature::Events), cfg.model.trim()] {
+        if !model.is_empty() && !models.iter().any(|m| m == model) {
+            models.push(model.to_string());
+        }
+    }
+    models
+}
+
+pub fn test_body(model: &str) -> Value {
+    json!({"model": model, "messages": [{"role": "user", "content": "Reply OK."}]})
+}
+
 pub fn chat_url(base_url: &str) -> String {
     format!("{}/chat/completions", base_url.trim().trim_end_matches('/'))
 }
@@ -250,26 +264,42 @@ pub fn cache_path() -> PathBuf {
     crate::settings::cache_dir().join("ai-sentiment.json")
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct CachedSentiment {
+    tone: Sentiment,
+    at: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum StoredSentiment {
+    Current(CachedSentiment),
+    Legacy(Sentiment),
+}
+
 #[derive(Debug, Default)]
 pub struct SentimentCache {
-    map: HashMap<String, Sentiment>,
+    map: HashMap<String, CachedSentiment>,
     order: VecDeque<String>,
 }
 
 impl SentimentCache {
     pub fn load(path: &Path) -> Self {
-        let entries: Vec<(String, Sentiment)> =
+        let entries: Vec<(String, StoredSentiment)> =
             std::fs::read(path).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
         let mut c = Self::default();
-        c.insert_all(entries);
+        c.insert_all(entries.into_iter().map(|(key, value)| (key, match value {
+            StoredSentiment::Current(value) => value,
+            StoredSentiment::Legacy(tone) => CachedSentiment { tone, at: 0 },
+        })));
         c
     }
 
-    pub fn get(&self, key: &str) -> Option<Sentiment> {
+    pub fn get(&self, key: &str) -> Option<CachedSentiment> {
         self.map.get(key).copied()
     }
 
-    pub fn insert_all(&mut self, items: impl IntoIterator<Item = (String, Sentiment)>) {
+    pub fn insert_all(&mut self, items: impl IntoIterator<Item = (String, CachedSentiment)>) {
         for (k, v) in items {
             if self.map.insert(k.clone(), v).is_some() {
                 self.order.retain(|o| *o != k);
@@ -287,7 +317,7 @@ impl SentimentCache {
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir)?;
         }
-        let entries: Vec<(&String, Sentiment)> = self.order.iter().map(|k| (k, self.map[k])).collect();
+        let entries: Vec<(&String, CachedSentiment)> = self.order.iter().map(|k| (k, self.map[k])).collect();
         let tmp = path.with_extension("json.tmp");
         std::fs::write(&tmp, serde_json::to_vec(&entries)?)?;
         std::fs::rename(tmp, path)
@@ -310,7 +340,11 @@ pub async fn apply(shared: &Shared, symbol: &str, articles: &mut [Article]) {
         let cache = guard.get_or_insert_with(|| SentimentCache::load(&cache_path()));
         for (i, a) in articles.iter_mut().enumerate() {
             match cache.get(&cache_key(&model, &a.link)) {
-                Some(s) => a.sentiment = s,
+                Some(s) => {
+                    a.sentiment = s.tone;
+                    a.ai_model = Some(model.clone());
+                    a.ai_at = (s.at != 0).then_some(s.at);
+                },
                 None => missing.push(i),
             }
         }
@@ -326,10 +360,13 @@ pub async fn apply(shared: &Shared, symbol: &str, articles: &mut [Article]) {
             return;
         }
     };
+    let at = now_secs();
     let mut entries = Vec::with_capacity(missing.len());
     for (&i, tone) in missing.iter().zip(tones) {
         articles[i].sentiment = tone;
-        entries.push((cache_key(&model, &articles[i].link), tone));
+        articles[i].ai_model = Some(model.clone());
+        articles[i].ai_at = Some(at);
+        entries.push((cache_key(&model, &articles[i].link), CachedSentiment { tone, at }));
     }
     let mut guard = lock(&shared.ai_cache);
     if let Some(cache) = guard.as_mut() {
@@ -442,18 +479,50 @@ mod tests {
     }
 
     #[test]
+    fn connection_models_are_distinct_trimmed_and_ordered() {
+        let mut cfg = AiConfig { model: " base ".into(), news_model: " news ".into(), events_model: " events ".into(), ..Default::default() };
+        assert_eq!(test_models(&cfg), ["news", "events", "base"]);
+        cfg.news_model.clear();
+        cfg.events_model = " base ".into();
+        assert_eq!(test_models(&cfg), ["base"]);
+        cfg.model.clear();
+        cfg.events_model.clear();
+        assert!(test_models(&cfg).is_empty());
+        cfg.events_model = "events".into();
+        assert_eq!(test_models(&cfg), ["events"]);
+    }
+
+    #[test]
+    fn connection_body_has_only_model_and_short_user_message() {
+        assert_eq!(test_body("m"), json!({"model": "m", "messages": [{"role": "user", "content": "Reply OK."}]}));
+    }
+
+    #[test]
+    fn cache_loads_legacy_and_timestamped_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("ai.json");
+        std::fs::write(&p, r#"[["old","positive"],["new",{"tone":"negative","at":123}]]"#).unwrap();
+        let c = SentimentCache::load(&p);
+        assert_eq!(c.get("old"), Some(CachedSentiment { tone: Sentiment::Positive, at: 0 }));
+        assert_eq!(c.get("new"), Some(CachedSentiment { tone: Sentiment::Negative, at: 123 }));
+        c.save(&p).unwrap();
+        let saved: Value = serde_json::from_slice(&std::fs::read(&p).unwrap()).unwrap();
+        assert_eq!(saved[0][1], json!({"tone": "positive", "at": 0}));
+    }
+
+    #[test]
     fn cache_roundtrips_and_caps_oldest() {
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("c/ai.json");
         let mut c = SentimentCache::load(&p);
-        c.insert_all((0..CACHE_CAP + 5).map(|i| (format!("k{i}"), Sentiment::Positive)));
-        c.insert_all([("k10".to_string(), Sentiment::Negative)]);
+        c.insert_all((0..CACHE_CAP + 5).map(|i| (format!("k{i}"), CachedSentiment { tone: Sentiment::Positive, at: 123 })));
+        c.insert_all([("k10".to_string(), CachedSentiment { tone: Sentiment::Negative, at: 456 })]);
         assert_eq!(c.get("k0"), None);
-        assert_eq!(c.get("k10"), Some(Sentiment::Negative));
+        assert_eq!(c.get("k10"), Some(CachedSentiment { tone: Sentiment::Negative, at: 456 }));
         c.save(&p).unwrap();
         let back = SentimentCache::load(&p);
-        assert_eq!(back.get("k10"), Some(Sentiment::Negative));
-        assert_eq!(back.get(&format!("k{}", CACHE_CAP + 4)), Some(Sentiment::Positive));
+        assert_eq!(back.get("k10"), Some(CachedSentiment { tone: Sentiment::Negative, at: 456 }));
+        assert_eq!(back.get(&format!("k{}", CACHE_CAP + 4)), Some(CachedSentiment { tone: Sentiment::Positive, at: 123 }));
         assert_eq!(back.map.len(), CACHE_CAP);
         assert_ne!(cache_key("a", "l"), cache_key("b", "l"));
     }

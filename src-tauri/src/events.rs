@@ -71,6 +71,8 @@ pub struct Impact {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EventAnalysis {
+    #[serde(default)]
+    pub model: String,
     /// Unix seconds.
     pub generated: i64,
     pub tone: Sentiment,
@@ -270,7 +272,7 @@ pub fn parse_analysis(content: &str, now: i64) -> Result<EventAnalysis, String> 
     if summary.is_empty() && impacts.is_empty() {
         return Err("empty analysis in reply".into());
     }
-    Ok(EventAnalysis { generated: now, tone, summary, impacts })
+    Ok(EventAnalysis { model: String::new(), generated: now, tone, summary, impacts })
 }
 
 const SYSTEM_PROMPT: &str = "You are a markets analyst. Analyze the given scheduled US economic release and its likely effect on US stocks, using its figures, the recent headlines and your own knowledge. If the actual figure is out, judge it against the expectation and the prior; otherwise describe what a beat or a miss would mean. Reply with only a JSON object: {\"tone\":\"positive\"|\"negative\"|\"neutral\" (likely effect on US stocks),\"summary\":string (a few sentences: what the release measures, what to watch and how markets may react),\"impacts\":[{\"name\":ticker or sector name,\"kind\":\"stock\"|\"sector\",\"score\":integer -100..100 (expected price effect, negative is bearish),\"confidence\":integer 0..100,\"confidence_label\":\"low\"|\"medium\"|\"high\",\"reasoning\":string}]}. Pick the most affected stocks and sectors. No prose, no code fences.";
@@ -356,7 +358,7 @@ fn store(cache: &mut AnalysisCache, key: String, a: EventAnalysis, now: i64) {
 }
 
 /// AI analysis of one event, cached on disk for 6 hours per model and figure.
-pub async fn analyze(client: &reqwest::Client, event: &MarketEvent) -> Result<EventAnalysis, String> {
+pub async fn analyze(client: &reqwest::Client, event: &MarketEvent, force: bool) -> Result<EventAnalysis, String> {
     let now = now_secs();
     let cfg = ai::load_config(&ai::env_path());
     if !cfg.configured(ai::Feature::Events) {
@@ -365,12 +367,15 @@ pub async fn analyze(client: &reqwest::Client, event: &MarketEvent) -> Result<Ev
     let model = cfg.model_for(ai::Feature::Events);
     let key = analysis_key(model, event);
     let path = analysis_path();
-    if let Some(a) = lookup(&load_cache(&path), &key, now) {
-        return Ok(a);
+    if !force {
+        if let Some(a) = lookup(&load_cache(&path), &key, now) {
+            return Ok(a);
+        }
     }
     let titles = headlines(client, &event.name).await;
     let reply = ai::chat(client, &cfg, request_body(model, now, event, &titles), Duration::from_secs(60)).await?;
-    let a = parse_analysis(&ai::reply_content(&reply)?, now)?;
+    let mut a = parse_analysis(&ai::reply_content(&reply)?, now)?;
+    a.model = model.to_string();
     let _guard = lock(&CACHE_FILE);
     let mut cache = load_cache(&path);
     store(&mut cache, key, a.clone(), now);
@@ -392,7 +397,7 @@ mod tests {
     }
 
     fn analysis(generated: i64) -> EventAnalysis {
-        EventAnalysis { generated, tone: Sentiment::Neutral, summary: "s".into(), impacts: Vec::new() }
+        EventAnalysis { model: "m".into(), generated, tone: Sentiment::Neutral, summary: "s".into(), impacts: Vec::new() }
     }
 
     #[test]
@@ -463,9 +468,10 @@ mod tests {
     fn cache_stores_replaces_expires_and_caps() {
         let mut c = AnalysisCache::new();
         store(&mut c, "a".into(), analysis(NOW), NOW);
-        store(&mut c, "a".into(), analysis(NOW + 1), NOW + 1);
+        let replacement = EventAnalysis { summary: "fresh".into(), ..analysis(NOW + 1) };
+        store(&mut c, "a".into(), replacement.clone(), NOW + 1);
         assert_eq!(c.len(), 1);
-        assert_eq!(lookup(&c, "a", NOW + 1).unwrap().generated, NOW + 1);
+        assert_eq!(lookup(&c, "a", NOW + 1).unwrap(), replacement);
         assert!(lookup(&c, "a", NOW + 1 + ANALYSIS_TTL).is_none());
         assert!(lookup(&c, "b", NOW).is_none());
         store(&mut c, "b".into(), analysis(NOW + ANALYSIS_TTL + 2), NOW + ANALYSIS_TTL + 2);
@@ -485,6 +491,10 @@ mod tests {
         let c = vec![("k".to_string(), analysis(NOW))];
         save_cache(&p, &c).unwrap();
         assert_eq!(load_cache(&p), c);
+        let mut legacy = serde_json::to_value(&c).unwrap();
+        legacy[0][1].as_object_mut().unwrap().remove("model");
+        std::fs::write(&p, serde_json::to_vec(&legacy).unwrap()).unwrap();
+        assert!(load_cache(&p)[0].1.model.is_empty());
     }
 
     #[test]
@@ -576,7 +586,7 @@ mod tests {
     #[ignore]
     fn live_analysis() {
         let e = event();
-        let a = tauri::async_runtime::block_on(analyze(&crate::quote::client(), &e)).unwrap();
+        let a = tauri::async_runtime::block_on(analyze(&crate::quote::client(), &e, false)).unwrap();
         assert!(!a.summary.is_empty(), "{a:?}");
     }
 }
