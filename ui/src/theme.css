@@ -1,4 +1,4 @@
-/* Every color lives here. Light by default, dark follows the OS. */
+/* Every color lives here. Light by default, with system and explicit dark themes. */
 :root {
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
@@ -42,40 +42,107 @@
   color-scheme: light;
 }
 
+:root {
+  --dark-bg: #111113;
+  --dark-surface: #1c1c1e;
+  --dark-text: #f2f2f7;
+  --dark-muted: #98989d;
+  --dark-faint: #3a3a3c;
+  --dark-grid: rgba(255, 255, 255, 0.07);
+  --dark-accent: #4c8dff;
+  --dark-up: #34c759;
+  --dark-down: #ff453a;
+  --dark-flat: #8e8e93;
+  --dark-ext-shade: rgba(255, 255, 255, 0.035);
+  --dark-crosshair: rgba(255, 255, 255, 0.4);
+  --dark-tooltip-bg: rgba(28, 28, 30, 0.96);
+  --dark-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  --dark-ma-1: #ffb340;
+  --dark-ma-2: #a68bff;
+  --dark-ma-3: #ff6fa8;
+  --dark-ma-4: #4dd0e1;
+  --dark-ma-5: #a5d64c;
+  --dark-fib: rgba(255, 196, 77, 0.7);
+  --dark-rsi: #a68bff;
+  --dark-bb: rgba(100, 180, 255, 0.8);
+  --dark-bb-fill: rgba(100, 180, 255, 0.07);
+  --dark-vwap: #ff5c93;
+  --dark-rating: #ff9f0a;
+  --dark-news: #ffd60a;
+  --dark-dividend: #30d1a0;
+  --dark-split: #bf5af2;
+  --dark-warn-bg: #3a2e12;
+  --dark-warn-text: #ffd27a;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #111113;
-    --surface: #1c1c1e;
-    --text: #f2f2f7;
-    --muted: #98989d;
-    --faint: #3a3a3c;
-    --grid: rgba(255, 255, 255, 0.07);
-    --accent: #4c8dff;
-    --up: #34c759;
-    --down: #ff453a;
-    --flat: #8e8e93;
-    --ext-shade: rgba(255, 255, 255, 0.035);
-    --crosshair: rgba(255, 255, 255, 0.4);
-    --tooltip-bg: rgba(28, 28, 30, 0.96);
-    --shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
-    --ma-1: #ffb340;
-    --ma-2: #a68bff;
-    --ma-3: #ff6fa8;
-    --ma-4: #4dd0e1;
-    --ma-5: #a5d64c;
-    --fib: rgba(255, 196, 77, 0.7);
-    --rsi: #a68bff;
-    --bb: rgba(100, 180, 255, 0.8);
-    --bb-fill: rgba(100, 180, 255, 0.07);
-    --vwap: #ff5c93;
-    --rating: #ff9f0a;
-    --news: #ffd60a;
-    --dividend: #30d1a0;
-    --split: #bf5af2;
-    --warn-bg: #3a2e12;
-    --warn-text: #ffd27a;
+  :root:not([data-theme="light"]) {
+    --bg: var(--dark-bg);
+    --surface: var(--dark-surface);
+    --text: var(--dark-text);
+    --muted: var(--dark-muted);
+    --faint: var(--dark-faint);
+    --grid: var(--dark-grid);
+    --accent: var(--dark-accent);
+    --up: var(--dark-up);
+    --down: var(--dark-down);
+    --flat: var(--dark-flat);
+    --ext-shade: var(--dark-ext-shade);
+    --crosshair: var(--dark-crosshair);
+    --tooltip-bg: var(--dark-tooltip-bg);
+    --shadow: var(--dark-shadow);
+    --ma-1: var(--dark-ma-1);
+    --ma-2: var(--dark-ma-2);
+    --ma-3: var(--dark-ma-3);
+    --ma-4: var(--dark-ma-4);
+    --ma-5: var(--dark-ma-5);
+    --fib: var(--dark-fib);
+    --rsi: var(--dark-rsi);
+    --bb: var(--dark-bb);
+    --bb-fill: var(--dark-bb-fill);
+    --vwap: var(--dark-vwap);
+    --rating: var(--dark-rating);
+    --news: var(--dark-news);
+    --dividend: var(--dark-dividend);
+    --split: var(--dark-split);
+    --warn-bg: var(--dark-warn-bg);
+    --warn-text: var(--dark-warn-text);
     color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: var(--dark-bg);
+  --surface: var(--dark-surface);
+  --text: var(--dark-text);
+  --muted: var(--dark-muted);
+  --faint: var(--dark-faint);
+  --grid: var(--dark-grid);
+  --accent: var(--dark-accent);
+  --up: var(--dark-up);
+  --down: var(--dark-down);
+  --flat: var(--dark-flat);
+  --ext-shade: var(--dark-ext-shade);
+  --crosshair: var(--dark-crosshair);
+  --tooltip-bg: var(--dark-tooltip-bg);
+  --shadow: var(--dark-shadow);
+  --ma-1: var(--dark-ma-1);
+  --ma-2: var(--dark-ma-2);
+  --ma-3: var(--dark-ma-3);
+  --ma-4: var(--dark-ma-4);
+  --ma-5: var(--dark-ma-5);
+  --fib: var(--dark-fib);
+  --rsi: var(--dark-rsi);
+  --bb: var(--dark-bb);
+  --bb-fill: var(--dark-bb-fill);
+  --vwap: var(--dark-vwap);
+  --rating: var(--dark-rating);
+  --news: var(--dark-news);
+  --dividend: var(--dark-dividend);
+  --split: var(--dark-split);
+  --warn-bg: var(--dark-warn-bg);
+  --warn-text: var(--dark-warn-text);
+  color-scheme: dark;
 }
 
 * {
@@ -138,9 +205,37 @@ button {
   --sk-base: rgba(0, 0, 0, 0.06);
   --sk-shine: rgba(0, 0, 0, 0.12);
 }
+:root {
+  --dark-sk-base: rgba(255, 255, 255, 0.06);
+  --dark-sk-shine: rgba(255, 255, 255, 0.13);
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
-    --sk-base: rgba(255, 255, 255, 0.06);
-    --sk-shine: rgba(255, 255, 255, 0.13);
+  :root:not([data-theme="light"]) {
+    --sk-base: var(--dark-sk-base);
+    --sk-shine: var(--dark-sk-shine);
   }
+}
+
+:root[data-theme="dark"] {
+  --sk-base: var(--dark-sk-base);
+  --sk-shine: var(--dark-sk-shine);
+}
+
+
+:root[data-palette="accessible"] {
+  --up: #0072b2;
+  --down: #d55e00;
+  --accessible-dark-up: #56b4e9;
+  --accessible-dark-down: #e69f00;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-palette="accessible"]:not([data-theme="light"]) {
+    --up: var(--accessible-dark-up);
+    --down: var(--accessible-dark-down);
+  }
+}
+:root[data-palette="accessible"][data-theme="dark"] {
+  --up: var(--accessible-dark-up);
+  --down: var(--accessible-dark-down);
 }

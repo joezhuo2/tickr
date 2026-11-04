@@ -78,6 +78,8 @@ update themselves: install v0.5.1 once from Releases.
 
 ## Features
 
+- **Display settings:** choose System, Light or Dark, text size from 100% to 150%, and standard or accessible blue/orange gain and loss colors. Changes apply immediately and are saved.
+
 ### Tray and hotkey
 
 - **Tray icon:** the company logo with an up/down badge. Hover for the
@@ -384,8 +386,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.10.2
-git push origin v0.10.2
+git tag v0.10.3
+git push origin v0.10.3
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

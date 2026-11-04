@@ -2,6 +2,9 @@
 
 export type Session = "pre" | "regular" | "post" | "closed";
 export type RefreshMode = "balanced" | "low_power";
+export type Theme = "system" | "light" | "dark";
+export type TextSize = 100 | 110 | 125 | 150;
+export type Palette = "standard" | "accessible";
 export type ChartMode = "line" | "candles";
 export type ChartScale = "linear" | "log" | "percent";
 
@@ -109,6 +112,9 @@ export interface DrawingPoint { t: number; price: number }
 export interface Drawing { id: number; kind: "hline" | "trend" | "text"; points: DrawingPoint[]; text: string }
 
 export interface Init {
+  theme: Theme;
+  text_size: TextSize;
+  palette: Palette;
   drawings: Record<string, Drawing[]>;
   data_provider: DataProvider;
   symbol: string;

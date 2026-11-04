@@ -3,6 +3,8 @@
 
 use image::imageops::FilterType;
 
+use crate::settings::Palette;
+
 /// Pixel size of the icon. The macOS menu bar draws it 18pt tall, which is
 /// 36 px on Retina; a 32 px icon would be upscaled and blurry there.
 #[cfg(target_os = "macos")]
@@ -65,9 +67,9 @@ fn blend(px: &mut [u8], rgb: [u8; 3], a: f64) {
 }
 
 /// Three small candles, used when no logo is available.
-fn glyph(x: f64, y: f64) -> Option<[u8; 3]> {
+fn glyph(x: f64, y: f64, up: [u8; 3], down: [u8; 3]) -> Option<[u8; 3]> {
     // (center x, wick top, body top, body bottom, wick bottom, color)
-    let candles = [(9.0, 12.0, 15.0, 22.0, 25.0, DOWN), (16.0, 7.0, 10.0, 18.0, 21.0, UP), (23.0, 5.0, 7.0, 14.0, 17.0, UP)];
+    let candles = [(9.0, 12.0, 15.0, 22.0, 25.0, down), (16.0, 7.0, 10.0, 18.0, 21.0, up), (23.0, 5.0, 7.0, 14.0, 17.0, up)];
     for (cx, wt, bt, bb, wb, col) in candles {
         let body = (x - cx).abs() <= 2.5 && y >= bt && y <= bb;
         let wick = (x - cx).abs() <= 0.6 && y >= wt && y <= wb;
@@ -89,7 +91,12 @@ fn in_triangle(x: f64, y: f64, up: bool) -> bool {
 }
 
 /// Composes the icon as SIZE x SIZE RGBA.
-pub fn compose(logo_png: Option<&[u8]>, badge: Badge) -> Vec<u8> {
+pub fn compose(logo_png: Option<&[u8]>, badge: Badge, palette: Palette, dark: bool) -> Vec<u8> {
+    let (up, down) = match (palette, dark) {
+        (Palette::Standard, _) => (UP, DOWN),
+        (Palette::Accessible, false) => ([0, 114, 178], [213, 94, 0]),
+        (Palette::Accessible, true) => ([86, 180, 233], [230, 159, 0]),
+    };
     let s = SIZE as usize;
     let logo = logo_png
         .and_then(|b| image::load_from_memory(b).ok())
@@ -113,7 +120,7 @@ pub fn compose(logo_png: Option<&[u8]>, badge: Badge) -> Vec<u8> {
                     let mut acc = [0.0f64; 3];
                     let mut n = 0.0;
                     for (x, y) in samples(px, py) {
-                        if let Some(c) = glyph(x, y) {
+                        if let Some(c) = glyph(x, y, up, down) {
                             for k in 0..3 {
                                 acc[k] += c[k] as f64;
                             }
@@ -128,8 +135,8 @@ pub fn compose(logo_png: Option<&[u8]>, badge: Badge) -> Vec<u8> {
             }
 
             let color = match badge {
-                Badge::Up => UP,
-                Badge::Down => DOWN,
+                Badge::Up => up,
+                Badge::Down => down,
                 Badge::Closed => GRAY,
                 Badge::None => continue,
             };
@@ -162,7 +169,7 @@ mod tests {
 
     #[test]
     fn size_and_corners() {
-        let img = compose(None, Badge::None);
+        let img = compose(None, Badge::None, Palette::Standard, true);
         assert_eq!(img.len(), (SIZE * SIZE * 4) as usize);
         assert_eq!(px(&img, 0, 0)[3], 0, "rounded corner is transparent");
         assert_eq!(px(&img, 16, 2)[3], 255, "inside is opaque");
@@ -177,8 +184,8 @@ mod tests {
     #[test]
     fn badge_colors() {
         let (cx, cy) = BADGE_C;
-        let up = compose(None, Badge::Up);
-        let down = compose(None, Badge::Down);
+        let up = compose(None, Badge::Up, Palette::Standard, true);
+        let down = compose(None, Badge::Down, Palette::Standard, true);
         assert_eq!(&at(&up, cx, cy + 5.0)[..3], &UP);
         assert_eq!(&at(&down, cx, cy - 5.0)[..3], &DOWN);
         // Triangle center is white.
@@ -186,11 +193,22 @@ mod tests {
     }
 
     #[test]
+    fn accessible_badge_colors() {
+        let (cx, cy) = BADGE_C;
+        for (dark, up, down) in [(false, [0, 114, 178], [213, 94, 0]), (true, [86, 180, 233], [230, 159, 0])] {
+            let rising = compose(None, Badge::Up, Palette::Accessible, dark);
+            let falling = compose(None, Badge::Down, Palette::Accessible, dark);
+            assert_eq!(&at(&rising, cx, cy + 5.0)[..3], &up);
+            assert_eq!(&at(&falling, cx, cy - 5.0)[..3], &down);
+        }
+    }
+
+    #[test]
     fn logo_is_used() {
-        let with = compose(Some(LOGO), Badge::None);
-        let without = compose(None, Badge::None);
+        let with = compose(Some(LOGO), Badge::None, Palette::Standard, true);
+        let without = compose(None, Badge::None, Palette::Standard, true);
         assert_ne!(with, without);
         // Garbage bytes fall back to the glyph.
-        assert_eq!(compose(Some(b"nope"), Badge::None), without);
+        assert_eq!(compose(Some(b"nope"), Badge::None, Palette::Standard, true), without);
     }
 }

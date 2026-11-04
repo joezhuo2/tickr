@@ -11,6 +11,7 @@
 
   let {
     chart,
+    redrawKey = 0,
     drawings,
     drawingBusy,
     saveDrawings,
@@ -23,6 +24,7 @@
     news = [],
   }: {
     chart: Chart | null;
+    redrawKey?: number;
     drawings: Record<string, Drawing[]>;
     drawingBusy: boolean;
     saveDrawings: (symbol: string, drawings: Drawing[]) => Promise<boolean>;
@@ -683,7 +685,7 @@
 
   $effect(() => {
     // Redraw when any of these change.
-    void [list, preview, selected, tool, candles, mode, width, height, hover, geo, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt];
+    void [redrawKey, list, preview, selected, tool, candles, mode, width, height, hover, geo, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt];
     draw();
   });
 
@@ -1122,7 +1124,7 @@
         <dt>Open</dt><dd>{price(tip.c.o, chart.meta.currency)}</dd>
         <dt>High</dt><dd>{price(tip.c.h, chart.meta.currency)}</dd>
         <dt>Low</dt><dd>{price(tip.c.l, chart.meta.currency)}</dd>
-        <dt>Close</dt><dd class={tip.c.c >= tip.c.o ? "up" : "down"}>{price(tip.c.c, chart.meta.currency)}</dd>
+        <dt>Close</dt><dd class={tip.c.c >= tip.c.o ? "up" : "down"}>{tip.c.c > tip.c.o ? "↑" : tip.c.c < tip.c.o ? "↓" : "→"} {price(tip.c.c, chart.meta.currency)}</dd>
         <dt>Volume</dt><dd>{volume(tip.c.v)}</dd>
         {#if tip.rsi != null}<dt>RSI</dt><dd>{num(tip.rsi, 1)}</dd>{/if}
         {#each tip.macd as line}{#if line.value != null}<dt>{line.label}</dt><dd>{num(line.value, 2)}</dd>{/if}{/each}

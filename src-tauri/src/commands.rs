@@ -18,7 +18,7 @@ use crate::options::Options;
 use crate::stats::Section;
 use crate::news::Article;
 use crate::quote::{self, Chart, Quote, SearchHit};
-use crate::settings::{RefreshMode, ChartMode, ChartScale, Dots, Group, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
+use crate::settings::{Theme, Palette, validate_text_size, RefreshMode, ChartMode, ChartScale, Dots, Group, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
 use crate::state::{lock, now_secs, QuoteState, Shared};
 
 #[derive(Serialize)]
@@ -27,6 +27,9 @@ pub struct Init {
     symbol: String,
     range: String,
     interval: String,
+    theme: Theme,
+    text_size: u16,
+    palette: Palette,
     chart_mode: ChartMode,
     refresh_mode: RefreshMode,
     chart_scale: ChartScale,
@@ -73,6 +76,9 @@ pub fn init_payload(shared: &Shared) -> Init {
         symbol: s.symbol,
         range: s.range,
         interval: s.interval,
+        theme: s.theme,
+        text_size: s.text_size,
+        palette: s.palette,
         chart_mode: s.chart_mode,
         refresh_mode: s.refresh_mode,
         chart_scale: s.chart_scale,
@@ -191,6 +197,32 @@ pub fn set_interval(shared: State<'_, Arc<Shared>>, interval: String) -> Result<
     }
     shared.update_settings(|s| s.interval = interval);
     Ok(())
+}
+
+#[tauri::command]
+pub fn set_theme(app: AppHandle, shared: State<'_, Arc<Shared>>, theme: Theme) -> Result<(), String> {
+    if let Some(win) = crate::window::get(&app) {
+        win.set_background_color(Some(crate::window::background(theme))).map_err(|e| e.to_string())?;
+    }
+    shared.update_settings(|s| s.theme = theme);
+    crate::tray::update(&app, &shared);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_text_size(app: AppHandle, shared: State<'_, Arc<Shared>>, percent: u16) -> Result<(), String> {
+    validate_text_size(percent)?;
+    if let Some(win) = crate::window::get(&app) {
+        win.set_zoom(f64::from(percent) / 100.0).map_err(|e| e.to_string())?;
+    }
+    shared.update_settings(|s| s.text_size = percent);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_palette(app: AppHandle, shared: State<'_, Arc<Shared>>, palette: Palette) {
+    shared.update_settings(|s| s.palette = palette);
+    crate::tray::update(&app, &shared);
 }
 
 #[tauri::command]

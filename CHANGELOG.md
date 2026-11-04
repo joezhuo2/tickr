@@ -6,6 +6,15 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.3] - 2026-11-04
+
+### Added
+- **Display settings** ([#109](https://github.com/joezhuo2/tickr/issues/109)):
+  Settings can force a light or dark theme, enlarge text up to 150%, and switch
+  gain and loss to a blue and orange pair that also applies to the tray badge.
+  Candle tooltips gain a direction arrow, so gain and loss never rely on color
+  alone.
+
 ## [0.10.2] - 2026-11-04
 
 ### Added

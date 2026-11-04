@@ -50,6 +50,8 @@
   } from "./lib/types";
   import { actionFor, bindKey, nextGroupTab } from "./lib/keybinds";
   import { overlayVisibility, shouldAnalyze } from "./lib/indicators";
+  import { applyDisplay } from "./lib/display";
+  import type { Theme, TextSize, Palette } from "./lib/types";
   import { paneIn } from "./lib/motion";
 
   // Injected before load, so the first frame already has real content.
@@ -76,6 +78,16 @@
       return false;
     } finally { drawingBusy = false; }
   }
+
+  let theme = $state<Theme>("system");
+  let textSize = $state<TextSize>(100);
+  let palette = $state<Palette>("standard");
+  let displayKey = $state(0);
+  $effect(() => {
+    applyDisplay(document.documentElement, theme, palette);
+    void textSize;
+    untrack(() => displayKey++);
+  });
 
   let mode = $state<ChartMode>("line");
   let refreshMode = $state<RefreshMode>("balanced");
@@ -192,6 +204,10 @@
   }
 
   function apply(init: Init) {
+    theme = init.theme;
+    textSize = init.text_size;
+    palette = init.palette;
+    applyDisplay(document.documentElement, theme, palette);
     dataProvider = init.data_provider;
     symbol = init.symbol;
     range = init.range;
@@ -727,7 +743,7 @@
             {:else if view === "technicals"}
               <div class="split">
                 {#if chart}
-                  <ChartView {chart} {mode} {scale} {drawings} {drawingBusy} {saveDrawings} analysis={activeAnalysis} {overlays} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
+                  <ChartView redrawKey={displayKey} {chart} {mode} {scale} {drawings} {drawingBusy} {saveDrawings} analysis={activeAnalysis} {overlays} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
                 {:else if chartError}
                   <div class="msg">
                     {chartError}
@@ -752,7 +768,7 @@
                 />
               </div>
             {:else if chart}
-              <ChartView {chart} {mode} {scale} {drawings} {drawingBusy} {saveDrawings} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
+              <ChartView redrawKey={displayKey} {chart} {mode} {scale} {drawings} {drawingBusy} {saveDrawings} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
             {:else if chartError}
               <div class="msg">
                 {chartError}
@@ -778,7 +794,7 @@
       onrefresh={refresh}
     />
     {#if settingsOpen}
-      <Settings bind:refreshMode bind:hotkey bind:error={hotkeyError} {defaultHotkey} bind:keybinds bind:dots onclose={() => (settingsOpen = false)} />
+      <Settings bind:theme bind:textSize bind:palette bind:refreshMode bind:hotkey bind:error={hotkeyError} {defaultHotkey} bind:keybinds bind:dots onclose={() => (settingsOpen = false)} />
     {/if}
   </div>
 {/if}

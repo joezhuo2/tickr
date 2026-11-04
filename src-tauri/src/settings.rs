@@ -20,6 +20,36 @@ pub enum ChartMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Theme {
+    #[default]
+    System,
+    Light,
+    Dark,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Palette {
+    #[default]
+    Standard,
+    Accessible,
+}
+
+pub fn validate_text_size(percent: u16) -> Result<(), String> {
+    if ![100, 110, 125, 150].contains(&percent) {
+        return Err("Text size must be 100, 110, 125 or 150 percent".into());
+    }
+    Ok(())
+}
+
+fn deserialize_text_size<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<u16, D::Error> {
+    let percent = u16::deserialize(deserializer)?;
+    validate_text_size(percent).map_err(serde::de::Error::custom)?;
+    Ok(percent)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum RefreshMode {
     #[default]
@@ -262,6 +292,10 @@ pub struct Settings {
     pub symbol: String,
     pub range: String,
     pub interval: String,
+    pub theme: Theme,
+    #[serde(deserialize_with = "deserialize_text_size")]
+    pub text_size: u16,
+    pub palette: Palette,
     pub chart_mode: ChartMode,
     pub refresh_mode: RefreshMode,
     pub chart_scale: ChartScale,
@@ -301,6 +335,9 @@ impl Default for Settings {
             symbol: "AAPL".into(),
             range: "1d".into(),
             interval: "auto".into(),
+            theme: Theme::System,
+            text_size: 100,
+            palette: Palette::Standard,
             chart_mode: ChartMode::Line,
             refresh_mode: RefreshMode::Balanced,
             chart_scale: ChartScale::Linear,
@@ -375,6 +412,26 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn display_settings() {
+        let defaults = Settings::default();
+        let old: Settings = serde_json::from_str(r#"{"symbol":"NVDA","chart_mode":"candles"}"#).unwrap();
+        for s in [&defaults, &old] {
+            assert_eq!(s.theme, Theme::System);
+            assert_eq!(s.text_size, 100);
+            assert_eq!(s.palette, Palette::Standard);
+        }
+        for percent in [100, 110, 125, 150] {
+            assert!(validate_text_size(percent).is_ok());
+            let s = Settings { theme: Theme::Dark, text_size: percent, palette: Palette::Accessible, ..defaults.clone() };
+            assert_eq!(serde_json::from_str::<Settings>(&serde_json::to_string(&s).unwrap()).unwrap(), s);
+        }
+        for percent in [0, 99, 101, 111, 126, 151, u16::MAX] {
+            assert!(validate_text_size(percent).is_err());
+            assert!(serde_json::from_str::<Settings>(&format!(r#"{{"text_size":{percent}}}"#)).is_err());
+        }
+    }
 
     #[test]
     fn indicator_validation() {
