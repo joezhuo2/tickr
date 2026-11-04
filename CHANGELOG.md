@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.6] - 2026-11-04
+
+### Security
+- **AI key stays out of the page:** the saved API key is no longer sent to the
+  Settings page. The field shows "Key saved", leaving it blank keeps the key, and
+  a new Clear button removes it.
+
 ## [0.10.5] - 2026-11-04
 
 ### Added
