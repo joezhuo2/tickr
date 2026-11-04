@@ -117,6 +117,10 @@ pub struct Keybinds {
     pub chart_mode: String,
     pub chart_scale: String,
     pub chart_interval: String,
+    pub draw_level: String,
+    pub draw_trend: String,
+    pub draw_text: String,
+    pub draw_ruler: String,
     pub refresh: String,
     pub range: String,
     pub technicals: String,
@@ -145,6 +149,10 @@ impl Default for Keybinds {
             chart_mode: "c".into(),
             chart_scale: "l".into(),
             chart_interval: "i".into(),
+            draw_level: "1".into(),
+            draw_trend: "2".into(),
+            draw_text: "3".into(),
+            draw_ruler: "4".into(),
             refresh: "r".into(),
             range: "v".into(),
             technicals: "t".into(),
@@ -570,6 +578,10 @@ mod tests {
         assert_eq!(s.keybinds.chart_mode, "c");
         assert_eq!(s.keybinds.chart_scale, "l");
         assert_eq!(s.keybinds.chart_interval, "i");
+        assert_eq!(s.keybinds.draw_level, "1");
+        assert_eq!(s.keybinds.draw_trend, "2");
+        assert_eq!(s.keybinds.draw_text, "3");
+        assert_eq!(s.keybinds.draw_ruler, "4");
         assert_eq!(s.keybinds.settings, ",");
         assert_eq!(s.keybinds.toggle_watchlist, "w");
         assert_eq!(s.keybinds.watchlist, "x");
