@@ -4,6 +4,7 @@ import type { Keybinds } from "./types";
 
 const DEFAULTS: Keybinds = {
   chart_mode: "c",
+  chart_scale: "l",
   refresh: "r",
   range: "v",
   technicals: "t",

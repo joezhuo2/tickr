@@ -162,6 +162,7 @@ export interface Group {
 /** In-window shortcuts from settings.rs: one key each, "" when unbound. */
 export interface Keybinds {
   chart_mode: string;
+  chart_scale: string;
   refresh: string;
   range: string;
   technicals: string;

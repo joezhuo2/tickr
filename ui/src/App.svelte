@@ -526,6 +526,9 @@
       case "chart_mode":
         setMode(mode === "line" ? "candles" : "line");
         break;
+      case "chart_scale":
+        setScale(scale === "linear" ? "log" : scale === "log" ? "percent" : "linear");
+        break;
       case "refresh":
         refresh();
         break;
