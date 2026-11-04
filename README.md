@@ -144,7 +144,13 @@ taskbar to keep it visible.
   the chart as a PNG image, the other its candles as CSV (time in UTC, open,
   high, low, close, volume). A button turns green once the copy lands.
 - **Refresh:** the button in the bottom bar fetches the quote and reloads the
-  chart right away.
+  chart right away. **Background refresh** in Settings defaults to **Balanced**:
+  quotes update every 15 seconds during regular trading, 60 seconds pre/post-market,
+  and 15 minutes when closed. **Low-power** keeps that cadence while visible and
+  slows it to 60 seconds, 5 minutes, and 30 minutes while hidden or minimized.
+  Armed alerts keep their usual 15-second cadence in either mode. Low-power pauses
+  automatic minute chart and watchlist refreshes while hidden and refreshes stale
+  data when shown. Quotes also refresh promptly after system wake or network recovery.
 
 ### Views
 
@@ -473,7 +479,7 @@ src-tauri/src/
   market.rs     Yahoo batch quotes and screeners: indices, macro, sectors, top movers
   news.rs       Yahoo search news: 20 latest headlines, newest first, web links only
   sentiment.rs  headline tone (positive, negative, neutral) from a financial keyword list
-  poller.rs     background refresh: 15 s during market hours, 60 s pre/post, 15 min when closed
+  poller.rs     Balanced/Low-power refresh, alert cadence, system wake and network recovery
   tray.rs       tooltip text, macOS menu bar title, and the right-click menu
   trayicon.rs   icon (32 px, 36 px on macOS): logo in a rounded square plus a direction badge
   logo.rs       Elbstream logo fetch with a disk cache
