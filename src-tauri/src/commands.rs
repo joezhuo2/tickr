@@ -269,18 +269,42 @@ pub struct AiPrefs {
     pub enabled: bool,
     #[serde(flatten)]
     pub config: AiConfig,
+    #[serde(default)]
+    pub has_key: bool,
+}
+
+fn ai_prefs_for_page(enabled: bool, mut config: AiConfig) -> AiPrefs {
+    let has_key = !config.api_key.trim().is_empty();
+    config.api_key.clear();
+    AiPrefs { enabled, config, has_key }
+}
+
+fn keep_stored_key(mut config: AiConfig, stored: AiConfig) -> AiConfig {
+    if config.api_key.trim().is_empty() {
+        config.api_key = stored.api_key;
+    }
+    config
 }
 
 #[tauri::command]
 pub fn get_ai_config(shared: State<'_, Arc<Shared>>) -> AiPrefs {
-    AiPrefs { enabled: lock(&shared.settings).ai_news, config: crate::ai::load_config(&crate::ai::env_path()) }
+    ai_prefs_for_page(lock(&shared.settings).ai_news, crate::ai::load_config(&crate::ai::env_path()))
 }
 
 #[tauri::command]
 pub fn set_ai_config(shared: State<'_, Arc<Shared>>, prefs: AiPrefs) -> Result<(), String> {
-    crate::ai::save_config(&crate::ai::env_path(), &prefs.config).map_err(|e| format!("Could not save AI settings: {e}"))?;
+    let path = crate::ai::env_path();
+    let config = keep_stored_key(prefs.config, crate::ai::load_config(&path));
+    crate::ai::save_config(&path, &config).map_err(|e| format!("Could not save AI settings: {e}"))?;
     shared.update_settings(|s| s.ai_news = prefs.enabled);
     Ok(())
+}
+
+#[tauri::command]
+pub fn clear_ai_key() -> Result<(), String> {
+    let path = crate::ai::env_path();
+    let config = AiConfig { api_key: String::new(), ..crate::ai::load_config(&path) };
+    crate::ai::save_config(&path, &config).map_err(|e| format!("Could not clear the AI key: {e}"))
 }
 
 fn notification_permission(app: &AppHandle) -> Result<(), String> {
@@ -791,6 +815,23 @@ pub async fn test_alpaca(shared: State<'_, Arc<Shared>>) -> Result<(), String> {
 #[cfg(test)]
 mod provider_tests {
     use super::*;
+    #[test]
+    fn ai_key_never_reaches_the_page() {
+        let config = AiConfig { model: "m".into(), api_key: "TESTONLYSECRET".into(), ..Default::default() };
+        let page = ai_prefs_for_page(true, config.clone());
+        assert!(page.has_key);
+        assert!(!serde_json::to_string(&page).unwrap().contains("TESTONLYSECRET"));
+        assert!(!ai_prefs_for_page(true, AiConfig { api_key: "  ".into(), ..Default::default() }).has_key);
+    }
+    #[test]
+    fn blank_key_keeps_the_stored_one() {
+        let stored = AiConfig { api_key: "old".into(), ..Default::default() };
+        let blank = AiConfig { model: "m".into(), api_key: " ".into(), ..Default::default() };
+        let kept = keep_stored_key(blank, stored.clone());
+        assert_eq!((kept.model.as_str(), kept.api_key.as_str()), ("m", "old"));
+        let typed = AiConfig { api_key: "new".into(), ..Default::default() };
+        assert_eq!(keep_stored_key(typed, stored).api_key, "new");
+    }
     #[test]
     fn status_has_no_credentials() {
         let payload = DataProvider { provider: "alpaca".into(), feed: "iex".into(), has_keys: true, stream: crate::stream::Status::Error("Authentication failed (402)".into()) };

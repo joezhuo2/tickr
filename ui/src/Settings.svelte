@@ -57,7 +57,7 @@
     invoke("set_dots", { dots }).catch(console.warn);
   }
 
-  let ai = $state<AiConfig>({ enabled: true, base_url: "", model: "", news_model: "", events_model: "", api_key: "" });
+  let ai = $state<AiConfig>({ enabled: true, base_url: "", model: "", news_model: "", events_model: "", api_key: "", has_key: false });
   let aiStatus = $state<{ text: string; ok: boolean } | null>(null);
   let showKey = $state(false);
   let market = $state<DataProvider>({ provider: "yahoo", feed: "iex", has_keys: false, stream: { kind: "off" } });
@@ -94,9 +94,22 @@
     invoke<AiConfig>("get_ai_config").then((c) => (ai = c)).catch(console.warn);
   });
 
+  async function clearAiKey() {
+    try {
+      await invoke("clear_ai_key");
+      ai.api_key = "";
+      ai.has_key = false;
+      aiStatus = { ok: true, text: "API key cleared." };
+    } catch (e) {
+      aiStatus = { ok: false, text: String(e) };
+    }
+  }
+
   async function saveAi() {
     try {
       await invoke("set_ai_config", { prefs: ai });
+      if (ai.api_key.trim()) ai.has_key = true;
+      ai.api_key = "";
       const ready = (own: string) => !!ai.base_url.trim() && !!(own.trim() || ai.model.trim());
       aiStatus = {
         ok: true,
@@ -299,8 +312,9 @@
     <label class="row">
       <span>API key</span>
       <span class="keys">
-        <input class="field" type={showKey ? "text" : "password"} autocomplete="off" spellcheck="false" bind:value={ai.api_key} onchange={saveAi} />
+        <input class="field" type={showKey ? "text" : "password"} autocomplete="off" spellcheck="false" bind:value={ai.api_key} placeholder={ai.has_key ? "Key saved" : ""} onchange={saveAi} />
         <button class="link" onclick={(e) => { e.preventDefault(); showKey = !showKey; }}>{showKey ? "Hide" : "Show"}</button>
+        <button class="link" disabled={!ai.has_key} onclick={(e) => { e.preventDefault(); clearAiKey(); }}>Clear</button>
       </span>
     </label>
     <p class:error={aiStatus && !aiStatus.ok} class="hint">
