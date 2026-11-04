@@ -6,6 +6,15 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.9.11] - 2026-11-04
+
+### Added
+- **Optional Alpaca market data** ([#97](https://github.com/joezhuo2/tickr/issues/97)):
+  Settings can switch the selected stock's quotes and candles to Alpaca with
+  your own keys, on the IEX or SIP feed, with live trades over a WebSocket
+  stream. Yahoo stays the default and takes over if Alpaca fails. The footer
+  shows the source in use. The watchlist and alerts still use Yahoo.
+
 ## [0.9.10] - 2026-11-04
 
 ### Added
