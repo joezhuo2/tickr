@@ -91,6 +91,7 @@ pub struct Meta {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Chart {
+    pub source: String,
     pub meta: Meta,
     pub range: String,
     pub interval: String,
@@ -132,6 +133,9 @@ pub struct Extended {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Quote {
+    #[serde(skip)]
+    pub periods: Option<Periods>,
+    pub source: String,
     pub symbol: String,
     pub name: String,
     pub exchange: String,
@@ -240,7 +244,7 @@ pub fn parse_chart(body: &[u8], range: &str, interval: &str) -> Result<Chart, St
         .filter_map(|x| Some(Split { t: x["date"].as_i64()?, ratio: x["splitRatio"].as_str()?.to_string() }))
         .collect();
     splits.sort_by_key(|x| x.t);
-    Ok(Chart { meta, range: range.into(), interval: interval.into(), candles, dividends, splits })
+    Ok(Chart { source: "yahoo".into(), meta, range: range.into(), interval: interval.into(), candles, dividends, splits })
 }
 
 pub fn session_at(periods: Option<&Periods>, now: i64) -> Session {
@@ -286,6 +290,8 @@ pub fn quote_from(chart: &Chart, now: i64) -> Quote {
     });
 
     Quote {
+        periods: m.periods,
+        source: chart.source.clone(),
         symbol: m.symbol.clone(),
         name: m.name.clone(),
         exchange: m.exchange.clone(),

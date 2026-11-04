@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use base64::Engine;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_notification::NotificationExt;
 
 use crate::ai::AiConfig;
@@ -23,6 +23,7 @@ use crate::state::{lock, now_secs, QuoteState, Shared};
 
 #[derive(Serialize)]
 pub struct Init {
+    data_provider: DataProvider,
     symbol: String,
     range: String,
     interval: String,
@@ -66,6 +67,7 @@ pub fn init_payload(shared: &Shared) -> Init {
     let logo = lock(&shared.logo).clone().filter(|(sym, _)| *sym == s.symbol);
     let analyst = shared.analysts.cached(&s.symbol, now_secs());
     Init {
+        data_provider: provider_payload(shared),
         symbol: s.symbol,
         range: s.range,
         interval: s.interval,
@@ -97,7 +99,10 @@ pub fn get_init(shared: State<'_, Arc<Shared>>) -> Init {
 
 #[tauri::command]
 pub async fn get_chart(shared: State<'_, Arc<Shared>>, symbol: String, range: String, interval: String) -> Result<Chart, String> {
-    let chart = quote::fetch_chart(&shared.http, &symbol, &range, &interval).await?;
+    let revision = shared.revision();
+    let chart = crate::provider::Provider::current(&shared).fetch_chart(&shared.http, &symbol, &range, &interval).await?;
+    let _settings = lock(&shared.settings);
+    if shared.revision() != revision { return Err("Market data settings changed; try again".into()); }
     *lock(&shared.last_chart) = Some(chart.clone());
     Ok(chart)
 }
@@ -107,6 +112,7 @@ pub async fn get_chart(shared: State<'_, Arc<Shared>>, symbol: String, range: St
 /// same candles the window shows; fetches otherwise.
 #[tauri::command]
 pub async fn analyze(shared: State<'_, Arc<Shared>>, symbol: String, range: String, interval: String) -> Result<Analysis, String> {
+    let revision = shared.revision();
     let cached = lock(&shared.last_chart)
         .clone()
         .filter(|c| c.meta.symbol.eq_ignore_ascii_case(symbol.trim()) && c.range == range
@@ -114,7 +120,9 @@ pub async fn analyze(shared: State<'_, Arc<Shared>>, symbol: String, range: Stri
     let chart = match cached {
         Some(c) => c,
         None => {
-            let c = quote::fetch_chart(&shared.http, &symbol, &range, &interval).await?;
+            let c = crate::provider::Provider::current(&shared).fetch_chart(&shared.http, &symbol, &range, &interval).await?;
+            let _settings = lock(&shared.settings);
+            if shared.revision() != revision { return Err("Market data settings changed; try again".into()); }
             *lock(&shared.last_chart) = Some(c.clone());
             c
         }
@@ -138,10 +146,16 @@ pub async fn set_symbol(app: AppHandle, shared: State<'_, Arc<Shared>>, symbol: 
     if symbol.is_empty() {
         return Err("empty symbol".into());
     }
-    let q = quote::fetch_quote(&shared.http, &symbol, now_secs()).await?;
+    let revision = shared.revision();
+    let q = crate::provider::Provider::current(&shared).fetch_quote(&shared.http, &symbol, now_secs()).await?;
+    let mut settings = lock(&shared.settings);
+    if shared.revision() != revision { return Err("Market data settings changed; try again".into()); }
     let state = QuoteState { quote: Some(q), error: None, updated_at: now_secs() };
-    shared.update_settings(|s| s.symbol = symbol.clone());
+    settings.symbol = symbol.clone();
+    if let Err(e) = settings.save(&shared.settings_path) { log::warn!("save settings: {e}"); }
     *lock(&shared.quote) = state.clone();
+    drop(settings);
+    shared.stream_wake.notify_one();
     crate::tray::update(&app, &shared);
     shared.wake.notify_one();
     Ok(state)
@@ -579,5 +593,108 @@ mod tests {
         let watchlist = vec!["AAPL".to_string(), "NVDA".to_string()];
         let got = clean_groups(vec![g(" Tech ", &["aapl", "TSLA", "NVDA"]), g("tech", &["AAPL"]), g("  ", &["AAPL"]), g("Empty", &[])], &watchlist);
         assert_eq!(got, [g("Tech", &["AAPL", "NVDA"]), g("Empty", &[])]);
+    }
+}
+
+#[derive(Clone, Serialize)]
+pub struct DataProvider {
+    provider: String,
+    feed: String,
+    has_keys: bool,
+    stream: crate::stream::Status,
+}
+
+fn provider_payload(shared: &Shared) -> DataProvider {
+    let s = lock(&shared.settings);
+    DataProvider {
+        provider: s.data_provider.clone(), feed: s.alpaca_feed.clone(),
+        has_keys: crate::alpaca::load_keys(&crate::ai::env_path()).is_some(),
+        stream: lock(&shared.stream_status).clone(),
+    }
+}
+
+#[tauri::command]
+pub fn get_data_provider(shared: State<'_, Arc<Shared>>) -> DataProvider { provider_payload(&shared) }
+
+fn provider_changed(app: &AppHandle, shared: &Shared) -> DataProvider {
+    crate::stream::set_status(app, shared, crate::stream::Status::Off);
+    shared.stream_wake.notify_one();
+    shared.wake.notify_one();
+    let payload = provider_payload(shared);
+    let _ = app.emit_to(crate::window::LABEL, "data-provider", &payload);
+    payload
+}
+
+#[tauri::command]
+pub fn set_data_provider(app: AppHandle, shared: State<'_, Arc<Shared>>, provider: String, feed: String, key_id: Option<String>, secret: Option<String>) -> Result<DataProvider, String> {
+    use crate::alpaca::{load_keys, save_keys, validate_key, AlpacaCreds};
+    use crate::provider::{Feed, Provider};
+    if !matches!(provider.as_str(), "yahoo" | "alpaca") { return Err("Unknown data provider".into()); }
+    let parsed_feed = Feed::parse(&feed)?;
+    let mut settings = lock(&shared.settings);
+    let path = crate::ai::env_path();
+    let old = load_keys(&path);
+    let keep = |value: Option<String>, stored: Option<&str>| -> Result<String, String> {
+        match value {
+            Some(v) if !v.is_empty() => { validate_key(&v)?; Ok(v) },
+            _ => Ok(stored.unwrap_or_default().to_string()),
+        }
+    };
+    let keys = AlpacaCreds {
+        key_id: keep(key_id, old.as_ref().map(|k| k.key_id.as_str()))?,
+        secret: keep(secret, old.as_ref().map(|k| k.secret.as_str()))?,
+    };
+    let has_keys = !keys.key_id.is_empty() && !keys.secret.is_empty();
+    if (!keys.key_id.is_empty() || !keys.secret.is_empty() || provider == "alpaca") && !has_keys { return Err("Both Alpaca keys are required".into()); }
+    let mut next = settings.clone();
+    next.data_provider = provider.clone();
+    next.alpaca_feed = feed;
+    if has_keys { save_keys(&path, Some(&keys)).map_err(|_| "Could not save Alpaca keys")?; }
+    if next.save(&shared.settings_path).is_err() {
+        if has_keys { let _ = save_keys(&path, old.as_ref()); }
+        return Err("Could not save market data settings".into());
+    }
+    *settings = next;
+    *lock(&shared.provider) = if provider == "alpaca" { Provider::Alpaca(keys, parsed_feed) } else { Provider::Yahoo };
+    shared.provider_revision.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    *lock(&shared.last_chart) = None;
+    drop(settings);
+    Ok(provider_changed(&app, &shared))
+}
+
+#[tauri::command]
+pub fn clear_alpaca_keys(app: AppHandle, shared: State<'_, Arc<Shared>>) -> Result<DataProvider, String> {
+    let mut settings = lock(&shared.settings);
+    let mut next = settings.clone();
+    next.data_provider = "yahoo".into();
+    next.save(&shared.settings_path).map_err(|_| "Could not save market data settings")?;
+    if crate::alpaca::save_keys(&crate::ai::env_path(), None).is_err() {
+        let _ = settings.save(&shared.settings_path);
+        return Err("Could not clear Alpaca keys".into());
+    }
+    *settings = next;
+    *lock(&shared.provider) = crate::provider::Provider::Yahoo;
+    shared.provider_revision.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    *lock(&shared.last_chart) = None;
+    drop(settings);
+    Ok(provider_changed(&app, &shared))
+}
+
+#[tauri::command]
+pub async fn test_alpaca(shared: State<'_, Arc<Shared>>) -> Result<(), String> {
+    let keys = crate::alpaca::load_keys(&crate::ai::env_path()).ok_or("No saved Alpaca keys")?;
+    let feed = crate::provider::Feed::parse(&lock(&shared.settings).alpaca_feed)?;
+    crate::alpaca::snapshot(&shared.http, &keys, feed, "AAPL").await.map(|_| ())
+}
+
+#[cfg(test)]
+mod provider_tests {
+    use super::*;
+    #[test]
+    fn status_has_no_credentials() {
+        let payload = DataProvider { provider: "alpaca".into(), feed: "iex".into(), has_keys: true, stream: crate::stream::Status::Error("Authentication failed (402)".into()) };
+        let json = serde_json::to_string(&payload).unwrap();
+        for forbidden in ["TESTONLYSECRET", "secret", "key_id", "api_key"] { assert!(!json.contains(forbidden)); }
+        assert!(json.contains("has_keys"));
     }
 }

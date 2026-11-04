@@ -41,6 +41,10 @@ pub struct Shared {
     pub quote: Mutex<QuoteState>,
     /// Wakes the poller early (symbol changed).
     pub wake: Notify,
+    pub stream_wake: Notify,
+    pub provider: Mutex<crate::provider::Provider>,
+    pub provider_revision: std::sync::atomic::AtomicU64,
+    pub stream_status: Mutex<crate::stream::Status>,
     /// Last successful price per armed alert; reset when paused or rearmed.
     pub alert_prices: Mutex<HashMap<u32, f64>>,
     /// Logo PNG for the current symbol: (symbol, bytes). None bytes = no logo.
@@ -65,6 +69,10 @@ impl Shared {
     pub fn new(settings_path: PathBuf, settings: Settings) -> Self {
         let geometry = settings.geometry;
         Self {
+            provider: Mutex::new(crate::provider::Provider::load(&settings)),
+            provider_revision: std::sync::atomic::AtomicU64::new(0),
+            stream_status: Mutex::new(crate::stream::Status::Off),
+            stream_wake: Notify::new(),
             settings: Mutex::new(settings),
             settings_path,
             http: crate::quote::client(),
@@ -92,6 +100,8 @@ impl Shared {
         }
         s.clone()
     }
+
+    pub fn revision(&self) -> u64 { self.provider_revision.load(std::sync::atomic::Ordering::SeqCst) }
 
     pub fn symbol(&self) -> String {
         lock(&self.settings).symbol.clone()

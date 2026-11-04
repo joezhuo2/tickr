@@ -208,6 +208,8 @@ fn validate_preset_name(name: &str) -> Result<String, String> {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
+    pub data_provider: String,
+    pub alpaca_feed: String,
     pub indicators: IndicatorConfig,
     pub indicator_presets: Vec<IndicatorPreset>,
     pub symbol: String,
@@ -243,6 +245,8 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            data_provider: "yahoo".into(),
+            alpaca_feed: "iex".into(),
             indicators: IndicatorConfig::default(),
             indicator_presets: Vec::new(),
             symbol: "AAPL".into(),

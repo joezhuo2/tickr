@@ -41,13 +41,20 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
         let mut failures = 0u32;
         loop {
             let symbol = shared.symbol();
-            let result = quote::fetch_quote(&shared.http, &symbol, now_secs()).await;
-            let fresh = result.as_ref().ok().cloned();
+            let revision = shared.revision();
+            let provider = crate::provider::Provider::current(&shared);
+            let result = provider.fetch_quote(&shared.http, &symbol, now_secs()).await;
+            let mut fresh = result.as_ref().ok().cloned();
+            if fresh.as_ref().is_some_and(|q| q.source != "yahoo") && lock(&shared.settings).alerts.iter().any(|a| a.enabled && a.symbol == symbol) {
+                fresh = quote::fetch_quote(&shared.http, &symbol, now_secs()).await.ok();
+            }
             // The symbol may have changed while fetching; drop stale results.
-            if shared.symbol() != symbol {
+            if shared.symbol() != symbol || shared.revision() != revision {
                 continue;
             }
             let session = {
+                let settings = lock(&shared.settings);
+                if settings.symbol != symbol || shared.revision() != revision { continue; }
                 let mut q = lock(&shared.quote);
                 match result {
                     Ok(quote) => {
