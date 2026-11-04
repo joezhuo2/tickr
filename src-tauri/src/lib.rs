@@ -108,6 +108,7 @@ pub fn run() {
             commands::set_groups,
             commands::get_watch_quotes,
             commands::get_news,
+            commands::get_news_feed,
             commands::open_news,
             commands::get_events,
             commands::analyze_event,

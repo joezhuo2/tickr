@@ -1,23 +1,53 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { ago, newsDate, sentimentLabel, sentimentTone } from "./lib/format";
-  import type { Article } from "./lib/types";
+  import type { Article, FeedArticle, Group } from "./lib/types";
+  import { filterArticles, topics } from "./lib/newsfeed";
 
   // articles: undefined while loading with nothing cached.
   let {
     symbol,
+    groups,
+    scope = $bindable("symbol"),
+    feed,
+    emptyScope,
     articles,
     error,
     now,
     onretry,
   }: {
     symbol: string;
+    groups: Group[];
+    scope: string;
+    feed: FeedArticle[] | undefined;
+    emptyScope: boolean;
     articles: Article[] | undefined;
     error: string | null;
     /** Unix seconds, for the relative times. */
     now: number;
     onretry: () => void;
   } = $props();
+
+  let ticker = $state("");
+  let publisher = $state("");
+  let topic = $state("");
+  const isFeed = $derived(scope !== "symbol");
+  const loaded = $derived(isFeed ? feed : articles);
+  const tickers = $derived([...new Set(feed?.flatMap((a) => a.symbols) ?? [])].sort());
+  const publishers = $derived([...new Set(feed?.map((a) => a.publisher).filter(Boolean) ?? [])].sort());
+  const allTopics = $derived([...new Set(feed?.flatMap((a) => topics(a.title)) ?? [])].sort());
+  const rows = $derived(isFeed ? filterArticles(feed ?? [], ticker, publisher, topic) : (articles ?? []).map((a) => ({ ...a, symbols: [] })));
+
+  function clearFilters() {
+    ticker = "";
+    publisher = "";
+    topic = "";
+  }
+
+  $effect(() => {
+    scope;
+    clearFilters();
+  });
 
   // Headlines show in the viewer's own time zone.
   const offset = -new Date().getTimezoneOffset() * 60;
@@ -27,12 +57,40 @@
   }
 </script>
 
-{#if articles === undefined && error}
+<div class="controls">
+  <select aria-label="News scope" bind:value={scope}>
+    <option value="symbol">{symbol}</option>
+    <option value="watchlist">Watchlist</option>
+    {#each groups as group (group.name)}
+      <option value={`group:${group.name}`}>{group.name}</option>
+    {/each}
+  </select>
+  {#if isFeed && feed?.length}
+    <select aria-label="Ticker" bind:value={ticker}>
+      <option value="">All tickers</option>
+      {#each tickers as value}<option {value}>{value}</option>{/each}
+    </select>
+    <select aria-label="Publisher" bind:value={publisher}>
+      <option value="">All publishers</option>
+      {#each publishers as value}<option {value}>{value}</option>{/each}
+    </select>
+    <select aria-label="Topic" bind:value={topic}>
+      <option value="">All topics</option>
+      {#each allTopics as value}<option {value}>{value}</option>{/each}
+    </select>
+  {/if}
+</div>
+
+{#if isFeed && emptyScope}
+  <div class="msg">{scope === "watchlist" ? "Your watchlist is empty" : "This group is empty"}</div>
+{:else if loaded === undefined && error}
   <div class="msg">
     Could not load news: {error}
     <button class="retry" onclick={onretry}>Retry</button>
   </div>
-{:else if articles === undefined}
+{:else if loaded === undefined && isFeed}
+  <div class="msg" aria-busy="true">Loading news…</div>
+{:else if loaded === undefined}
   <div class="list" aria-busy="true" aria-label="Loading news">
     {#each [0, 1, 2, 3, 4, 5] as i (i)}
       <div class="row">
@@ -41,15 +99,21 @@
       </div>
     {/each}
   </div>
-{:else if articles.length === 0}
-  <div class="msg">No recent news for {symbol}</div>
+{:else if loaded.length === 0}
+  <div class="msg">No recent news for {isFeed ? (scope === "watchlist" ? "your watchlist" : "this group") : symbol}</div>
+{:else if rows.length === 0}
+  <div class="msg">
+    No headlines match these filters
+    <button class="retry" onclick={clearFilters}>Clear filters</button>
+  </div>
 {:else}
   <ul class="list">
-    {#each articles as a (a.link)}
+    {#each rows as a (a.link)}
       <li>
         <button class="row" title={a.link} onclick={() => open(a)}>
           <span class="title">{a.title}</span>
           <span class="meta">
+            {#each a.symbols as ticker}<span class="ticker">{ticker}</span>{/each}
             {#if a.publisher}<span>{a.publisher}</span> ·{/if}
             <time datetime={new Date(a.published * 1000).toISOString()}>{newsDate(a.published, offset)}</time>
             · <span>{ago(a.published, now)}</span>
@@ -64,6 +128,30 @@
 {/if}
 
 <style>
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 0;
+  }
+  select {
+    min-width: 0;
+    max-width: 100%;
+    border: 1px solid var(--faint);
+    border-radius: 6px;
+    background: var(--surface);
+    color: inherit;
+    font: inherit;
+    padding: 3px 6px;
+  }
+  .ticker {
+    display: inline-block;
+    margin-right: 6px;
+    padding: 0 4px;
+    border: 1px solid var(--faint);
+    border-radius: 4px;
+    font-size: 10.5px;
+  }
   .list {
     flex: 1;
     min-height: 0;

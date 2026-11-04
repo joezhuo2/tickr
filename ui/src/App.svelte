@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import Analysts from "./Analysts.svelte";
   import Alerts from "./Alerts.svelte";
   import ChartView from "./Chart.svelte";
@@ -25,6 +25,7 @@
     validInterval,
     type Analysis,
     type Article,
+    type FeedArticle,
     type Chart,
     type ChartMode,
     type ChartScale,
@@ -103,6 +104,12 @@
   let news = $state<Article[] | undefined>(undefined);
   let newsError = $state<string | null>(null);
   let newsLoading = $state(false);
+  let newsScope = $state("symbol");
+  let feed = $state<FeedArticle[] | undefined>(undefined);
+  let feedError = $state<string | null>(null);
+  let feedLoading = $state(false);
+  const feedCache = new Map<string, { members: string; articles: FeedArticle[] }>();
+  let feedSeq = 0;
   let watchlist = $state<string[]>([]);
   let groups = $state<Group[]>([]);
   let groupTab = $state<string | null>(null);
@@ -120,6 +127,47 @@
   /** Headlines fetched this session, keyed by symbol. */
   const newsCache = new Map<string, Article[]>();
   let newsSeq = 0;
+
+  const feedSymbols = $derived(newsScope === "watchlist" ? watchlist : groups.find((g) => `group:${g.name}` === newsScope)?.symbols ?? []);
+
+  $effect(() => {
+    const scope = newsScope;
+    const symbols = [...feedSymbols];
+    if (view === "news") {
+      untrack(() => {
+        if (scope !== "symbol") loadFeed(scope, symbols);
+        else ++feedSeq;
+      });
+    }
+  });
+
+  $effect(() => {
+    if (newsScope.startsWith("group:") && !groups.some((g) => `group:${g.name}` === newsScope)) newsScope = "symbol";
+  });
+
+  async function loadFeed(scope = newsScope, symbols = [...feedSymbols]) {
+    const mine = ++feedSeq;
+    const members = JSON.stringify(symbols);
+    const cached = feedCache.get(scope);
+    feed = cached?.members === members ? cached.articles : undefined;
+    feedError = null;
+    feedLoading = symbols.length > 0;
+    if (!symbols.length) {
+      feed = [];
+      return;
+    }
+    try {
+      const articles = await invoke<FeedArticle[]>("get_news_feed", { symbols });
+      if (mine === feedSeq) {
+        feedCache.set(scope, { members, articles });
+        feed = articles;
+      }
+    } catch (e) {
+      if (mine === feedSeq) feedError = String(e);
+    } finally {
+      if (mine === feedSeq) feedLoading = false;
+    }
+  }
 
   function apply(init: Init) {
     symbol = init.symbol;
@@ -594,7 +642,7 @@
             <button role="tab" aria-selected={view === "stats"} class:on={view === "stats"} onclick={() => (view = view === "stats" ? "chart" : "stats")}>
               Stats
             </button>
-            {#if view === "news" ? newsLoading : view === "market" ? marketLoading : view === "events" ? eventsLoading : view === "options" ? optionsLoading : loading || (view === "technicals" && analyzing)}<span
+            {#if view === "news" ? (newsScope === "symbol" ? newsLoading : feedLoading) : view === "market" ? marketLoading : view === "events" ? eventsLoading : view === "options" ? optionsLoading : loading || (view === "technicals" && analyzing)}<span
                 class="spin"
                 aria-label="Loading"
               ></span>{/if}
@@ -625,7 +673,9 @@
             {:else if view === "options"}
               <OptionsView {options} error={optionsError} onretry={() => loadOptions(options?.expiry ?? undefined)} onexpiry={loadOptions} bind:side={optionsSide} />
             {:else if view === "news"}
-              <News {symbol} articles={news} error={newsError} {now} onretry={loadNews} />
+              <News {symbol} {groups} bind:scope={newsScope} articles={news} {feed}
+                emptyScope={feedSymbols.length === 0} error={newsScope === "symbol" ? newsError : feedError}
+                {now} onretry={() => newsScope === "symbol" ? loadNews() : loadFeed()} />
             {:else if view === "technicals"}
               <div class="split">
                 {#if chart}

@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.9.10] - 2026-11-04
+
+### Added
+- **Watchlist news feed** ([#96](https://github.com/joezhuo2/tickr/issues/96)):
+  News can now combine headlines across the watchlist or a named group, merge
+  duplicate stories, and filter by ticker, publisher or topic.
+
 ## [0.9.9] - 2026-11-03
 
 ### Added

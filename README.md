@@ -180,6 +180,8 @@ it is instant.
 - **Stats:** key statistics in Valuation, Trading, Dividends & splits, Shares
   & short interest, Profitability and Financials. ETFs get a Fund section and
   crypto a Crypto section. Changes, growth and returns are green or red.
+- **News feed:** choose Watchlist or a named group in News to combine headlines,
+  deduplicate stories and filter by ticker, publisher and topic.
 - **News:** the 20 latest headlines, newest first, with publisher, time and a
   Positive / Negative / Neutral pill. The sentiment is guessed on your machine
   from the headline's words, so take it as a hint. Click one to open it in
@@ -371,8 +373,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.9.9
-git push origin v0.9.9
+git tag v0.9.10
+git push origin v0.9.10
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
