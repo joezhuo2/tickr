@@ -6,6 +6,15 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-11-04
+
+### Added
+- **Background refresh modes** ([#113](https://github.com/joezhuo2/tickr/issues/113)):
+  Settings offers Balanced, the existing cadence, and Low-power, which slows
+  updates while the window is hidden. Quotes refresh promptly after system wake,
+  network recovery or showing the window. Armed alerts keep their 15-second
+  cadence in both modes.
+
 ## [0.10.1] - 2026-11-04
 
 ### Added
