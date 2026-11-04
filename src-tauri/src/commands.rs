@@ -320,6 +320,7 @@ pub async fn test_ai(shared: State<'_, Arc<Shared>>) -> Result<Vec<AiTestResult>
         let start = std::time::Instant::now();
         let result = crate::ai::chat(&shared.http, &cfg, crate::ai::test_body(&model), std::time::Duration::from_secs(20))
             .await.and_then(|body| crate::ai::reply_content(&body));
+        lock(&shared.connections).ai.record(&result, now_secs());
         results.push(AiTestResult { model, ok: result.is_ok(), ms: start.elapsed().as_millis() as u64, error: result.err() });
     }
     Ok(results)
@@ -450,7 +451,9 @@ pub async fn get_options(shared: State<'_, Arc<Shared>>, symbol: String, date: O
 /// Recent headlines for the symbol, newest first.
 #[tauri::command]
 pub async fn get_news(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<Vec<Article>, String> {
-    let mut list = crate::news::fetch(&shared.http, &symbol).await.inspect_err(|e| log::warn!("news {symbol}: {e}"))?;
+    let result = crate::news::fetch(&shared.http, &symbol).await;
+    lock(&shared.connections).news.record(&result, now_secs());
+    let mut list = result.inspect_err(|e| log::warn!("news {symbol}: {e}"))?;
     crate::ai::apply(&shared, symbol.trim(), &mut list).await;
     Ok(list)
 }
@@ -464,8 +467,9 @@ pub async fn get_news_feed(shared: State<'_, Arc<Shared>>, symbols: Vec<String>)
     let tasks: Vec<_> = cleaned.into_iter().map(|symbol| {
         let shared = Arc::clone(shared.inner());
         tauri::async_runtime::spawn(async move {
-            let mut list = crate::news::fetch(&shared.http, &symbol).await
-                .inspect_err(|e| log::warn!("news {symbol}: {e}"))?;
+            let result = crate::news::fetch(&shared.http, &symbol).await;
+            lock(&shared.connections).news.record(&result, now_secs());
+            let mut list = result.inspect_err(|e| log::warn!("news {symbol}: {e}"))?;
             crate::ai::apply(&shared, &symbol, &mut list).await;
             Ok::<_, String>((symbol, list))
         })
@@ -494,7 +498,12 @@ pub async fn get_events(shared: State<'_, Arc<Shared>>, force: bool) -> Result<c
 /// AI analysis of one event, run when the user opens it.
 #[tauri::command]
 pub async fn analyze_event(shared: State<'_, Arc<Shared>>, event: crate::events::MarketEvent, force: Option<bool>) -> Result<crate::events::EventAnalysis, String> {
-    crate::events::analyze(&shared.http, &event, force.unwrap_or(false)).await.inspect_err(|e| log::warn!("event analysis {}: {e}", event.name))
+    let start = now_secs();
+    let result = crate::events::analyze(&shared.http, &event, force.unwrap_or(false)).await;
+    if result.as_ref().map_or(true, |a| a.generated >= start) {
+        lock(&shared.connections).ai.record(&result, now_secs());
+    }
+    result.inspect_err(|e| log::warn!("event analysis {}: {e}", event.name))
 }
 
 /// Opens a headline in the default browser.
