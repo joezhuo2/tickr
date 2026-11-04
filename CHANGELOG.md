@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.5] - 2026-11-04
+
+### Added
+- **Recent symbols and history** ([#104](https://github.com/joezhuo2/tickr/issues/104)):
+  the empty search box lists the last 10 symbols viewed. Back and Forward buttons
+  or `Alt+←` and `Alt+→` step through this session's symbols, and `B` toggles
+  between the last two.
+
 ## [0.10.4] - 2026-11-04
 
 ### Changed

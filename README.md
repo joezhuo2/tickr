@@ -113,6 +113,10 @@ taskbar to keep it visible.
 - **Symbol and range:** search to change the symbol, pick a range from 1D to
   Max and switch between line and candles. 1D, 5D and 1M charts reload about
   once a minute.
+- **Recent symbols and history:** focus the empty search box to see the last
+  10 symbols you viewed. The Back and Forward buttons (or Alt+Left and
+  Alt+Right) step through this session's symbols, and B jumps to the previous
+  one, so pressing it again toggles between two.
 - **Price scales:** linear, logarithmic, or percentage change rebased to the
   first visible candle as you pan and zoom. Press L to cycle scales.
 - **Drawings:** the toolbar places levels, trendlines and text, saved per symbol.
@@ -283,7 +287,10 @@ typing in a text field.
 | | `G` | Next watchlist group (opens the Watchlist) |
 | | `F` | Add stock to Watchlist |
 | General | `S` | Focus search |
+| | `B` | Previous symbol (toggles between two) |
 | | `,` | Toggle Settings |
+| Fixed | `Alt+←` | Back to the previous symbol in history |
+| | `Alt+→` | Forward in history |
 
 ### AI news analysis
 
@@ -389,8 +396,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.10.4
-git push origin v0.10.4
+git tag v0.10.5
+git push origin v0.10.5
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

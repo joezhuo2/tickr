@@ -2,10 +2,14 @@
   import { invoke } from "@tauri-apps/api/core";
   import type { SearchHit } from "./lib/types";
 
-  let { onpick }: { onpick: (symbol: string) => Promise<string | null> } = $props();
+  let { onpick, recent, current }: { onpick: (symbol: string) => Promise<string | null>; recent: string[]; current: string } = $props();
 
   let q = $state("");
-  let hits = $state<SearchHit[]>([]);
+  let found = $state<SearchHit[]>([]);
+  const showRecent = $derived(!q.trim());
+  const hits = $derived<SearchHit[]>(
+    showRecent ? recent.filter((s) => s !== current).map((symbol) => ({ symbol, name: "", exchange: "", kind: "" })) : found,
+  );
   let active = $state(0);
   let open = $state(false);
   let busy = $state(false);
@@ -29,8 +33,9 @@
     cancelSearch();
     const query = q.trim();
     if (!query) {
-      hits = [];
-      open = false;
+      found = [];
+      active = 0;
+      open = true;
       return;
     }
     timer = setTimeout(async () => {
@@ -38,7 +43,7 @@
       try {
         const res = await invoke<SearchHit[]>("search", { q: query });
         if (mine !== seq) return;
-        hits = res;
+        found = res;
         active = 0;
         open = true;
       } catch (e) {
@@ -55,7 +60,7 @@
     busy = false;
     if (!error) {
       q = "";
-      hits = [];
+      found = [];
     }
   }
 
@@ -86,20 +91,26 @@
     bind:value={q}
     oninput={onInput}
     onkeydown={onKey}
-    onfocus={() => (open = hits.length > 0)}
+    onfocus={() => {
+      active = 0;
+      open = hits.length > 0;
+    }}
     onblur={() => setTimeout(() => (open = false), 120)}
     disabled={busy}
     aria-invalid={!!error}
   />
   {#if error}<div class="error">{error}</div>{/if}
   {#if open && hits.length}
-    <ul role="listbox">
+    <ul role="listbox" aria-label={showRecent ? "Recent symbols" : "Search results"}>
+      {#if showRecent}<li role="presentation" class="head">Recent</li>{/if}
       {#each hits as h, i (h.symbol)}
         <li role="option" aria-selected={i === active}>
           <button class:active={i === active} onmousedown={(e) => e.preventDefault()} onclick={() => pick(h.symbol)}>
             <b>{h.symbol}</b>
-            <span class="n">{h.name}</span>
-            <span class="x">{h.exchange}{h.kind ? ` · ${h.kind}` : ""}</span>
+            {#if !showRecent}
+              <span class="n">{h.name}</span>
+              <span class="x">{h.exchange}{h.kind ? ` · ${h.kind}` : ""}</span>
+            {/if}
           </button>
         </li>
       {/each}
@@ -168,6 +179,11 @@
   button.active,
   button:hover {
     background: var(--surface);
+  }
+  .head {
+    padding: 3px 8px;
+    color: var(--muted);
+    font-size: 11px;
   }
   b {
     grid-row: span 2;

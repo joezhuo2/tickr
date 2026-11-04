@@ -55,6 +55,7 @@ pub struct Init {
     drawings: std::collections::HashMap<String, Vec<crate::settings::Drawing>>,
     indicator_presets: Vec<IndicatorPreset>,
     alerts: Vec<PriceAlert>,
+    recent_symbols: Vec<String>,
 }
 
 fn data_uri(png: &[u8]) -> String {
@@ -99,6 +100,7 @@ pub fn init_payload(shared: &Shared) -> Init {
         drawings: s.drawings,
         indicator_presets: s.indicator_presets,
         alerts: s.alerts,
+        recent_symbols: s.recent_symbols,
     }
 }
 
@@ -162,6 +164,7 @@ pub async fn set_symbol(app: AppHandle, shared: State<'_, Arc<Shared>>, symbol: 
     if shared.revision() != revision { return Err("Market data settings changed; try again".into()); }
     let state = QuoteState { quote: Some(q), error: None, updated_at: now_secs() };
     settings.symbol = symbol.clone();
+    crate::settings::push_recent(&mut settings.recent_symbols, &symbol);
     if let Err(e) = settings.save(&shared.settings_path) { log::warn!("save settings: {e}"); }
     *lock(&shared.quote) = state.clone();
     drop(settings);

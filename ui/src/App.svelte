@@ -54,6 +54,7 @@
   import type { Theme, TextSize, Palette } from "./lib/types";
   import { refreshOutcome, type RefreshView } from "./lib/refresh";
   import { paneIn } from "./lib/motion";
+  import { emptyHistory, goBack, goForward, previous, pushRecent, visit, type History, type Move } from "./lib/history";
 
   // Injected before load, so the first frame already has real content.
   const boot = window.__TICKR_INIT__ ?? null;
@@ -147,6 +148,10 @@
   let groups = $state<Group[]>([]);
   let groupTab = $state<string | null>(null);
   let alerts = $state<PriceAlert[]>([]);
+  let recent = $state<string[]>([]);
+  let history = $state<History>(emptyHistory());
+  let navigating = false;
+  let picking = 0;
   let now = $state(Date.now() / 1000);
   let refreshing = $state(false);
   let refreshStatus = $state<ReturnType<typeof refreshOutcome> | null>(null);
@@ -245,6 +250,7 @@
     watchlist = init.watchlist ?? [];
     groups = init.groups ?? [];
     alerts = init.alerts ?? [];
+    recent = init.recent_symbols ?? [];
     if (init.logo_known) logo = init.logo;
     if (init.analyst_known) analyst = init.analyst;
     // Shown at once, refreshed by loadChart (at = 0 marks it stale).
@@ -421,9 +427,36 @@
   }
 
   async function pickSymbol(next: string): Promise<string | null> {
+    if (navigating) return "Still switching symbol";
+    const from = symbol;
+    picking++;
+    try {
+      const error = await switchSymbol(next);
+      if (!error) history = visit(history, from, symbol);
+      return error;
+    } finally {
+      picking--;
+    }
+  }
+
+  async function navigate(move: (h: History, current: string) => Move | null) {
+    const m = navigating || picking ? null : move(history, symbol);
+    if (!m) return;
+    navigating = true;
+    try {
+      const error = await switchSymbol(m.to);
+      if (error) console.warn(error);
+      else history = m.history;
+    } finally {
+      navigating = false;
+    }
+  }
+
+  async function switchSymbol(next: string): Promise<string | null> {
     try {
       qs = await invoke<QuoteState>("set_symbol", { symbol: next });
       symbol = qs.quote?.symbol ?? next.toUpperCase();
+      recent = pushRecent(recent, symbol);
       clearAnalysis();
       logo = undefined;
       loadChart();
@@ -599,6 +632,11 @@
   function onKey(e: KeyboardEvent) {
     if (!ready || settingsOpen || e.defaultPrevented) return;
     if (e.target instanceof Element && e.target.closest("input, textarea, select, [contenteditable]")) return;
+    if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+      e.preventDefault();
+      if (!e.repeat) navigate(e.key === "ArrowLeft" ? goBack : goForward);
+      return;
+    }
     const key = bindKey(e);
     const action = key && actionFor(keybinds, key);
     if (!action) return;
@@ -669,6 +707,9 @@
       case "search":
         search?.focus();
         break;
+      case "previous_symbol":
+        if (!e.repeat) navigate(previous);
+        break;
     }
   }
 
@@ -728,7 +769,15 @@
       />
       <section>
         <div class="toolbar">
-          <Search bind:this={search} onpick={pickSymbol} />
+          <div class="nav">
+            <button title="Back (Alt+←)" aria-label="Back (Alt+←)" disabled={!history.back.length} onclick={() => navigate(goBack)}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+            </button>
+            <button title="Forward (Alt+→)" aria-label="Forward (Alt+→)" disabled={!history.forward.length} onclick={() => navigate(goForward)}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+            </button>
+            <Search bind:this={search} onpick={pickSymbol} {recent} current={symbol} />
+          </div>
           <div class="views">
             <div class="seg">
               <button class:on={view === "options"} aria-pressed={view === "options"} onclick={toggleOptions}>Options</button>
@@ -910,6 +959,38 @@
   .views {
     display: flex;
     gap: 6px;
+  }
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .nav button {
+    width: 24px;
+    height: 24px;
+    padding: 3px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .nav button:hover:not(:disabled) {
+    background: var(--surface);
+    color: var(--text);
+  }
+  .nav button:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .nav svg {
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   .seg {
     display: flex;

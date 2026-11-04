@@ -135,6 +135,7 @@ pub struct Keybinds {
     pub add_watchlist: String,
     pub events: String,
     pub next_group: String,
+    pub previous_symbol: String,
 }
 
 impl Default for Keybinds {
@@ -161,6 +162,7 @@ impl Default for Keybinds {
             add_watchlist: "f".into(),
             events: "k".into(),
             next_group: "g".into(),
+            previous_symbol: "b".into(),
         }
     }
 }
@@ -322,6 +324,16 @@ pub struct Settings {
     /// Classify headline tone with the AI endpoint from .env.local.
     pub ai_news: bool,
     pub alerts: Vec<crate::alerts::PriceAlert>,
+    /// Most recently viewed symbols, newest first.
+    pub recent_symbols: Vec<String>,
+}
+
+pub const MAX_RECENT_SYMBOLS: usize = 10;
+
+pub fn push_recent(recent: &mut Vec<String>, symbol: &str) {
+    recent.retain(|s| s != symbol);
+    recent.insert(0, symbol.to_string());
+    recent.truncate(MAX_RECENT_SYMBOLS);
 }
 
 impl Default for Settings {
@@ -357,6 +369,7 @@ impl Default for Settings {
             dots: Dots::default(),
             ai_news: true,
             alerts: Vec::new(),
+            recent_symbols: Vec::new(),
         }
     }
 }
@@ -530,6 +543,19 @@ mod tests {
         assert!(s.auto_update);
         assert!(s.alerts.is_empty());
         assert!(s.ai_news);
+        assert!(s.recent_symbols.is_empty());
+    }
+
+    #[test]
+    fn recent_symbols_move_to_front_dedupe_and_cap() {
+        let mut recent = vec!["AAPL".to_string(), "MSFT".to_string(), "NVDA".to_string()];
+        push_recent(&mut recent, "NVDA");
+        assert_eq!(recent, ["NVDA", "AAPL", "MSFT"]);
+        push_recent(&mut recent, "TSLA");
+        assert_eq!(recent, ["TSLA", "NVDA", "AAPL", "MSFT"]);
+        for n in 0..20 { push_recent(&mut recent, &format!("S{n}")); }
+        assert_eq!(recent.len(), MAX_RECENT_SYMBOLS);
+        assert_eq!(recent[0], "S19");
     }
 
     #[test]
@@ -549,6 +575,7 @@ mod tests {
         assert_eq!(s.keybinds.options_expiry, "d");
         assert_eq!(s.keybinds.add_watchlist, "f");
         assert_eq!(s.keybinds.next_group, "g");
+        assert_eq!(s.keybinds.previous_symbol, "b");
         assert!(!s.dots.news);
         assert!(s.dots.earnings && s.dots.analysts);
     }
