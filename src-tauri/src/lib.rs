@@ -107,6 +107,7 @@ pub fn run() {
             commands::set_dots,
             commands::get_ai_config,
             commands::set_ai_config,
+            commands::clear_ai_key,
             commands::add_alert,
             commands::set_alert_enabled,
             commands::delete_alert,
