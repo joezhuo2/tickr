@@ -9,6 +9,7 @@ pub mod alerts;
 pub mod analyst;
 pub mod autostart;
 pub mod commands;
+pub mod connections;
 pub mod earnings;
 pub mod events;
 pub mod grades;
@@ -81,6 +82,9 @@ pub fn run() {
         .manage(shared.clone())
         .invoke_handler(tauri::generate_handler![
             commands::get_init,
+            connections::get_connections,
+            connections::retry_connection,
+            connections::get_diagnostics,
             commands::get_data_provider,
             commands::set_data_provider,
             commands::clear_alpaca_keys,
