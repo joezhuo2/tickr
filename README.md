@@ -299,7 +299,9 @@ keyword lexicon by default. Optionally, Settings > AI > News analysis sends new
 headlines to any OpenAI-compatible chat-completions endpoint (OpenAI, Ollama,
 LM Studio, ...) to classify them as positive, neutral or negative. Fill in the
 base URL (for example `https://api.openai.com/v1`), the model and, if the
-endpoint needs one, the API key. The key may stay empty for local endpoints.
+endpoint needs one, the API key. The key may stay empty for local endpoints. A saved key is never sent back to
+the page: the field shows "Key saved", leaving it blank keeps the key, and Clear
+removes it.
 
 Model is the master model. To use a different one for a feature, fill in News
 model (headline tone) or Events model (event analysis); a blank field uses
