@@ -6,6 +6,15 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.10] - 2026-11-04
+
+### Added
+- **Connections panel** ([#111](https://github.com/joezhuo2/tickr/issues/111)):
+  Settings > Connections shows quote, news and AI status, the last success and a
+  readable error, with Retry for each. Copy diagnostics copies app and OS
+  versions, the log folder and connection details with credentials, the AI base
+  URL and your home folder redacted.
+
 ## [0.10.9] - 2026-11-04
 
 ### Added
