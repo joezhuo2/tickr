@@ -30,6 +30,7 @@
     type FeedArticle,
     type Chart,
     type ChartMode,
+    type RefreshMode,
     type ChartScale,
     type Market,
     type Options,
@@ -77,6 +78,7 @@
   }
 
   let mode = $state<ChartMode>("line");
+  let refreshMode = $state<RefreshMode>("balanced");
   let scale = $state<ChartScale>("linear");
   let hotkey = $state("");
   let defaultHotkey = $state("");
@@ -196,6 +198,7 @@
     interval = validInterval(range, init.interval);
     drawings = init.drawings ?? {};
     mode = init.chart_mode;
+    refreshMode = init.refresh_mode ?? "balanced";
     scale = init.chart_scale;
     hotkey = init.hotkey;
     defaultHotkey = init.default_hotkey;
@@ -579,13 +582,22 @@
     }
   }
 
+  function refreshChart() {
+    if (refreshMode === "low_power" && (document.hidden || loading)) return;
+    if (/^\d+m$/.test(chart?.interval ?? "") && Date.now() - chartAt > FRESH_MS) loadChart(true);
+  }
+
   onMount(() => {
+    const onVisible = () => {
+      if (refreshMode === "low_power" && !document.hidden) refreshChart();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     if (!boot) invoke<Init>("get_init").then(apply);
     const un = listen<QuoteState>("quote", (e) => {
       qs = e.payload;
       refreshing = false;
       // Keep intraday-candle charts (1D, 5D, 1M) current; daily ones barely move.
-      if (/^\d+m$/.test(chart?.interval ?? "") && Date.now() - chartAt > FRESH_MS) loadChart(true);
+      refreshChart();
     });
     const tick = setInterval(() => (now = Date.now() / 1000), 15_000);
     const unProvider = listen<DataProvider>("data-provider", (e) => {
@@ -603,6 +615,7 @@
       unStream.then((f) => f());
       unAlerts.then((f) => f());
       clearInterval(tick);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   });
 </script>
@@ -692,7 +705,7 @@
         {#key view}
           <div class="pane" in:paneIn={view === "watchlist" ? { y: 16, speed: "slow" } : {}}>
             {#if view === "watchlist"}
-              <Watchlist symbols={watchlist} {groups} current={symbol} bind:tab={groupTab} onopen={openWatched} ongroups={saveGroups} />
+              <Watchlist {refreshMode} symbols={watchlist} {groups} current={symbol} bind:tab={groupTab} onopen={openWatched} ongroups={saveGroups} />
             {:else if view === "alerts"}
               <Alerts {symbol} {quote} {alerts} onchange={(next) => (alerts = next)} />
             {:else if view === "analysts"}
@@ -765,7 +778,7 @@
       onrefresh={refresh}
     />
     {#if settingsOpen}
-      <Settings bind:hotkey bind:error={hotkeyError} {defaultHotkey} bind:keybinds bind:dots onclose={() => (settingsOpen = false)} />
+      <Settings bind:refreshMode bind:hotkey bind:error={hotkeyError} {defaultHotkey} bind:keybinds bind:dots onclose={() => (settingsOpen = false)} />
     {/if}
   </div>
 {/if}

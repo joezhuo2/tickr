@@ -4,7 +4,7 @@
   import { actionFor, bindKey, groupActions, keyLabel, rebind, type Action } from "./lib/keybinds";
   import { backdrop, dialog } from "./lib/motion";
   import { onMount } from "svelte";
-  import type { AiConfig, DataProvider, Dots, Keybinds } from "./lib/types";
+  import type { AiConfig, DataProvider, Dots, Keybinds, RefreshMode } from "./lib/types";
 
   let {
     hotkey = $bindable(),
@@ -12,6 +12,7 @@
     defaultHotkey,
     keybinds = $bindable(),
     dots = $bindable(),
+    refreshMode = $bindable(),
     onclose,
   }: {
     hotkey: string;
@@ -20,6 +21,7 @@
     defaultHotkey: string;
     keybinds: Keybinds;
     dots: Dots;
+    refreshMode: RefreshMode;
     onclose: () => void;
   } = $props();
 
@@ -153,6 +155,15 @@
       <h2>Settings</h2>
       <button class="close" aria-label="Close" onclick={onclose}>×</button>
     </header>
+
+    <div class="row">
+      <label for="refresh-mode">Background refresh</label>
+      <select id="refresh-mode" class="field" bind:value={refreshMode} onchange={() => invoke("set_refresh_mode", { mode: refreshMode }).catch(console.warn)}>
+        <option value="balanced">Balanced</option>
+        <option value="low_power">Low-power</option>
+      </select>
+    </div>
+    <p class="hint">Low-power slows updates while the window is hidden, and alerts keep their usual cadence.</p>
 
     <h3>Global hotkey</h3>
     <div class="row">

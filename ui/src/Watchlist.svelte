@@ -2,10 +2,11 @@
   import { invoke } from "@tauri-apps/api/core";
   import { untrack } from "svelte";
   import { byGain, direction, price, sessionMove, signed } from "./lib/format";
-  import type { Group, WatchQuote } from "./lib/types";
+  import type { Group, RefreshMode, WatchQuote } from "./lib/types";
 
   let {
     symbols,
+    refreshMode,
     groups,
     current,
     tab = $bindable(),
@@ -13,6 +14,7 @@
     ongroups,
   }: {
     symbols: string[];
+    refreshMode: RefreshMode;
     groups: Group[];
     /** The symbol shown in the chart, highlighted. */
     current: string;
@@ -82,8 +84,12 @@
   // Biggest gain first, by the move of the session now trading.
   const order = $derived(byGain(shown, (s) => moves[s]?.pct));
 
+  let loadedAt = 0;
+  let loading = false;
+
   async function load(list: string[]) {
     if (!list.length) return;
+    loading = true;
     try {
       const got = await invoke<WatchQuote[]>("get_watch_quotes", { symbols: list });
       const next = { ...quotes };
@@ -92,8 +98,11 @@
         next[q.symbol] = q.quote || !next[q.symbol]?.quote ? q : { ...next[q.symbol], error: q.error };
       }
       quotes = next;
+      loadedAt = Date.now();
     } catch {
       // Offline: cards keep what they have.
+    } finally {
+      loading = false;
     }
   }
 
@@ -101,9 +110,22 @@
   const key = $derived([...symbols].sort().join(","));
   $effect(() => {
     key;
-    untrack(() => load(symbols));
-    const t = setInterval(() => load(symbols), REFRESH_MS);
-    return () => clearInterval(t);
+    const refresh = () => {
+      if (refreshMode === "low_power" && document.hidden) return;
+      if (refreshMode === "balanced" || !loading) load(symbols);
+    };
+    const onVisible = () => {
+      if (refreshMode === "low_power" && !document.hidden && Date.now() - loadedAt > REFRESH_MS) refresh();
+    };
+    untrack(() => {
+      if (refreshMode !== "low_power" || !document.hidden) load(symbols);
+    });
+    const t = setInterval(refresh, REFRESH_MS);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   });
 </script>
 
