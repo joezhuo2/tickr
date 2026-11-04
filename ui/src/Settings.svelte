@@ -4,9 +4,12 @@
   import { actionFor, bindKey, groupActions, keyLabel, rebind, type Action } from "./lib/keybinds";
   import { backdrop, dialog } from "./lib/motion";
   import { onMount } from "svelte";
-  import type { AiConfig, DataProvider, Dots, Keybinds, RefreshMode } from "./lib/types";
+  import type { AiConfig, DataProvider, Dots, Keybinds, RefreshMode, Theme, TextSize, Palette } from "./lib/types";
 
   let {
+    theme = $bindable(),
+    textSize = $bindable(),
+    palette = $bindable(),
     hotkey = $bindable(),
     error = $bindable(null),
     defaultHotkey,
@@ -15,6 +18,9 @@
     refreshMode = $bindable(),
     onclose,
   }: {
+    theme: Theme;
+    textSize: TextSize;
+    palette: Palette;
     hotkey: string;
     /** Set by the backend when the saved hotkey could not be registered. */
     error?: string | null;
@@ -24,6 +30,21 @@
     refreshMode: RefreshMode;
     onclose: () => void;
   } = $props();
+
+  let displayError = $state<string | null>(null);
+  let displayBusy = $state(false);
+  async function saveDisplay(command: string, args: Record<string, string | number>, apply: () => void) {
+    displayBusy = true;
+    displayError = null;
+    try {
+      await invoke(command, args);
+      apply();
+    } catch (e) {
+      displayError = String(e);
+    } finally {
+      displayBusy = false;
+    }
+  }
 
   const DOTS: { id: keyof Dots; label: string }[] = [
     { id: "earnings", label: "Earnings" },
@@ -155,6 +176,27 @@
       <h2>Settings</h2>
       <button class="close" aria-label="Close" onclick={onclose}>×</button>
     </header>
+
+    <h3>Display</h3>
+    <label class="row">
+      <span>Theme</span>
+      <select class="field" value={theme} disabled={displayBusy} onchange={(e) => { const next = e.currentTarget.value as Theme; saveDisplay("set_theme", { theme: next }, () => theme = next); }}>
+        <option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option>
+      </select>
+    </label>
+    <label class="row">
+      <span>Text size</span>
+      <select class="field" value={textSize} disabled={displayBusy} onchange={(e) => { const next = Number(e.currentTarget.value) as TextSize; saveDisplay("set_text_size", { percent: next }, () => textSize = next); }}>
+        <option value={100}>100%</option><option value={110}>110%</option><option value={125}>125%</option><option value={150}>150%</option>
+      </select>
+    </label>
+    <label class="row">
+      <span>Gain/loss colors</span>
+      <select class="field" value={palette} disabled={displayBusy} onchange={(e) => { const next = e.currentTarget.value as Palette; saveDisplay("set_palette", { palette: next }, () => palette = next); }}>
+        <option value="standard">Standard</option><option value="accessible">Accessible blue and orange</option>
+      </select>
+    </label>
+    {#if displayError}<p class="error">{displayError}</p>{/if}
 
     <div class="row">
       <label for="refresh-mode">Background refresh</label>
