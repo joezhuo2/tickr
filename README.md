@@ -120,6 +120,7 @@ taskbar to keep it visible.
 - **Price scales:** linear, logarithmic, or percentage change rebased to the
   first visible candle as you pan and zoom. Press L to cycle scales.
 - **Drawings:** the toolbar places levels, trendlines and text, saved per symbol.
+  Keys 1 to 4 pick the level, trendline, text and ruler tools.
   Drag to move them or adjust trend endpoints, and Delete removes the selection.
   Ctrl+Z undoes, Ctrl+Shift+Z redoes, and Escape returns to Cursor. The ruler
   measures price, percent, bars and elapsed time without saving.
@@ -270,6 +271,10 @@ typing in a text field.
 | Chart | `C` | Switch line / candles |
 | | `L` | Cycle price scale (Lin, Log, %) |
 | | `I` | Cycle candle length (Auto, then the lengths the range allows) |
+| | `1` | Draw level (press again for Cursor) |
+| | `2` | Draw trendline |
+| | `3` | Draw text |
+| | `4` | Ruler |
 | | `V` | Cycle date range |
 | | `R` | Refresh |
 | Panels | `T` | Open Technicals |
