@@ -6,6 +6,16 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.17] - 2026-11-04
+
+### Changed
+- **Data freshness labels** ([#105](https://github.com/joezhuo2/tickr/issues/105)):
+  the footer shows source, quote time, chart time and known delay separately
+  instead of a plain Live. Quote and chart are marked stale independently, with
+  a note beside the affected content. Live only shows when the quote is recent
+  and the market is open, and delay shows as unknown when the source does not
+  say.
+
 ## [0.10.16] - 2026-11-04
 
 ### Added
