@@ -76,6 +76,47 @@ pub enum ChartTimeZone {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
+pub enum SplitOrientation {
+    #[default]
+    Side,
+    Stacked,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ChartLayout {
+    pub split: bool,
+    pub orientation: SplitOrientation,
+    pub sync_range: bool,
+    pub symbol: String,
+    pub range: String,
+    pub interval: String,
+}
+
+impl Default for ChartLayout {
+    fn default() -> Self {
+        Self { split: false, orientation: SplitOrientation::Side, sync_range: false, symbol: String::new(), range: String::new(), interval: "auto".into() }
+    }
+}
+
+impl ChartLayout {
+    pub fn cleaned(self) -> Result<Self, String> {
+        let symbol = self.symbol.trim().to_uppercase();
+        if symbol.chars().count() > 32 || !symbol.chars().all(|c| c.is_ascii_alphanumeric() || ".-^=_".contains(c)) {
+            return Err("Invalid second chart symbol".into());
+        }
+        if !self.range.is_empty() && crate::quote::interval_for(&self.range).is_none() {
+            return Err(format!("unknown range {}", self.range));
+        }
+        if self.interval != "auto" && !crate::quote::intervals_for(&self.range).contains(&self.interval.as_str()) {
+            return Err(format!("unknown interval {}", self.interval));
+        }
+        Ok(Self { symbol, ..self })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
 pub enum WatchlistSortKey {
     #[default]
     Change,
@@ -265,6 +306,7 @@ pub struct Keybinds {
     pub draw_text: String,
     pub draw_ruler: String,
     pub draw_pen: String,
+    pub chart_split: String,
     pub refresh: String,
     pub range: String,
     pub technicals: String,
@@ -298,6 +340,7 @@ impl Default for Keybinds {
             draw_text: "3".into(),
             draw_ruler: "4".into(),
             draw_pen: "5".into(),
+            chart_split: "j".into(),
             refresh: "r".into(),
             range: "v".into(),
             technicals: "t".into(),
@@ -459,6 +502,7 @@ pub struct Settings {
     pub chart_extended_hours: bool,
     pub chart_shade_sessions: bool,
     pub chart_time_zone: ChartTimeZone,
+    pub chart_layout: ChartLayout,
     pub hotkey: String,
     pub geometry: Option<Geometry>,
     // Tray menu toggles.
@@ -518,6 +562,7 @@ impl Default for Settings {
             chart_extended_hours: true,
             chart_shade_sessions: true,
             chart_time_zone: ChartTimeZone::Exchange,
+            chart_layout: ChartLayout::default(),
             hotkey: DEFAULT_HOTKEY.into(),
             geometry: None,
             show_extended: true,
@@ -761,6 +806,7 @@ mod tests {
         assert_eq!(s.keybinds.draw_text, "3");
         assert_eq!(s.keybinds.draw_ruler, "4");
         assert_eq!(s.keybinds.draw_pen, "5");
+        assert_eq!(s.keybinds.chart_split, "j");
         assert_eq!(s.keybinds.settings, ",");
         assert_eq!(s.keybinds.toggle_watchlist, "w");
         assert_eq!(s.keybinds.watchlist, "x");
@@ -832,6 +878,43 @@ mod tests {
         s.save(&p).unwrap();
         assert_eq!(Settings::load(&p), s);
         assert!(!Settings::load(&p).show_extended);
+    }
+
+    #[test]
+    fn chart_layout_defaults_for_old_settings_and_roundtrips() {
+        let old: Settings = serde_json::from_str(r#"{"symbol":"NVDA"}"#).unwrap();
+        assert_eq!(old.chart_layout, ChartLayout::default());
+        assert!(!old.chart_layout.split);
+        assert_eq!(old.chart_layout.orientation, SplitOrientation::Side);
+        assert!(!old.chart_layout.sync_range);
+        assert_eq!(old.chart_layout.interval, "auto");
+        let partial: Settings = serde_json::from_str(r#"{"chart_layout":{"split":true,"orientation":"stacked"}}"#).unwrap();
+        assert!(partial.chart_layout.split);
+        assert_eq!(partial.chart_layout.orientation, SplitOrientation::Stacked);
+        assert!(partial.chart_layout.symbol.is_empty() && partial.chart_layout.range.is_empty());
+        assert!(serde_json::from_str::<Settings>(r#"{"chart_layout":{"orientation":"diagonal"}}"#).is_err());
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        let s = Settings {
+            chart_layout: ChartLayout { split: true, orientation: SplitOrientation::Stacked, sync_range: true, symbol: "MSFT".into(), range: "1y".into(), interval: "1d".into() },
+            ..Settings::default()
+        };
+        s.save(&p).unwrap();
+        assert_eq!(Settings::load(&p), s);
+        assert_eq!(serde_json::to_value(&s.chart_layout).unwrap()["orientation"], serde_json::json!("stacked"));
+    }
+
+    #[test]
+    fn chart_layout_cleaning_normalizes_and_rejects() {
+        let layout = |symbol: &str, range: &str, interval: &str| ChartLayout { symbol: symbol.into(), range: range.into(), interval: interval.into(), ..ChartLayout::default() };
+        assert_eq!(layout(" brk-b ", "1y", "1d").cleaned().unwrap().symbol, "BRK-B");
+        assert_eq!(layout("", "", "auto").cleaned().unwrap(), ChartLayout::default());
+        assert!(layout("^GSPC", "5d", "15m").cleaned().is_ok());
+        assert!(layout("A B", "1y", "auto").cleaned().is_err());
+        assert!(layout(&"A".repeat(33), "1y", "auto").cleaned().is_err());
+        assert!(layout("AAPL", "2y", "auto").cleaned().is_err());
+        assert!(layout("AAPL", "1y", "5m").cleaned().is_err());
+        assert!(layout("AAPL", "", "1d").cleaned().is_err());
     }
 
     #[test]

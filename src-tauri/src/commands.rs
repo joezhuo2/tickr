@@ -20,7 +20,7 @@ use crate::stats::Section;
 use crate::news::Article;
 use crate::quote::{self, Chart, Quote, SearchHit};
 use crate::screener::{self, ScreenRow};
-use crate::settings::{EventFilter, ChartTimeZone, Theme, Palette, validate_text_size, RefreshMode, ChartMode, ChartScale, Dots, Group, WatchlistSort, WatchlistView, SavedScreen, ScreenRule, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
+use crate::settings::{EventFilter, ChartLayout, ChartTimeZone, Theme, Palette, validate_text_size, RefreshMode, ChartMode, ChartScale, Dots, Group, WatchlistSort, WatchlistView, SavedScreen, ScreenRule, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
 use crate::state::{lock, now_secs, QuoteState, Shared};
 
 #[derive(Serialize)]
@@ -38,6 +38,7 @@ pub struct Init {
     chart_extended_hours: bool,
     chart_shade_sessions: bool,
     chart_time_zone: ChartTimeZone,
+    chart_layout: ChartLayout,
     hotkey: String,
     default_hotkey: &'static str,
     /// Why the hotkey is not registered, if it is not.
@@ -95,6 +96,7 @@ pub fn init_payload(shared: &Shared) -> Init {
         chart_extended_hours: s.chart_extended_hours,
         chart_shade_sessions: s.chart_shade_sessions,
         chart_time_zone: s.chart_time_zone,
+        chart_layout: s.chart_layout,
         hotkey: s.hotkey,
         default_hotkey: DEFAULT_HOTKEY,
         hotkey_error: lock(&shared.hotkey_error).clone(),
@@ -126,12 +128,12 @@ pub fn get_init(shared: State<'_, Arc<Shared>>) -> Init {
 }
 
 #[tauri::command]
-pub async fn get_chart(shared: State<'_, Arc<Shared>>, symbol: String, range: String, interval: String, extended: bool) -> Result<Chart, String> {
+pub async fn get_chart(shared: State<'_, Arc<Shared>>, symbol: String, range: String, interval: String, extended: bool, secondary: Option<bool>) -> Result<Chart, String> {
     let revision = shared.revision();
     let chart = crate::provider::Provider::current(&shared).fetch_chart(&shared.http, &symbol, &range, &interval, extended).await?;
     let _settings = lock(&shared.settings);
     if shared.revision() != revision { return Err("Market data settings changed; try again".into()); }
-    *lock(&shared.last_chart) = Some(chart.clone());
+    if secondary != Some(true) { *lock(&shared.last_chart) = Some(chart.clone()); }
     Ok(chart)
 }
 
@@ -273,6 +275,13 @@ pub fn set_chart_shade_sessions(shared: State<'_, Arc<Shared>>, enabled: bool) {
 #[tauri::command]
 pub fn set_chart_time_zone(shared: State<'_, Arc<Shared>>, zone: ChartTimeZone) {
     shared.update_settings(|s| s.chart_time_zone = zone);
+}
+
+#[tauri::command]
+pub fn set_chart_layout(shared: State<'_, Arc<Shared>>, layout: ChartLayout) -> Result<ChartLayout, String> {
+    let layout = layout.cleaned()?;
+    shared.update_settings(|s| s.chart_layout = layout.clone());
+    Ok(layout)
 }
 
 #[tauri::command]

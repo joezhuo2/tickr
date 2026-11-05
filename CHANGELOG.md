@@ -6,6 +6,15 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.22] - 2026-11-05
+
+### Added
+- **Two synchronized charts** ([#95](https://github.com/joezhuo2/tickr/issues/95)):
+  optional second chart pane, side by side or stacked, with its own symbol and
+  range. Crosshair time is linked across both charts, and an optional sync
+  toggle moves both to the same time window. The layout is saved; the default
+  stays a single chart.
+
 ## [0.10.21] - 2026-11-05
 
 ### Added

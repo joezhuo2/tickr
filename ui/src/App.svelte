@@ -16,6 +16,7 @@
   import Left from "./Left.svelte";
   import News from "./News.svelte";
   import Search from "./Search.svelte";
+  import SecondChart from "./SecondChart.svelte";
   import Settings from "./Settings.svelte";
   import Technicals from "./Technicals.svelte";
   import Watchlist from "./Watchlist.svelte";
@@ -35,6 +36,7 @@
     type RefreshMode,
     type ChartScale,
     type ChartTimeZone,
+    type ChartLayout,
     type Market,
     type Options,
     type Consensus,
@@ -69,6 +71,7 @@
   import { emptyHistory, goBack, goForward, previous, pushRecent, visit, type History, type Move } from "./lib/history";
   import { DEFAULT_WATCHLIST_SORT } from "./lib/watchlistSort";
   import { DEFAULT_EVENT_FILTER, localDay, weekRange } from "./lib/calendar";
+  import type { TimeWindow } from "./lib/chartsync";
 
   // Injected before load, so the first frame already has real content.
   const boot = window.__TICKR_INIT__ ?? null;
@@ -111,6 +114,12 @@
   let chartExtended = $state(true);
   let shadeSessions = $state(true);
   let chartTimeZone = $state<ChartTimeZone>("exchange");
+  let layout = $state<ChartLayout>({ split: false, orientation: "side", sync_range: false, symbol: "", range: "", interval: "auto" });
+  let layoutWrite = Promise.resolve();
+  let secondView: SecondChart | undefined = $state();
+  type Pane = "main" | "second";
+  let syncHover = $state.raw<{ source: Pane; t: number } | null>(null);
+  let syncWindow = $state.raw<{ source: Pane; w: TimeWindow } | null>(null);
   let hotkey = $state("");
   let defaultHotkey = $state("");
   let hotkeyError = $state<string | null>(null);
@@ -285,6 +294,7 @@
     chartExtended = init.chart_extended_hours ?? true;
     shadeSessions = init.chart_shade_sessions ?? true;
     chartTimeZone = init.chart_time_zone ?? "exchange";
+    if (init.chart_layout) layout = init.chart_layout;
     hotkey = init.hotkey;
     defaultHotkey = init.default_hotkey;
     hotkeyError = init.hotkey_error;
@@ -784,6 +794,7 @@
     });
     invoke("refresh_quote").catch((e) => finishQuote?.(String(e)));
     const chartDone = loadChart(true, true);
+    void secondView?.load(true);
     let panelDone: Promise<string | void>;
     switch (activeView) {
       case "news": panelDone = newsScope === "symbol" ? loadNews(true) : loadFeed(newsScope, [...feedSymbols], true); break;
@@ -827,6 +838,20 @@
     invoke("set_chart_time_zone", { zone }).catch(console.warn);
   }
 
+  function saveLayout(patch: Partial<ChartLayout>) {
+    const next = { ...layout, ...patch };
+    if (!next.split || !next.sync_range) syncWindow = null;
+    if (!next.split) syncHover = null;
+    if (next.split && view !== "chart") view = "chart";
+    layout = next;
+    layoutWrite = layoutWrite.then(() => invoke<ChartLayout>("set_chart_layout", { layout: next })).then(() => undefined, console.warn);
+  }
+
+  function hoverFrom(source: Pane, t: number | null) {
+    if (t != null) syncHover = { source, t };
+    else if (syncHover?.source === source) syncHover = null;
+  }
+
   function setMode(m: ChartMode) {
     if (view !== "technicals") view = "chart";
     mode = m;
@@ -866,6 +891,13 @@
         break;
       case "chart_interval":
         changeInterval(nextInterval(range, interval));
+        break;
+      case "chart_split":
+        if (!e.repeat) {
+          const split = view !== "chart" || !layout.split;
+          view = "chart";
+          saveLayout({ split });
+        }
         break;
       case "draw_level":
       case "draw_trend":
@@ -955,6 +987,8 @@
       cache.clear();
       clearAnalysis();
       void loadChart(true);
+      secondView?.clearCache();
+      void secondView?.load(true);
     });
     const unStream = listen<StreamStatus>("stream-status", (e) => (dataProvider.stream = e.payload));
     invoke<DataProvider>("get_data_provider").then((c) => (dataProvider = c)).catch(console.warn);
@@ -1070,6 +1104,17 @@
               <button class:on={chartExtended} aria-pressed={chartExtended} title="Show pre-market and after-hours candles" onclick={() => saveChartExtended(!chartExtended)}>Ext</button>
             </div>
           {/if}
+          <div class="seg" role="group" aria-label="Chart layout">
+            {#each [{ id: "single", label: "1", title: "One chart" }, { id: "side", label: "Side", title: "Two charts side by side" }, { id: "stacked", label: "Stack", title: "Two charts stacked" }] as l (l.id)}
+              {@const on = view === "chart" && (l.id === "single" ? !layout.split : layout.split && layout.orientation === l.id)}
+              <button class:on aria-pressed={on} title={l.title} aria-label={l.title} onclick={() => saveLayout(l.id === "single" ? { split: false } : { split: true, orientation: l.id as ChartLayout["orientation"] })}>{l.label}</button>
+            {/each}
+          </div>
+          {#if layout.split}
+            <div class="seg" role="group" aria-label="Chart sync">
+              <button class:on={layout.sync_range} aria-pressed={layout.sync_range} title="Pan and zoom both charts together" onclick={() => saveLayout({ sync_range: !layout.sync_range })}>Sync</button>
+            </div>
+          {/if}
         </div>
         {#key view}
           <div class="pane" in:paneIn={view === "watchlist" ? { y: 16, speed: "slow" } : {}}>
@@ -1143,15 +1188,63 @@
                   onanalyze={() => runAnalysis()}
                 />
               </div>
-            {:else if chart}
-              <ChartView bind:this={chartView} redrawKey={displayKey} {chart} staleNote={chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
-            {:else if chartError}
-              <div class="msg">
-                {chartError}
-                <button class="retry" onclick={() => loadChart(true)}>Retry</button>
-              </div>
             {:else}
-              <ChartSkeleton />
+              <div class="charts" class:stacked={layout.split && layout.orientation === "stacked"}>
+                {#if chart}
+                  <ChartView
+                    bind:this={chartView}
+                    redrawKey={displayKey}
+                    {chart}
+                    staleNote={chartStale}
+                    {mode}
+                    {scale}
+                    {shadeSessions}
+                    timeZone={chartTimeZone}
+                    {drawings}
+                    {drawingBusy}
+                    {saveDrawings}
+                    earnings={dots.earnings ? earnings?.history : []}
+                    ratings={dots.analysts ? ratingChanges : []}
+                    news={dots.news ? news : []}
+                    linkedTime={layout.split && syncHover?.source === "second" ? syncHover.t : null}
+                    onhovertime={layout.split ? (t) => hoverFrom("main", t) : undefined}
+                    linkedWindow={layout.split && layout.sync_range && syncWindow?.source === "second" ? syncWindow.w : null}
+                    onwindow={layout.split && layout.sync_range ? (w) => (syncWindow = { source: "main", w }) : undefined}
+                  />
+                {:else if chartError}
+                  <div class="msg">
+                    {chartError}
+                    <button class="retry" onclick={() => loadChart(true)}>Retry</button>
+                  </div>
+                {:else}
+                  <ChartSkeleton />
+                {/if}
+                {#if layout.split}
+                  <SecondChart
+                    bind:this={secondView}
+                    {layout}
+                    mainSymbol={symbol}
+                    mainRange={range}
+                    mainInterval={interval}
+                    extended={chartExtended}
+                    {refreshMode}
+                    {recent}
+                    redrawKey={displayKey}
+                    {mode}
+                    {scale}
+                    {shadeSessions}
+                    timeZone={chartTimeZone}
+                    {drawings}
+                    {drawingBusy}
+                    {saveDrawings}
+                    linkedTime={syncHover?.source === "main" ? syncHover.t : null}
+                    onhovertime={(t) => hoverFrom("second", t)}
+                    linkedWindow={layout.sync_range && syncWindow?.source === "main" ? syncWindow.w : null}
+                    onwindow={layout.sync_range ? (w) => (syncWindow = { source: "second", w }) : undefined}
+                    onlayout={saveLayout}
+                  />
+                {/if}
+              </div>
             {/if}
           </div>
         {/key}
@@ -1202,6 +1295,16 @@
     flex: 1;
     min-height: 0;
     display: flex;
+    flex-direction: column;
+  }
+  .charts {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    gap: 10px;
+  }
+  .charts.stacked {
     flex-direction: column;
   }
   .toolbar {
