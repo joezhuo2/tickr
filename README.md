@@ -125,6 +125,11 @@ taskbar to keep it visible.
   time from a chosen start date, with play/pause, stepping and playback speed.
   Indicators and analysis use only revealed candles, and forward-looking panels
   are hidden while replay is on. Nothing about replay is saved.
+- **Paper trading:** the Paper view (H by default) places simulated market, limit
+  and stop orders, long or short, with commission and slippage settings and
+  buying-power checks. The live account is saved to paper.json. During bar replay
+  a separate session-only account fills at the next revealed bar's open. All
+  results are simulated.
 - **Recent symbols and history:** focus the empty search box to see the last
   10 symbols you viewed. The Back and Forward buttons (or Alt+Left and
   Alt+Right) step through this session's symbols, and B jumps to the previous
@@ -303,6 +308,7 @@ typing in a text field.
 | | `5` | Pen |
 | | `J` | Toggle second chart |
 | | `Y` | Toggle bar replay |
+| | `H` | Open Paper trading |
 | | `V` | Cycle date range |
 | | `R` | Refresh |
 | Panels | `T` | Open Technicals |
@@ -451,8 +457,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.0
-git push origin v0.11.0
+git tag v0.11.1
+git push origin v0.11.1
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
