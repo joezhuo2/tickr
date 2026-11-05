@@ -6,6 +6,19 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-11-05
+
+### Added
+- **Random historical practice** ([#115](https://github.com/joezhuo2/tickr/issues/115)):
+  pick a watchlist group, candle interval and date range, and tickr picks a
+  random symbol and start point (volatile periods about one time in three). It
+  shows the preceding candles with the future hidden, and you choose Long, Short
+  or Skip. Entries fill at the next candle's open, and you can close at a
+  revealed close. Ending the exercise reveals the result card (return, bars
+  held, Skip comparison) with entry and exit markers. Everything is labelled
+  Simulated. Indicators and analysis use only revealed candles, and live quotes,
+  news, earnings and analyst targets are hidden during practice.
+
 ## [0.11.1] - 2026-11-05
 
 ### Added

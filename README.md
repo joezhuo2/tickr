@@ -130,6 +130,10 @@ taskbar to keep it visible.
   buying-power checks. The live account is saved to paper.json. During bar replay
   a separate session-only account fills at the next revealed bar's open. All
   results are simulated.
+- **Random practice:** the Q key (by default) starts a practice round that picks a random symbol
+  and start point from a watchlist group, shows the candles before it and lets
+  you choose Long, Short or Skip. The result card compares your trade with Skip.
+  Everything is labelled Simulated, and live quotes and news are hidden.
 - **Recent symbols and history:** focus the empty search box to see the last
   10 symbols you viewed. The Back and Forward buttons (or Alt+Left and
   Alt+Right) step through this session's symbols, and B jumps to the previous
@@ -309,6 +313,7 @@ typing in a text field.
 | | `J` | Toggle second chart |
 | | `Y` | Toggle bar replay |
 | | `H` | Open Paper trading |
+| | `Q` | Start random practice |
 | | `V` | Cycle date range |
 | | `R` | Refresh |
 | Panels | `T` | Open Technicals |
@@ -457,8 +462,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.1
-git push origin v0.11.1
+git tag v0.11.2
+git push origin v0.11.2
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
