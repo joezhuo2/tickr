@@ -3,7 +3,8 @@
   import { untrack } from "svelte";
   import { direction, price, sessionMove, signed, volume } from "./lib/format";
   import { WATCHLIST_SORT_KEYS, nextSort, sortSymbols } from "./lib/watchlistSort";
-  import type { Group, RefreshMode, WatchQuote, WatchlistSort } from "./lib/types";
+  import type { Group, RefreshMode, SavedScreen, ScreenRule, WatchQuote, WatchlistSort } from "./lib/types";
+  import Screener from "./Screener.svelte";
 
   let {
     symbols,
@@ -11,10 +12,13 @@
     groups,
     current,
     sort,
+    screens,
     tab = $bindable(),
     onopen,
     ongroups,
     onsort,
+    onsavescreen,
+    ondeletescreen,
   }: {
     symbols: string[];
     refreshMode: RefreshMode;
@@ -22,11 +26,16 @@
     /** The symbol shown in the chart, highlighted. */
     current: string;
     sort: WatchlistSort;
+    screens: SavedScreen[];
     tab: string | null;
     onopen: (symbol: string) => void;
     ongroups: (groups: Group[]) => void;
     onsort: (sort: WatchlistSort) => void;
+    onsavescreen: (name: string, rules: ScreenRule[]) => Promise<string | undefined>;
+    ondeletescreen: (name: string) => void;
   } = $props();
+
+  let screening = $state(false);
 
   const REFRESH_MS = 60_000;
 
@@ -206,42 +215,49 @@
           onclick={() => onsort(nextSort(sort, k.key))}
         >{k.label}{on ? (sort.dir === "desc" ? " ↓" : " ↑") : ""}</button>
       {/each}
+      {#if !editing}
+        <button class="screen" class:on={screening} aria-pressed={screening} onclick={() => (screening = !screening)}>Screen</button>
+      {/if}
     </div>
-    <div class="grid" class:editing>
-      {#each order as symbol (symbol)}
-        {@const w = quotes[symbol]}
-        {@const q = w?.quote}
-        <button
-          class="card"
-          class:current={symbol === current && !editing}
-          class:in={editing && group?.symbols.includes(symbol)}
-          aria-pressed={editing ? !!group?.symbols.includes(symbol) : undefined}
-          title={w?.error && !q ? w.error : q?.name || symbol}
-          onclick={() => (editing ? toggle(symbol) : onopen(symbol))}
-        >
-          <span class="top">
-            <span class="sym">{symbol}</span>
-            {#if q}<span class="dot {q.session}"></span>{/if}
-            {#if q && sort.key === "volume"}<span class="vol">{volume(q.volume)}</span>{/if}
-          </span>
-          {#if q}
-            <span class="name">{q.name || q.exchange || "—"}</span>
-            {@const m = moves[symbol]}
-            <span class="line">
-              <span class="px">{price(m.price, q.currency)}</span>
-              <span class="bar">|</span>
-              <span class="chg {direction(m.pct)}">{m.pct == null ? "—" : `${signed(m.pct)}%`}</span>
+    {#if screening && !editing}
+      <Screener symbols={order} {screens} {onopen} onsave={onsavescreen} ondelete={ondeletescreen} />
+    {:else}
+      <div class="grid" class:editing>
+        {#each order as symbol (symbol)}
+          {@const w = quotes[symbol]}
+          {@const q = w?.quote}
+          <button
+            class="card"
+            class:current={symbol === current && !editing}
+            class:in={editing && group?.symbols.includes(symbol)}
+            aria-pressed={editing ? !!group?.symbols.includes(symbol) : undefined}
+            title={w?.error && !q ? w.error : q?.name || symbol}
+            onclick={() => (editing ? toggle(symbol) : onopen(symbol))}
+          >
+            <span class="top">
+              <span class="sym">{symbol}</span>
+              {#if q}<span class="dot {q.session}"></span>{/if}
+              {#if q && sort.key === "volume"}<span class="vol">{volume(q.volume)}</span>{/if}
             </span>
-          {:else if w?.error}
-            <span class="name">Unavailable</span>
-            <span class="line"><span class="px">—</span></span>
-          {:else}
-            <span class="sk" style="width: 70%; height: 11px; margin-top: 3px"></span>
-            <span class="sk" style="width: 80%; height: 16px; margin-top: auto"></span>
-          {/if}
-        </button>
-      {/each}
-    </div>
+            {#if q}
+              <span class="name">{q.name || q.exchange || "—"}</span>
+              {@const m = moves[symbol]}
+              <span class="line">
+                <span class="px">{price(m.price, q.currency)}</span>
+                <span class="bar">|</span>
+                <span class="chg {direction(m.pct)}">{m.pct == null ? "—" : `${signed(m.pct)}%`}</span>
+              </span>
+            {:else if w?.error}
+              <span class="name">Unavailable</span>
+              <span class="line"><span class="px">—</span></span>
+            {:else}
+              <span class="sk" style="width: 70%; height: 11px; margin-top: 3px"></span>
+              <span class="sk" style="width: 80%; height: 16px; margin-top: auto"></span>
+            {/if}
+          </button>
+        {/each}
+      </div>
+    {/if}
   {/if}
 {/if}
 
@@ -326,6 +342,9 @@
   .sort button.on {
     background: var(--surface);
     color: var(--text);
+  }
+  .sort .screen {
+    margin-left: auto;
   }
   .vol {
     margin-left: auto;

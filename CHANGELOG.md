@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.12] - 2026-11-04
+
+### Added
+- **Watchlist screener** ([#91](https://github.com/joezhuo2/tickr/issues/91)):
+  filter watchlist symbols by RSI(14), price above or below SMA 20, 50 and 200,
+  and daily change %, with saved named filters.
+
 ## [0.10.11] - 2026-11-04
 
 ### Added

@@ -90,6 +90,63 @@ pub struct WatchlistSort {
     pub dir: WatchlistSortDir,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ScreenKind {
+    Rsi,
+    Sma,
+    Change,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ScreenOp {
+    Above,
+    Below,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ScreenRule {
+    pub kind: ScreenKind,
+    pub op: ScreenOp,
+    pub value: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SavedScreen {
+    pub name: String,
+    pub rules: Vec<ScreenRule>,
+}
+
+pub const SCREEN_SMA_LENGTHS: [u32; 3] = [20, 50, 200];
+const MAX_SCREENS: usize = 50;
+const MAX_SCREEN_RULES: usize = 10;
+
+pub fn validate_screen_rules(rules: &[ScreenRule]) -> Result<(), String> {
+    if !(1..=MAX_SCREEN_RULES).contains(&rules.len()) {
+        return Err(format!("A filter needs 1 to {MAX_SCREEN_RULES} rules"));
+    }
+    for r in rules {
+        if !r.value.is_finite() {
+            return Err("Rule values must be numbers".into());
+        }
+        match r.kind {
+            ScreenKind::Rsi if !(0.0..=100.0).contains(&r.value) => return Err("RSI must be from 0 to 100".into()),
+            ScreenKind::Sma if !SCREEN_SMA_LENGTHS.iter().any(|&n| f64::from(n) == r.value) => {
+                return Err("Moving average must be SMA 20, 50 or 200".into());
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+fn validate_screen_name(name: &str) -> Result<String, String> {
+    let name = name.trim();
+    if !(1..=40).contains(&name.chars().count()) { return Err("Filter names must contain 1 to 40 characters".into()); }
+    Ok(name.into())
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DrawingPoint {
     pub t: i64,
@@ -352,6 +409,7 @@ pub struct Settings {
     /// Watchlist groups, in tab order.
     pub groups: Vec<Group>,
     pub watchlist_sort: WatchlistSort,
+    pub screens: Vec<SavedScreen>,
     /// Look for new releases in the background.
     pub auto_update: bool,
     pub keybinds: Keybinds,
@@ -400,6 +458,7 @@ impl Default for Settings {
             watchlist: Vec::new(),
             groups: Vec::new(),
             watchlist_sort: WatchlistSort::default(),
+            screens: Vec::new(),
             auto_update: true,
             keybinds: Keybinds::default(),
             dots: Dots::default(),
@@ -438,6 +497,24 @@ impl Settings {
         let name = validate_preset_name(name)?;
         self.indicator_presets.retain(|p| p.name != name);
         Ok(())
+    }
+
+    pub fn save_screen(&mut self, name: &str, rules: Vec<ScreenRule>) -> Result<(), String> {
+        let name = validate_screen_name(name)?;
+        validate_screen_rules(&rules)?;
+        let screen = SavedScreen { name: name.clone(), rules };
+        let at = self.screens.iter().position(|s| s.name.to_lowercase() == name.to_lowercase());
+        match at {
+            Some(i) => self.screens[i] = screen,
+            None if self.screens.len() >= MAX_SCREENS => return Err(format!("At most {MAX_SCREENS} saved filters are allowed")),
+            None => self.screens.push(screen),
+        }
+        Ok(())
+    }
+
+    pub fn delete_screen(&mut self, name: &str) {
+        let name = name.trim().to_lowercase();
+        self.screens.retain(|s| s.name.to_lowercase() != name);
     }
 
     /// Missing or unreadable files give defaults.
@@ -576,6 +653,7 @@ mod tests {
         assert!(s.indicator_presets.is_empty());
         assert!(s.unload_on_minimize);
         assert!(s.groups.is_empty());
+        assert!(s.screens.is_empty());
         assert!(s.auto_update);
         assert!(s.alerts.is_empty());
         assert!(s.ai_news);
@@ -645,6 +723,63 @@ mod tests {
         let s = Settings { watchlist_sort: WatchlistSort { key: WatchlistSortKey::Price, dir: WatchlistSortDir::Asc }, ..Settings::default() };
         s.save(&p).unwrap();
         assert_eq!(Settings::load(&p), s);
+    }
+
+    fn rule(kind: ScreenKind, op: ScreenOp, value: f64) -> ScreenRule {
+        ScreenRule { kind, op, value }
+    }
+
+    #[test]
+    fn screens_default_for_old_settings_and_roundtrip() {
+        let old: Settings = serde_json::from_str(r#"{"symbol":"NVDA"}"#).unwrap();
+        assert!(old.screens.is_empty());
+        let saved: Settings = serde_json::from_str(
+            r#"{"screens":[{"name":"Oversold","rules":[{"kind":"rsi","op":"below","value":30},{"kind":"sma","op":"above","value":200}]}]}"#,
+        )
+        .unwrap();
+        assert_eq!(saved.screens[0].rules[1], rule(ScreenKind::Sma, ScreenOp::Above, 200.0));
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        saved.save(&p).unwrap();
+        assert_eq!(Settings::load(&p), saved);
+    }
+
+    #[test]
+    fn screens_save_overwrite_delete_and_limits() {
+        let mut s = Settings::default();
+        let oversold = vec![rule(ScreenKind::Rsi, ScreenOp::Below, 30.0)];
+        s.save_screen("  Oversold  ", oversold.clone()).unwrap();
+        s.save_screen("Momentum", vec![rule(ScreenKind::Change, ScreenOp::Above, -2.5)]).unwrap();
+        let wider = vec![rule(ScreenKind::Rsi, ScreenOp::Below, 35.0), rule(ScreenKind::Sma, ScreenOp::Above, 50.0)];
+        s.save_screen("oversold", wider.clone()).unwrap();
+        assert_eq!(s.screens.len(), 2);
+        assert_eq!(s.screens[0], SavedScreen { name: "oversold".into(), rules: wider });
+        s.delete_screen(" OVERSOLD ");
+        assert_eq!(s.screens.iter().map(|x| x.name.as_str()).collect::<Vec<_>>(), ["Momentum"]);
+        s.delete_screen("missing");
+        assert_eq!(s.screens.len(), 1);
+
+        for name in [" ".to_string(), "x".repeat(41)] {
+            assert!(s.save_screen(&name, oversold.clone()).is_err());
+        }
+        assert!(s.save_screen("Empty", vec![]).is_err());
+        assert!(s.save_screen("Many", vec![oversold[0]; 11]).is_err());
+        for bad in [
+            rule(ScreenKind::Rsi, ScreenOp::Above, 101.0),
+            rule(ScreenKind::Rsi, ScreenOp::Above, -1.0),
+            rule(ScreenKind::Sma, ScreenOp::Above, 100.0),
+            rule(ScreenKind::Change, ScreenOp::Below, f64::NAN),
+            rule(ScreenKind::Change, ScreenOp::Below, f64::INFINITY),
+        ] {
+            assert!(s.save_screen("Bad", vec![bad]).is_err(), "{bad:?}");
+        }
+        assert_eq!(s.screens.len(), 1);
+        for n in 1..MAX_SCREENS {
+            s.save_screen(&n.to_string(), oversold.clone()).unwrap();
+        }
+        assert!(s.save_screen("overflow", oversold.clone()).is_err());
+        s.save_screen("1", oversold).unwrap();
+        assert_eq!(s.screens.len(), MAX_SCREENS);
     }
 
     #[test]

@@ -13,6 +13,27 @@ export interface WatchlistSort {
   key: WatchlistSortKey;
   dir: WatchlistSortDir;
 }
+export type ScreenKind = "rsi" | "sma" | "change";
+export type ScreenOp = "above" | "below";
+export interface ScreenRule {
+  kind: ScreenKind;
+  op: ScreenOp;
+  value: number;
+}
+export interface SavedScreen {
+  name: string;
+  rules: ScreenRule[];
+}
+export interface ScreenRow {
+  symbol: string;
+  price: number | null;
+  change_pct: number | null;
+  rsi: number | null;
+  sma20: number | null;
+  sma50: number | null;
+  sma200: number | null;
+  error: string | null;
+}
 
 export interface Candle {
   t: number;
@@ -145,6 +166,7 @@ export interface Init {
   watchlist: string[];
   groups: Group[];
   watchlist_sort: WatchlistSort;
+  screens: SavedScreen[];
   keybinds: Keybinds;
   dots: Dots;
   indicators: IndicatorConfig;

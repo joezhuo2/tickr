@@ -18,7 +18,8 @@ use crate::options::Options;
 use crate::stats::Section;
 use crate::news::Article;
 use crate::quote::{self, Chart, Quote, SearchHit};
-use crate::settings::{Theme, Palette, validate_text_size, RefreshMode, ChartMode, ChartScale, Dots, Group, WatchlistSort, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
+use crate::screener::{self, ScreenRow};
+use crate::settings::{Theme, Palette, validate_text_size, RefreshMode, ChartMode, ChartScale, Dots, Group, WatchlistSort, SavedScreen, ScreenRule, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
 use crate::state::{lock, now_secs, QuoteState, Shared};
 
 #[derive(Serialize)]
@@ -50,6 +51,7 @@ pub struct Init {
     watchlist: Vec<String>,
     groups: Vec<Group>,
     watchlist_sort: WatchlistSort,
+    screens: Vec<SavedScreen>,
     keybinds: Keybinds,
     dots: Dots,
     indicators: IndicatorConfig,
@@ -96,6 +98,7 @@ pub fn init_payload(shared: &Shared) -> Init {
         watchlist: s.watchlist,
         groups: s.groups,
         watchlist_sort: s.watchlist_sort,
+        screens: s.screens,
         keybinds: s.keybinds,
         dots: s.dots,
         indicators: s.indicators,
@@ -594,6 +597,71 @@ pub async fn get_watch_quotes(shared: State<'_, Arc<Shared>>, symbols: Vec<Strin
     Ok(out)
 }
 
+async fn screen_symbol(shared: &Shared, provider: &crate::provider::Provider, symbol: String, revision: u64) -> ScreenRow {
+    if let Some(row) = shared.screener.cached(&symbol, now_secs(), revision) {
+        return row;
+    }
+    let Ok(_permit) = shared.screener.limit().acquire_owned().await else {
+        return ScreenRow::failed(symbol, "Screener unavailable".into());
+    };
+    if let Some(row) = shared.screener.cached(&symbol, now_secs(), revision) {
+        return row;
+    }
+    match provider.fetch_chart(&shared.http, &symbol, screener::RANGE, screener::INTERVAL).await {
+        Ok(chart) => {
+            let row = ScreenRow::from_candles(symbol, &chart.candles);
+            if row.error.is_none() && shared.revision() == revision {
+                shared.screener.store(&row, now_secs(), revision);
+            }
+            row
+        }
+        Err(e) => ScreenRow::failed(symbol, e),
+    }
+}
+
+#[tauri::command]
+pub async fn get_screener_data(shared: State<'_, Arc<Shared>>, symbols: Vec<String>) -> Result<Vec<ScreenRow>, String> {
+    let starred = lock(&shared.settings).watchlist.clone();
+    let symbols: Vec<String> = clean_symbols(symbols).into_iter().filter(|s| starred.contains(s)).collect();
+    let revision = shared.revision();
+    let provider = crate::provider::Provider::current(&shared);
+    let shared: Arc<Shared> = shared.inner().clone();
+    let tasks: Vec<_> = symbols
+        .into_iter()
+        .map(|symbol| {
+            let (shared, provider) = (shared.clone(), provider.clone());
+            tauri::async_runtime::spawn(async move { screen_symbol(&shared, &provider, symbol, revision).await })
+        })
+        .collect();
+    let mut out = Vec::with_capacity(tasks.len());
+    for t in tasks {
+        out.push(t.await.map_err(|e| e.to_string())?);
+    }
+    Ok(out)
+}
+
+fn edit_screens(shared: &Shared, edit: impl FnOnce(&mut Settings) -> Result<(), String>) -> Result<Vec<SavedScreen>, String> {
+    let mut settings = lock(&shared.settings);
+    let mut next = settings.clone();
+    edit(&mut next)?;
+    next.save(&shared.settings_path).map_err(|e| format!("Could not save filters: {e}"))?;
+    *settings = next.clone();
+    Ok(next.screens)
+}
+
+#[tauri::command]
+pub fn save_screen(shared: State<'_, Arc<Shared>>, name: String, rules: Vec<ScreenRule>) -> Result<Vec<SavedScreen>, String> {
+    edit_screens(&shared, |s| s.save_screen(&name, rules))
+}
+
+#[tauri::command]
+pub fn delete_screen(shared: State<'_, Arc<Shared>>, name: String) -> Result<Vec<SavedScreen>, String> {
+    edit_screens(&shared, |s| {
+        s.delete_screen(&name);
+        Ok(())
+    })
+}
+
 fn edit_indicators(shared: &Shared, edit: impl FnOnce(&mut Settings) -> Result<(), String>) -> Result<Settings, String> {
     let mut settings = lock(&shared.settings);
     let mut next = settings.clone();
@@ -622,6 +690,24 @@ pub fn delete_indicator_preset(shared: State<'_, Arc<Shared>>, name: String) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn screen_edits_persist_and_rejections_leave_settings_unchanged() {
+        use crate::settings::{ScreenKind, ScreenOp};
+        let dir = tempfile::tempdir().unwrap();
+        let shared = Shared::new(dir.path().join("settings.json"), Default::default());
+        let rules = vec![ScreenRule { kind: ScreenKind::Rsi, op: ScreenOp::Below, value: 30.0 }];
+        let saved = edit_screens(&shared, |s| s.save_screen("Oversold", rules.clone())).unwrap();
+        assert_eq!(saved, [SavedScreen { name: "Oversold".into(), rules: rules.clone() }]);
+        assert_eq!(Settings::load(&shared.settings_path).screens, saved);
+        assert_eq!(init_payload(&shared).screens, saved);
+        assert!(edit_screens(&shared, |s| s.save_screen("Bad", vec![])).is_err());
+        assert_eq!(Settings::load(&shared.settings_path).screens, saved);
+        assert_eq!(lock(&shared.settings).screens, saved);
+        let left = edit_screens(&shared, |s| { s.delete_screen("oversold"); Ok(()) }).unwrap();
+        assert!(left.is_empty());
+        assert!(Settings::load(&shared.settings_path).screens.is_empty());
+    }
 
     #[test]
     fn drawing_edits_validate_and_persist_atomically() {
