@@ -3,7 +3,8 @@
   import { untrack } from "svelte";
   import { direction, price, sessionMove, signed, volume } from "./lib/format";
   import { WATCHLIST_SORT_KEYS, nextSort, sortSymbols } from "./lib/watchlistSort";
-  import type { Group, RefreshMode, SavedScreen, ScreenRule, WatchQuote, WatchlistSort } from "./lib/types";
+  import { heatColor, heatWeights, layoutHeatmap, tileDetail } from "./lib/heatmap";
+  import type { Group, RefreshMode, SavedScreen, ScreenRule, WatchQuote, WatchlistSort, WatchlistView } from "./lib/types";
   import Screener from "./Screener.svelte";
 
   let {
@@ -12,11 +13,13 @@
     groups,
     current,
     sort,
+    view,
     screens,
     tab = $bindable(),
     onopen,
     ongroups,
     onsort,
+    onview,
     onsavescreen,
     ondeletescreen,
   }: {
@@ -26,11 +29,13 @@
     /** The symbol shown in the chart, highlighted. */
     current: string;
     sort: WatchlistSort;
+    view: WatchlistView;
     screens: SavedScreen[];
     tab: string | null;
     onopen: (symbol: string) => void;
     ongroups: (groups: Group[]) => void;
     onsort: (sort: WatchlistSort) => void;
+    onview: (view: WatchlistView) => void;
     onsavescreen: (name: string, rules: ScreenRule[]) => Promise<string | undefined>;
     ondeletescreen: (name: string) => void;
   } = $props();
@@ -102,6 +107,35 @@
       sort,
     ),
   );
+
+  const mapOn = $derived(view === "heatmap" && !editing && !screening);
+  let mapW = $state(0);
+  let mapH = $state(0);
+  const tiles = $derived.by(() => {
+    const weights = heatWeights(shown.map((s) => moves[s]?.pct));
+    return layoutHeatmap(
+      shown.map((id, i) => ({ id, weight: weights[i] })),
+      mapW,
+      mapH,
+    );
+  });
+
+  function toggleMap() {
+    if (screening) {
+      screening = false;
+      if (view !== "heatmap") onview("heatmap");
+      return;
+    }
+    onview(view === "heatmap" ? "cards" : "heatmap");
+  }
+
+  function tip(symbol: string): string {
+    const w = quotes[symbol];
+    const q = w?.quote;
+    if (!q) return w?.error ? `${symbol}: ${w.error}` : symbol;
+    const m = moves[symbol];
+    return `${q.name || symbol}: ${price(m.price, q.currency)} (${m.pct == null ? "—" : `${signed(m.pct)}%`})`;
+  }
 
   let loadedAt = 0;
   let loading = false;
@@ -205,22 +239,47 @@
       <p class="hint">Click Edit to pick some from your starred stocks.</p>
     </div>
   {:else}
-    <div class="sort" role="group" aria-label="Sort watchlist">
-      {#each WATCHLIST_SORT_KEYS as k (k.key)}
-        {@const on = sort.key === k.key}
-        <button
-          class:on
-          aria-pressed={on}
-          aria-label={on ? `${k.label}, sorted ${sort.dir === "desc" ? "high to low" : "low to high"}` : `Sort by ${k.label}`}
-          onclick={() => onsort(nextSort(sort, k.key))}
-        >{k.label}{on ? (sort.dir === "desc" ? " ↓" : " ↑") : ""}</button>
-      {/each}
+    <div class="sort">
+      {#if !mapOn}
+        <span class="keys" role="group" aria-label="Sort watchlist">
+          {#each WATCHLIST_SORT_KEYS as k (k.key)}
+            {@const on = sort.key === k.key}
+            <button
+              class:on
+              aria-pressed={on}
+              aria-label={on ? `${k.label}, sorted ${sort.dir === "desc" ? "high to low" : "low to high"}` : `Sort by ${k.label}`}
+              onclick={() => onsort(nextSort(sort, k.key))}
+            >{k.label}{on ? (sort.dir === "desc" ? " ↓" : " ↑") : ""}</button>
+          {/each}
+        </span>
+      {/if}
       {#if !editing}
-        <button class="screen" class:on={screening} aria-pressed={screening} onclick={() => (screening = !screening)}>Screen</button>
+        <span class="tools">
+          <button class:on={mapOn} aria-pressed={mapOn} onclick={toggleMap}>Heatmap</button>
+          <button class:on={screening} aria-pressed={screening} onclick={() => (screening = !screening)}>Screen</button>
+        </span>
       {/if}
     </div>
     {#if screening && !editing}
       <Screener symbols={order} {screens} {onopen} onsave={onsavescreen} ondelete={ondeletescreen} />
+    {:else if mapOn}
+      <div class="map" bind:clientWidth={mapW} bind:clientHeight={mapH}>
+        {#each tiles as t (t.id)}
+          {@const d = tileDetail(t.w, t.h)}
+          {@const pct = moves[t.id]?.pct}
+          <button
+            class="tile"
+            class:current={t.id === current}
+            style="left: {t.x}px; top: {t.y}px; width: {t.w}px; height: {t.h}px; background: {heatColor(pct)}"
+            title={tip(t.id)}
+            aria-label={tip(t.id)}
+            onclick={() => onopen(t.id)}
+          >
+            {#if d !== "none"}<span class="tsym" class:big={d === "full"}>{t.id}</span>{/if}
+            {#if d === "full"}<span class="tchg">{pct == null ? "—" : `${signed(pct)}%`}</span>{/if}
+          </button>
+        {/each}
+      </div>
     {:else}
       <div class="grid" class:editing>
         {#each order as symbol (symbol)}
@@ -343,8 +402,65 @@
     background: var(--surface);
     color: var(--text);
   }
-  .sort .screen {
+  .keys,
+  .tools {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .tools {
     margin-left: auto;
+  }
+  .map {
+    flex: 1;
+    min-height: 0;
+    margin-top: 6px;
+    position: relative;
+    overflow: hidden;
+    border-radius: 6px;
+  }
+  .tile {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    padding: 2px;
+    border: 1px solid var(--bg);
+    border-radius: 4px;
+    color: var(--text);
+    cursor: pointer;
+    overflow: hidden;
+    font-variant-numeric: tabular-nums;
+    transition: filter var(--motion-fast) var(--ease-out);
+  }
+  .tile:hover {
+    filter: brightness(1.08) saturate(1.1);
+    z-index: 1;
+  }
+  .tile.current {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+  .tsym {
+    max-width: 100%;
+    font-weight: 750;
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tsym.big {
+    font-size: 14px;
+  }
+  .tchg {
+    max-width: 100%;
+    font-size: 12px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .vol {
     margin-left: auto;
