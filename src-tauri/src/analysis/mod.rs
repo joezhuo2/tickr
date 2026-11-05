@@ -618,6 +618,8 @@ mod tests {
             candles,
             dividends: Vec::new(),
             splits: Vec::new(),
+            last_bar_time: None,
+            delay_secs: None,
         }
     }
 

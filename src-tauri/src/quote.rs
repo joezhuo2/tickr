@@ -98,6 +98,8 @@ pub struct Chart {
     pub candles: Vec<Candle>,
     pub dividends: Vec<Dividend>,
     pub splits: Vec<Split>,
+    pub last_bar_time: Option<i64>,
+    pub delay_secs: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -153,6 +155,7 @@ pub struct Quote {
     pub session: Session,
     pub extended: Option<Extended>,
     pub market_time: i64,
+    pub delay_secs: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -219,7 +222,7 @@ pub fn parse_chart(body: &[u8], range: &str, interval: &str) -> Result<Chart, St
     let ts = r["timestamp"].as_array().cloned().unwrap_or_default();
     let q = &r["indicators"]["quote"][0];
     let col = |k: &str, i: usize| f(&q[k][i]);
-    let candles = ts
+    let candles: Vec<Candle> = ts
         .iter()
         .enumerate()
         .filter_map(|(i, t)| {
@@ -244,7 +247,31 @@ pub fn parse_chart(body: &[u8], range: &str, interval: &str) -> Result<Chart, St
         .filter_map(|x| Some(Split { t: x["date"].as_i64()?, ratio: x["splitRatio"].as_str()?.to_string() }))
         .collect();
     splits.sort_by_key(|x| x.t);
-    Ok(Chart { source: "yahoo".into(), meta, range: range.into(), interval: interval.into(), candles, dividends, splits })
+    let last_bar_time = candles.last().map(|c| c.t);
+    let delay_secs = yahoo_delay(&meta.symbol, &meta.exchange);
+    Ok(Chart { source: "yahoo".into(), meta, range: range.into(), interval: interval.into(), candles, dividends, splits, last_bar_time, delay_secs })
+}
+
+const YAHOO_DELAY_MINUTES: &[(&str, i64)] = &[
+    ("CBT", 10), ("CME", 10), ("NYB", 30), ("CMX", 30), ("NYM", 30), ("BA", 30), ("VI", 15), ("AX", 20), ("XA", 0),
+    ("BR", 15), ("SA", 15), ("CN", 0), ("NE", 0), ("TO", 0), ("V", 0), ("SN", 15), ("SS", 30), ("SZ", 30), ("CL", 20),
+    ("PR", 20), ("CO", 0), ("CA", 20), ("TL", 0), ("XD", 0), ("NX", 15), ("HE", 0), ("PA", 15), ("BE", 15), ("BM", 15),
+    ("DU", 15), ("F", 15), ("HM", 15), ("HA", 15), ("MU", 15), ("SG", 15), ("DE", 15), ("AT", 15), ("HK", 15), ("BD", 15),
+    ("IC", 0), ("BO", 15), ("NS", 0), ("JK", 10), ("IR", 15), ("TA", 20), ("TI", 20), ("MI", 20), ("T", 20), ("KW", 15),
+    ("RG", 0), ("VS", 0), ("KL", 15), ("MX", 20), ("AS", 15), ("NZ", 20), ("OL", 15), ("WA", 15), ("LS", 15), ("QA", 15),
+    ("RO", 15), ("SI", 20), ("JO", 15), ("KS", 20), ("KQ", 20), ("MC", 15), ("SAU", 15), ("ST", 0), ("SW", 30), ("TWO", 20),
+    ("TW", 20), ("BK", 15), ("IS", 15), ("AE", 15), ("AQ", 15), ("XC", 0), ("L", 20), ("IL", 20), ("CR", 15), ("VN", 15),
+];
+
+pub fn yahoo_delay(symbol: &str, exchange: &str) -> Option<i64> {
+    let symbol = symbol.trim().to_ascii_uppercase();
+    if let Some((_, suffix)) = symbol.rsplit_once('.') {
+        return YAHOO_DELAY_MINUTES.iter().find(|(s, _)| *s == suffix).map(|(_, m)| m * 60);
+    }
+    if symbol.ends_with("=X") || (exchange.starts_with("Nasdaq") && !symbol.starts_with('^')) {
+        return Some(0);
+    }
+    None
 }
 
 pub fn session_at(periods: Option<&Periods>, now: i64) -> Session {
@@ -309,6 +336,7 @@ pub fn quote_from(chart: &Chart, now: i64) -> Quote {
         session,
         extended,
         market_time: m.market_time,
+        delay_secs: chart.delay_secs,
     }
 }
 
@@ -419,6 +447,33 @@ mod tests {
     fn parses_daily_range() {
         let c = parse_chart(MONTH, "1mo", "1d").unwrap();
         assert!(c.candles.len() >= 15);
+    }
+
+    #[test]
+    fn carries_bar_time_and_delay() {
+        let c = day();
+        assert_eq!(c.last_bar_time, c.candles.last().map(|k| k.t));
+        assert_eq!(c.delay_secs, Some(0));
+        let p = c.meta.periods.unwrap();
+        let q = quote_from(&c, p.regular.start + 600);
+        assert_eq!(q.market_time, c.meta.market_time);
+        assert_eq!(q.delay_secs, Some(0));
+        let body = br#"{"chart":{"result":[{"meta":{"regularMarketPrice":1,"symbol":"X"}}]}}"#;
+        let empty = parse_chart(body, "1d", "5m").unwrap();
+        assert_eq!(empty.last_bar_time, None);
+        assert_eq!(empty.meta.market_time, 0);
+    }
+
+    #[test]
+    fn yahoo_delay_only_when_published() {
+        assert_eq!(yahoo_delay("AAPL", "NasdaqGS"), Some(0));
+        assert_eq!(yahoo_delay("VOD.L", "LSE"), Some(1200));
+        assert_eq!(yahoo_delay("SAP.DE", "XETRA"), Some(900));
+        assert_eq!(yahoo_delay("SHOP.TO", "Toronto"), Some(0));
+        assert_eq!(yahoo_delay("IBM", "NYSE"), None);
+        assert_eq!(yahoo_delay("ZZZ.QQ", "Unknown"), None);
+        assert_eq!(yahoo_delay("^IXIC", "Nasdaq GIDS"), None);
+        assert_eq!(yahoo_delay("EURUSD=X", "CCY"), Some(0));
     }
 
     #[test]
