@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.18] - 2026-11-04
+
+### Added
+- **Alert actions** ([#107](https://github.com/joezhuo2/tickr/issues/107)):
+  edit an alert's direction and level in place, duplicate an alert, click its
+  ticker to open the chart, filter by All, Armed, Triggered or Paused, and see
+  the trigger price and time on triggered alerts.
+
 ## [0.10.17] - 2026-11-04
 
 ### Changed

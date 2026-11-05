@@ -248,7 +248,10 @@ currency), **Day move %** (up or down X% from yesterday's close), **Move since
 armed %** (up or down X% from the price when armed), **Trailing %** or
 **Trailing amount** (falls by that much from the high since arming, or rises
 from the low). The list includes alerts for every symbol. **Pause**, **Rearm**
-and **Delete** manage them. By default an alert fires once and then shows
+and **Delete** manage them, **Edit** changes an alert's direction and level, and
+**Duplicate** copies it. Click an alert's ticker to open its chart, and filter
+the list by All, Armed, Triggered or Paused. Triggered alerts show the trigger
+price and time. By default an alert fires once and then shows
 **Triggered**; tick **Recurring** to keep it armed, with a cooldown in minutes
 (default 15) during which it stays quiet. A recurring alert needs a fresh
 crossing to fire again. **Regular session only** ignores extended-hours
@@ -433,8 +436,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.10.17
-git push origin v0.10.17
+git tag v0.10.18
+git push origin v0.10.18
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
