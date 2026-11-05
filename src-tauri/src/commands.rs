@@ -141,7 +141,7 @@ pub async fn get_chart(shared: State<'_, Arc<Shared>>, symbol: String, range: St
 /// Reuses the last fetched chart when it matches, so the analysis covers the
 /// same candles the window shows; fetches otherwise.
 #[tauri::command]
-pub async fn analyze(shared: State<'_, Arc<Shared>>, symbol: String, range: String, interval: String, extended: bool) -> Result<Analysis, String> {
+pub async fn analyze(shared: State<'_, Arc<Shared>>, symbol: String, range: String, interval: String, extended: bool, until: Option<i64>) -> Result<Analysis, String> {
     let revision = shared.revision();
     let cached = lock(&shared.last_chart)
         .clone()
@@ -156,6 +156,10 @@ pub async fn analyze(shared: State<'_, Arc<Shared>>, symbol: String, range: Stri
             *lock(&shared.last_chart) = Some(c.clone());
             c
         }
+    };
+    let chart = match until {
+        Some(t) => crate::analysis::reveal_until(&chart, t),
+        None => chart,
     };
     crate::analysis::analyze_with_config(&chart, &lock(&shared.settings).indicators).inspect_err(|e| log::info!("analyze {symbol} {range}: {e}"))
 }

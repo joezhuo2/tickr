@@ -307,6 +307,7 @@ pub struct Keybinds {
     pub draw_ruler: String,
     pub draw_pen: String,
     pub chart_split: String,
+    pub chart_replay: String,
     pub refresh: String,
     pub range: String,
     pub technicals: String,
@@ -341,6 +342,7 @@ impl Default for Keybinds {
             draw_ruler: "4".into(),
             draw_pen: "5".into(),
             chart_split: "j".into(),
+            chart_replay: "y".into(),
             refresh: "r".into(),
             range: "v".into(),
             technicals: "t".into(),
@@ -807,6 +809,7 @@ mod tests {
         assert_eq!(s.keybinds.draw_ruler, "4");
         assert_eq!(s.keybinds.draw_pen, "5");
         assert_eq!(s.keybinds.chart_split, "j");
+        assert_eq!(s.keybinds.chart_replay, "y");
         assert_eq!(s.keybinds.settings, ",");
         assert_eq!(s.keybinds.toggle_watchlist, "w");
         assert_eq!(s.keybinds.watchlist, "x");
