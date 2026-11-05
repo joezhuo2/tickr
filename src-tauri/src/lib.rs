@@ -131,6 +131,7 @@ pub fn run() {
             commands::set_watchlist,
             commands::set_groups,
             commands::set_watchlist_sort,
+            commands::set_watchlist_view,
             commands::get_watch_quotes,
             commands::get_screener_data,
             commands::save_screen,
