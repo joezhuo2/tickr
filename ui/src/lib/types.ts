@@ -115,6 +115,8 @@ export interface SearchHit {
   name: string;
   exchange: string;
   kind: string;
+  quote_type: string;
+  currency: string;
 }
 
 export interface Ratings {
