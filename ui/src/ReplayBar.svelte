@@ -14,6 +14,7 @@
     onback,
     onspeed,
     onexit,
+    practice = false,
   }: {
     state: ReplayState;
     intraday: boolean;
@@ -27,30 +28,35 @@
     onback: () => void;
     onspeed: (speed: Speed) => void;
     onexit: () => void;
+    practice?: boolean;
   } = $props();
 
   const end = $derived(isAtEnd(state));
 </script>
 
-<div class="replay" role="toolbar" aria-label="Bar replay">
-  <span class="tag">Replay</span>
-  <label>
-    <span>Start</span>
-    <input
-      type={intraday ? "datetime-local" : "date"}
-      aria-label="Replay start"
-      value={start}
-      {min}
-      {max}
-      onchange={(e) => {
-        if (e.currentTarget.value) onstart(e.currentTarget.value);
-      }}
-    />
-  </label>
+<div class="replay" role="toolbar" aria-label={practice ? "Practice playback" : "Bar replay"}>
+  <span class="tag">{practice ? "Practice" : "Replay"}</span>
+  {#if !practice}
+    <label>
+      <span>Start</span>
+      <input
+        type={intraday ? "datetime-local" : "date"}
+        aria-label="Replay start"
+        value={start}
+        {min}
+        {max}
+        onchange={(e) => {
+          if (e.currentTarget.value) onstart(e.currentTarget.value);
+        }}
+      />
+    </label>
+  {/if}
   <div class="controls">
-    <button title="Step back (←)" aria-label="Step back" disabled={state.cursor <= state.start} onclick={onback}>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M18 5l-9 7 9 7z" /></svg>
-    </button>
+    {#if !practice}
+      <button title="Step back (←)" aria-label="Step back" disabled={state.cursor <= state.start} onclick={onback}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M18 5l-9 7 9 7z" /></svg>
+      </button>
+    {/if}
     <button class="play" title={state.playing ? "Pause (Space)" : "Play (Space)"} aria-label={state.playing ? "Pause" : "Play"} aria-pressed={state.playing} disabled={end && !state.playing} onclick={ontoggle}>
       {#if state.playing}
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14" /></svg>
@@ -63,7 +69,7 @@
     </button>
   </div>
   <select
-    aria-label="Replay speed"
+    aria-label={practice ? "Practice speed" : "Replay speed"}
     value={state.speed}
     onchange={(e) => {
       const speed = Number(e.currentTarget.value);
@@ -76,7 +82,7 @@
   </select>
   <span class="when" role="status">{when}{#if end} · end of data{/if}</span>
   <span class="count">{state.cursor - state.start + 1} / {state.total - state.start}</span>
-  <button class="exit" title="Exit replay (Esc)" onclick={onexit}>Exit</button>
+  <button class="exit" title={practice ? "Exit practice (Esc)" : "Exit replay (Esc)"} onclick={onexit}>Exit</button>
 </div>
 
 <style>

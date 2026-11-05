@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ACTIONS, CATEGORIES, actionFor, groupActions, bindKey, keyLabel, nextGroupTab, rebind, replayAllows } from "./keybinds";
+import { ACTIONS, CATEGORIES, actionFor, groupActions, bindKey, keyLabel, nextGroupTab, practiceAllows, rebind, replayAllows } from "./keybinds";
 import type { Keybinds } from "./types";
 
 const DEFAULTS: Keybinds = {
@@ -13,6 +13,7 @@ const DEFAULTS: Keybinds = {
   draw_pen: "5",
   chart_split: "j",
   chart_replay: "y",
+  practice: "q",
   refresh: "r",
   range: "v",
   technicals: "t",
@@ -62,7 +63,7 @@ describe("actionFor", () => {
     expect(actionFor(DEFAULTS, ",")).toBe("settings");
     expect(actionFor(DEFAULTS, "w")).toBe("toggle_watchlist");
     expect(actionFor(DEFAULTS, "x")).toBe("watchlist");
-    expect(actionFor(DEFAULTS, "q")).toBeNull();
+    expect(actionFor(DEFAULTS, "6")).toBeNull();
     expect(actionFor({ ...DEFAULTS, search: "" }, "")).toBeNull();
   });
 });
@@ -118,6 +119,24 @@ describe("chart_replay", () => {
   it("blocks panels, drawing and the second chart during replay", () => {
     for (const id of ["chart_replay", "chart_mode", "chart_scale", "technicals", "paper", "analyze", "settings"] as const) expect(replayAllows(id)).toBe(true);
     for (const id of ["news", "earnings", "analysts", "options", "market", "events", "alerts", "toggle_watchlist", "chart_split", "draw_level", "draw_pen"] as const) expect(replayAllows(id)).toBe(false);
+  });
+});
+
+describe("practice", () => {
+  it("is a chart action on Q that can be rebound and unbound", () => {
+    expect(actionFor(DEFAULTS, "q")).toBe("practice");
+    expect(ACTIONS.find((a) => a.id === "practice")?.category).toBe("chart");
+    const next = rebind(DEFAULTS, "practice", "y");
+    expect(actionFor(next, "y")).toBe("practice");
+    expect(actionFor(next, "q")).toBe("chart_replay");
+    expect(actionFor({ ...DEFAULTS, practice: "" }, "q")).toBeNull();
+  });
+  it("can be reached from bar replay", () => {
+    expect(replayAllows("practice")).toBe(true);
+  });
+  it("allows only view-only actions during practice", () => {
+    for (const id of ["practice", "chart_mode", "chart_scale", "technicals", "analyze", "settings"] as const) expect(practiceAllows(id)).toBe(true);
+    for (const id of ["chart_replay", "chart_interval", "range", "refresh", "paper", "search", "previous_symbol", "watchlist", "add_watchlist", "news", "earnings", "analysts", "alerts", "options", "market", "events", "toggle_watchlist", "next_group", "chart_split", "draw_level", "draw_pen"] as const) expect(practiceAllows(id)).toBe(false);
   });
 });
 

@@ -47,13 +47,22 @@ impl Provider {
     }
     pub async fn fetch_chart(&self, client: &reqwest::Client, symbol: &str, range: &str, interval: &str, extended: bool) -> Result<Chart, String> {
         let mut chart = quote::fetch_chart(client, symbol, range, interval, extended).await?;
+        self.overlay_bars(client, symbol, &mut chart).await;
+        Ok(chart)
+    }
+    pub async fn fetch_period(&self, client: &reqwest::Client, symbol: &str, interval: &str, start: i64, end: i64) -> Result<Chart, String> {
+        let mut chart = quote::fetch_period(client, symbol, interval, start, end).await?;
+        self.overlay_bars(client, symbol, &mut chart).await;
+        quote::trim_period(&mut chart, start, end);
+        Ok(chart)
+    }
+    async fn overlay_bars(&self, client: &reqwest::Client, symbol: &str, chart: &mut Chart) {
         if let Self::Alpaca(keys, feed) = self {
             if eligible(symbol) {
-                let result = alpaca::bars(client, keys, *feed, &chart).await;
-                apply_bars(&mut chart, result, *feed);
+                let result = alpaca::bars(client, keys, *feed, chart).await;
+                apply_bars(chart, result, *feed);
             }
         }
-        Ok(chart)
     }
 }
 

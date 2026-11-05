@@ -138,16 +138,37 @@ pub async fn get_chart(shared: State<'_, Arc<Shared>>, symbol: String, range: St
     Ok(chart)
 }
 
+#[tauri::command]
+pub async fn get_history(shared: State<'_, Arc<Shared>>, symbol: String, interval: String, start: i64, end: i64) -> Result<Chart, String> {
+    let revision = shared.revision();
+    let chart = crate::provider::Provider::current(&shared).fetch_period(&shared.http, &symbol, &interval, start, end).await?;
+    let _settings = lock(&shared.settings);
+    if shared.revision() != revision { return Err("Market data settings changed; try again".into()); }
+    *lock(&shared.history) = Some(chart.clone());
+    Ok(chart)
+}
+
+fn history_for(shared: &Shared, symbol: &str, interval: &str) -> Result<Chart, String> {
+    lock(&shared.history)
+        .clone()
+        .filter(|c| c.meta.symbol.eq_ignore_ascii_case(symbol.trim()) && c.interval == interval)
+        .ok_or_else(|| "No history loaded for this symbol; start a new setup".into())
+}
+
 /// Technical analysis of the chart on screen.
 /// Reuses the last fetched chart when it matches, so the analysis covers the
 /// same candles the window shows; fetches otherwise.
 #[tauri::command]
 pub async fn analyze(shared: State<'_, Arc<Shared>>, symbol: String, range: String, interval: String, extended: bool, until: Option<i64>) -> Result<Analysis, String> {
     let revision = shared.revision();
-    let cached = lock(&shared.last_chart)
-        .clone()
-        .filter(|c| c.meta.symbol.eq_ignore_ascii_case(symbol.trim()) && c.range == range
-            && quote::resolve_interval(&range, &interval, extended).is_some_and(|(i, p)| c.interval == i && c.extended == p));
+    let cached = if range == quote::PERIOD_RANGE {
+        Some(history_for(&shared, &symbol, &interval)?)
+    } else {
+        lock(&shared.last_chart)
+            .clone()
+            .filter(|c| c.meta.symbol.eq_ignore_ascii_case(symbol.trim()) && c.range == range
+                && quote::resolve_interval(&range, &interval, extended).is_some_and(|(i, p)| c.interval == i && c.extended == p))
+    };
     let chart = match cached {
         Some(c) => c,
         None => {
@@ -951,6 +972,20 @@ mod tests {
         *lock(&shared.last_chart) = Some(chart);
         assert!(init_payload(&shared).chart.is_some());
         lock(&shared.settings).chart_extended_hours = true;
+        assert!(init_payload(&shared).chart.is_none());
+    }
+
+    #[test]
+    fn history_is_kept_apart_from_the_live_chart() {
+        let dir = tempfile::tempdir().unwrap();
+        let shared = Shared::new(dir.path().join("settings.json"), Default::default());
+        assert!(history_for(&shared, "AAPL", "1d").is_err());
+        let chart = quote::parse_period(include_bytes!("../../fixtures/chart-period-1d.json"), "1d", 1735689600, 1743465600).unwrap();
+        *lock(&shared.history) = Some(chart.clone());
+        assert_eq!(history_for(&shared, " aapl ", "1d").unwrap(), chart);
+        assert!(history_for(&shared, "AAPL", "1wk").is_err());
+        assert!(history_for(&shared, "MSFT", "1d").is_err());
+        assert!(lock(&shared.last_chart).is_none());
         assert!(init_payload(&shared).chart.is_none());
     }
 

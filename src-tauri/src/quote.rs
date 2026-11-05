@@ -401,6 +401,44 @@ pub async fn fetch_chart(client: &reqwest::Client, symbol: &str, range: &str, in
     Ok(chart)
 }
 
+pub const PERIOD_RANGE: &str = "period";
+pub const PERIOD_INTERVALS: [&str; 3] = ["60m", "1d", "1wk"];
+
+pub fn period_query(interval: &str, start: i64, end: i64) -> Result<[(&'static str, String); 5], String> {
+    let interval = PERIOD_INTERVALS.iter().find(|&&i| i == interval).ok_or("unsupported interval for a date range")?;
+    if start <= 0 || end <= start {
+        return Err("bad date range".into());
+    }
+    Ok([
+        ("period1", start.to_string()),
+        ("period2", end.to_string()),
+        ("interval", (*interval).to_string()),
+        ("includePrePost", "false".into()),
+        ("events", "div,split".into()),
+    ])
+}
+
+pub fn parse_period(body: &[u8], interval: &str, start: i64, end: i64) -> Result<Chart, String> {
+    let mut chart = parse_chart(body, PERIOD_RANGE, interval)?;
+    trim_period(&mut chart, start, end);
+    Ok(chart)
+}
+
+pub fn trim_period(chart: &mut Chart, start: i64, end: i64) {
+    chart.candles.retain(|c| c.t >= start && c.t < end);
+    chart.dividends.retain(|d| d.t >= start && d.t < end);
+    chart.splits.retain(|s| s.t >= start && s.t < end);
+    chart.last_bar_time = chart.candles.last().map(|c| c.t);
+}
+
+pub async fn fetch_period(client: &reqwest::Client, symbol: &str, interval: &str, start: i64, end: i64) -> Result<Chart, String> {
+    let query = period_query(interval, start, end)?;
+    let url = format!("{CHART_URL}/{}", symbol.trim().to_uppercase());
+    let pairs: Vec<(&str, &str)> = query.iter().map(|(k, v)| (*k, v.as_str())).collect();
+    let body = get(client, &url, &pairs).await?;
+    parse_period(&body, interval, start, end)
+}
+
 /// 1-minute 1d chart, for the freshest price and extended-hours value.
 pub async fn fetch_quote(client: &reqwest::Client, symbol: &str, now: i64) -> Result<Quote, String> {
     let url = format!("{CHART_URL}/{}", symbol.trim().to_uppercase());
@@ -485,6 +523,43 @@ mod tests {
         assert_eq!(yahoo_delay("ZZZ.QQ", "Unknown"), None);
         assert_eq!(yahoo_delay("^IXIC", "Nasdaq GIDS"), None);
         assert_eq!(yahoo_delay("EURUSD=X", "CCY"), Some(0));
+    }
+
+    #[test]
+    fn parses_a_date_range() {
+        let body: &[u8] = include_bytes!("../../fixtures/chart-period-1d.json");
+        let c = parse_period(body, "1d", 1735689600, 1743465600).unwrap();
+        assert_eq!(c.range, PERIOD_RANGE);
+        assert_eq!(c.interval, "1d");
+        assert!(!c.extended);
+        assert_eq!(c.meta.symbol, "AAPL");
+        assert_eq!(c.candles.len(), 60);
+        assert_eq!(c.candles[0].t, 1735828200);
+        assert_eq!(c.last_bar_time, Some(1743427800));
+        assert!(c.candles.windows(2).all(|w| w[0].t < w[1].t));
+        assert_eq!(c.dividends, [Dividend { t: 1739197800, amount: 0.25 }]);
+        let trimmed = parse_period(body, "1d", 1736000000, 1739197800).unwrap();
+        assert!(trimmed.candles.iter().all(|k| k.t >= 1736000000 && k.t < 1739197800));
+        assert!(trimmed.candles.len() < 60 && !trimmed.candles.is_empty());
+        assert!(trimmed.dividends.is_empty());
+        assert_eq!(trimmed.last_bar_time, trimmed.candles.last().map(|k| k.t));
+        let json = serde_json::to_value(&c).unwrap();
+        assert_eq!(json["range"], "period");
+        assert!(json["candles"][0]["o"].is_f64());
+    }
+
+    #[test]
+    fn date_range_query() {
+        let q = period_query("1d", 100, 200).unwrap();
+        assert_eq!(q[0], ("period1", "100".to_string()));
+        assert_eq!(q[1], ("period2", "200".to_string()));
+        assert_eq!(q[2], ("interval", "1d".to_string()));
+        assert_eq!(q[3], ("includePrePost", "false".to_string()));
+        for i in PERIOD_INTERVALS { assert!(period_query(i, 1, 2).is_ok()); }
+        assert!(period_query("5m", 100, 200).is_err());
+        assert!(period_query("1d", 200, 200).is_err());
+        assert!(period_query("1d", 0, 200).is_err());
+        assert!(resolve_interval(PERIOD_RANGE, "1d", false).is_none());
     }
 
     #[test]

@@ -23,7 +23,7 @@
     starred: boolean;
     onanalysts: () => void;
     onstar: () => void;
-    replay?: { bar: Candle; change: number | null; change_pct: number | null; currency: string; when: string } | null;
+    replay?: { bar: Candle; change: number | null; change_pct: number | null; currency: string; when: string; label?: string; name?: string; exchange?: string } | null;
   } = $props();
   const up = $derived(upside(analyst?.target_mean, quote?.price));
   // Whole numbers once prices reach 100, so the range fits the panel.
@@ -62,7 +62,11 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" /></svg>
     </button>
   </div>
-  {#if quote}
+  {#if replay?.name != null}
+    <div class="name" title={replay.name}>
+      {replay.name || "—"}{#if replay.exchange}<span> · {replay.exchange}</span>{/if}
+    </div>
+  {:else if quote}
     <div class="name" title={quote.name}>
       {quote.name || "—"}{#if quote.exchange}<span> · {quote.exchange}</span>{/if}
     </div>
@@ -75,7 +79,7 @@
     {#if replay.change != null && replay.change_pct != null}
       <div class="chg {direction(replay.change)}" title="Change from the previous bar">{change(replay.change, replay.change_pct)}</div>
     {/if}
-    <div class="session"><i class="replay"></i>Replay · {replay.when}</div>
+    <div class="session"><i class="replay"></i>{replay.label ?? "Replay"} · {replay.when}</div>
     <dl>
       <dt>Open</dt><dd>{price(replay.bar.o, replay.currency)}</dd>
       <dt>High</dt><dd>{price(replay.bar.h, replay.currency)}</dd>
