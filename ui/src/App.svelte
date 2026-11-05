@@ -8,6 +8,7 @@
   import ChartSkeleton from "./ChartSkeleton.svelte";
   import EarningsView from "./Earnings.svelte";
   import EventsView from "./Events.svelte";
+  import FinancialsView from "./Financials.svelte";
   import Footer from "./Footer.svelte";
   import MarketView from "./Market.svelte";
   import OptionsView from "./Options.svelte";
@@ -39,6 +40,7 @@
     type Dots,
     type Earnings,
     type EventsReport,
+    type Financials,
     type Group,
     type WatchlistSort,
     type SavedScreen,
@@ -117,6 +119,10 @@
   let earnings = $state<Earnings | null | undefined>(undefined);
   let ratingChanges = $state<RatingChange[]>([]);
   let stats = $state<StatSection[] | null | undefined>(undefined);
+  let financials = $state<Financials | null | undefined>(undefined);
+  let financialsError = $state<string | null>(null);
+  let financialsSym = "";
+  let financialsSeq = 0;
   let market = $state<Market | undefined>(undefined);
   let marketError = $state<string | null>(null);
   let marketLoading = $state(false);
@@ -357,6 +363,27 @@
     }
   }
 
+  async function loadFinancials(manual = false) {
+    const mine = ++financialsSeq;
+    const sym = symbol;
+    financialsError = null;
+    try {
+      const result = await invoke<Financials | null>("get_financials", { symbol: sym, force: manual });
+      if (mine === financialsSeq && sym === symbol) {
+        financials = result;
+        financialsSym = sym;
+      }
+    } catch (e) {
+      if ((!manual || financials === undefined) && mine === financialsSeq && sym === symbol) financialsError = String(e);
+      return String(e);
+    }
+  }
+
+  function toggleFinancials() {
+    view = view === "financials" ? "chart" : "financials";
+    if (view === "financials" && financialsSym !== symbol) loadFinancials();
+  }
+
   async function loadRatingChanges(manual = false) {
     const mine = ++ratingChangesSeq;
     const sym = symbol;
@@ -479,6 +506,10 @@
       loadRatingChanges();
       stats = undefined;
       loadStats();
+      financials = undefined;
+      financialsSym = "";
+      financialsError = null;
+      if (view === "financials") loadFinancials();
       loadNews();
       options = undefined;
       if (view === "options") loadOptions();
@@ -630,6 +661,7 @@
       case "news": panelDone = newsScope === "symbol" ? loadNews(true) : loadFeed(newsScope, [...feedSymbols], true); break;
       case "earnings": panelDone = loadEarnings(true); break;
       case "stats": panelDone = loadStats(true); break;
+      case "financials": panelDone = loadFinancials(true); break;
       case "analysts": panelDone = Promise.all([loadAnalyst(true), loadRatingChanges(true)]).then((errors) => errors.find(Boolean)); break;
       case "events": panelDone = loadEvents(true, true); break;
       case "market": panelDone = loadMarket(true); break;
@@ -872,6 +904,9 @@
             <button role="tab" aria-selected={view === "stats"} class:on={view === "stats"} onclick={() => (view = view === "stats" ? "chart" : "stats")}>
               Stats
             </button>
+            <button role="tab" aria-selected={view === "financials"} class:on={view === "financials"} onclick={toggleFinancials}>
+              Financials
+            </button>
             {#if view === "news" ? (newsScope === "symbol" ? newsLoading : feedLoading) : view === "market" ? marketLoading : view === "events" ? eventsLoading : view === "options" ? optionsLoading : loading || (view === "technicals" && analyzing)}<span
                 class="spin"
                 aria-label="Loading"
@@ -896,6 +931,8 @@
               <EarningsView {symbol} {earnings} />
             {:else if view === "stats"}
               <StatsView {symbol} {stats} />
+            {:else if view === "financials"}
+              <FinancialsView {symbol} {financials} error={financialsError} onretry={() => loadFinancials()} />
             {:else if view === "market"}
               <MarketView {market} error={marketError} onretry={() => loadMarket()} onopen={openWatched} />
             {:else if view === "events"}
