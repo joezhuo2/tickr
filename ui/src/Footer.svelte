@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { DataProvider, Quote } from "./lib/types";
+  import { sourceName, type Segment, type Status } from "./lib/freshness";
   import { invoke } from "@tauri-apps/api/core";
 
   let {
@@ -7,6 +8,9 @@
     dataProvider,
     error = null,
     status,
+    quoteLabel,
+    chartLabel,
+    delayText,
     settingsOn,
     onsettings,
     watchlistOn,
@@ -19,7 +23,10 @@
     error?: string | null;
     quote: Quote | null;
     dataProvider: DataProvider;
-    status: { kind: "live" | "stale" | "offline" | "loading"; text: string };
+    status: Status;
+    quoteLabel: Segment | null;
+    chartLabel: Segment | null;
+    delayText: string | null;
     settingsOn: boolean;
     onsettings: () => void;
     watchlistOn: boolean;
@@ -31,7 +38,8 @@
   const source = $derived(quote?.source ?? "yahoo");
   const sourceLabel = $derived(source === "yahoo"
     ? dataProvider.provider === "alpaca" && /^[A-Z]{1,5}$/.test(quote?.symbol ?? "") ? "Yahoo (fallback)" : "Yahoo"
-    : `Alpaca ${source === "alpaca-sip" ? "SIP" : "IEX"} · ${dataProvider.stream.kind}`);
+    : `${sourceName(source)} · ${dataProvider.stream.kind}`);
+  const detail = $derived([quoteLabel?.text, chartLabel?.text, sourceLabel, delayText].filter(Boolean).join(" · "));
 </script>
 
 <footer>
@@ -53,7 +61,11 @@
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" /></svg>
   </button>
   {#if refreshStatus}<span role="status" class:error={refreshStatus.error}>{refreshStatus.text}</span>{/if}
-  <span class="source" title={dataProvider.stream.message ?? sourceLabel}>{sourceLabel}</span>
+  <span class="source" title={dataProvider.stream.message ? `${detail}. ${dataProvider.stream.message}` : detail}>
+    {#if quoteLabel}<span class:stale={quoteLabel.stale}>{quoteLabel.text}</span> · {/if}
+    {#if chartLabel}<span class:stale={chartLabel.stale}>{chartLabel.text}</span> · {/if}
+    {sourceLabel}{#if delayText} · {delayText}{/if}
+  </span>
   <span class="status {status.kind}" title={status.text}><i></i>{status.text}</span>
 </footer>
 
@@ -191,13 +203,23 @@
       transform: rotate(360deg);
     }
   }
-  .source { color: var(--muted); white-space: nowrap; }
+  .source {
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .source .stale {
+    color: #ffb340;
+  }
   .status {
     display: flex;
     align-items: center;
     gap: 6px;
     color: var(--muted);
     white-space: nowrap;
+    flex: none;
   }
   .status i {
     width: 7px;
@@ -207,13 +229,19 @@
   .live i {
     background: var(--up);
   }
+  .delayed i {
+    background: var(--accent);
+  }
   .stale i {
     background: #ffb340;
   }
   .offline i {
     background: var(--down);
   }
-  .loading i {
+  .loading i,
+  .recent i,
+  .closed i,
+  .unknown i {
     background: var(--flat);
   }
 </style>

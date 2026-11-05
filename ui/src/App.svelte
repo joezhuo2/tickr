@@ -62,6 +62,7 @@
   import { applyDisplay } from "./lib/display";
   import type { Theme, TextSize, Palette } from "./lib/types";
   import { refreshOutcome, type RefreshView } from "./lib/refresh";
+  import { chartNote, chartSegment, chartTime, classifyChart, classifyQuote, delayLabel, localOffset, quoteNote, quoteSegment, quoteStatus, quoteTime, sourceName } from "./lib/freshness";
   import { paneIn } from "./lib/motion";
   import { emptyHistory, goBack, goForward, previous, pushRecent, visit, type History, type Move } from "./lib/history";
   import { DEFAULT_WATCHLIST_SORT } from "./lib/watchlistSort";
@@ -309,13 +310,38 @@
 
   const quote = $derived(qs.quote && qs.quote.symbol === symbol ? qs.quote : null);
 
-  const status = $derived.by(() => {
-    if (qs.error && !quote) return { kind: "offline" as const, text: `Offline: ${qs.error}` };
-    if (!quote) return { kind: "loading" as const, text: "Loading…" };
-    const age = now - qs.updated_at;
-    if (qs.error || age > 20 * 60) return { kind: "stale" as const, text: qs.error ? `Stale: ${qs.error}` : "Stale" };
-    return { kind: "live" as const, text: age < 90 ? "Live" : `Updated ${Math.round(age / 60)} min ago` };
-  });
+  const shownChart = $derived(chart && chart.meta.symbol.toUpperCase() === symbol.toUpperCase() ? chart : null);
+  const offset = $derived(localOffset(now));
+  const quoteReading = $derived(quote ? classifyQuote({ time: quoteTime(quote), session: quote.session, now, delay: quote.delay_secs }) : null);
+  const chartReading = $derived(
+    shownChart && quote
+      ? classifyChart({ time: chartTime(shownChart), interval: shownChart.interval, session: quote.session, now, delay: shownChart.delay_secs })
+      : null,
+  );
+  const status = $derived(
+    quoteStatus({ hasQuote: !!quote, error: qs.error, reading: quoteReading, session: quote?.session ?? null, delay: quote?.delay_secs, now, offset }),
+  );
+  const quoteStale = $derived(
+    quote ? quoteNote(quoteReading, now, offset, { source: quote.source, error: qs.error, stream: dataProvider.stream.kind, delay: quote.delay_secs }) : null,
+  );
+  const chartStale = $derived(
+    shownChart
+      ? chartNote(chartReading, shownChart.interval, now, offset, {
+          source: shownChart.source,
+          error: qs.error,
+          stream: dataProvider.stream.kind,
+          lowPower: refreshMode === "low_power",
+          delay: shownChart.delay_secs,
+        })
+      : null,
+  );
+  const quoteLabel = $derived(quoteSegment(quoteReading, now, offset));
+  const chartLabel = $derived(
+    shownChart && quote
+      ? chartSegment(chartReading, shownChart.interval, now, offset, shownChart.source !== quote.source ? sourceName(shownChart.source) : null)
+      : null,
+  );
+  const delayText = $derived(quote ? delayLabel(quote.delay_secs) : null);
 
   /** Shows the cached chart (or a skeleton) at once, then fetches if stale. */
   async function loadChart(force = false, manual = false) {
@@ -925,6 +951,7 @@
         {quote}
         {logo}
         {analyst}
+        staleNote={quoteStale}
         starred={watchlist.includes(symbol)}
         onanalysts={() => (view = "analysts")}
         onstar={toggleStar}
@@ -1056,7 +1083,7 @@
             {:else if view === "technicals"}
               <div class="split">
                 {#if chart}
-                  <ChartView bind:this={chartView} redrawKey={displayKey} {chart} {mode} {scale} {drawings} {drawingBusy} {saveDrawings} analysis={activeAnalysis} {overlays} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
+                  <ChartView bind:this={chartView} redrawKey={displayKey} {chart} staleNote={chartStale} {mode} {scale} {drawings} {drawingBusy} {saveDrawings} analysis={activeAnalysis} {overlays} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
                 {:else if chartError}
                   <div class="msg">
                     {chartError}
@@ -1081,7 +1108,7 @@
                 />
               </div>
             {:else if chart}
-              <ChartView bind:this={chartView} redrawKey={displayKey} {chart} {mode} {scale} {drawings} {drawingBusy} {saveDrawings} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
+              <ChartView bind:this={chartView} redrawKey={displayKey} {chart} staleNote={chartStale} {mode} {scale} {drawings} {drawingBusy} {saveDrawings} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
             {:else if chartError}
               <div class="msg">
                 {chartError}
@@ -1099,6 +1126,9 @@
       {dataProvider}
       error={hotkeyError}
       {status}
+      {quoteLabel}
+      {chartLabel}
+      {delayText}
       settingsOn={settingsOpen}
       onsettings={() => (settingsOpen = !settingsOpen)}
       watchlistOn={view === "watchlist"}

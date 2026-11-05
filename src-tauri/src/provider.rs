@@ -59,7 +59,12 @@ impl Provider {
 
 fn apply_bars(chart: &mut Chart, result: Result<Vec<Candle>, String>, feed: Feed) {
     match result {
-        Ok(candles) if !candles.is_empty() => { chart.candles = candles; chart.source = feed.source().into(); },
+        Ok(candles) if !candles.is_empty() => {
+            chart.last_bar_time = candles.last().map(|c| c.t);
+            chart.candles = candles;
+            chart.source = feed.source().into();
+            chart.delay_secs = Some(0);
+        },
         Ok(_) => log::warn!("Alpaca returned no bars; using Yahoo"),
         Err(e) => log::warn!("Alpaca chart: {e}; using Yahoo"),
     }
@@ -83,6 +88,8 @@ mod tests {
             apply_bars(&mut chart, Ok(bars.clone()), feed);
             assert_eq!(chart.source, feed.source());
             assert_eq!(chart.candles, bars);
+            assert_eq!(chart.last_bar_time, bars.last().map(|c| c.t));
+            assert_eq!(chart.delay_secs, Some(0));
             assert_eq!(chart.range, original.range);
             assert_eq!(chart.interval, original.interval);
             assert_eq!(chart.meta, original.meta);

@@ -57,6 +57,7 @@ export interface Meta {
   currency: string;
   price: number;
   prev_close: number | null;
+  market_time?: number;
   gmtoffset: number;
   periods: { pre: Period; regular: Period; post: Period } | null;
 }
@@ -69,6 +70,8 @@ export interface Chart {
   candles: Candle[];
   dividends: { t: number; amount: number }[];
   splits: { t: number; ratio: string }[];
+  last_bar_time?: number | null;
+  delay_secs?: number | null;
 }
 
 export interface Extended {
@@ -98,6 +101,7 @@ export interface Quote {
   session: Session;
   extended: Extended | null;
   market_time: number;
+  delay_secs?: number | null;
 }
 
 export interface QuoteState {

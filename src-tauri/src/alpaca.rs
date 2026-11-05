@@ -57,6 +57,7 @@ pub fn trade(quote: &mut Quote, price: f64, t: i64, feed: Feed) {
         quote.market_time = t;
     }
     quote.source = feed.source().into();
+    quote.delay_secs = Some(0);
 }
 
 pub fn overlay(quote: &mut Quote, v: &Value, feed: Feed) -> Result<(), String> {
@@ -178,6 +179,7 @@ mod tests {
             assert_eq!(q.day_low, Some(325.0));
             assert_eq!(q.prev_close, Some(320.0));
             assert_eq!(q.source, "alpaca-iex");
+            assert_eq!(q.delay_secs, Some(0));
             if extended {
                 assert_eq!(q.price, original_price);
                 let ext = q.extended.unwrap();
