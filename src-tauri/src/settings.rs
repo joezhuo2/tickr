@@ -66,6 +66,30 @@ pub enum ChartScale {
     Percent,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum WatchlistSortKey {
+    #[default]
+    Change,
+    Price,
+    Volume,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum WatchlistSortDir {
+    #[default]
+    Desc,
+    Asc,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct WatchlistSort {
+    pub key: WatchlistSortKey,
+    pub dir: WatchlistSortDir,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DrawingPoint {
     pub t: i64,
@@ -327,6 +351,7 @@ pub struct Settings {
     pub watchlist: Vec<String>,
     /// Watchlist groups, in tab order.
     pub groups: Vec<Group>,
+    pub watchlist_sort: WatchlistSort,
     /// Look for new releases in the background.
     pub auto_update: bool,
     pub keybinds: Keybinds,
@@ -374,6 +399,7 @@ impl Default for Settings {
             autostart: None,
             watchlist: Vec::new(),
             groups: Vec::new(),
+            watchlist_sort: WatchlistSort::default(),
             auto_update: true,
             keybinds: Keybinds::default(),
             dots: Dots::default(),
@@ -604,6 +630,19 @@ mod tests {
             groups: vec![Group { name: "Crypto".into(), symbols: vec!["BTC-USD".into()] }],
             ..Settings::default()
         };
+        s.save(&p).unwrap();
+        assert_eq!(Settings::load(&p), s);
+    }
+
+    #[test]
+    fn watchlist_sort_defaults_and_roundtrip() {
+        let old: Settings = serde_json::from_str(r#"{"symbol":"NVDA"}"#).unwrap();
+        assert_eq!(old.watchlist_sort, WatchlistSort { key: WatchlistSortKey::Change, dir: WatchlistSortDir::Desc });
+        let partial: Settings = serde_json::from_str(r#"{"watchlist_sort":{"key":"volume"}}"#).unwrap();
+        assert_eq!(partial.watchlist_sort, WatchlistSort { key: WatchlistSortKey::Volume, dir: WatchlistSortDir::Desc });
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        let s = Settings { watchlist_sort: WatchlistSort { key: WatchlistSortKey::Price, dir: WatchlistSortDir::Asc }, ..Settings::default() };
         s.save(&p).unwrap();
         assert_eq!(Settings::load(&p), s);
     }

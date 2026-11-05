@@ -126,6 +126,7 @@ pub fn run() {
             commands::get_options,
             commands::set_watchlist,
             commands::set_groups,
+            commands::set_watchlist_sort,
             commands::get_watch_quotes,
             commands::get_news,
             commands::get_news_feed,
