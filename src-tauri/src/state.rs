@@ -53,6 +53,8 @@ pub struct Shared {
     pub alert_prices: Mutex<HashMap<u32, f64>>,
     /// Logo PNG for the current symbol: (symbol, bytes). None bytes = no logo.
     pub logo: Mutex<Option<(String, Option<Vec<u8>>)>>,
+    pub paper: Mutex<crate::paper::PaperAccount>,
+    pub paper_path: PathBuf,
     /// Last known window geometry while it was not minimized.
     pub geometry: Mutex<Option<Geometry>>,
     /// Last chart the window fetched; survives window unloads.
@@ -72,7 +74,10 @@ pub struct Shared {
 impl Shared {
     pub fn new(settings_path: PathBuf, settings: Settings) -> Self {
         let geometry = settings.geometry;
+        let paper_path = crate::paper::paper_path(&settings_path);
         Self {
+            paper: Mutex::new(crate::paper::PaperAccount::load(&paper_path)),
+            paper_path,
             provider: Mutex::new(crate::provider::Provider::load(&settings)),
             provider_revision: std::sync::atomic::AtomicU64::new(0),
             stream_status: Mutex::new(crate::stream::Status::Off),

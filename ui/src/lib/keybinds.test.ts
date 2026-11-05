@@ -27,6 +27,7 @@ const DEFAULTS: Keybinds = {
   news: "n",
   analyze: "z",
   options: "o",
+  paper: "h",
   options_side: "u",
   options_expiry: "d",
   add_watchlist: "f",
@@ -115,8 +116,19 @@ describe("chart_replay", () => {
     expect(bindKey(down("Escape"))).toBeNull();
   });
   it("blocks panels, drawing and the second chart during replay", () => {
-    for (const id of ["chart_replay", "chart_mode", "chart_scale", "technicals", "analyze", "settings"] as const) expect(replayAllows(id)).toBe(true);
+    for (const id of ["chart_replay", "chart_mode", "chart_scale", "technicals", "paper", "analyze", "settings"] as const) expect(replayAllows(id)).toBe(true);
     for (const id of ["news", "earnings", "analysts", "options", "market", "events", "alerts", "toggle_watchlist", "chart_split", "draw_level", "draw_pen"] as const) expect(replayAllows(id)).toBe(false);
+  });
+});
+
+describe("paper", () => {
+  it("is a panel action on H that can be rebound and unbound", () => {
+    expect(actionFor(DEFAULTS, "h")).toBe("paper");
+    expect(ACTIONS.find((a) => a.id === "paper")?.category).toBe("panels");
+    const next = rebind(DEFAULTS, "paper", "y");
+    expect(actionFor(next, "y")).toBe("paper");
+    expect(actionFor(next, "h")).toBe("chart_replay");
+    expect(actionFor({ ...DEFAULTS, paper: "" }, "h")).toBeNull();
   });
 });
 
@@ -138,7 +150,7 @@ describe("groupActions", () => {
   });
   it("keeps actions in their declared order within a group", () => {
     const panels = groupActions().find((g) => g.id === "panels")!;
-    expect(panels.actions.map((a) => a.id)).toEqual(["technicals", "analyze", "analysts", "earnings", "alerts", "market", "events", "news", "options"]);
+    expect(panels.actions.map((a) => a.id)).toEqual(["technicals", "analyze", "analysts", "earnings", "alerts", "market", "events", "news", "options", "paper"]);
   });
   it("puts the options actions in their own group", () => {
     const options = groupActions().find((g) => g.id === "options")!;

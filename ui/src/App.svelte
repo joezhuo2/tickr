@@ -64,6 +64,8 @@
   import { actionFor, bindKey, keyLabel, nextGroupTab, replayAllows } from "./lib/keybinds";
   import ReplayBar from "./ReplayBar.svelte";
   import * as Replay from "./lib/replay";
+  import PaperView from "./Paper.svelte";
+  import * as Paper from "./lib/paper";
   import { fullTime } from "./lib/format";
   import { overlayVisibility, shouldAnalyze } from "./lib/indicators";
   import { applyDisplay } from "./lib/display";
@@ -198,6 +200,12 @@
   let alerts = $state<PriceAlert[]>([]);
   let recent = $state<string[]>([]);
   let history = $state<History>(emptyHistory());
+  let paper = $state.raw<Paper.Account>(Paper.newAccount());
+  let paperLoaded = $state(false);
+  let paperWrite = Promise.resolve();
+  let paperError = $state<string | null>(null);
+  let paperNotice = $state<string | null>(null);
+  let paperBook = $state.raw<Paper.Book | null>(null);
   let navigating = false;
   let picking = 0;
   let now = $state(Date.now() / 1000);
@@ -327,6 +335,7 @@
     loadRatingChanges();
     loadStats();
     loadNews();
+    loadPaper();
   }
   if (boot) apply(boot);
 
@@ -557,7 +566,7 @@
     if (replay || !base || !Replay.canReplay(base.candles.length)) return;
     chartSeq++;
     loading = false;
-    if (view !== "chart" && view !== "technicals") view = "chart";
+    if (view !== "chart" && view !== "technicals" && view !== "paper") view = "chart";
     const bars = base.candles;
     replaySession++;
     replayBars = bars;
@@ -570,11 +579,15 @@
     syncHover = null;
     syncWindow = null;
     replay = Replay.startAt(bars, bars[Math.max(Replay.MIN_CONTEXT, Math.floor(bars.length / 2))].t);
+    openPaperBook();
   }
 
   function exitReplay() {
     if (!replay) return;
     replaySession++;
+    paperBook = null;
+    paperError = null;
+    paperNotice = null;
     replay = null;
     replayBars = [];
     replayBase = null;
@@ -597,7 +610,155 @@
     if (!replay || !replayBars.length) return;
     const wall = Date.parse(value.length === 10 ? `${value}T00:00Z` : `${value}Z`) / 1000;
     const next = Replay.startAt(replayBars.map((b) => ({ t: b.t + replayOffset(b.t) })), wall, Replay.MIN_CONTEXT, replay.speed);
-    if (next) replay = next;
+    if (next) {
+      replay = next;
+      openPaperBook();
+    }
+  }
+
+  function openPaperBook(account = Paper.newAccount(paper.starting_cash, paper.costs)) {
+    paperBook = replay ? Paper.openBook(account, replay.cursor) : null;
+    paperError = null;
+    paperNotice = null;
+  }
+
+  $effect(() => {
+    const cursor = replayCursor;
+    if (cursor < 0) return;
+    untrack(() => {
+      if (!paperBook || !replay) return;
+      const r = Paper.seekBook(paperBook, replayBars, cursor, symbol);
+      paperBook = r.book;
+      if (r.events.length) paperNotice = paperEventText(r.events);
+    });
+  });
+
+  const paperAccount = $derived(replay ? (paperBook ? Paper.bookAccount(paperBook) : null) : paperLoaded ? paper : null);
+  const paperMark = $derived(replay ? (replayChart ? replayChart.candles[replayChart.candles.length - 1].c : null) : (quote?.price ?? null));
+  const liveBlock = $derived(Paper.liveBlock(quote?.session ?? null, quoteReading?.state ?? null, quote?.price ?? null));
+  const paperMarketBlock = $derived(replay ? (Replay.isAtEnd(replay) ? "End of replay data, no next bar to fill at" : null) : liveBlock);
+  const paperFills = $derived((paperAccount?.fills ?? []).filter((f) => f.symbol === symbol).map((f) => ({ t: f.time, side: f.side, price: f.price })));
+
+  function paperEventText(events: Paper.BarEvent[]): string {
+    return events
+      .map((e) => (e.kind === "fill" ? `Simulated ${e.order.side} ${e.fill.qty} ${e.fill.symbol} filled at ${e.fill.price.toFixed(2)}` : `Simulated ${e.order.side} ${e.order.qty} ${e.order.symbol} rejected: ${e.error}`))
+      .join(". ");
+  }
+
+  async function loadPaper() {
+    try {
+      paper = await invoke<Paper.Account>("get_paper");
+      paperLoaded = true;
+    } catch (e) {
+      paperError = `Could not load the simulated account: ${e}`;
+    }
+  }
+
+  function savePaper(next: Paper.Account) {
+    paper = next;
+    paperWrite = paperWrite
+      .then(() => invoke<Paper.Account>("save_paper", { account: next }))
+      .then(
+        () => {
+          if (!replay && paperError?.startsWith("Could not save")) paperError = null;
+        },
+        (e) => {
+          if (!replay) paperError = `Could not save the simulated account: ${e}`;
+        },
+      );
+  }
+
+  function setPaperAccount(next: Paper.Account) {
+    if (replay) {
+      if (paperBook) paperBook = Paper.updateBook(paperBook, next);
+    } else savePaper(next);
+  }
+
+  function paperOrder(req: Paper.OrderRequest) {
+    const account = paperAccount;
+    paperError = null;
+    paperNotice = null;
+    if (!account) return;
+    let r: Paper.Outcome;
+    if (replay) {
+      if (req.kind === "market" && paperMarketBlock) {
+        paperError = paperMarketBlock;
+        return;
+      }
+      const bar = replayBars[replay.cursor];
+      r = Paper.placeOrder(account, req, bar.t, bar.c);
+    } else if (req.kind === "market") {
+      if (liveBlock || !quote) {
+        paperError = liveBlock ?? "No live quote yet";
+        return;
+      }
+      r = Paper.marketOrder(account, req.symbol, req.side, req.qty, quote.price, quoteTime(quote) ?? quote.market_time);
+    } else {
+      r = Paper.placeOrder(account, req, quote ? (quoteTime(quote) ?? quote.market_time) : 0);
+    }
+    if (!r.ok) {
+      paperError = r.error;
+      return;
+    }
+    setPaperAccount(r.account);
+    if (r.fill) paperNotice = `Simulated ${r.fill.side} ${r.fill.qty} ${r.fill.symbol} filled at ${r.fill.price.toFixed(2)}`;
+    else if (r.order) paperNotice = r.order.kind === "market" ? "Simulated market order queued for the next bar's open" : `Simulated ${r.order.kind} order placed`;
+  }
+
+  function paperCancel(id: number) {
+    if (paperAccount) setPaperAccount(Paper.cancelOrder(paperAccount, id));
+  }
+
+  function paperCosts(costs: Paper.Costs) {
+    if (!paperAccount) return;
+    const r = Paper.setCosts(paperAccount, costs);
+    if (!r.ok) paperError = r.error;
+    else {
+      setPaperAccount(r.account);
+      paperNotice = "Simulation costs saved";
+    }
+  }
+
+  async function paperReset(startingCash: number) {
+    if (!paperAccount) return;
+    const costs = paperAccount.costs;
+    const r = Paper.reset(paperAccount, startingCash);
+    if (!r.ok) {
+      paperError = r.error;
+      return;
+    }
+    paperError = null;
+    if (replay) {
+      openPaperBook(r.account);
+      paperNotice = "Replay session account reset";
+      return;
+    }
+    try {
+      await paperWrite;
+      paper = await invoke<Paper.Account>("reset_paper", { startingCash, costs });
+      paperNotice = "Simulated account reset";
+    } catch (e) {
+      paperError = `Could not reset the simulated account: ${e}`;
+    }
+  }
+
+  $effect(() => {
+    const q = quote;
+    if (!q || liveBlock) return;
+    untrack(() => {
+      if (!paperLoaded || !paper.orders.some((o) => o.symbol === q.symbol)) return;
+      const t = quoteTime(q);
+      if (t == null) return;
+      const r = Paper.processPrice(paper, q.symbol, q.price, t);
+      if (!r.events.length) return;
+      savePaper(r.account);
+      if (!replay) paperNotice = paperEventText(r.events);
+    });
+  });
+
+  function paperWhen(t: number): string {
+    if (replay) return replayWhen(t);
+    return fullTime(t, localOffset(t), "1m");
   }
 
   function replayUpdate(next: (s: Replay.ReplayState) => Replay.ReplayState) {
@@ -623,7 +784,7 @@
   });
 
   $effect.pre(() => {
-    if (replay && view !== "chart" && view !== "technicals") view = "chart";
+    if (replay && view !== "chart" && view !== "technicals" && view !== "paper") view = "chart";
   });
 
   async function runReplayAnalysis(background = false) {
@@ -823,7 +984,7 @@
 
   function setRange(r: string) {
     // The Technicals view keeps its split chart across range changes.
-    if (view !== "technicals") view = "chart";
+    if (view !== "technicals" && view !== "paper") view = "chart";
     if (r === range) return;
     exitReplay();
     range = r;
@@ -1042,7 +1203,7 @@
   }
 
   function setMode(m: ChartMode) {
-    if (view !== "technicals") view = "chart";
+    if (view !== "technicals" && view !== "paper") view = "chart";
     mode = m;
     invoke("set_chart_mode", { mode: m }).catch(console.warn);
   }
@@ -1115,7 +1276,7 @@
       case "draw_ruler":
       case "draw_pen": {
         if (e.repeat) break;
-        if (view !== "chart" && view !== "technicals") view = "chart";
+        if (view !== "chart" && view !== "technicals" && view !== "paper") view = "chart";
         await tick();
         const tools = { draw_level: "hline", draw_trend: "trend", draw_text: "text", draw_ruler: "ruler", draw_pen: "pen" } as const;
         chartView?.drawTool(tools[action]);
@@ -1132,6 +1293,9 @@
       case "earnings":
       case "alerts":
         view = view === action ? "chart" : action;
+        break;
+      case "paper":
+        if (!e.repeat) view = view === "paper" ? "chart" : "paper";
         break;
       case "market":
         if (!e.repeat) toggleMarket();
@@ -1273,7 +1437,7 @@
         <div class="range-controls">
           <div class="ranges" role="tablist">
             {#each RANGES as r (r.id)}
-              {@const on = (view === "chart" || view === "technicals") && range === r.id}
+              {@const on = (view === "chart" || view === "technicals" || view === "paper") && range === r.id}
               <button role="tab" aria-selected={on} class:on onclick={() => setRange(r.id)}>
                 {r.label}
               </button>
@@ -1301,6 +1465,9 @@
             </button>
             <button role="tab" aria-selected={view === "financials"} class:on={view === "financials"} disabled={!!replay} onclick={toggleFinancials}>
               Financials
+            </button>
+            <button role="tab" aria-selected={view === "paper"} class:on={view === "paper"} title={`Simulated paper trading (${keyLabel(keybinds.paper)})`} onclick={() => (view = view === "paper" ? "chart" : "paper")}>
+              Paper
             </button>
             {#if view === "news" ? (newsScope === "symbol" ? newsLoading : feedLoading) : view === "market" ? marketLoading : view === "events" ? (eventsTab === "watchlist" ? watchCalLoading : eventsLoading) : view === "options" ? optionsLoading : loading || (view === "technicals" && analyzing)}<span
                 class="spin"
@@ -1402,7 +1569,7 @@
             {:else if view === "technicals"}
               <div class="split">
                 {#if mainChart}
-                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} />
+                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={paperFills} />
                 {:else if chartError}
                   <div class="msg">
                     {chartError}
@@ -1425,6 +1592,39 @@
                   ondeletepreset={deletePreset}
                   onanalyze={() => runAnalysis()}
                 />
+              </div>
+            {:else if view === "paper"}
+              <div class="split">
+                {#if mainChart}
+                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={paperFills} />
+                {:else if chartError}
+                  <div class="msg">
+                    {chartError}
+                    <button class="retry" onclick={() => loadChart(true)}>Retry</button>
+                  </div>
+                {:else}
+                  <ChartSkeleton />
+                {/if}
+                {#if paperAccount}
+                  <PaperView
+                    account={paperAccount}
+                    {symbol}
+                    currency={mainChart?.meta.currency ?? quote?.currency ?? "USD"}
+                    replay={!!replay}
+                    mark={paperMark}
+                    markLabel={replay ? "Last revealed close" : "Last quote"}
+                    marketBlock={paperMarketBlock}
+                    error={paperError}
+                    notice={paperNotice}
+                    when={paperWhen}
+                    onorder={paperOrder}
+                    oncancel={paperCancel}
+                    oncosts={paperCosts}
+                    onreset={paperReset}
+                  />
+                {:else}
+                  <div class="msg">{paperError ?? "Loading the simulated account…"}</div>
+                {/if}
               </div>
             {:else}
               <div class="charts" class:stacked={split && layout.orientation === "stacked"}>
@@ -1449,6 +1649,7 @@
                     linkedWindow={split && layout.sync_range && syncWindow?.source === "second" ? syncWindow.w : null}
                     onwindow={split && layout.sync_range ? (w) => (syncWindow = { source: "main", w }) : undefined}
                     replay={!!replay}
+                    fills={paperFills}
                   />
                 {:else if chartError}
                   <div class="msg">

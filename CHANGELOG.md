@@ -6,6 +6,18 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-11-05
+
+### Added
+- **Paper trading** ([#101](https://github.com/joezhuo2/tickr/issues/101)):
+  simulated market, limit and stop orders with long and short positions,
+  commission and slippage settings, buying-power checks, realized and
+  unrealized P&L, a trade history and fill markers on the chart. The live
+  account is saved to paper.json. During bar replay a separate session-only
+  account fills at the next revealed bar's open and steps back with the replay.
+  Everything is labelled Simulated. Live market orders are only allowed in the
+  regular session with a fresh quote.
+
 ## [0.11.0] - 2026-11-05
 
 ### Added
