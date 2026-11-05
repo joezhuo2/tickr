@@ -32,6 +32,7 @@
     linkedWindow = null,
     onwindow,
     replay = false,
+    fills = [],
   }: {
     chart: Chart | null;
     redrawKey?: number;
@@ -53,6 +54,7 @@
     linkedWindow?: TimeWindow | null;
     onwindow?: (w: TimeWindow) => void;
     replay?: boolean;
+    fills?: { t: number; side: "buy" | "sell"; price: number }[];
   } = $props();
 
   let wrap: HTMLDivElement | undefined = $state();
@@ -124,6 +126,13 @@
       if (i >= 0) m.set(i, [...(m.get(i) ?? []), a]);
     }
     return m;
+  });
+  const fillMarks = $derived.by(() => {
+    const times = candles.map((c) => c.t);
+    return fills.flatMap((f) => {
+      const i = candleAt(times, f.t);
+      return i >= 0 ? [{ i, buy: f.side === "buy", price: f.price }] : [];
+    });
   });
   const dividendsAt = $derived.by(() => {
     const times = candles.map((c) => c.t);
@@ -401,6 +410,30 @@
       }
     }
     ctx.restore();
+
+    if (fillMarks.length) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(PAD.l - 4, PAD.t, g.plotW + 8, g.priceH);
+      ctx.clip();
+      ctx.strokeStyle = v("--bg");
+      ctx.lineWidth = 1;
+      for (const m of fillMarks) {
+        if (m.i < g.i0 || m.i > g.i1) continue;
+        const x = g.x(m.i);
+        const y = g.y(m.price);
+        const dir = m.buy ? 1 : -1;
+        ctx.fillStyle = v(m.buy ? "--up" : "--down");
+        ctx.beginPath();
+        ctx.moveTo(x, y + dir * 2);
+        ctx.lineTo(x - 5, y + dir * 10);
+        ctx.lineTo(x + 5, y + dir * 10);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
 
     drawDrawings(ctx, v);
 
@@ -711,7 +744,7 @@
 
   $effect(() => {
     // Redraw when any of these change.
-    void [redrawKey, list, preview, selected, tool, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt];
+    void [redrawKey, list, preview, selected, tool, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt, fillMarks];
     draw();
   });
 
