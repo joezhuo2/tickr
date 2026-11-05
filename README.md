@@ -111,8 +111,9 @@ taskbar to keep it visible.
 ### Chart
 
 - **Symbol and range:** search to change the symbol, pick a range from 1D to
-  Max and switch between line and candles. 1D, 5D and 1M charts reload about
-  once a minute.
+  Max and switch between line and candles. Search filters by asset type and
+  exchange, and exact ticker matches come first. Press Enter on a typed ticker
+  to open it directly. 1D, 5D and 1M charts reload about once a minute.
 - **Recent symbols and history:** focus the empty search box to see the last
   10 symbols you viewed. The Back and Forward buttons (or Alt+Left and
   Alt+Right) step through this session's symbols, and B jumps to the previous
@@ -436,8 +437,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.10.18
-git push origin v0.10.18
+git tag v0.10.19
+git push origin v0.10.19
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

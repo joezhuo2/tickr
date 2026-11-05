@@ -164,6 +164,8 @@ pub struct SearchHit {
     pub name: String,
     pub exchange: String,
     pub kind: String,
+    pub quote_type: String,
+    pub currency: String,
 }
 
 fn f(v: &Value) -> Option<f64> {
@@ -356,6 +358,8 @@ pub fn parse_search(body: &[u8]) -> Result<Vec<SearchHit>, String> {
                     .to_string(),
                 exchange: s(&q["exchDisp"]),
                 kind: s(&q["typeDisp"]),
+                quote_type: s(&q["quoteType"]),
+                currency: s(&q["currency"]),
             })
         })
         .collect())
@@ -399,8 +403,10 @@ pub async fn fetch_quote(client: &reqwest::Client, symbol: &str, now: i64) -> Re
     Ok(quote_from(&parse_chart(&body, "1d", "1m")?, now))
 }
 
+const SEARCH_COUNT: &str = "20";
+
 pub async fn search(client: &reqwest::Client, q: &str) -> Result<Vec<SearchHit>, String> {
-    let body = get(client, SEARCH_URL, &[("q", q), ("quotesCount", "8"), ("newsCount", "0")]).await?;
+    let body = get(client, SEARCH_URL, &[("q", q), ("quotesCount", SEARCH_COUNT), ("newsCount", "0")]).await?;
     parse_search(&body)
 }
 
@@ -575,5 +581,28 @@ mod tests {
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].name, "Apple Inc.");
         assert_eq!(hits[0].exchange, "NASDAQ");
+        assert_eq!(hits[0].quote_type, "");
+        assert_eq!(hits[0].currency, "");
+    }
+
+    #[test]
+    fn search_carries_type_and_listing_fields() {
+        let hits = parse_search(include_bytes!("../../fixtures/search-shop.json")).unwrap();
+        let rows: Vec<_> = hits.iter().map(|h| (h.symbol.as_str(), h.exchange.as_str(), h.quote_type.as_str(), h.kind.as_str())).collect();
+        assert_eq!(rows.len(), 7);
+        assert_eq!(rows[0], ("SHOP", "NASDAQ", "EQUITY", "Equity"));
+        assert_eq!(rows[1], ("SHOP.TO", "Toronto", "EQUITY", "Equity"));
+        assert_eq!(rows[2], ("SHPU", "NASDAQ", "ETF", "ETF"));
+        assert_eq!(hits[1].name, "Shopify Inc.");
+        assert_eq!(hits[2].name, "Direxion Daily SHOP Bull 2X ETF");
+        assert!(hits.iter().all(|h| h.currency.is_empty()));
+    }
+
+    #[test]
+    fn search_passes_currency_through_when_present() {
+        let body = br#"{"quotes":[{"symbol":"BTC-USD","quoteType":"CRYPTOCURRENCY","currency":"USD"},{"symbol":"X","quoteType":null,"currency":5}]}"#;
+        let hits = parse_search(body).unwrap();
+        assert_eq!((hits[0].quote_type.as_str(), hits[0].currency.as_str()), ("CRYPTOCURRENCY", "USD"));
+        assert_eq!((hits[1].quote_type.as_str(), hits[1].currency.as_str()), ("", ""));
     }
 }
