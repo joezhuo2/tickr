@@ -12,6 +12,7 @@ use crate::alerts::{self, AlertKind, Direction, PriceAlert};
 use crate::analysis::Analysis;
 use crate::analyst::Consensus;
 use crate::earnings::Earnings;
+use crate::financials::Financials;
 use crate::grades::RatingChange;
 use crate::market::Market;
 use crate::options::Options;
@@ -441,6 +442,13 @@ pub async fn get_rating_changes(shared: State<'_, Arc<Shared>>, symbol: String) 
 #[tauri::command]
 pub async fn get_stats(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<Vec<Section>, String> {
     crate::stats::fetch(&shared.analysts, &symbol).await.inspect_err(|e| log::warn!("stats {symbol}: {e}"))
+}
+
+#[tauri::command]
+pub async fn get_financials(shared: State<'_, Arc<Shared>>, symbol: String, force: Option<bool>) -> Result<Option<Financials>, String> {
+    crate::financials::get(&shared.analysts, &shared.financials, &symbol, now_secs(), force.unwrap_or(false))
+        .await
+        .inspect_err(|e| log::warn!("financials {symbol}: {e}"))
 }
 
 #[tauri::command]
