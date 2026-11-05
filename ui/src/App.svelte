@@ -61,9 +61,11 @@
     type StatSection,
     type WatchDates,
   } from "./lib/types";
-  import { actionFor, bindKey, keyLabel, nextGroupTab, replayAllows } from "./lib/keybinds";
+  import { actionFor, bindKey, keyLabel, nextGroupTab, practiceAllows, replayAllows } from "./lib/keybinds";
   import ReplayBar from "./ReplayBar.svelte";
   import * as Replay from "./lib/replay";
+  import PracticeView from "./Practice.svelte";
+  import * as Practice from "./lib/practice";
   import PaperView from "./Paper.svelte";
   import * as Paper from "./lib/paper";
   import { fullTime } from "./lib/format";
@@ -558,18 +560,29 @@
     const bar = c[c.length - 1];
     const prev = c.length > 1 ? c[c.length - 2] : null;
     const change = prev ? bar.c - prev.c : null;
-    return { bar, change, change_pct: prev && change != null && prev.c ? (change / prev.c) * 100 : null, currency: replayChart.meta.currency, when: replayWhen(bar.t) };
+    const header = { bar, change, change_pct: prev && change != null && prev.c ? (change / prev.c) * 100 : null, currency: replayChart.meta.currency, when: replayWhen(bar.t) };
+    return practice ? { ...header, label: "Practice", name: practice.name, exchange: replayChart.meta.exchange } : header;
   });
 
-  function enterReplay() {
-    const base = shownChart;
-    if (replay || !base || !Replay.canReplay(base.candles.length)) return;
+  let practice = $state.raw<Practice.Exercise | null>(null);
+  let practiceSetup = $state<Practice.Setup>({ ...Practice.DEFAULT_SETUP });
+  let practiceOpen = $state(false);
+  let practiceBusy = $state(false);
+  let practiceError = $state<string | null>(null);
+  let practiceSeq = 0;
+  const practiceCount = $derived(Practice.scopeSymbols(practiceSetup.scope, watchlist, groups).length);
+  const practiceResult = $derived(practice?.trade && replay ? Practice.evaluate(practice.trade, replayBars, replay.cursor) : null);
+  const practiceSummary = $derived(practice?.ended && practice.trade ? Practice.summarize(practice.trade, replayBars) : null);
+  const practiceCanDecide = $derived(!!practice && !!replay && !practice.trade && !practice.ended && !Replay.isAtEnd(replay));
+  const practiceCanClose = $derived(!!practice?.trade && !!replay && !practice.ended && Practice.canClose(practice.trade, replay.cursor));
+
+  function beginReplay(base: Chart, next: Replay.ReplayState | null, paperSession = true) {
+    if (!next) return;
     chartSeq++;
     loading = false;
     if (view !== "chart" && view !== "technicals" && view !== "paper") view = "chart";
-    const bars = base.candles;
     replaySession++;
-    replayBars = bars;
+    replayBars = base.candles;
     replayBase = base;
     replayAnalysis = null;
     replayAnalysisError = null;
@@ -578,12 +591,126 @@
     replayAnalyzeOn = shouldAnalyze(!!activeAnalysis, indicators?.keep_analysis ?? false);
     syncHover = null;
     syncWindow = null;
-    replay = Replay.startAt(bars, bars[Math.max(Replay.MIN_CONTEXT, Math.floor(bars.length / 2))].t);
-    openPaperBook();
+    replay = next;
+    if (paperSession) openPaperBook();
+  }
+
+  function enterReplay() {
+    const base = shownChart;
+    if (replay || !base || !Replay.canReplay(base.candles.length)) return;
+    if (practiceOpen) cancelPractice();
+    const bars = base.candles;
+    beginReplay(base, Replay.startAt(bars, bars[Math.max(Replay.MIN_CONTEXT, Math.floor(bars.length / 2))].t));
+  }
+
+  function togglePractice() {
+    if (practice) exitReplay();
+    else if (practiceOpen) cancelPractice();
+    else {
+      exitReplay();
+      practiceSetup = Practice.validSetup(practiceSetup, groups);
+      practiceError = null;
+      practiceOpen = true;
+    }
+  }
+
+  function cancelPractice() {
+    practiceSeq++;
+    practiceBusy = false;
+    practiceError = null;
+    practiceOpen = false;
+  }
+
+  function changePractice() {
+    exitReplay();
+    practiceSetup = Practice.validSetup(practiceSetup, groups);
+    practiceOpen = true;
+  }
+
+  async function startPractice() {
+    if (practiceBusy) return;
+    const setup = Practice.validSetup(practiceSetup, groups);
+    practiceSetup = setup;
+    const pool = Practice.scopeSymbols(setup.scope, watchlist, groups);
+    if (!pool.length) {
+      practiceError = "No symbols to practice on";
+      return;
+    }
+    const mine = ++practiceSeq;
+    practiceBusy = true;
+    practiceError = null;
+    const rng: Practice.Rng = Math.random;
+    const w = Practice.fetchWindow(setup, Math.floor(Date.now() / 1000));
+    const misses: string[] = [];
+    try {
+      for (let n = 0; n < Practice.MAX_TRIES && pool.length; n++) {
+        const pick = pool.splice(Practice.randomInt(rng, pool.length), 1)[0];
+        let c: Chart;
+        try {
+          c = await invoke<Chart>("get_history", { symbol: pick, interval: setup.interval, start: w.start, end: w.end });
+        } catch (e) {
+          if (mine !== practiceSeq) return;
+          misses.push(`${pick}: ${e}`);
+          continue;
+        }
+        if (mine !== practiceSeq) return;
+        const start = Practice.pickStart(c.candles, w.from, rng);
+        if (!start) {
+          misses.push(`${pick}: not enough history`);
+          continue;
+        }
+        beginPractice(setup, pick, c, start);
+        return;
+      }
+      practiceError = `No usable setup found${misses.length ? ` (${misses.slice(0, 3).join("; ")})` : ""}`;
+    } finally {
+      if (mine === practiceSeq) practiceBusy = false;
+    }
+  }
+
+  function beginPractice(setup: Practice.Setup, pick: string, c: Chart, start: Practice.Candidate) {
+    const w = Practice.exerciseBars(c.candles, start.index);
+    const next = Replay.startAt(w.bars, w.bars[w.start].t, Practice.CONTEXT);
+    if (!next || next.start !== w.start) {
+      practiceError = "Could not start the setup";
+      return;
+    }
+    const base: Chart = { ...c, range: Practice.displayRange(setup.interval), meta: { ...c.meta, prev_close: null }, candles: w.bars, last_bar_time: w.bars[w.bars.length - 1].t };
+    exitReplay();
+    practiceSeq++;
+    practiceOpen = false;
+    practiceBusy = false;
+    practiceError = null;
+    practice = { setup, symbol: c.meta.symbol || pick, name: c.meta.name, start: w.start, volatile: start.volatile, trade: null, ended: false };
+    beginReplay(base, next, false);
+  }
+
+  function practiceDecide(decision: Practice.Decision) {
+    if (!practice || !replay || practice.trade || practice.ended) return;
+    if (decision !== "skip" && Replay.isAtEnd(replay)) return;
+    practice = { ...practice, trade: Practice.decide(decision, replay.cursor) };
+    if (decision === "skip") endPractice();
+  }
+
+  function practiceClose() {
+    if (!practice?.trade || !replay || practice.ended || !Practice.canClose(practice.trade, replay.cursor)) return;
+    practice = { ...practice, trade: Practice.close(practice.trade, replay.cursor) };
+    endPractice();
+  }
+
+  function endPractice() {
+    if (!practice || !replay || practice.ended) return;
+    const trade = Practice.finish(practice.trade ?? Practice.decide("skip", replay.cursor), replay.cursor);
+    practice = { ...practice, trade, ended: true };
+    replay = { ...Replay.pause(replay), cursor: replay.total - 1 };
   }
 
   function exitReplay() {
     if (!replay) return;
+    const wasPractice = !!practice;
+    practice = null;
+    practiceBusy = false;
+    practiceSeq++;
     replaySession++;
     paperBook = null;
     paperError = null;
@@ -595,6 +722,7 @@
     replayAnalysisError = null;
     replayAnalyzing = false;
     replayAnalyzeOn = false;
+    if (wasPractice && !chart) void loadChart();
     if (replayIndicatorsChanged) {
       replayIndicatorsChanged = false;
       if (chart && !loading && shouldAnalyze(!!analysis, indicators?.keep_analysis ?? false)) void runAnalysis(true);
@@ -784,7 +912,7 @@
   });
 
   $effect.pre(() => {
-    if (replay && view !== "chart" && view !== "technicals" && view !== "paper") view = "chart";
+    if (replay && view !== "chart" && view !== "technicals" && (practice || view !== "paper")) view = "chart";
   });
 
   async function runReplayAnalysis(background = false) {
@@ -796,6 +924,9 @@
     }
     replayAnalysisBusy = true;
     const session = replaySession;
+    const req = practice
+      ? { symbol: practice.symbol, range: Practice.PERIOD_RANGE, interval: practice.setup.interval, extended: false }
+      : { symbol, range, interval, extended: chartExtended };
     try {
       let until: number;
       do {
@@ -803,7 +934,7 @@
         if (!replay || session !== replaySession) return;
         until = replayBars[replay.cursor].t;
         try {
-          const a = await invoke<Analysis>("analyze", { symbol, range, interval, extended: chartExtended, until });
+          const a = await invoke<Analysis>("analyze", { ...req, until });
           if (!replay || session !== replaySession) return;
           if (a.as_of <= replayBars[replay.cursor].t) {
             replayAnalysis = a;
@@ -829,9 +960,10 @@
       ? displayOffset(techAnalysis.as_of, chartTimeZone, { timezone: mainChart.meta.timezone, gmtoffset: mainChart.meta.gmtoffset }, techAnalysis.interval)
       : (mainChart?.meta.gmtoffset ?? 0),
   );
-  const chartEarnings = $derived(dots.earnings ? (replay ? Replay.known(earnings?.history ?? [], (e) => e.reported, replayCutoff) : earnings?.history) : []);
-  const chartRatings = $derived(dots.analysts ? (replay ? Replay.known(ratingChanges, (r) => r.date, replayCutoff) : ratingChanges) : []);
-  const chartNews = $derived(dots.news ? (replay ? Replay.known(news ?? [], (a) => a.published, replayCutoff) : news) : []);
+  const chartEarnings = $derived(dots.earnings && !practice ? (replay ? Replay.known(earnings?.history ?? [], (e) => e.reported, replayCutoff) : earnings?.history) : []);
+  const chartRatings = $derived(dots.analysts && !practice ? (replay ? Replay.known(ratingChanges, (r) => r.date, replayCutoff) : ratingChanges) : []);
+  const chartNews = $derived(dots.news && !practice ? (replay ? Replay.known(news ?? [], (a) => a.published, replayCutoff) : news) : []);
+  const chartFills = $derived(practice ? Practice.markers(practiceResult, replayBars) : paperFills);
 
   /** Runs the local technical analysis on the chart on screen. */
   async function runAnalysis(background = false) {
@@ -1225,7 +1357,8 @@
       }
       if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
         e.preventDefault();
-        replayUpdate(e.key === "ArrowRight" ? Replay.step : Replay.stepBack);
+        if (e.key === "ArrowRight") replayUpdate(Replay.step);
+        else if (!practice) replayUpdate(Replay.stepBack);
         return;
       }
       if (e.key === "Escape") {
@@ -1234,13 +1367,21 @@
         return;
       }
     }
+    if (practiceOpen && !replay && e.key === "Escape" && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      e.preventDefault();
+      cancelPractice();
+      return;
+    }
     const key = bindKey(e);
     const action = key && actionFor(keybinds, key);
-    if (!action || (replay && !replayAllows(action))) return;
+    if (!action || (practice ? !practiceAllows(action) : replay && !replayAllows(action))) return;
     e.preventDefault();
     switch (action) {
       case "chart_replay":
         if (!e.repeat) toggleReplay();
+        break;
+      case "practice":
+        if (!e.repeat) togglePractice();
         break;
       case "settings":
         if (!e.repeat) settingsOpen = true;
@@ -1387,16 +1528,18 @@
   <div class="app">
     <main>
       <Left
-        {symbol}
+        symbol={practice?.symbol ?? symbol}
         {quote}
-        {logo}
+        logo={practice ? null : logo}
         {analyst}
         staleNote={replay ? null : quoteStale}
-        starred={watchlist.includes(symbol)}
+        starred={watchlist.includes(practice?.symbol ?? symbol)}
         onanalysts={() => {
           if (!replay) view = "analysts";
         }}
-        onstar={toggleStar}
+        onstar={() => {
+          if (!practice) toggleStar();
+        }}
         replay={replayHeader}
       />
       <section>
@@ -1437,8 +1580,8 @@
         <div class="range-controls">
           <div class="ranges" role="tablist">
             {#each RANGES as r (r.id)}
-              {@const on = (view === "chart" || view === "technicals" || view === "paper") && range === r.id}
-              <button role="tab" aria-selected={on} class:on onclick={() => setRange(r.id)}>
+              {@const on = !practice && (view === "chart" || view === "technicals" || view === "paper") && range === r.id}
+              <button role="tab" aria-selected={on} class:on disabled={!!practice} onclick={() => setRange(r.id)}>
                 {r.label}
               </button>
             {/each}
@@ -1466,7 +1609,7 @@
             <button role="tab" aria-selected={view === "financials"} class:on={view === "financials"} disabled={!!replay} onclick={toggleFinancials}>
               Financials
             </button>
-            <button role="tab" aria-selected={view === "paper"} class:on={view === "paper"} title={`Simulated paper trading (${keyLabel(keybinds.paper)})`} onclick={() => (view = view === "paper" ? "chart" : "paper")}>
+            <button role="tab" aria-selected={view === "paper"} class:on={view === "paper"} title={`Simulated paper trading (${keyLabel(keybinds.paper)})`} disabled={!!practice} onclick={() => (view = view === "paper" ? "chart" : "paper")}>
               Paper
             </button>
             {#if view === "news" ? (newsScope === "symbol" ? newsLoading : feedLoading) : view === "market" ? marketLoading : view === "events" ? (eventsTab === "watchlist" ? watchCalLoading : eventsLoading) : view === "options" ? optionsLoading : loading || (view === "technicals" && analyzing)}<span
@@ -1474,7 +1617,7 @@
                 aria-label="Loading"
               ></span>{/if}
           </div>
-          <select aria-label="Candle interval" value={interval} onchange={(event) => changeInterval(event.currentTarget.value)}>
+          <select aria-label="Candle interval" value={interval} disabled={!!practice} onchange={(event) => changeInterval(event.currentTarget.value)}>
             <option value="auto">Auto</option>
             {#each intervalsFor(range) as i (i)}
               <option value={i}>{INTERVAL_LABELS[i] ?? i}</option>
@@ -1482,7 +1625,7 @@
           </select>
           {#if range === "1d"}
             <div class="seg" role="group" aria-label="Extended hours">
-              <button class:on={chartExtended} aria-pressed={chartExtended} title="Show pre-market and after-hours candles" onclick={() => saveChartExtended(!chartExtended)}>Ext</button>
+              <button class:on={chartExtended} aria-pressed={chartExtended} title="Show pre-market and after-hours candles" disabled={!!practice} onclick={() => saveChartExtended(!chartExtended)}>Ext</button>
             </div>
           {/if}
           <div class="seg" role="group" aria-label="Chart layout">
@@ -1498,15 +1641,23 @@
           {/if}
           <div class="seg" role="group" aria-label="Bar replay">
             <button
-              class:on={!!replay}
-              aria-pressed={!!replay}
-              title={replay ? `Exit bar replay (${keyLabel(keybinds.chart_replay)} or Esc)` : canStartReplay ? `Bar replay (${keyLabel(keybinds.chart_replay)})` : "Bar replay needs more candles"}
-              disabled={!replay && !canStartReplay}
+              class:on={!!replay && !practice}
+              aria-pressed={!!replay && !practice}
+              title={practice ? "Exit practice first" : replay ? `Exit bar replay (${keyLabel(keybinds.chart_replay)} or Esc)` : canStartReplay ? `Bar replay (${keyLabel(keybinds.chart_replay)})` : "Bar replay needs more candles"}
+              disabled={!!practice || (!replay && !canStartReplay)}
               onclick={toggleReplay}>Replay</button>
+          </div>
+          <div class="seg" role="group" aria-label="Practice">
+            <button
+              class:on={!!practice || practiceOpen}
+              aria-pressed={!!practice || practiceOpen}
+              title={practice ? `Exit practice (${keyLabel(keybinds.practice)} or Esc)` : `Practice on a random historical setup (${keyLabel(keybinds.practice)})`}
+              onclick={togglePractice}>Practice</button>
           </div>
         </div>
         {#if replay && replayBars.length}
           <ReplayBar
+            practice={!!practice}
             state={replay}
             intraday={replayIntraday}
             start={replayInput(replayBars[replay.start].t)}
@@ -1519,6 +1670,30 @@
             onback={() => replayUpdate(Replay.stepBack)}
             onspeed={(speed) => replayUpdate((s) => Replay.setSpeed(s, speed))}
             onexit={exitReplay}
+          />
+        {/if}
+        {#if practice || practiceOpen}
+          <PracticeView
+            setup={practiceSetup}
+            {groups}
+            count={practiceCount}
+            exercise={practice}
+            result={practiceResult}
+            summary={practiceSummary}
+            busy={practiceBusy}
+            error={practiceError}
+            currency={replayBase?.meta.currency ?? "USD"}
+            canDecide={practiceCanDecide}
+            canClose={practiceCanClose}
+            whenAt={(i) => (replayBars[i] ? replayWhen(replayBars[i].t) : "")}
+            onsetup={(next) => (practiceSetup = next)}
+            onstart={startPractice}
+            oncancel={cancelPractice}
+            ondecide={practiceDecide}
+            onclose={practiceClose}
+            onend={endPractice}
+            onnext={startPractice}
+            onchange={changePractice}
           />
         {/if}
         {#key view}
@@ -1569,7 +1744,7 @@
             {:else if view === "technicals"}
               <div class="split">
                 {#if mainChart}
-                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={paperFills} />
+                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={chartFills} />
                 {:else if chartError}
                   <div class="msg">
                     {chartError}
@@ -1596,7 +1771,7 @@
             {:else if view === "paper"}
               <div class="split">
                 {#if mainChart}
-                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={paperFills} />
+                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={chartFills} />
                 {:else if chartError}
                   <div class="msg">
                     {chartError}
@@ -1649,7 +1824,7 @@
                     linkedWindow={split && layout.sync_range && syncWindow?.source === "second" ? syncWindow.w : null}
                     onwindow={split && layout.sync_range ? (w) => (syncWindow = { source: "main", w }) : undefined}
                     replay={!!replay}
-                    fills={paperFills}
+                    fills={chartFills}
                   />
                 {:else if chartError}
                   <div class="msg">
