@@ -31,6 +31,7 @@
     onhovertime,
     linkedWindow = null,
     onwindow,
+    replay = false,
   }: {
     chart: Chart | null;
     redrawKey?: number;
@@ -51,6 +52,7 @@
     onhovertime?: (t: number | null) => void;
     linkedWindow?: TimeWindow | null;
     onwindow?: (w: TimeWindow) => void;
+    replay?: boolean;
   } = $props();
 
   let wrap: HTMLDivElement | undefined = $state();
@@ -743,12 +745,30 @@
 
   let viewKey = "";
   let viewN = 0;
+  let savedView: { key: string; view: View; n: number } | null = null;
   $effect(() => {
-    const key = chart ? `${chart.meta.symbol} ${chart.range} ${chart.interval}` : "";
+    const base = chart ? `${chart.meta.symbol} ${chart.range} ${chart.interval}` : "";
+    const key = replay ? `${base} replay` : base;
     const n = candles.length;
-    view = key === viewKey ? follow(untrack(() => view), viewN, n) : full(n);
+    const current = untrack(() => view);
+    if (key === viewKey) view = follow(current, viewN, n);
+    else if (replay && viewKey === base) {
+      savedView = { key: base, view: current, n: viewN };
+      view = full(n);
+    } else if (!replay && savedView?.key === key) view = follow(savedView.view, savedView.n, n);
+    else view = full(n);
+    if (!replay) savedView = null;
     viewKey = key;
     viewN = n;
+  });
+
+  $effect(() => {
+    if (!replay) return;
+    untrack(() => {
+      cancelDrawing();
+      selected = null;
+      hover = null;
+    });
   });
 
   $effect(() => {
@@ -799,7 +819,7 @@
   let inputText = $state("");
   let gesture: { start: Pixel; original: Drawing | null; endpoint: number; moved: boolean; second: boolean } | null = null;
   const drawingSymbol = $derived(chart?.meta.symbol.toUpperCase() ?? "");
-  const list = $derived(drawings[drawingSymbol] ?? []);
+  const list = $derived(replay ? [] : (drawings[drawingSymbol] ?? []));
   const times = $derived(candles.map((c) => c.t));
   const linkedIndex = $derived(linkedTime == null ? -1 : barAt(times, linkedTime));
   $effect(() => {
@@ -832,11 +852,12 @@
   }
 
   export function drawTool(next: Tool) {
-    if (!chart) return;
+    if (!chart || replay) return;
     chooseTool(tool === next ? "cursor" : next);
   }
 
   function chooseTool(next: Tool) {
+    if (replay) return;
     cancelDrawing();
     tool = next;
     selected = null;
@@ -845,7 +866,7 @@
   }
 
   async function changeDrawings(action: Drawing[] | "undo" | "redo") {
-    if (drawingBusy) return;
+    if (drawingBusy || replay) return;
     const symbol = drawingSymbol;
     const next = undoReducer({ ...history, present: list }, action);
     if (next.present === list) return;
@@ -1099,6 +1120,8 @@
   function onKey(e: KeyboardEvent) {
     if ((e.target as Element).closest("input, textarea, select, [contenteditable]")) return;
     if (!chart) return;
+    if (replay && ["ArrowLeft", "ArrowRight", "Escape", " ", "Delete", "Backspace"].includes(e.key)) return;
+    if (replay && e.ctrlKey && e.key.toLowerCase() === "z") return;
     let handled = true;
     if (e.ctrlKey && e.key.toLowerCase() === "z") { cancelDrawing(); void changeDrawings(e.shiftKey ? "redo" : "undo"); }
     else if ((e.key === "Delete" || e.key === "Backspace") && selected != null) removeDrawing();
@@ -1178,7 +1201,7 @@
   onkeydown={onKey}
 >
   <canvas bind:this={canvas} style:width="{width}px" style:height="{height}px"></canvas>
-  {#if chart}
+  {#if chart && !replay}
     <div class="drawing-tools" role="toolbar" aria-label="Drawing tools">
       {#each tools as item}
         <button aria-label={item.label} aria-pressed={tool === item.tool} title={item.label} onclick={() => chooseTool(item.tool)}>{item.label}</button>
