@@ -36,6 +36,47 @@ export function hitTest(p: Pixel, a: Pixel, b?: Pixel): boolean {
   return (b ? segmentDistance(p, a, b) : Math.abs(p.y - a.y)) <= 6;
 }
 
+export const PEN_MAX_POINTS = 500;
+
+export function simplifyPath<T>(points: T[], pos: (p: T) => Pixel, tolerance = 1.5, max = PEN_MAX_POINTS): T[] {
+  if (points.length < 3) return points.slice();
+  let min = tolerance;
+  for (;;) {
+    const kept = [points[0]];
+    let last = pos(points[0]);
+    for (let i = 1; i < points.length - 1; i++) {
+      const p = pos(points[i]);
+      if (Math.hypot(p.x - last.x, p.y - last.y) >= min) { kept.push(points[i]); last = p; }
+    }
+    kept.push(points[points.length - 1]);
+    if (kept.length <= max || min > 1e6) return kept;
+    min *= 1.5;
+  }
+}
+
+export function polylineDistance(p: Pixel, path: Pixel[]): number {
+  if (!path.length) return Infinity;
+  if (path.length === 1) return segmentDistance(p, path[0], path[0]);
+  let best = Infinity;
+  for (let i = 1; i < path.length; i++) best = Math.min(best, segmentDistance(p, path[i - 1], path[i]));
+  return best;
+}
+
+export function hitPolyline(p: Pixel, path: Pixel[]): boolean {
+  return polylineDistance(p, path) <= 6;
+}
+
+export function pathBounds(path: Pixel[]): { minX: number; maxX: number; minY: number; maxY: number } {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of path) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return { minX, maxX, minY, maxY };
+}
+
 export interface History { past: Drawing[][]; present: Drawing[]; future: Drawing[][] }
 export function undoReducer(state: History, action: Drawing[] | "undo" | "redo"): History {
   if (action === "undo") return state.past.length ? { past: state.past.slice(0, -1), present: state.past[state.past.length - 1], future: [state.present, ...state.future] } : state;

@@ -1,5 +1,5 @@
 ﻿import { describe, expect, it } from "vitest";
-import { hitTest, indexToTime, rulerMeasurement, segmentDistance, timeToIndex, undoReducer, type History } from "./drawing";
+import { PEN_MAX_POINTS, hitPolyline, hitTest, indexToTime, pathBounds, polylineDistance, rulerMeasurement, segmentDistance, simplifyPath, timeToIndex, undoReducer, type History } from "./drawing";
 import { forward, inverse, scaleLabel } from "./scale";
 import type { Drawing } from "./types";
 
@@ -55,4 +55,59 @@ it("measures signed price and percent with absolute bars and elapsed time", () =
   expect(rulerMeasurement(a, a, bars).elapsed).toBe("0s");
   expect(rulerMeasurement(a, { ...b, t: 90 }, bars).elapsed).toBe("1.5m");
   expect(rulerMeasurement(a, { ...b, t: 172800 }, bars).elapsed).toBe("2d");
+});
+
+describe("freehand pen", () => {
+  const id = (p: { x: number; y: number }) => p;
+
+  it("drops near-duplicate points but keeps the endpoints", () => {
+    const stroke = [{ x: 0, y: 0 }, { x: 0.4, y: 0.2 }, { x: 0.5, y: 0.5 }, { x: 10, y: 0 }, { x: 10.3, y: 0.1 }, { x: 20, y: 5 }, { x: 20.2, y: 5 }];
+    expect(simplifyPath(stroke, id)).toEqual([stroke[0], stroke[3], stroke[5], stroke[6]]);
+    expect(simplifyPath(stroke, id, 0)).toEqual(stroke);
+  });
+  it("leaves short strokes alone and returns a copy", () => {
+    const two = [{ x: 0, y: 0 }, { x: 0, y: 0 }];
+    expect(simplifyPath(two, id)).toEqual(two);
+    expect(simplifyPath(two, id)).not.toBe(two);
+    expect(simplifyPath([], id)).toEqual([]);
+  });
+  it("keeps the original items, not copies", () => {
+    const stroke = [{ t: 1, price: 1 }, { t: 2, price: 1 }, { t: 3, price: 1 }, { t: 100, price: 1 }];
+    const kept = simplifyPath(stroke, (p) => ({ x: p.t, y: p.price }));
+    expect(kept).toHaveLength(3);
+    expect(kept[0]).toBe(stroke[0]);
+    expect(kept[1]).toBe(stroke[2]);
+    expect(kept[2]).toBe(stroke[3]);
+  });
+  it("thins dense strokes to the point limit", () => {
+    const stroke = Array.from({ length: 5000 }, (_, i) => ({ x: i * 2, y: Math.sin(i / 20) * 50 }));
+    const out = simplifyPath(stroke, id);
+    expect(out.length).toBeLessThanOrEqual(PEN_MAX_POINTS);
+    expect(out.length).toBeGreaterThan(100);
+    expect(out[0]).toBe(stroke[0]);
+    expect(out[out.length - 1]).toBe(stroke[4999]);
+    expect(simplifyPath(stroke, id, 1.5, 10).length).toBeLessThanOrEqual(10);
+  });
+  it("measures distance to the nearest part of a polyline", () => {
+    const path = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }];
+    expect(polylineDistance({ x: 5, y: 3 }, path)).toBe(3);
+    expect(polylineDistance({ x: 13, y: 5 }, path)).toBe(3);
+    expect(polylineDistance({ x: 13, y: 14 }, [{ x: 10, y: 10 }])).toBe(5);
+    expect(polylineDistance({ x: 0, y: 0 }, [])).toBe(Infinity);
+  });
+  it("hits a polyline within six pixels of any segment", () => {
+    const path = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }];
+    expect(hitPolyline({ x: 4, y: 6 }, path)).toBe(true);
+    expect(hitPolyline({ x: 16, y: 5 }, path)).toBe(true);
+    expect(hitPolyline({ x: 16.01, y: 5 }, path)).toBe(false);
+    expect(hitPolyline({ x: 3, y: -6.01 }, path)).toBe(false);
+    expect(hitPolyline({ x: 5, y: 5 }, [])).toBe(false);
+  });
+  it("bounds a path", () => {
+    expect(pathBounds([{ x: 3, y: 9 }, { x: -2, y: 4 }, { x: 8, y: 12 }])).toEqual({ minX: -2, maxX: 8, minY: 4, maxY: 12 });
+  });
+  it("round-trips pen anchors through bar indexes", () => {
+    const stroke = [{ t: 100, price: 10 }, { t: 190, price: 12 }, { t: 400, price: 11 }];
+    for (const p of stroke) expect(Math.round(indexToTime(times, timeToIndex(times, p.t)))).toBe(p.t);
+  });
 });

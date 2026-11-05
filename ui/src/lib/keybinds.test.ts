@@ -10,6 +10,7 @@ const DEFAULTS: Keybinds = {
   draw_trend: "2",
   draw_text: "3",
   draw_ruler: "4",
+  draw_pen: "5",
   refresh: "r",
   range: "v",
   technicals: "t",
