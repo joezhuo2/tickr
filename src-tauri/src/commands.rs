@@ -22,6 +22,7 @@ use crate::quote::{self, Chart, Quote, SearchHit};
 use crate::screener::{self, ScreenRow};
 use crate::settings::{EventFilter, ChartLayout, ChartTimeZone, Theme, Palette, validate_text_size, RefreshMode, ChartMode, ChartScale, Dots, Group, WatchlistSort, WatchlistView, SavedScreen, ScreenRule, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
 use crate::state::{lock, now_secs, QuoteState, Shared};
+use crate::paper::{Costs as PaperCosts, PaperAccount};
 
 #[derive(Serialize)]
 pub struct Init {
@@ -761,9 +762,62 @@ pub fn delete_indicator_preset(shared: State<'_, Arc<Shared>>, name: String) -> 
     Ok(edit_indicators(&shared, |s| s.delete_indicator_preset(&name))?.indicator_presets)
 }
 
+fn store_paper(shared: &Shared, account: PaperAccount) -> Result<PaperAccount, String> {
+    account.validate()?;
+    let mut current = lock(&shared.paper);
+    account.save(&shared.paper_path).map_err(|e| format!("Could not save paper account: {e}"))?;
+    *current = account.clone();
+    Ok(account)
+}
+
+#[tauri::command]
+pub fn get_paper(shared: State<'_, Arc<Shared>>) -> PaperAccount {
+    lock(&shared.paper).clone()
+}
+
+#[tauri::command]
+pub fn save_paper(shared: State<'_, Arc<Shared>>, account: PaperAccount) -> Result<PaperAccount, String> {
+    store_paper(&shared, account)
+}
+
+#[tauri::command]
+pub fn reset_paper(shared: State<'_, Arc<Shared>>, starting_cash: f64, costs: Option<PaperCosts>) -> Result<PaperAccount, String> {
+    let costs = costs.unwrap_or(lock(&shared.paper).costs);
+    store_paper(&shared, PaperAccount::new(starting_cash, costs))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn paper_account_saves_to_its_own_file_and_rejections_change_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let shared = Shared::new(dir.path().join("settings.json"), Default::default());
+        assert_eq!(*lock(&shared.paper), PaperAccount::default());
+        let mut account = PaperAccount::new(25_000.0, PaperCosts { commission: 1.0, commission_bps: 0.0, slippage_bps: 5.0 });
+        account.cash = 24_000.0;
+        let saved = store_paper(&shared, account.clone()).unwrap();
+        assert_eq!(saved, account);
+        assert_eq!(PaperAccount::load(&dir.path().join("paper.json")), account);
+        let mut bad = account.clone();
+        bad.cash = f64::NAN;
+        assert!(store_paper(&shared, bad).is_err());
+        assert_eq!(*lock(&shared.paper), account);
+        assert_eq!(PaperAccount::load(&shared.paper_path), account);
+        assert!(store_paper(&shared, PaperAccount::new(1.0, account.costs)).is_err());
+        let costs = lock(&shared.paper).costs;
+        let reset = store_paper(&shared, PaperAccount::new(50_000.0, costs)).unwrap();
+        assert_eq!(reset.cash, 50_000.0);
+        assert_eq!(reset.costs, account.costs);
+        let reloaded = Shared::new(dir.path().join("settings.json"), Default::default());
+        assert_eq!(lock(&reloaded.paper).cash, 50_000.0);
+        let blocker = dir.path().join("file");
+        std::fs::write(&blocker, "not a directory").unwrap();
+        let shared = Shared::new(blocker.join("settings.json"), Default::default());
+        assert!(store_paper(&shared, account).is_err());
+        assert_eq!(*lock(&shared.paper), PaperAccount::default());
+    }
 
     #[test]
     fn screen_edits_persist_and_rejections_leave_settings_unchanged() {

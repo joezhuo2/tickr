@@ -20,6 +20,7 @@ pub mod logo;
 pub mod market;
 pub mod options;
 pub mod news;
+pub mod paper;
 pub mod poller;
 pub mod quote;
 pub mod screener;
@@ -149,6 +150,9 @@ pub fn run() {
             commands::get_watch_calendar,
             commands::set_event_filter,
             commands::analyze_event,
+            commands::get_paper,
+            commands::save_paper,
+            commands::reset_paper,
         ])
         .on_window_event(window::on_event)
         .setup(move |app| {
