@@ -3,6 +3,8 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::analyst::Analysts;
+use crate::calendar::Cache;
+use crate::state::now_secs;
 
 const MODULES: &str = "earnings,calendarEvents";
 
@@ -87,9 +89,11 @@ pub fn parse(body: &[u8], symbol: &str) -> Result<Option<Earnings>, String> {
     }))
 }
 
-pub async fn fetch(analysts: &Analysts, symbol: &str) -> Result<Option<Earnings>, String> {
+pub async fn fetch(analysts: &Analysts, calendar: &Cache, symbol: &str) -> Result<Option<Earnings>, String> {
     let symbol = symbol.trim().to_uppercase();
-    parse(&analysts.summary(&symbol, MODULES).await?, &symbol)
+    let body = analysts.summary(&symbol, MODULES).await?;
+    calendar.seed(&symbol, &body, now_secs());
+    parse(&body, &symbol)
 }
 
 #[cfg(test)]

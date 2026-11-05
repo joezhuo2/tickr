@@ -1,6 +1,7 @@
-//! Upcoming US economic events for the next week, from Yahoo's calendar, and
-//! an AI analysis of one event when the user opens it.
+//! Economic events for any week, from Yahoo's calendar, and an AI analysis of
+//! one event when the user opens it.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -16,8 +17,9 @@ use crate::sentiment::Sentiment;
 use crate::state::{lock, now_secs};
 
 const CALENDAR_URL: &str = "https://query1.finance.yahoo.com/v1/finance/visualization";
-const FIELDS: [&str; 7] = [
+const FIELDS: [&str; 8] = [
     "econ_release",
+    "country_code",
     "startdatetime",
     "period",
     "after_release_actual",
@@ -25,9 +27,11 @@ const FIELDS: [&str; 7] = [
     "prior_release_actual",
     "originally_reported_actual",
 ];
-/// Yahoo caps a page at 100; a US week has about 55.
 const PAGE: u32 = 100;
-const DAYS_AHEAD: i64 = 7;
+const MAX_PAGES: u32 = 8;
+const WEEK_DAYS: i64 = 7;
+const MAX_SHIFT_DAYS: i64 = 366;
+const CACHED_WEEKS: usize = 12;
 const LIST_TTL: i64 = 15 * 60;
 const ANALYSIS_TTL: i64 = 6 * 3600;
 const ANALYSIS_CAP: usize = 200;
@@ -41,6 +45,8 @@ const ET_OFFSET: i64 = -5 * 3600;
 pub struct MarketEvent {
     pub id: String,
     pub name: String,
+    #[serde(default)]
+    pub country: String,
     /// Release time, Unix seconds.
     pub at: i64,
     /// What the figure covers, like "Oct" or "Q3".
@@ -56,7 +62,16 @@ pub struct MarketEvent {
 pub struct EventsReport {
     /// Unix seconds.
     pub fetched: i64,
+    pub start: String,
+    pub total: usize,
     pub events: Vec<MarketEvent>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Page {
+    pub events: Vec<MarketEvent>,
+    pub total: usize,
+    pub rows: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -80,8 +95,7 @@ pub struct EventAnalysis {
     pub impacts: Vec<Impact>,
 }
 
-/// The last list fetched this session.
-static LIST: Mutex<Option<EventsReport>> = Mutex::new(None);
+static LISTS: Mutex<Vec<EventsReport>> = Mutex::new(Vec::new());
 /// Serializes read-modify-write of the analysis cache file.
 static CACHE_FILE: Mutex<()> = Mutex::new(());
 
@@ -90,7 +104,7 @@ fn fresh(at: i64, now: i64, ttl: i64) -> bool {
 }
 
 /// "YYYY-MM-DD" in UTC.
-fn ymd(secs: i64) -> String {
+pub(crate) fn ymd(secs: i64) -> String {
     let z = secs.div_euclid(DAY) + 719_468;
     let era = z.div_euclid(146_097);
     let doe = z - era * 146_097;
@@ -135,36 +149,56 @@ fn slug(s: &str) -> String {
     out.trim_end_matches('-').to_string()
 }
 
-/// Calendar request for US economic events from `start` through `end` (YYYY-MM-DD).
-pub fn calendar_query(start: &str, end: &str) -> Value {
+pub(crate) fn parse_day(s: &str) -> Option<i64> {
+    let b = s.as_bytes();
+    if b.len() != 10 || b[4] != b'-' || b[7] != b'-' {
+        return None;
+    }
+    let n = |r: std::ops::Range<usize>| s.get(r).filter(|p| p.bytes().all(|c| c.is_ascii_digit()))?.parse::<i64>().ok();
+    let days = days_from_civil(n(0..4)?, n(5..7)?, n(8..10)?);
+    (ymd(days * DAY) == s).then_some(days)
+}
+
+pub fn week_window(start: Option<&str>, now: i64) -> Result<(String, String), String> {
+    let today = (now + ET_OFFSET).div_euclid(DAY);
+    let first = match start {
+        Some(s) => parse_day(s).ok_or("Invalid start date")?,
+        None => today,
+    };
+    if (first - today).abs() > MAX_SHIFT_DAYS {
+        return Err("That week is too far from today".into());
+    }
+    Ok((ymd(first * DAY), ymd((first + WEEK_DAYS) * DAY)))
+}
+
+pub fn calendar_query(start: &str, end: &str, offset: u32) -> Value {
     json!({
         "sortType": "ASC",
         "entityIdType": "economic_event",
         "sortField": "startdatetime",
         "includeFields": FIELDS,
         "size": PAGE,
-        "offset": 0,
+        "offset": offset,
         "query": {"operator": "and", "operands": [
             {"operator": "gte", "operands": ["startdatetime", start]},
             {"operator": "lte", "operands": ["startdatetime", end]},
-            {"operator": "eq", "operands": ["country_code", "US"]},
         ]},
     })
 }
 
-/// Events from a calendar response, by release time.
-pub fn parse_calendar(body: &[u8]) -> Result<Vec<MarketEvent>, String> {
+pub fn parse_calendar(body: &[u8]) -> Result<Page, String> {
     let v: Value = serde_json::from_slice(body).map_err(|e| format!("bad response: {e}"))?;
     if let Some(desc) = v["finance"]["error"]["description"].as_str() {
         return Err(desc.to_string());
     }
     let results = v["finance"]["result"].as_array().ok_or("no calendar in response")?;
     let Some(doc) = results.first().and_then(|r| r["documents"].as_array()?.first()) else {
-        return Ok(Vec::new());
+        return Ok(Page { events: Vec::new(), total: 0, rows: 0 });
     };
     let cols: Vec<&str> =
         doc["columns"].as_array().map(|a| a.as_slice()).unwrap_or_default().iter().map(|c| c["id"].as_str().unwrap_or_default()).collect();
     let rows = doc["rows"].as_array().map(|a| a.as_slice()).unwrap_or_default();
+    let total = results[0]["total"].as_u64().map_or(0, |t| t as usize).max(rows.len());
     let mut events: Vec<MarketEvent> = rows
         .iter()
         .filter_map(|row| {
@@ -178,11 +212,17 @@ pub fn parse_calendar(body: &[u8]) -> Result<Vec<MarketEvent>, String> {
             if name.is_empty() {
                 return None;
             }
+            let country = cell("country_code")
+                .map(|c| c.to_uppercase())
+                .filter(|c| (2..=3).contains(&c.len()) && c.bytes().all(|b| b.is_ascii_alphabetic()))
+                .unwrap_or_default();
+            let id = [at.to_string(), country.to_lowercase(), slug(&name)].into_iter().filter(|p| !p.is_empty()).collect::<Vec<_>>().join("-");
             Some(MarketEvent {
-                id: format!("{at}-{}", slug(&name)),
+                id,
                 name,
+                country,
                 at,
-                period: cell("period"),
+                period: cell("period").filter(|p| !p.eq_ignore_ascii_case("n/a")),
                 actual: cell("after_release_actual"),
                 expected: cell("consensus_estimate"),
                 prior: cell("prior_release_actual"),
@@ -191,26 +231,65 @@ pub fn parse_calendar(body: &[u8]) -> Result<Vec<MarketEvent>, String> {
         })
         .collect();
     events.sort_by_key(|e| e.at);
-    Ok(events)
+    Ok(Page { events, total, rows: rows.len() })
 }
 
-async fn fetch_list(analysts: &Analysts, now: i64) -> Result<EventsReport, String> {
-    let today = now + ET_OFFSET;
-    let body = calendar_query(&ymd(today), &ymd(today + DAYS_AHEAD * DAY));
-    let reply = analysts.post(CALENDAR_URL, &[("lang", "en-US"), ("region", "US")], &body).await?;
-    Ok(EventsReport { fetched: now, events: parse_calendar(&reply)? })
+pub fn merge_pages(pages: Vec<Page>) -> (Vec<MarketEvent>, usize) {
+    let total = pages.last().map_or(0, |p| p.total);
+    let mut seen = HashSet::new();
+    let mut events: Vec<MarketEvent> = pages
+        .into_iter()
+        .flat_map(|p| p.events)
+        .filter(|e| seen.insert((e.at, e.country.clone(), e.name.clone(), e.period.clone())))
+        .collect();
+    events.sort_by_key(|e| e.at);
+    let mut used = HashSet::new();
+    for e in &mut events {
+        let base = e.id.clone();
+        let mut n = 1;
+        while !used.insert(e.id.clone()) {
+            n += 1;
+            e.id = format!("{base}-{n}");
+        }
+    }
+    (events, total)
 }
 
-/// This week's events, cached for 15 minutes unless `force`; a failed refresh falls back to the last list.
-pub async fn fetch(analysts: &Analysts, force: bool) -> Result<EventsReport, String> {
+async fn fetch_list(analysts: &Analysts, start: &str, end: &str, now: i64) -> Result<EventsReport, String> {
+    let mut pages = Vec::new();
+    let mut offset = 0u32;
+    for _ in 0..MAX_PAGES {
+        let body = calendar_query(start, end, offset);
+        let page = parse_calendar(&analysts.post(CALENDAR_URL, &[("lang", "en-US"), ("region", "US")], &body).await?)?;
+        offset += page.rows as u32;
+        let done = page.rows == 0 || offset as usize >= page.total;
+        pages.push(page);
+        if done {
+            break;
+        }
+    }
+    let (events, total) = merge_pages(pages);
+    Ok(EventsReport { fetched: now, start: start.to_string(), total, events })
+}
+
+fn store_list(report: EventsReport) {
+    let mut lists = lock(&LISTS);
+    lists.retain(|r| r.start != report.start);
+    lists.push(report);
+    let over = lists.len().saturating_sub(CACHED_WEEKS);
+    lists.drain(..over);
+}
+
+pub async fn fetch(analysts: &Analysts, start: Option<&str>, force: bool) -> Result<EventsReport, String> {
     let now = now_secs();
-    let cached = lock(&LIST).clone();
+    let (start, end) = week_window(start, now)?;
+    let cached = lock(&LISTS).iter().find(|r| r.start == start).cloned();
     if let Some(r) = cached.as_ref().filter(|r| !force && fresh(r.fetched, now, LIST_TTL)) {
         return Ok(r.clone());
     }
-    match fetch_list(analysts, now).await {
+    match fetch_list(analysts, &start, &end, now).await {
         Ok(r) => {
-            *lock(&LIST) = Some(r.clone());
+            store_list(r.clone());
             Ok(r)
         }
         Err(e) => cached.ok_or(e).inspect(|_| log::warn!("events refresh failed, using the last list")),
@@ -275,14 +354,15 @@ pub fn parse_analysis(content: &str, now: i64) -> Result<EventAnalysis, String> 
     Ok(EventAnalysis { model: String::new(), generated: now, tone, summary, impacts })
 }
 
-const SYSTEM_PROMPT: &str = "You are a markets analyst. Analyze the given scheduled US economic release and its likely effect on US stocks, using its figures, the recent headlines and your own knowledge. If the actual figure is out, judge it against the expectation and the prior; otherwise describe what a beat or a miss would mean. Reply with only a JSON object: {\"tone\":\"positive\"|\"negative\"|\"neutral\" (likely effect on US stocks),\"summary\":string (a few sentences: what the release measures, what to watch and how markets may react),\"impacts\":[{\"name\":ticker or sector name,\"kind\":\"stock\"|\"sector\",\"score\":integer -100..100 (expected price effect, negative is bearish),\"confidence\":integer 0..100,\"confidence_label\":\"low\"|\"medium\"|\"high\",\"reasoning\":string}]}. Pick the most affected stocks and sectors. No prose, no code fences.";
+const SYSTEM_PROMPT: &str = "You are a markets analyst. Analyze the given scheduled economic release (its country is given) and its likely effect on markets and US stocks, using its figures, the recent headlines and your own knowledge. If the actual figure is out, judge it against the expectation and the prior; otherwise describe what a beat or a miss would mean. Reply with only a JSON object: {\"tone\":\"positive\"|\"negative\"|\"neutral\" (likely effect on US stocks),\"summary\":string (a few sentences: what the release measures, what to watch and how markets may react),\"impacts\":[{\"name\":ticker or sector name,\"kind\":\"stock\"|\"sector\",\"score\":integer -100..100 (expected price effect, negative is bearish),\"confidence\":integer 0..100,\"confidence_label\":\"low\"|\"medium\"|\"high\",\"reasoning\":string}]}. Pick the most affected stocks and sectors. No prose, no code fences.";
 
 pub fn request_body(model: &str, now: i64, e: &MarketEvent, headlines: &[String]) -> Value {
     let or = |v: &Option<String>, none: &str| v.clone().unwrap_or_else(|| none.to_string());
     let mut user = format!(
-        "Today: {}\nEvent: {} (US)\nRelease: {} {:02}:{:02} UTC\nPeriod: {}\nExpected: {}\nPrior: {}\nActual: {}\n",
+        "Today: {}\nEvent: {} ({})\nRelease: {} {:02}:{:02} UTC\nPeriod: {}\nExpected: {}\nPrior: {}\nActual: {}\n",
         ymd(now),
         e.name,
+        if e.country.is_empty() { "country unknown" } else { &e.country },
         ymd(e.at),
         e.at.rem_euclid(DAY) / 3600,
         e.at.rem_euclid(3600) / 60,
@@ -390,10 +470,11 @@ mod tests {
     use super::*;
 
     const ECON: &[u8] = include_bytes!("../../fixtures/events-econ.json");
+    const WORLD: &[u8] = include_bytes!("../../fixtures/events-world.json");
     const NOW: i64 = 1_793_577_600; // 2026-11-02 00:00 UTC
 
     fn event() -> MarketEvent {
-        parse_calendar(ECON).unwrap().remove(0)
+        parse_calendar(ECON).unwrap().events.remove(0)
     }
 
     fn analysis(generated: i64) -> EventAnalysis {
@@ -447,7 +528,7 @@ mod tests {
         let b = request_body("m", NOW, &e, &["A".into(), "B".into()]);
         assert_eq!((b["model"].as_str(), b["temperature"].as_i64()), (Some("m"), Some(0)));
         let user = b["messages"][1]["content"].as_str().unwrap();
-        for part in ["Today: 2026-11-02", "Event: ISM Manufacturing PMI", "Release: 2026-11-02 15:00 UTC", "Period: Oct", "Expected: 55.0", "Prior: 54.5", "Actual: not released yet", "- A\n- B\n"] {
+        for part in ["Today: 2026-11-02", "Event: ISM Manufacturing PMI (US)", "Release: 2026-11-02 15:00 UTC", "Period: Oct", "Expected: 55.0", "Prior: 54.5", "Actual: not released yet", "- A\n- B\n"] {
             assert!(user.contains(part), "{part:?} in {user}");
         }
         assert!(!user.contains("first reported"));
@@ -520,14 +601,15 @@ mod tests {
 
     #[test]
     fn parses_calendar_fixture() {
-        let got = parse_calendar(ECON).unwrap();
+        let got = parse_calendar(ECON).unwrap().events;
         let names: Vec<_> = got.iter().map(|e| e.name.as_str()).collect();
         assert_eq!(
             names,
             ["ISM Manufacturing PMI", "Redbook YY", "ADP National Employment", "Initial Jobless Clm", "Non-Farm Payrolls", "Consumer Credit"]
         );
         let ism = &got[0];
-        assert_eq!(ism.id, "1793631600-ism-manufacturing-pmi");
+        assert_eq!(ism.id, "1793631600-us-ism-manufacturing-pmi");
+        assert_eq!(ism.country, "US");
         assert_eq!(ism.at, 1_793_631_600);
         assert_eq!(ism.period.as_deref(), Some("Oct"));
         assert_eq!(ism.prior.as_deref(), Some("54.5"));
@@ -545,7 +627,7 @@ mod tests {
                 ["later","Bad Time","1","2"],
                 ["2026-11-03T15:00:00.000Z","*","1","2"],
                 ["2026-11-03T15:00:00.000Z",null,"1","2"]]}]}],"error":null}}"#;
-        let got = parse_calendar(body).unwrap();
+        let got = parse_calendar(body).unwrap().events;
         assert_eq!(got.len(), 2);
         assert_eq!(got[0].name, "ISM Manufacturing PMI");
         assert_eq!((got[0].expected.as_ref(), got[0].actual.as_ref()), (None, None));
@@ -554,22 +636,133 @@ mod tests {
 
     #[test]
     fn empty_and_error_replies() {
-        assert!(parse_calendar(br#"{"finance":{"result":[{"documents":[]}],"error":null}}"#).unwrap().is_empty());
-        assert!(parse_calendar(br#"{"finance":{"result":[],"error":null}}"#).unwrap().is_empty());
+        assert!(parse_calendar(br#"{"finance":{"result":[{"documents":[]}],"error":null}}"#).unwrap().events.is_empty());
+        assert!(parse_calendar(br#"{"finance":{"result":[],"error":null}}"#).unwrap().events.is_empty());
         let err = br#"{"finance":{"result":null,"error":{"code":"Unauthorized","description":"Invalid Crumb"}}}"#;
         assert_eq!(parse_calendar(err).unwrap_err(), "Invalid Crumb");
         assert!(parse_calendar(b"{}").is_err());
     }
 
     #[test]
-    fn builds_us_calendar_query() {
-        let q = calendar_query("2026-11-01", "2026-11-08");
+    fn builds_calendar_query_for_all_countries() {
+        let q = calendar_query("2026-11-01", "2026-11-08", 200);
         assert_eq!(q["entityIdType"], "economic_event");
-        assert_eq!(q["size"], 100);
+        assert_eq!((q["size"].as_u64(), q["offset"].as_u64()), (Some(100), Some(200)));
+        assert!(q["includeFields"].as_array().unwrap().contains(&json!("country_code")));
         let ops = q["query"]["operands"].as_array().unwrap();
+        assert_eq!(ops.len(), 2);
         assert_eq!(ops[0]["operands"], json!(["startdatetime", "2026-11-01"]));
         assert_eq!(ops[1]["operands"], json!(["startdatetime", "2026-11-08"]));
-        assert_eq!(ops[2]["operands"], json!(["country_code", "US"]));
+    }
+
+    #[test]
+    fn parses_world_page_with_countries_and_total() {
+        let page = parse_calendar(WORLD).unwrap();
+        assert_eq!((page.rows, page.events.len(), page.total), (40, 40, 64));
+        let countries: HashSet<_> = page.events.iter().map(|e| e.country.as_str()).collect();
+        assert_eq!(countries.len(), 12);
+        for c in ["US", "SE", "EU", "BR", "CA", "GH"] {
+            assert!(countries.contains(c), "{c}");
+        }
+        assert!(page.events.windows(2).all(|w| w[0].at <= w[1].at));
+        let ids: HashSet<_> = page.events.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids.len(), 40);
+        let swe = page.events.iter().find(|e| e.country == "SE" && e.name == "PMI Services").unwrap();
+        assert_eq!((swe.actual.as_deref(), swe.revised.as_deref()), (Some("55.7"), Some("57.3")));
+        let riks = page.events.iter().find(|e| e.name == "Riksbank Rate").unwrap();
+        assert_eq!((riks.period.as_deref(), riks.actual.as_deref()), (None, Some("2")));
+    }
+
+    #[test]
+    fn country_codes_are_validated_and_ids_stay_distinct() {
+        let body = br#"{"finance":{"result":[{"total":9,"documents":[{"columns":[
+            {"id":"econ_release"},{"id":"country_code"},{"id":"startdatetime"}],
+            "rows":[
+                ["CPI YY","eu","2026-11-04T10:00:00.000Z"],
+                ["CPI YY","IT","2026-11-04T10:00:00.000Z"],
+                ["CPI YY","","2026-11-04T10:00:00.000Z"],
+                ["CPI YY","not a code","2026-11-04T10:00:00.000Z"],
+                ["CPI YY",null,"2026-11-04T10:00:00.000Z"]]}]}],"error":null}}"#;
+        let page = parse_calendar(body).unwrap();
+        assert_eq!((page.rows, page.total), (5, 9));
+        let countries: Vec<_> = page.events.iter().map(|e| e.country.as_str()).collect();
+        assert_eq!(countries, ["EU", "IT", "", "", ""]);
+        assert_eq!(page.events[0].id, "1793786400-eu-cpi-yy");
+        assert_eq!(page.events[2].id, "1793786400-cpi-yy");
+    }
+
+    #[test]
+    fn total_never_undercounts_rows() {
+        let body = br#"{"finance":{"result":[{"total":1,"documents":[{"columns":[{"id":"econ_release"},{"id":"startdatetime"}],
+            "rows":[["A","2026-11-04T10:00:00.000Z"],["B","2026-11-04T11:00:00.000Z"]]}]}],"error":null}}"#;
+        let page = parse_calendar(body).unwrap();
+        assert_eq!((page.rows, page.total), (2, 2));
+        assert!(page.events.iter().all(|e| e.country.is_empty()));
+    }
+
+    #[test]
+    fn merges_pages_without_duplicates_in_time_order() {
+        let a = parse_calendar(WORLD).unwrap();
+        let mut b = a.clone();
+        b.events.reverse();
+        b.total = 64;
+        let (events, total) = merge_pages(vec![a.clone(), b]);
+        assert_eq!((events.len(), total), (40, 64));
+        assert!(events.windows(2).all(|w| w[0].at <= w[1].at));
+        assert_eq!(merge_pages(Vec::new()), (Vec::new(), 0));
+    }
+
+    #[test]
+    fn merge_keeps_distinct_rows_with_the_same_slug_and_drops_exact_repeats() {
+        let body = br#"{"finance":{"result":[{"total":4,"documents":[{"columns":[
+            {"id":"econ_release"},{"id":"country_code"},{"id":"startdatetime"},{"id":"period"}],
+            "rows":[
+                ["CPI MM, SA","US","2026-11-04T13:30:00.000Z","Oct"],
+                ["CPI MM SA","US","2026-11-04T13:30:00.000Z","Oct"],
+                ["CPI MM, SA","US","2026-11-04T13:30:00.000Z","Oct"],
+                ["CPI MM, SA","US","2026-11-04T13:30:00.000Z","Nov"]]}]}],"error":null}}"#;
+        let page = parse_calendar(body).unwrap();
+        let (events, total) = merge_pages(vec![page.clone(), page]);
+        assert_eq!((events.len(), total), (3, 4));
+        let ids: HashSet<_> = events.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids.len(), 3);
+        assert!(ids.contains("1793799000-us-cpi-mm-sa"));
+        assert!(ids.contains("1793799000-us-cpi-mm-sa-2"));
+        assert!(ids.contains("1793799000-us-cpi-mm-sa-3"));
+    }
+
+    #[test]
+    fn week_window_defaults_to_today_and_validates_dates() {
+        assert_eq!(week_window(None, NOW).unwrap(), ("2026-11-01".into(), "2026-11-08".into()));
+        assert_eq!(week_window(Some("2026-10-25"), NOW).unwrap(), ("2026-10-25".into(), "2026-11-01".into()));
+        assert_eq!(week_window(Some("2026-11-08"), NOW).unwrap(), ("2026-11-08".into(), "2026-11-15".into()));
+        assert_eq!(week_window(Some("2026-12-28"), NOW).unwrap().1, "2027-01-04");
+        for bad in ["", "soon", "2026-13-01", "2026-02-30", "2026-1-01", "20261101", "2026-11-01T00:00", "2026-11-0x", "-026-11-01", "2026-+1-01"] {
+            assert_eq!(week_window(Some(bad), NOW).unwrap_err(), "Invalid start date", "{bad}");
+        }
+        assert!(week_window(Some("2024-01-01"), NOW).is_err());
+        assert!(week_window(Some("2028-01-01"), NOW).is_err());
+        assert!(week_window(Some("2027-11-01"), NOW).is_ok());
+        assert!(week_window(Some("2025-11-02"), NOW).is_ok());
+    }
+
+    #[test]
+    fn list_cache_keeps_one_report_per_week_and_caps() {
+        let report = |start: &str, fetched| EventsReport { fetched, start: start.into(), total: 0, events: Vec::new() };
+        lock(&LISTS).clear();
+        store_list(report("2026-11-01", 1));
+        store_list(report("2026-11-08", 2));
+        store_list(report("2026-11-01", 3));
+        {
+            let lists = lock(&LISTS);
+            assert_eq!(lists.iter().map(|r| (r.start.as_str(), r.fetched)).collect::<Vec<_>>(), [("2026-11-08", 2), ("2026-11-01", 3)]);
+        }
+        for d in 0..CACHED_WEEKS + 3 {
+            store_list(report(&format!("2027-01-{:02}", d + 1), 10));
+        }
+        let lists = lock(&LISTS);
+        assert_eq!(lists.len(), CACHED_WEEKS);
+        assert_eq!(lists[0].start, "2027-01-04");
     }
 
     /// Hits Yahoo. Run with `cargo test -- --ignored live`.
@@ -577,8 +770,11 @@ mod tests {
     #[ignore]
     fn live_calendar() {
         let a = Analysts::new();
-        let r = tauri::async_runtime::block_on(fetch_list(&a, now_secs())).unwrap();
+        let now = now_secs();
+        let (start, end) = week_window(None, now).unwrap();
+        let r = tauri::async_runtime::block_on(fetch_list(&a, &start, &end, now)).unwrap();
         assert!(!r.events.is_empty(), "{r:?}");
+        assert!(r.events.iter().any(|e| e.country != "US"), "{r:?}");
     }
 
     /// Hits Yahoo and the configured AI endpoint. Run with `cargo test -- --ignored live`.

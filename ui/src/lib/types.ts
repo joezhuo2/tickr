@@ -167,6 +167,7 @@ export interface Init {
   groups: Group[];
   watchlist_sort: WatchlistSort;
   screens: SavedScreen[];
+  event_filter: EventFilter;
   keybinds: Keybinds;
   dots: Dots;
   indicators: IndicatorConfig;
@@ -237,10 +238,11 @@ export interface Impact {
   reasoning: string;
 }
 
-/** A scheduled US economic release from Yahoo's calendar. */
+/** A scheduled economic release from Yahoo's calendar. */
 export interface MarketEvent {
   id: string;
   name: string;
+  country: string;
   /** Release time, Unix seconds. */
   at: number;
   /** What the figure covers, like "Oct" or "Q3". */
@@ -255,7 +257,23 @@ export interface MarketEvent {
 export interface EventsReport {
   /** Unix seconds. */
   fetched: number;
+  start: string;
+  total: number;
   events: MarketEvent[];
+}
+
+export type EventImportance = "all" | "key";
+
+export interface EventFilter {
+  countries: string[];
+  importance: EventImportance;
+}
+
+export interface WatchDates {
+  symbol: string;
+  earnings: { date: string; estimated: boolean; eps_estimate: number | null } | null;
+  ex_dividend: string | null;
+  error: string | null;
 }
 
 /** AI read of one event, run when it is opened. */

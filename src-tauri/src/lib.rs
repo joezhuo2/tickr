@@ -8,6 +8,7 @@ pub mod analysis;
 pub mod alerts;
 pub mod analyst;
 pub mod autostart;
+pub mod calendar;
 pub mod commands;
 pub mod connections;
 pub mod earnings;
@@ -138,6 +139,8 @@ pub fn run() {
             commands::get_news_feed,
             commands::open_news,
             commands::get_events,
+            commands::get_watch_calendar,
+            commands::set_event_filter,
             commands::analyze_event,
         ])
         .on_window_event(window::on_event)

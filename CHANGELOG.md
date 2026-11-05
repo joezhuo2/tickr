@@ -6,6 +6,17 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.14] - 2026-11-04
+
+### Added
+- **Broader calendars** ([#93](https://github.com/joezhuo2/tickr/issues/93)):
+  economic events get week navigation plus country and importance filters
+  (saved). A new Watchlist dates tab lists upcoming earnings and ex-dividend
+  dates for starred symbols.
+
+### Changed
+- Event ids now include country, so cached AI event analyses regenerate once.
+
 ## [0.10.13] - 2026-11-04
 
 ### Added
