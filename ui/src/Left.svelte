@@ -1,6 +1,6 @@
 <script lang="ts">
   import { change, direction, num, price, ratingLabel, ratingTone, signed, span, upside, volume } from "./lib/format";
-  import type { Consensus, Quote } from "./lib/types";
+  import type { Candle, Consensus, Quote } from "./lib/types";
 
   // logo: undefined while loading, null when the symbol has none.
   // analyst: undefined while loading, null without coverage.
@@ -13,6 +13,7 @@
     starred,
     onanalysts,
     onstar,
+    replay = null,
   }: {
     symbol: string;
     quote: Quote | null;
@@ -22,6 +23,7 @@
     starred: boolean;
     onanalysts: () => void;
     onstar: () => void;
+    replay?: { bar: Candle; change: number | null; change_pct: number | null; currency: string; when: string } | null;
   } = $props();
   const up = $derived(upside(analyst?.target_mean, quote?.price));
   // Whole numbers once prices reach 100, so the range fits the panel.
@@ -68,7 +70,19 @@
     <span class="sk" style="width: 150px; height: 14px; margin: 3px 0 13px"></span>
   {/if}
 
-  {#if quote}
+  {#if replay}
+    <div class="price">{price(replay.bar.c, replay.currency)}</div>
+    {#if replay.change != null && replay.change_pct != null}
+      <div class="chg {direction(replay.change)}" title="Change from the previous bar">{change(replay.change, replay.change_pct)}</div>
+    {/if}
+    <div class="session"><i class="replay"></i>Replay · {replay.when}</div>
+    <dl>
+      <dt>Open</dt><dd>{price(replay.bar.o, replay.currency)}</dd>
+      <dt>High</dt><dd>{price(replay.bar.h, replay.currency)}</dd>
+      <dt>Low</dt><dd>{price(replay.bar.l, replay.currency)}</dd>
+      <dt>Volume</dt><dd>{volume(replay.bar.v)}</dd>
+    </dl>
+  {:else if quote}
     <div class="price">{price(quote.price, quote.currency)}</div>
     <div class="chg {direction(quote.change)}">{change(quote.change, quote.change_pct)}</div>
     {#if staleNote}<div class="stale" role="status">{staleNote}</div>{/if}
@@ -292,6 +306,9 @@
   .session i.pre,
   .session i.post {
     background: #ffb340;
+  }
+  .session i.replay {
+    background: var(--accent);
   }
   .ext {
     display: flex;

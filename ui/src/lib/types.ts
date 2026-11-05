@@ -234,6 +234,7 @@ export interface Keybinds {
   draw_ruler: string;
   draw_pen: string;
   chart_split: string;
+  chart_replay: string;
   refresh: string;
   range: string;
   technicals: string;

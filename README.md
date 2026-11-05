@@ -121,6 +121,10 @@ taskbar to keep it visible.
   side or stacked, with its own symbol and range. Crosshair time is linked
   across both charts, and an optional sync toggle moves both to the same time
   window. The layout is saved; a single chart is the default.
+- **Bar replay:** the toggle (Y by default) reveals the chart one candle at a
+  time from a chosen start date, with play/pause, stepping and playback speed.
+  Indicators and analysis use only revealed candles, and forward-looking panels
+  are hidden while replay is on. Nothing about replay is saved.
 - **Recent symbols and history:** focus the empty search box to see the last
   10 symbols you viewed. The Back and Forward buttons (or Alt+Left and
   Alt+Right) step through this session's symbols, and B jumps to the previous
@@ -298,6 +302,7 @@ typing in a text field.
 | | `4` | Ruler |
 | | `5` | Pen |
 | | `J` | Toggle second chart |
+| | `Y` | Toggle bar replay |
 | | `V` | Cycle date range |
 | | `R` | Refresh |
 | Panels | `T` | Open Technicals |
@@ -446,8 +451,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.10.22
-git push origin v0.10.22
+git tag v0.11.0
+git push origin v0.11.0
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

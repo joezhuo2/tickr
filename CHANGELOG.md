@@ -6,6 +6,18 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-05
+
+### Added
+- **Bar replay** ([#100](https://github.com/joezhuo2/tickr/issues/100)): reveal
+  the chart one candle at a time from a chosen start date, with play/pause,
+  step forward and back, and playback speed. Indicators and analysis use only
+  revealed candles. The live quote, news, earnings, analyst targets and other
+  forward-looking panels are hidden or disabled while replay is on, and pan and
+  zoom cannot show unrevealed candles. The replay hotkey is rebindable (default
+  Y), with Space, Left, Right and Escape for playback controls. Nothing about
+  replay is saved.
+
 ## [0.10.22] - 2026-11-05
 
 ### Added

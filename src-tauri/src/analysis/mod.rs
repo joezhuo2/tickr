@@ -328,6 +328,16 @@ fn snap(raw: f64, above: bool, close: f64, atr: f64, swing: Option<&Swing>) -> T
     }
 }
 
+pub fn reveal_until(chart: &Chart, until: i64) -> Chart {
+    Chart {
+        candles: chart.candles.iter().filter(|k| k.t <= until).cloned().collect(),
+        dividends: chart.dividends.iter().filter(|d| d.t <= until).cloned().collect(),
+        splits: chart.splits.iter().filter(|s| s.t <= until).cloned().collect(),
+        last_bar_time: chart.candles.iter().map(|k| k.t).filter(|&t| t <= until).max(),
+        ..chart.clone()
+    }
+}
+
 #[cfg(test)]
 pub fn analyze(chart: &Chart) -> Result<Analysis, String> {
     analyze_with_config(chart, &crate::settings::IndicatorConfig::default())
@@ -689,6 +699,40 @@ mod tests {
     fn is_deterministic() {
         let c = chart((0..120).map(|i| 50.0 + wave(i) + 0.1 * i as f64));
         assert_eq!(analyze(&c).unwrap(), analyze(&c).unwrap());
+    }
+
+    #[test]
+    fn reveal_until_ignores_later_bars() {
+        let mut full = chart((0..250).map(|i| 100.0 + 0.3 * i as f64 + wave(i)));
+        full.dividends = vec![crate::quote::Dividend { t: 10 * 86_400, amount: 0.5 }, crate::quote::Dividend { t: 200 * 86_400, amount: 0.5 }];
+        full.splits = vec![crate::quote::Split { t: 220 * 86_400, ratio: "2:1".into() }];
+        let until = 150 * 86_400;
+        let cut = reveal_until(&full, until);
+        assert_eq!(cut.candles, full.candles[..=150].to_vec());
+        assert_eq!(cut.dividends.len(), 1);
+        assert!(cut.splits.is_empty());
+        assert_eq!(cut.last_bar_time, Some(until));
+
+        let mut altered = full.clone();
+        for k in &mut altered.candles[151..] {
+            k.c *= 3.0;
+            k.h *= 3.0;
+            k.v *= 10.0;
+        }
+        let a = analyze(&cut).unwrap();
+        assert_eq!(a, analyze(&reveal_until(&altered, until)).unwrap());
+        assert_eq!(a.as_of, until);
+        assert_eq!(a.bars, 151);
+        assert!(a.series.t.iter().all(|&t| t <= until));
+        assert!(a.patterns.iter().all(|p| p.t <= until));
+        assert_ne!(a, analyze(&full).unwrap());
+    }
+
+    #[test]
+    fn reveal_until_between_bars_keeps_earlier_ones() {
+        let full = chart((0..40).map(|i| 50.0 + wave(i)));
+        assert_eq!(reveal_until(&full, 20 * 86_400 + 3600).candles.len(), 21);
+        assert!(reveal_until(&full, -1).candles.is_empty());
     }
 
     #[test]

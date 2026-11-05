@@ -30,6 +30,7 @@
     type StreamStatus,
     type Analysis,
     type Article,
+    type Candle,
     type FeedArticle,
     type Chart,
     type ChartMode,
@@ -60,14 +61,17 @@
     type StatSection,
     type WatchDates,
   } from "./lib/types";
-  import { actionFor, bindKey, nextGroupTab } from "./lib/keybinds";
+  import { actionFor, bindKey, keyLabel, nextGroupTab, replayAllows } from "./lib/keybinds";
+  import ReplayBar from "./ReplayBar.svelte";
+  import * as Replay from "./lib/replay";
+  import { fullTime } from "./lib/format";
   import { overlayVisibility, shouldAnalyze } from "./lib/indicators";
   import { applyDisplay } from "./lib/display";
   import type { Theme, TextSize, Palette } from "./lib/types";
   import { refreshOutcome, type RefreshView } from "./lib/refresh";
   import { chartNote, chartSegment, chartTime, classifyChart, classifyQuote, delayLabel, localOffset, quoteNote, quoteSegment, quoteStatus, quoteTime, sourceName } from "./lib/freshness";
   import { paneIn } from "./lib/motion";
-  import { displayOffset } from "./lib/session";
+  import { displayOffset, isIntraday } from "./lib/session";
   import { emptyHistory, goBack, goForward, previous, pushRecent, visit, type History, type Move } from "./lib/history";
   import { DEFAULT_WATCHLIST_SORT } from "./lib/watchlistSort";
   import { DEFAULT_EVENT_FILTER, localDay, weekRange } from "./lib/calendar";
@@ -363,6 +367,7 @@
 
   /** Shows the cached chart (or a skeleton) at once, then fetches if stale. */
   async function loadChart(force = false, manual = false) {
+    if (replay) return;
     const mine = ++chartSeq;
     const key = cacheKey();
     const hit = cache.get(key);
@@ -489,15 +494,190 @@
     if (view === "news") loadNews();
   }
 
+  let replay = $state<Replay.ReplayState | null>(null);
+  let replayBars = $state.raw<Candle[]>([]);
+  let replayBase = $state.raw<Chart | null>(null);
+  let replaySession = 0;
+  let replayAnalysis = $state.raw<Analysis | null>(null);
+  let replayAnalyzeOn = $state(false);
+  let replayAnalyzing = $state(false);
+  let replayAnalysisError = $state<string | null>(null);
+  let replayAnalysisBusy = false;
+  let replayAnalysisAgain = false;
+  let replayIndicatorsChanged = false;
+  const replayCursor = $derived(replay?.cursor ?? -1);
+  const replayPlaying = $derived(replay?.playing ?? false);
+  const replayCutoff = $derived(replay ? Replay.cutoff(replayBars, replay) : Infinity);
+  const replayChart = $derived.by<Chart | null>(() => {
+    const base = replayBase;
+    const cursor = replayCursor;
+    const cut = replayCutoff;
+    if (!base || cursor < 0) return null;
+    const candles = Replay.revealed(replayBars, untrack(() => replay)!);
+    const last = candles[candles.length - 1];
+    return {
+      ...base,
+      meta: { ...base.meta, price: last.c, market_time: last.t },
+      candles,
+      dividends: Replay.known(base.dividends, (d) => d.t, cut),
+      splits: Replay.known(base.splits, (s) => s.t, cut),
+      last_bar_time: last.t,
+    };
+  });
+  const replayLastTime = $derived(replayChart ? replayChart.candles[replayChart.candles.length - 1].t : -Infinity);
+  const shownReplayAnalysis = $derived(replayAnalysis && replayAnalysis.as_of <= replayLastTime ? replayAnalysis : null);
+  const replayIntraday = $derived(replayBase ? isIntraday(replayBase.interval) : false);
+  const canStartReplay = $derived(!!shownChart && Replay.canReplay(shownChart.candles.length));
+
+  function replayOffset(t: number): number {
+    const base = replayBase;
+    if (!base) return 0;
+    return displayOffset(t, chartTimeZone, { timezone: base.meta.timezone, gmtoffset: base.meta.gmtoffset }, base.interval);
+  }
+
+  function replayInput(t: number): string {
+    return new Date((t + replayOffset(t)) * 1000).toISOString().slice(0, replayIntraday ? 16 : 10);
+  }
+
+  function replayWhen(t: number): string {
+    return replayBase ? fullTime(t, replayOffset(t), replayBase.interval) : "";
+  }
+
+  const replayHeader = $derived.by(() => {
+    if (!replayChart) return null;
+    const c = replayChart.candles;
+    const bar = c[c.length - 1];
+    const prev = c.length > 1 ? c[c.length - 2] : null;
+    const change = prev ? bar.c - prev.c : null;
+    return { bar, change, change_pct: prev && change != null && prev.c ? (change / prev.c) * 100 : null, currency: replayChart.meta.currency, when: replayWhen(bar.t) };
+  });
+
+  function enterReplay() {
+    const base = shownChart;
+    if (replay || !base || !Replay.canReplay(base.candles.length)) return;
+    chartSeq++;
+    loading = false;
+    if (view !== "chart" && view !== "technicals") view = "chart";
+    const bars = base.candles;
+    replaySession++;
+    replayBars = bars;
+    replayBase = base;
+    replayAnalysis = null;
+    replayAnalysisError = null;
+    replayAnalyzing = false;
+    replayIndicatorsChanged = false;
+    replayAnalyzeOn = shouldAnalyze(!!activeAnalysis, indicators?.keep_analysis ?? false);
+    syncHover = null;
+    syncWindow = null;
+    replay = Replay.startAt(bars, bars[Math.max(Replay.MIN_CONTEXT, Math.floor(bars.length / 2))].t);
+  }
+
+  function exitReplay() {
+    if (!replay) return;
+    replaySession++;
+    replay = null;
+    replayBars = [];
+    replayBase = null;
+    replayAnalysis = null;
+    replayAnalysisError = null;
+    replayAnalyzing = false;
+    replayAnalyzeOn = false;
+    if (replayIndicatorsChanged) {
+      replayIndicatorsChanged = false;
+      if (chart && !loading && shouldAnalyze(!!analysis, indicators?.keep_analysis ?? false)) void runAnalysis(true);
+    }
+  }
+
+  function toggleReplay() {
+    if (replay) exitReplay();
+    else enterReplay();
+  }
+
+  function restartReplay(value: string) {
+    if (!replay || !replayBars.length) return;
+    const wall = Date.parse(value.length === 10 ? `${value}T00:00Z` : `${value}Z`) / 1000;
+    const next = Replay.startAt(replayBars.map((b) => ({ t: b.t + replayOffset(b.t) })), wall, Replay.MIN_CONTEXT, replay.speed);
+    if (next) replay = next;
+  }
+
+  function replayUpdate(next: (s: Replay.ReplayState) => Replay.ReplayState) {
+    if (replay) replay = next(replay);
+  }
+
+  $effect(() => {
+    if (!replayPlaying) return;
+    let last = performance.now();
+    const id = setInterval(() => {
+      const t = performance.now();
+      replayUpdate((s) => Replay.tick(s, t - last));
+      last = t;
+    }, 40);
+    return () => clearInterval(id);
+  });
+
+  $effect(() => {
+    if (replayCursor < 0) return;
+    untrack(() => {
+      if (replayAnalyzeOn || indicators?.keep_analysis) void runReplayAnalysis(true);
+    });
+  });
+
+  $effect.pre(() => {
+    if (replay && view !== "chart" && view !== "technicals") view = "chart";
+  });
+
+  async function runReplayAnalysis(background = false) {
+    if (!replay) return;
+    if (!background) replayAnalyzing = true;
+    if (replayAnalysisBusy) {
+      replayAnalysisAgain = true;
+      return;
+    }
+    replayAnalysisBusy = true;
+    const session = replaySession;
+    try {
+      let until: number;
+      do {
+        replayAnalysisAgain = false;
+        if (!replay || session !== replaySession) return;
+        until = replayBars[replay.cursor].t;
+        try {
+          const a = await invoke<Analysis>("analyze", { symbol, range, interval, extended: chartExtended, until });
+          if (!replay || session !== replaySession) return;
+          if (a.as_of <= replayBars[replay.cursor].t) {
+            replayAnalysis = a;
+            replayAnalysisError = null;
+          }
+        } catch (e) {
+          if (session === replaySession) replayAnalysisError = String(e);
+        }
+      } while (replayAnalysisAgain || (replay && session === replaySession && replayBars[replay.cursor].t !== until));
+    } finally {
+      replayAnalysisBusy = false;
+      if (session === replaySession) replayAnalyzing = false;
+      else if (replayAnalysisAgain) void runReplayAnalysis(true);
+    }
+  }
+
   const activeAnalysis = $derived(analysis && analysisKey === cacheKey() ? analysis : null);
+  const techAnalysis = $derived(replay ? shownReplayAnalysis : activeAnalysis);
+  const mainChart = $derived(replay ? replayChart : chart);
+  const split = $derived(layout.split && !replay);
   const analysisOffset = $derived(
-    activeAnalysis && chart
-      ? displayOffset(activeAnalysis.as_of, chartTimeZone, { timezone: chart.meta.timezone, gmtoffset: chart.meta.gmtoffset }, activeAnalysis.interval)
-      : (chart?.meta.gmtoffset ?? 0),
+    techAnalysis && mainChart
+      ? displayOffset(techAnalysis.as_of, chartTimeZone, { timezone: mainChart.meta.timezone, gmtoffset: mainChart.meta.gmtoffset }, techAnalysis.interval)
+      : (mainChart?.meta.gmtoffset ?? 0),
   );
+  const chartEarnings = $derived(dots.earnings ? (replay ? Replay.known(earnings?.history ?? [], (e) => e.reported, replayCutoff) : earnings?.history) : []);
+  const chartRatings = $derived(dots.analysts ? (replay ? Replay.known(ratingChanges, (r) => r.date, replayCutoff) : ratingChanges) : []);
+  const chartNews = $derived(dots.news ? (replay ? Replay.known(news ?? [], (a) => a.published, replayCutoff) : news) : []);
 
   /** Runs the local technical analysis on the chart on screen. */
   async function runAnalysis(background = false) {
+    if (replay) {
+      replayAnalyzeOn = true;
+      return runReplayAnalysis(background);
+    }
     if (!chart || (background && loading)) return;
     const mine = ++analysisSeq;
     const key = cacheKey();
@@ -526,6 +706,11 @@
 
   async function saveIndicators(config: IndicatorConfig) {
     indicators = await invoke<IndicatorConfig>("set_indicators", { config });
+    if (replay) {
+      replayIndicatorsChanged = true;
+      if (replayAnalyzeOn || indicators.keep_analysis) void runReplayAnalysis(true);
+      return;
+    }
     if (chart && !loading && shouldAnalyze(!!analysis, indicators.keep_analysis)) void runAnalysis(true);
   }
 
@@ -566,6 +751,7 @@
   async function switchSymbol(next: string): Promise<string | null> {
     try {
       qs = await invoke<QuoteState>("set_symbol", { symbol: next });
+      exitReplay();
       symbol = qs.quote?.symbol ?? next.toUpperCase();
       recent = pushRecent(recent, symbol);
       clearAnalysis();
@@ -639,6 +825,7 @@
     // The Technicals view keeps its split chart across range changes.
     if (view !== "technicals") view = "chart";
     if (r === range) return;
+    exitReplay();
     range = r;
     interval = validInterval(range, interval);
     clearAnalysis();
@@ -650,6 +837,7 @@
 
   function changeInterval(next: string) {
     if (next === interval) return;
+    exitReplay();
     interval = validInterval(range, next);
     const saved = interval;
     clearAnalysis();
@@ -823,6 +1011,7 @@
 
   function saveChartExtended(enabled: boolean) {
     if (enabled === chartExtended) return;
+    if (range === "1d") exitReplay();
     chartExtended = enabled;
     invoke("set_chart_extended_hours", { enabled }).catch(console.warn);
     if (range === "1d") loadChart(true);
@@ -866,11 +1055,32 @@
       if (!e.repeat) navigate(e.key === "ArrowLeft" ? goBack : goForward);
       return;
     }
+    if (replay && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      if (e.key === " ") {
+        if (e.target instanceof Element && e.target.closest("button, a")) return;
+        e.preventDefault();
+        if (!e.repeat) replayUpdate(Replay.toggle);
+        return;
+      }
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        replayUpdate(e.key === "ArrowRight" ? Replay.step : Replay.stepBack);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (!e.repeat) exitReplay();
+        return;
+      }
+    }
     const key = bindKey(e);
     const action = key && actionFor(keybinds, key);
-    if (!action) return;
+    if (!action || (replay && !replayAllows(action))) return;
     e.preventDefault();
     switch (action) {
+      case "chart_replay":
+        if (!e.repeat) toggleReplay();
+        break;
       case "settings":
         if (!e.repeat) settingsOpen = true;
         break;
@@ -984,6 +1194,7 @@
     const tick = setInterval(() => (now = Date.now() / 1000), 15_000);
     const unProvider = listen<DataProvider>("data-provider", (e) => {
       dataProvider = e.payload;
+      exitReplay();
       cache.clear();
       clearAnalysis();
       void loadChart(true);
@@ -1016,10 +1227,13 @@
         {quote}
         {logo}
         {analyst}
-        staleNote={quoteStale}
+        staleNote={replay ? null : quoteStale}
         starred={watchlist.includes(symbol)}
-        onanalysts={() => (view = "analysts")}
+        onanalysts={() => {
+          if (!replay) view = "analysts";
+        }}
         onstar={toggleStar}
+        replay={replayHeader}
       />
       <section>
         <div class="toolbar">
@@ -1034,16 +1248,16 @@
           </div>
           <div class="views">
             <div class="seg">
-              <button class:on={view === "options"} aria-pressed={view === "options"} onclick={toggleOptions}>Options</button>
+              <button class:on={view === "options"} aria-pressed={view === "options"} disabled={!!replay} onclick={toggleOptions}>Options</button>
             </div>
             <div class="seg">
-              <button class:on={view === "market"} aria-pressed={view === "market"} onclick={toggleMarket}>Market</button>
+              <button class:on={view === "market"} aria-pressed={view === "market"} disabled={!!replay} onclick={toggleMarket}>Market</button>
             </div>
             <div class="seg">
-              <button class:on={view === "events"} aria-pressed={view === "events"} onclick={toggleEvents}>Events</button>
+              <button class:on={view === "events"} aria-pressed={view === "events"} disabled={!!replay} onclick={toggleEvents}>Events</button>
             </div>
             <div class="seg">
-              <button class:on={view === "news"} aria-pressed={view === "news"} onclick={toggleNews}>News</button>
+              <button class:on={view === "news"} aria-pressed={view === "news"} disabled={!!replay} onclick={toggleNews}>News</button>
             </div>
             <div class="seg" role="group" aria-label="Chart type">
               <button class:on={view !== "news" && view !== "market" && view !== "events" && view !== "options" && mode === "line"} onclick={() => setMode("line")}>Line</button>
@@ -1065,7 +1279,7 @@
               </button>
             {/each}
             <span class="sep"></span>
-            <button role="tab" aria-selected={view === "alerts"} class:on={view === "alerts"} onclick={() => (view = view === "alerts" ? "chart" : "alerts")}>
+            <button role="tab" aria-selected={view === "alerts"} class:on={view === "alerts"} disabled={!!replay} onclick={() => (view = view === "alerts" ? "chart" : "alerts")}>
               Alerts
             </button>
             <button
@@ -1076,16 +1290,16 @@
             >
               Technicals
             </button>
-            <button role="tab" aria-selected={view === "analysts"} class:on={view === "analysts"} onclick={() => (view = view === "analysts" ? "chart" : "analysts")}>
+            <button role="tab" aria-selected={view === "analysts"} class:on={view === "analysts"} disabled={!!replay} onclick={() => (view = view === "analysts" ? "chart" : "analysts")}>
               Analysts
             </button>
-            <button role="tab" aria-selected={view === "earnings"} class:on={view === "earnings"} onclick={() => (view = view === "earnings" ? "chart" : "earnings")}>
+            <button role="tab" aria-selected={view === "earnings"} class:on={view === "earnings"} disabled={!!replay} onclick={() => (view = view === "earnings" ? "chart" : "earnings")}>
               Earnings
             </button>
-            <button role="tab" aria-selected={view === "stats"} class:on={view === "stats"} onclick={() => (view = view === "stats" ? "chart" : "stats")}>
+            <button role="tab" aria-selected={view === "stats"} class:on={view === "stats"} disabled={!!replay} onclick={() => (view = view === "stats" ? "chart" : "stats")}>
               Stats
             </button>
-            <button role="tab" aria-selected={view === "financials"} class:on={view === "financials"} onclick={toggleFinancials}>
+            <button role="tab" aria-selected={view === "financials"} class:on={view === "financials"} disabled={!!replay} onclick={toggleFinancials}>
               Financials
             </button>
             {#if view === "news" ? (newsScope === "symbol" ? newsLoading : feedLoading) : view === "market" ? marketLoading : view === "events" ? (eventsTab === "watchlist" ? watchCalLoading : eventsLoading) : view === "options" ? optionsLoading : loading || (view === "technicals" && analyzing)}<span
@@ -1107,15 +1321,39 @@
           <div class="seg" role="group" aria-label="Chart layout">
             {#each [{ id: "single", label: "1", title: "One chart" }, { id: "side", label: "Side", title: "Two charts side by side" }, { id: "stacked", label: "Stack", title: "Two charts stacked" }] as l (l.id)}
               {@const on = view === "chart" && (l.id === "single" ? !layout.split : layout.split && layout.orientation === l.id)}
-              <button class:on aria-pressed={on} title={l.title} aria-label={l.title} onclick={() => saveLayout(l.id === "single" ? { split: false } : { split: true, orientation: l.id as ChartLayout["orientation"] })}>{l.label}</button>
+              <button class:on aria-pressed={on} title={l.title} aria-label={l.title} disabled={!!replay} onclick={() => saveLayout(l.id === "single" ? { split: false } : { split: true, orientation: l.id as ChartLayout["orientation"] })}>{l.label}</button>
             {/each}
           </div>
           {#if layout.split}
             <div class="seg" role="group" aria-label="Chart sync">
-              <button class:on={layout.sync_range} aria-pressed={layout.sync_range} title="Pan and zoom both charts together" onclick={() => saveLayout({ sync_range: !layout.sync_range })}>Sync</button>
+              <button class:on={layout.sync_range} aria-pressed={layout.sync_range} title="Pan and zoom both charts together" disabled={!!replay} onclick={() => saveLayout({ sync_range: !layout.sync_range })}>Sync</button>
             </div>
           {/if}
+          <div class="seg" role="group" aria-label="Bar replay">
+            <button
+              class:on={!!replay}
+              aria-pressed={!!replay}
+              title={replay ? `Exit bar replay (${keyLabel(keybinds.chart_replay)} or Esc)` : canStartReplay ? `Bar replay (${keyLabel(keybinds.chart_replay)})` : "Bar replay needs more candles"}
+              disabled={!replay && !canStartReplay}
+              onclick={toggleReplay}>Replay</button>
+          </div>
         </div>
+        {#if replay && replayBars.length}
+          <ReplayBar
+            state={replay}
+            intraday={replayIntraday}
+            start={replayInput(replayBars[replay.start].t)}
+            min={replayInput(replayBars[Replay.MIN_CONTEXT].t)}
+            max={replayInput(replayBars[replayBars.length - 1].t)}
+            when={replayHeader?.when ?? ""}
+            onstart={restartReplay}
+            ontoggle={() => replayUpdate(Replay.toggle)}
+            onstep={() => replayUpdate(Replay.step)}
+            onback={() => replayUpdate(Replay.stepBack)}
+            onspeed={(speed) => replayUpdate((s) => Replay.setSpeed(s, speed))}
+            onexit={exitReplay}
+          />
+        {/if}
         {#key view}
           <div class="pane" in:paneIn={view === "watchlist" ? { y: 16, speed: "slow" } : {}}>
             {#if view === "watchlist"}
@@ -1163,8 +1401,8 @@
                 {now} onretry={() => newsScope === "symbol" ? loadNews() : loadFeed()} />
             {:else if view === "technicals"}
               <div class="split">
-                {#if chart}
-                  <ChartView bind:this={chartView} redrawKey={displayKey} {chart} staleNote={chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={activeAnalysis} {overlays} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
+                {#if mainChart}
+                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} />
                 {:else if chartError}
                   <div class="msg">
                     {chartError}
@@ -1174,10 +1412,10 @@
                   <ChartSkeleton />
                 {/if}
                 <Technicals
-                  analysis={activeAnalysis}
-                  loading={analyzing}
-                  error={analysisError}
-                  bars={chart?.candles.length ?? 0}
+                  analysis={techAnalysis}
+                  loading={replay ? replayAnalyzing || (replayAnalyzeOn && !shownReplayAnalysis && !replayAnalysisError) : analyzing}
+                  error={replay ? replayAnalysisError : analysisError}
+                  bars={mainChart?.candles.length ?? 0}
                   gmtoffset={analysisOffset}
                   {overlays}
                   config={indicators!}
@@ -1189,13 +1427,13 @@
                 />
               </div>
             {:else}
-              <div class="charts" class:stacked={layout.split && layout.orientation === "stacked"}>
-                {#if chart}
+              <div class="charts" class:stacked={split && layout.orientation === "stacked"}>
+                {#if mainChart}
                   <ChartView
                     bind:this={chartView}
                     redrawKey={displayKey}
-                    {chart}
-                    staleNote={chartStale}
+                    chart={mainChart}
+                    staleNote={replay ? null : chartStale}
                     {mode}
                     {scale}
                     {shadeSessions}
@@ -1203,13 +1441,14 @@
                     {drawings}
                     {drawingBusy}
                     {saveDrawings}
-                    earnings={dots.earnings ? earnings?.history : []}
-                    ratings={dots.analysts ? ratingChanges : []}
-                    news={dots.news ? news : []}
-                    linkedTime={layout.split && syncHover?.source === "second" ? syncHover.t : null}
-                    onhovertime={layout.split ? (t) => hoverFrom("main", t) : undefined}
-                    linkedWindow={layout.split && layout.sync_range && syncWindow?.source === "second" ? syncWindow.w : null}
-                    onwindow={layout.split && layout.sync_range ? (w) => (syncWindow = { source: "main", w }) : undefined}
+                    earnings={chartEarnings}
+                    ratings={chartRatings}
+                    news={chartNews}
+                    linkedTime={split && syncHover?.source === "second" ? syncHover.t : null}
+                    onhovertime={split ? (t) => hoverFrom("main", t) : undefined}
+                    linkedWindow={split && layout.sync_range && syncWindow?.source === "second" ? syncWindow.w : null}
+                    onwindow={split && layout.sync_range ? (w) => (syncWindow = { source: "main", w }) : undefined}
+                    replay={!!replay}
                   />
                 {:else if chartError}
                   <div class="msg">
@@ -1219,7 +1458,7 @@
                 {:else}
                   <ChartSkeleton />
                 {/if}
-                {#if layout.split}
+                {#if split}
                   <SecondChart
                     bind:this={secondView}
                     {layout}
@@ -1261,7 +1500,9 @@
       settingsOn={settingsOpen}
       onsettings={() => (settingsOpen = !settingsOpen)}
       watchlistOn={view === "watchlist"}
-      onwatchlist={() => (view = view === "watchlist" ? "chart" : "watchlist")}
+      onwatchlist={() => {
+        if (!replay) view = view === "watchlist" ? "chart" : "watchlist";
+      }}
       {refreshing}
       {refreshStatus}
       onrefresh={refresh}
@@ -1372,6 +1613,11 @@
     background: var(--bg);
     color: var(--text);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  }
+  .seg button:disabled,
+  .ranges button:disabled {
+    opacity: 0.4;
+    cursor: default;
   }
   .range-controls {
     display: flex;

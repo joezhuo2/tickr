@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ACTIONS, CATEGORIES, actionFor, groupActions, bindKey, keyLabel, nextGroupTab, rebind } from "./keybinds";
+import { ACTIONS, CATEGORIES, actionFor, groupActions, bindKey, keyLabel, nextGroupTab, rebind, replayAllows } from "./keybinds";
 import type { Keybinds } from "./types";
 
 const DEFAULTS: Keybinds = {
@@ -12,6 +12,7 @@ const DEFAULTS: Keybinds = {
   draw_ruler: "4",
   draw_pen: "5",
   chart_split: "j",
+  chart_replay: "y",
   refresh: "r",
   range: "v",
   technicals: "t",
@@ -96,6 +97,26 @@ describe("chart_split", () => {
     expect(actionFor(next, "c")).toBe("chart_split");
     expect(actionFor(next, "j")).toBe("chart_mode");
     expect(actionFor({ ...DEFAULTS, chart_split: "" }, "j")).toBeNull();
+  });
+});
+
+describe("chart_replay", () => {
+  it("is a chart action on Y that can be rebound and unbound", () => {
+    expect(actionFor(DEFAULTS, "y")).toBe("chart_replay");
+    expect(ACTIONS.find((a) => a.id === "chart_replay")?.category).toBe("chart");
+    const next = rebind(DEFAULTS, "chart_replay", "j");
+    expect(actionFor(next, "j")).toBe("chart_replay");
+    expect(actionFor(next, "y")).toBe("chart_split");
+    expect(actionFor({ ...DEFAULTS, chart_replay: "" }, "y")).toBeNull();
+  });
+  it("does not use the replay control keys", () => {
+    for (const key of [" ", "Escape", "ArrowLeft", "ArrowRight"]) expect(actionFor(DEFAULTS, key)).toBeNull();
+    expect(bindKey(down(" "))).toBeNull();
+    expect(bindKey(down("Escape"))).toBeNull();
+  });
+  it("blocks panels, drawing and the second chart during replay", () => {
+    for (const id of ["chart_replay", "chart_mode", "chart_scale", "technicals", "analyze", "settings"] as const) expect(replayAllows(id)).toBe(true);
+    for (const id of ["news", "earnings", "analysts", "options", "market", "events", "alerts", "toggle_watchlist", "chart_split", "draw_level", "draw_pen"] as const) expect(replayAllows(id)).toBe(false);
   });
 });
 
