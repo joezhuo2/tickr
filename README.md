@@ -117,6 +117,10 @@ taskbar to keep it visible.
 - **Sessions and time zone:** extended-hours candles can be shown or hidden on
   the chart without changing the tray quote setting. Pre- and post-market
   sessions are shaded, and chart times can use the exchange or local time zone.
+- **Second chart:** the toggle (J by default) opens a second chart pane, side by
+  side or stacked, with its own symbol and range. Crosshair time is linked
+  across both charts, and an optional sync toggle moves both to the same time
+  window. The layout is saved; a single chart is the default.
 - **Recent symbols and history:** focus the empty search box to see the last
   10 symbols you viewed. The Back and Forward buttons (or Alt+Left and
   Alt+Right) step through this session's symbols, and B jumps to the previous
@@ -293,6 +297,7 @@ typing in a text field.
 | | `3` | Draw text |
 | | `4` | Ruler |
 | | `5` | Pen |
+| | `J` | Toggle second chart |
 | | `V` | Cycle date range |
 | | `R` | Refresh |
 | Panels | `T` | Open Technicals |
@@ -441,8 +446,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.10.21
-git push origin v0.10.21
+git tag v0.10.22
+git push origin v0.10.22
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
