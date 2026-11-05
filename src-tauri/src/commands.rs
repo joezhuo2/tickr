@@ -371,19 +371,22 @@ pub fn add_alert(app: AppHandle, shared: State<'_, Arc<Shared>>, symbol: String,
         return Err(format!("Cooldown can be at most {} minutes.", alerts::MAX_COOLDOWN_MINS));
     }
     notification_permission(&app)?;
-    let result = edit_alerts(&shared, |alerts| {
-        if alerts.len() >= alerts::MAX_ALERTS {
-            return Err(format!("You can save up to {} alerts. Delete one first.", alerts::MAX_ALERTS));
-        }
-        if alerts.iter().any(|a| a.symbol == symbol && a.kind == kind && a.direction == direction && a.level == level) {
-            return Err("An alert for this symbol, kind, direction and level already exists.".into());
-        }
-        let id = alerts.iter().map(|a| a.id).max().unwrap_or(0).checked_add(1).ok_or("Alert IDs exhausted.")?;
-        alerts.push(PriceAlert { id, symbol, direction, level, enabled: true, triggered_at: None, kind, reference: None, recurring, cooldown_mins, regular_only });
-        Ok(())
-    })?;
+    let result = edit_alerts(&shared, |alerts| alerts::add(alerts, symbol, kind, direction, level, recurring, cooldown_mins, regular_only))?;
     shared.wake.notify_one();
     Ok(result)
+}
+
+#[tauri::command]
+pub fn update_alert(shared: State<'_, Arc<Shared>>, id: u32, level: f64, direction: Direction) -> Result<Vec<PriceAlert>, String> {
+    let result = edit_alerts(&shared, |alerts| alerts::update(alerts, id, level, direction))?;
+    lock(&shared.alert_prices).remove(&id);
+    shared.wake.notify_one();
+    Ok(result)
+}
+
+#[tauri::command]
+pub fn duplicate_alert(shared: State<'_, Arc<Shared>>, id: u32) -> Result<Vec<PriceAlert>, String> {
+    edit_alerts(&shared, |alerts| alerts::duplicate(alerts, id))
 }
 
 #[tauri::command]
@@ -391,15 +394,7 @@ pub fn set_alert_enabled(app: AppHandle, shared: State<'_, Arc<Shared>>, id: u32
     if enabled {
         notification_permission(&app)?;
     }
-    let result = edit_alerts(&shared, |alerts| {
-        let alert = alerts.iter_mut().find(|a| a.id == id).ok_or("Alert no longer exists.")?;
-        alert.enabled = enabled;
-        if enabled {
-            alert.triggered_at = None;
-            alert.reference = None;
-        }
-        Ok(())
-    })?;
+    let result = edit_alerts(&shared, |alerts| alerts::set_enabled(alerts, id, enabled))?;
     shared.wake.notify_one();
     Ok(result)
 }
@@ -862,7 +857,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let shared = Shared::new(dir.path().join("settings.json"), Default::default());
         edit_alerts(&shared, |alerts| {
-            alerts.push(PriceAlert { id: 1, symbol: "AAPL".into(), direction: Direction::Above, level: 100.0, enabled: true, triggered_at: None, kind: AlertKind::Price, reference: None, recurring: false, cooldown_mins: 15, regular_only: false });
+            alerts.push(PriceAlert { id: 1, symbol: "AAPL".into(), direction: Direction::Above, level: 100.0, enabled: true, triggered_at: None, kind: AlertKind::Price, reference: None, recurring: false, cooldown_mins: 15, regular_only: false, triggered_price: None });
             Ok(())
         }).unwrap();
         lock(&shared.alert_prices).insert(1, 99.0);
@@ -884,7 +879,7 @@ mod tests {
         std::fs::write(&blocker, "not a directory").unwrap();
         let shared = Shared::new(blocker.join("settings.json"), Default::default());
         assert!(edit_alerts(&shared, |alerts| {
-            alerts.push(PriceAlert { id: 1, symbol: "AAPL".into(), direction: Direction::Above, level: 100.0, enabled: true, triggered_at: None, kind: AlertKind::Price, reference: None, recurring: false, cooldown_mins: 15, regular_only: false });
+            alerts.push(PriceAlert { id: 1, symbol: "AAPL".into(), direction: Direction::Above, level: 100.0, enabled: true, triggered_at: None, kind: AlertKind::Price, reference: None, recurring: false, cooldown_mins: 15, regular_only: false, triggered_price: None });
             Ok(())
         }).is_err());
         assert!(lock(&shared.settings).alerts.is_empty());

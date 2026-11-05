@@ -118,6 +118,8 @@ pub fn run() {
             commands::clear_ai_key,
             commands::add_alert,
             commands::set_alert_enabled,
+            commands::update_alert,
+            commands::duplicate_alert,
             commands::delete_alert,
             commands::get_logo,
             commands::open_logo_credit,

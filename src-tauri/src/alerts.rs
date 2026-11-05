@@ -66,6 +66,106 @@ pub struct PriceAlert {
     pub cooldown_mins: u32,
     #[serde(default)]
     pub regular_only: bool,
+    #[serde(default)]
+    pub triggered_price: Option<f64>,
+}
+
+fn has_twin(alerts: &[PriceAlert], symbol: &str, kind: AlertKind, direction: Direction, level: f64, ignoring: Option<u32>) -> bool {
+    alerts.iter().any(|a| {
+        Some(a.id) != ignoring && a.symbol == symbol && a.kind == kind && a.direction == direction && a.level == level
+    })
+}
+
+pub fn ensure_room(alerts: &[PriceAlert]) -> Result<(), String> {
+    if alerts.len() >= MAX_ALERTS {
+        return Err(format!("You can save up to {MAX_ALERTS} alerts. Delete one first."));
+    }
+    Ok(())
+}
+
+fn next_id(alerts: &[PriceAlert]) -> Result<u32, String> {
+    alerts.iter().map(|a| a.id).max().unwrap_or(0).checked_add(1).ok_or_else(|| "Alert IDs exhausted.".to_string())
+}
+
+fn position(alerts: &[PriceAlert], id: u32) -> Result<usize, String> {
+    alerts.iter().position(|a| a.id == id).ok_or_else(|| "Alert no longer exists.".to_string())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn add(
+    alerts: &mut Vec<PriceAlert>,
+    symbol: String,
+    kind: AlertKind,
+    direction: Direction,
+    level: f64,
+    recurring: bool,
+    cooldown_mins: u32,
+    regular_only: bool,
+) -> Result<(), String> {
+    ensure_room(alerts)?;
+    if has_twin(alerts, &symbol, kind, direction, level, None) {
+        return Err("An alert for this symbol, kind, direction and level already exists.".into());
+    }
+    let id = next_id(alerts)?;
+    alerts.push(PriceAlert {
+        id,
+        symbol,
+        direction,
+        level,
+        enabled: true,
+        triggered_at: None,
+        kind,
+        reference: None,
+        recurring,
+        cooldown_mins,
+        regular_only,
+        triggered_price: None,
+    });
+    Ok(())
+}
+
+pub fn set_enabled(alerts: &mut [PriceAlert], id: u32, enabled: bool) -> Result<(), String> {
+    let index = position(alerts, id)?;
+    let alert = &mut alerts[index];
+    alert.enabled = enabled;
+    if enabled {
+        alert.triggered_at = None;
+        alert.triggered_price = None;
+        alert.reference = None;
+    }
+    Ok(())
+}
+
+pub fn update(alerts: &mut [PriceAlert], id: u32, level: f64, direction: Direction) -> Result<(), String> {
+    let index = position(alerts, id)?;
+    let current = &alerts[index];
+    validate(&current.symbol, level, current.kind, direction)?;
+    let moved = current.level != level || current.direction != direction;
+    if moved && has_twin(alerts, &current.symbol, current.kind, direction, level, Some(id)) {
+        return Err("An alert for this symbol, kind, direction and level already exists.".into());
+    }
+    let alert = &mut alerts[index];
+    if alert.direction != direction && alert.kind.tracks_reference() {
+        alert.reference = None;
+    }
+    alert.level = level;
+    alert.direction = direction;
+    Ok(())
+}
+
+pub fn duplicate(alerts: &mut Vec<PriceAlert>, id: u32) -> Result<(), String> {
+    let index = position(alerts, id)?;
+    ensure_room(alerts)?;
+    let copy = PriceAlert {
+        id: next_id(alerts)?,
+        enabled: false,
+        triggered_at: None,
+        triggered_price: None,
+        reference: None,
+        ..alerts[index].clone()
+    };
+    alerts.insert(index + 1, copy);
+    Ok(())
 }
 
 pub fn validate(symbol: &str, level: f64, kind: AlertKind, direction: Direction) -> Result<String, String> {
@@ -190,6 +290,7 @@ fn evaluate(
                 continue;
             }
             alert.triggered_at = Some(now);
+            alert.triggered_price = Some(current);
             if alert.recurring {
                 prices.insert(alert.id, current);
                 if tracks {
@@ -375,6 +476,21 @@ mod tests {
         assert!(!a.recurring);
         assert_eq!(a.cooldown_mins, 15);
         assert!(!a.regular_only);
+        assert_eq!(a.triggered_price, None);
+    }
+
+    #[test]
+    fn old_json_triggered_alert_keeps_time_and_has_no_price() {
+        let a: PriceAlert = serde_json::from_str(
+            r#"{"id":4,"symbol":"AAPL","direction":"below","level":150.0,"enabled":false,"triggered_at":1700000000,"kind":"price","recurring":false}"#,
+        )
+        .unwrap();
+        assert_eq!(a.triggered_at, Some(1_700_000_000));
+        assert_eq!(a.triggered_price, None);
+        assert!(!a.enabled);
+        let saved = serde_json::to_string(&PriceAlert { triggered_price: Some(149.5), ..a }).unwrap();
+        let back: PriceAlert = serde_json::from_str(&saved).unwrap();
+        assert_eq!(back.triggered_price, Some(149.5));
     }
 
     fn alert(id: u32, symbol: &str, enabled: bool) -> PriceAlert {
@@ -390,6 +506,7 @@ mod tests {
             recurring: false,
             cooldown_mins: 15,
             regular_only: false,
+            triggered_price: None,
         }
     }
 
@@ -646,5 +763,204 @@ mod tests {
         assert_eq!(describe(&day, "AAPL", 188.2, "USD"), "AAPL is 188.2000 USD, down 5% from yesterday's close.");
         let trail = PriceAlert { reference: Some(198.1), ..kind_alert(AlertKind::TrailPercent, Direction::Below, 5.0) };
         assert_eq!(describe(&trail, "AAPL", 188.2, "USD"), "AAPL is 188.2000 USD, 5% below its 198.1000 high.");
+    }
+
+    #[test]
+    fn firing_records_trigger_price_and_time() {
+        let mut alerts = vec![alert(1, "AAPL", true)];
+        let mut prices = HashMap::new();
+        run(&mut alerts, &mut prices, obs(99.0), 1);
+        assert_eq!(run(&mut alerts, &mut prices, obs(101.5), 50), (true, 1));
+        assert_eq!(alerts[0].triggered_at, Some(50));
+        assert_eq!(alerts[0].triggered_price, Some(101.5));
+    }
+
+    #[test]
+    fn failed_dispatch_records_no_trigger() {
+        let mut alerts = vec![alert(1, "AAPL", true)];
+        let mut prices = HashMap::from([(1, 99.0)]);
+        assert!(!evaluate(&mut alerts, &mut prices, "AAPL", &obs(101.0), 2, |_, _| false));
+        assert_eq!(alerts[0].triggered_at, None);
+        assert_eq!(alerts[0].triggered_price, None);
+    }
+
+    #[test]
+    fn recurring_refire_replaces_trigger_price() {
+        let mut alerts = vec![PriceAlert { recurring: true, cooldown_mins: 0, ..alert(1, "AAPL", true) }];
+        let mut prices = HashMap::new();
+        run(&mut alerts, &mut prices, obs(99.0), 1);
+        run(&mut alerts, &mut prices, obs(101.0), 2);
+        assert_eq!(alerts[0].triggered_price, Some(101.0));
+        run(&mut alerts, &mut prices, obs(99.0), 3);
+        run(&mut alerts, &mut prices, obs(104.0), 4);
+        assert_eq!((alerts[0].triggered_at, alerts[0].triggered_price), (Some(4), Some(104.0)));
+    }
+
+    #[test]
+    fn rearming_clears_trigger_details_but_pausing_keeps_them() {
+        let mut alerts = vec![PriceAlert { recurring: true, triggered_at: Some(5), triggered_price: Some(101.0), ..alert(1, "AAPL", true) }];
+        set_enabled(&mut alerts, 1, false).unwrap();
+        assert!(!alerts[0].enabled);
+        assert_eq!((alerts[0].triggered_at, alerts[0].triggered_price), (Some(5), Some(101.0)));
+        set_enabled(&mut alerts, 1, true).unwrap();
+        assert!(alerts[0].enabled);
+        assert_eq!((alerts[0].triggered_at, alerts[0].triggered_price), (None, None));
+        assert!(set_enabled(&mut alerts, 9, true).is_err());
+    }
+
+    #[test]
+    fn paused_alert_never_fires_even_when_price_crosses() {
+        let mut alerts = vec![alert(1, "AAPL", true)];
+        let mut prices = HashMap::new();
+        run(&mut alerts, &mut prices, obs(99.0), 1);
+        set_enabled(&mut alerts, 1, false).unwrap();
+        for (now, p) in [(2, 101.0), (3, 90.0), (4, 150.0)] {
+            assert!(!evaluate(&mut alerts, &mut prices, "AAPL", &obs(p), now, |_, _| panic!("paused alert fired")));
+        }
+        assert_eq!((alerts[0].triggered_at, alerts[0].triggered_price), (None, None));
+        assert!(!alerts[0].enabled);
+    }
+
+    #[test]
+    fn paused_recurring_and_trailing_alerts_never_fire() {
+        let mut alerts = vec![
+            PriceAlert { recurring: true, cooldown_mins: 0, ..alert(1, "AAPL", true) },
+            PriceAlert { reference: Some(120.0), id: 2, ..kind_alert(AlertKind::TrailAmount, Direction::Below, 5.0) },
+        ];
+        let mut prices = HashMap::from([(1, 99.0), (2, 118.0)]);
+        set_enabled(&mut alerts, 1, false).unwrap();
+        set_enabled(&mut alerts, 2, false).unwrap();
+        assert!(!evaluate(&mut alerts, &mut prices, "AAPL", &obs(101.0), 1, |_, _| panic!("paused fired")));
+        assert!(!evaluate(&mut alerts, &mut prices, "AAPL", &obs(100.0), 2, |_, _| panic!("paused fired")));
+        assert_eq!(alerts[1].reference, Some(120.0));
+    }
+
+    #[test]
+    fn resumed_alert_needs_a_fresh_baseline_before_firing() {
+        let mut alerts = vec![alert(1, "AAPL", true)];
+        let mut prices = HashMap::new();
+        run(&mut alerts, &mut prices, obs(99.0), 1);
+        set_enabled(&mut alerts, 1, false).unwrap();
+        prices.remove(&1);
+        set_enabled(&mut alerts, 1, true).unwrap();
+        assert_eq!(run(&mut alerts, &mut prices, obs(120.0), 2), (false, 0));
+        assert_eq!(run(&mut alerts, &mut prices, obs(99.0), 3), (false, 0));
+        assert_eq!(run(&mut alerts, &mut prices, obs(101.0), 4), (true, 1));
+    }
+
+    #[test]
+    fn update_changes_level_and_direction_and_keeps_state() {
+        let mut alerts = vec![PriceAlert { enabled: false, triggered_at: Some(7), triggered_price: Some(101.0), ..alert(1, "AAPL", true) }];
+        update(&mut alerts, 1, 120.5, Direction::Below).unwrap();
+        assert_eq!((alerts[0].level, alerts[0].direction), (120.5, Direction::Below));
+        assert!(!alerts[0].enabled);
+        assert_eq!((alerts[0].triggered_at, alerts[0].triggered_price), (Some(7), Some(101.0)));
+        assert_eq!(alerts[0].symbol, "AAPL");
+    }
+
+    #[test]
+    fn update_validates_like_add_and_reports_missing_alerts() {
+        let mut alerts = vec![alert(1, "AAPL", true), kind_alert(AlertKind::DayPercent, Direction::Above, 5.0)];
+        alerts[1].id = 2;
+        for bad in [f64::NAN, f64::INFINITY, 0.0, -3.0] {
+            assert!(update(&mut alerts, 1, bad, Direction::Above).is_err());
+        }
+        assert!(update(&mut alerts, 2, 100.0, Direction::Below).is_err());
+        assert!(update(&mut alerts, 2, 99.0, Direction::Below).is_ok());
+        assert_eq!(update(&mut alerts, 9, 10.0, Direction::Above).unwrap_err(), "Alert no longer exists.");
+        assert_eq!(alerts[0].level, 100.0);
+    }
+
+    #[test]
+    fn update_rejects_a_twin_but_allows_saving_unchanged_values() {
+        let mut alerts = vec![alert(1, "AAPL", true), PriceAlert { level: 110.0, ..alert(2, "AAPL", true) }, alert(3, "AAPL", false)];
+        assert!(update(&mut alerts, 2, 100.0, Direction::Above).is_err());
+        assert_eq!(alerts[1].level, 110.0);
+        assert!(update(&mut alerts, 1, 100.0, Direction::Above).is_ok());
+        assert!(update(&mut alerts, 1, 100.0, Direction::Below).is_ok());
+        alerts.push(alert(4, "MSFT", true));
+        assert!(update(&mut alerts, 4, 110.0, Direction::Above).is_ok());
+    }
+
+    #[test]
+    fn update_resets_trailing_reference_only_when_direction_changes() {
+        let mut alerts = vec![PriceAlert { reference: Some(120.0), ..kind_alert(AlertKind::TrailAmount, Direction::Below, 5.0) }];
+        update(&mut alerts, 1, 8.0, Direction::Below).unwrap();
+        assert_eq!(alerts[0].reference, Some(120.0));
+        update(&mut alerts, 1, 8.0, Direction::Above).unwrap();
+        assert_eq!(alerts[0].reference, None);
+        let mut plain = vec![PriceAlert { reference: Some(1.0), ..alert(1, "AAPL", true) }];
+        update(&mut plain, 1, 100.0, Direction::Below).unwrap();
+        assert_eq!(plain[0].reference, Some(1.0));
+    }
+
+    #[test]
+    fn edited_level_applies_to_the_next_crossing() {
+        let mut alerts = vec![alert(1, "AAPL", true)];
+        let mut prices = HashMap::new();
+        run(&mut alerts, &mut prices, obs(99.0), 1);
+        update(&mut alerts, 1, 105.0, Direction::Above).unwrap();
+        prices.remove(&1);
+        assert_eq!(run(&mut alerts, &mut prices, obs(101.0), 2), (false, 0));
+        assert_eq!(run(&mut alerts, &mut prices, obs(105.0), 3), (true, 1));
+    }
+
+    #[test]
+    fn duplicate_creates_a_paused_copy_right_after_the_original() {
+        let mut alerts = vec![
+            PriceAlert {
+                recurring: true,
+                cooldown_mins: 30,
+                regular_only: true,
+                triggered_at: Some(9),
+                triggered_price: Some(101.0),
+                reference: Some(98.0),
+                ..alert(1, "AAPL", true)
+            },
+            alert(5, "MSFT", true),
+        ];
+        duplicate(&mut alerts, 1).unwrap();
+        assert_eq!(alerts.iter().map(|a| a.id).collect::<Vec<_>>(), [1, 6, 5]);
+        let copy = &alerts[1];
+        assert_eq!((copy.symbol.as_str(), copy.level, copy.direction, copy.kind), ("AAPL", 100.0, Direction::Above, AlertKind::Price));
+        assert!(copy.recurring && copy.regular_only);
+        assert_eq!(copy.cooldown_mins, 30);
+        assert!(!copy.enabled);
+        assert_eq!((copy.triggered_at, copy.triggered_price, copy.reference), (None, None, None));
+        assert!(alerts[0].enabled);
+        assert_eq!(alerts[0].triggered_at, Some(9));
+    }
+
+    #[test]
+    fn duplicate_never_fires_and_respects_limits() {
+        let mut alerts = vec![alert(1, "AAPL", true)];
+        duplicate(&mut alerts, 1).unwrap();
+        let mut prices = HashMap::new();
+        let mut sent = Vec::new();
+        for (now, p) in [(1, 99.0), (2, 101.0)] {
+            evaluate(&mut alerts, &mut prices, "AAPL", &obs(p), now, |a, _| {
+                sent.push(a.id);
+                true
+            });
+        }
+        assert_eq!(sent, [1]);
+        assert_eq!(alerts[1].triggered_at, None);
+        assert_eq!(duplicate(&mut alerts, 9).unwrap_err(), "Alert no longer exists.");
+        let mut full: Vec<_> = (1..=MAX_ALERTS as u32).map(|i| alert(i, "AAPL", true)).collect();
+        assert!(duplicate(&mut full, 1).is_err());
+        assert_eq!(full.len(), MAX_ALERTS);
+    }
+
+    #[test]
+    fn add_rejects_twins_and_full_lists() {
+        let mut alerts = Vec::new();
+        let add_one = |alerts: &mut Vec<PriceAlert>, level| add(alerts, "AAPL".into(), AlertKind::Price, Direction::Above, level, false, 15, false);
+        add_one(&mut alerts, 100.0).unwrap();
+        assert!(add_one(&mut alerts, 100.0).is_err());
+        add_one(&mut alerts, 101.0).unwrap();
+        assert_eq!(alerts.iter().map(|a| a.id).collect::<Vec<_>>(), [1, 2]);
+        assert!(alerts.iter().all(|a| a.enabled && a.triggered_price.is_none()));
+        let mut full: Vec<_> = (1..=MAX_ALERTS as u32).map(|i| alert(i, "AAPL", true)).collect();
+        assert!(add_one(&mut full, 7.0).is_err());
     }
 }
