@@ -36,6 +36,7 @@ export const ACTIONS: { id: Action; label: string; category: Category }[] = [
   { id: "events", label: "Open Events", category: "panels" },
   { id: "news", label: "Open News", category: "panels" },
   { id: "options", label: "Open Options", category: "panels" },
+  { id: "paper", label: "Open Paper trading", category: "panels" },
   { id: "options_side", label: "Switch calls / puts", category: "options" },
   { id: "options_expiry", label: "Next expiry date", category: "options" },
   { id: "toggle_watchlist", label: "Toggle Watchlist", category: "watchlist" },
@@ -73,7 +74,7 @@ export function rebind(binds: Keybinds, id: Action, key: string): Keybinds {
   return next;
 }
 
-const REPLAY_ACTIONS = new Set<Action>(["chart_mode", "chart_scale", "chart_interval", "chart_replay", "range", "refresh", "technicals", "analyze", "search", "previous_symbol", "watchlist", "add_watchlist", "settings"]);
+const REPLAY_ACTIONS = new Set<Action>(["chart_mode", "chart_scale", "chart_interval", "chart_replay", "range", "refresh", "technicals", "paper", "analyze", "search", "previous_symbol", "watchlist", "add_watchlist", "settings"]);
 
 export function replayAllows(action: Action): boolean {
   return REPLAY_ACTIONS.has(action);

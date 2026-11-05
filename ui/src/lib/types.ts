@@ -249,6 +249,7 @@ export interface Keybinds {
   news: string;
   analyze: string;
   options: string;
+  paper: string;
   options_side: string;
   options_expiry: string;
   add_watchlist: string;
