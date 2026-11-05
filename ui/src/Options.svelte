@@ -1,6 +1,8 @@
 <script lang="ts">
   import { tick } from "svelte";
   import { change, direction, num, volume } from "./lib/format";
+  import { addLeg, entryPrice, makeLeg, type Leg, type LegSide, type PriceMode, type SavedStrategy } from "./lib/payoff";
+  import Strategy from "./Strategy.svelte";
   import type { OptionContract, Options } from "./lib/types";
 
   let {
@@ -20,6 +22,10 @@
   let text = $state("");
   let wrap = $state<HTMLDivElement>();
   let mid = $state<HTMLElement>();
+  let legs = $state<Leg[]>([]);
+  let saved = $state<SavedStrategy[]>([]);
+  let mode = $state<PriceMode>("mid");
+  let loadedExpiry: number | null | undefined;
 
   const iso = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
   const dates = $derived(new Map((options?.expirations ?? []).map((t) => [iso(t), t])));
@@ -31,6 +37,20 @@
   $effect(() => {
     if (options?.expiry != null) text = iso(options.expiry);
   });
+
+  $effect(() => {
+    const expiry = options?.expiry ?? null;
+    if (expiry === loadedExpiry) return;
+    loadedExpiry = expiry;
+    legs = [];
+    saved = [];
+  });
+
+  function add(c: OptionContract, action: LegSide) {
+    const kind = side === "calls" ? "call" : "put";
+    const price = entryPrice(c, action, mode) ?? 0;
+    legs = addLeg(legs, makeLeg({ kind, side: action, strike: c.strike, quantity: 1, price }));
+  }
 
   $effect(() => {
     if (!options || !wrap) return;
@@ -65,6 +85,10 @@
     <td>{volume(c.open_interest)}</td>
     <td>{c.iv == null ? "—" : `${(c.iv * 100).toFixed(1)}%`}</td>
     <td class="when">{traded(c.last_trade)}</td>
+    <td class="add">
+      <button onclick={() => add(c, "long")} aria-label="Buy {side === 'calls' ? 'call' : 'put'} at strike {num(c.strike)}">Buy</button>
+      <button onclick={() => add(c, "short")} aria-label="Sell {side === 'calls' ? 'call' : 'put'} at strike {num(c.strike)}">Sell</button>
+    </td>
   </tr>
 {/snippet}
 
@@ -99,33 +123,41 @@
     </datalist>
     {#if error}<span class="err">{error} <button class="retry" onclick={onretry}>Retry</button></span>{/if}
   </div>
-  {#if rows.length === 0}
-    <div class="msg">No {side} for this expiry.</div>
-  {:else}
-    <div class="wrap" bind:this={wrap}>
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">Strike</th>
-            <th scope="col">Last</th>
-            <th scope="col">Bid / Ask</th>
-            <th scope="col">Change</th>
-            <th scope="col">Volume</th>
-            <th scope="col">Open int.</th>
-            <th scope="col">IV</th>
-            <th scope="col">Last trade</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each above as c (c.symbol)}{@render row(c)}{/each}
-          <tr class="mid" bind:this={mid}>
-            <td colspan="8">{price == null ? "—" : num(price)}</td>
-          </tr>
-          {#each below as c (c.symbol)}{@render row(c)}{/each}
-        </tbody>
-      </table>
+  <div class="body">
+    <div class="chain">
+      {#if rows.length === 0}
+        <div class="msg">No {side} for this expiry.</div>
+      {:else}
+        <div class="wrap" bind:this={wrap}>
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Strike</th>
+                <th scope="col">Last</th>
+                <th scope="col">Bid / Ask</th>
+                <th scope="col">Change</th>
+                <th scope="col">Volume</th>
+                <th scope="col">Open int.</th>
+                <th scope="col">IV</th>
+                <th scope="col">Last trade</th>
+                <th scope="col">Strategy</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each above as c (c.symbol)}{@render row(c)}{/each}
+              <tr class="mid" bind:this={mid}>
+                <td colspan="9">{price == null ? "—" : num(price)}</td>
+              </tr>
+              {#each below as c (c.symbol)}{@render row(c)}{/each}
+            </tbody>
+          </table>
+        </div>
+      {/if}
     </div>
-  {/if}
+    <div class="side">
+      <Strategy {options} bind:legs bind:saved bind:mode />
+    </div>
+  </div>
 {/if}
 
 <style>
@@ -148,6 +180,56 @@
   }
   input {
     width: 110px;
+  }
+  .body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    gap: 12px;
+  }
+  .chain {
+    flex: 1.2 1 0;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .side {
+    flex: 1 1 0;
+    min-width: 340px;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--faint);
+    padding-left: 8px;
+  }
+  @media (max-width: 900px) {
+    .body {
+      flex-direction: column;
+    }
+    .side {
+      min-width: 0;
+      border-left: 0;
+      padding-left: 0;
+      border-top: 1px solid var(--faint);
+    }
+  }
+  .add button {
+    border: 1px solid var(--faint);
+    background: var(--surface);
+    color: inherit;
+    font: inherit;
+    font-size: 11px;
+    border-radius: 5px;
+    padding: 1px 7px;
+    cursor: pointer;
+  }
+  .add button:first-child {
+    color: var(--up);
+    margin-right: 4px;
+  }
+  .add button:last-child {
+    color: var(--down);
   }
   .wrap {
     flex: 1;

@@ -6,6 +6,16 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.16] - 2026-11-04
+
+### Added
+- **Options strategy builder** ([#99](https://github.com/joezhuo2/tickr/issues/99)):
+  add long or short legs from the chain, start from eight presets (long call,
+  long put, covered call, bull call spread, bear put spread, straddle,
+  strangle, iron condor), and see the expiration payoff diagram with
+  break-evens, max profit and loss, and net debit or credit. Up to three saved
+  strategies can be overlaid to compare.
+
 ## [0.10.15] - 2026-11-04
 
 ### Added
