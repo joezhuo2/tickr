@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.20] - 2026-11-04
+
+### Added
+- **Chart session controls** ([#110](https://github.com/joezhuo2/tickr/issues/110)):
+  show or hide extended-hours candles on the chart independently of the tray
+  quote setting, shade pre- and post-market sessions, and show chart times in
+  exchange or local time. Defaults match previous behavior.
+
 ## [0.10.19] - 2026-11-04
 
 ### Added
