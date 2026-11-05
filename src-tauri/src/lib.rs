@@ -96,6 +96,7 @@ pub fn run() {
             commands::set_chart_extended_hours,
             commands::set_chart_shade_sessions,
             commands::set_chart_time_zone,
+            commands::set_chart_layout,
             commands::analyze,
             commands::set_indicators,
             commands::save_indicator_preset,
