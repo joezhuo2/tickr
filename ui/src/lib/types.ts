@@ -8,6 +8,15 @@ export type Palette = "standard" | "accessible";
 export type ChartMode = "line" | "candles";
 export type ChartScale = "linear" | "log" | "percent";
 export type ChartTimeZone = "exchange" | "local";
+export type SplitOrientation = "side" | "stacked";
+export interface ChartLayout {
+  split: boolean;
+  orientation: SplitOrientation;
+  sync_range: boolean;
+  symbol: string;
+  range: string;
+  interval: string;
+}
 export type WatchlistSortKey = "change" | "price" | "volume";
 export type WatchlistSortDir = "desc" | "asc";
 export type WatchlistView = "cards" | "heatmap";
@@ -163,6 +172,7 @@ export interface Init {
   chart_extended_hours: boolean;
   chart_shade_sessions: boolean;
   chart_time_zone: ChartTimeZone;
+  chart_layout: ChartLayout;
   hotkey: string;
   default_hotkey: string;
   /** Why the hotkey is not registered (taken at startup), if it is not. */
@@ -223,6 +233,7 @@ export interface Keybinds {
   draw_text: string;
   draw_ruler: string;
   draw_pen: string;
+  chart_split: string;
   refresh: string;
   range: string;
   technicals: string;

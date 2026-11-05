@@ -23,6 +23,7 @@ export const ACTIONS: { id: Action; label: string; category: Category }[] = [
   { id: "draw_text", label: "Draw text", category: "chart" },
   { id: "draw_ruler", label: "Ruler", category: "chart" },
   { id: "draw_pen", label: "Draw freehand", category: "chart" },
+  { id: "chart_split", label: "Toggle second chart", category: "chart" },
   { id: "range", label: "Cycle date range", category: "chart" },
   { id: "refresh", label: "Refresh", category: "chart" },
   { id: "technicals", label: "Open Technicals", category: "panels" },

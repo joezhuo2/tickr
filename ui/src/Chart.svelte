@@ -9,6 +9,7 @@
   import { untrack } from "svelte";
   import { fadeIn } from "./lib/motion";
   import { follow, full, isFull, pan, reveal, visible, zoom, type View } from "./lib/viewport";
+  import { barAt, viewWindow, windowView, type TimeWindow } from "./lib/chartsync";
 
   let {
     chart,
@@ -26,6 +27,10 @@
     ratings = [],
     news = [],
     staleNote = null,
+    linkedTime = null,
+    onhovertime,
+    linkedWindow = null,
+    onwindow,
   }: {
     chart: Chart | null;
     redrawKey?: number;
@@ -42,6 +47,10 @@
     ratings?: RatingChange[];
     news?: Article[];
     staleNote?: string | null;
+    linkedTime?: number | null;
+    onhovertime?: (t: number | null) => void;
+    linkedWindow?: TimeWindow | null;
+    onwindow?: (w: TimeWindow) => void;
   } = $props();
 
   let wrap: HTMLDivElement | undefined = $state();
@@ -422,6 +431,16 @@
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
       ctx.fillText(label, width - PAD.r + 8, y);
+    } else if (hover == null && linkedIndex >= g.i0 && linkedIndex <= g.i1) {
+      const x = Math.round(g.x(linkedIndex)) + 0.5;
+      ctx.strokeStyle = v("--crosshair");
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x, PAD.t);
+      ctx.lineTo(x, bottom);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
   }
 
@@ -690,7 +709,7 @@
 
   $effect(() => {
     // Redraw when any of these change.
-    void [redrawKey, list, preview, selected, tool, candles, mode, width, height, hover, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt];
+    void [redrawKey, list, preview, selected, tool, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt];
     draw();
   });
 
@@ -747,12 +766,20 @@
     const r = wrap!.getBoundingClientRect();
     if (!e.ctrlKey && (e.shiftKey || Math.abs(dx) >= Math.abs(e.deltaY))) view = pan(view, geo.n, (dx * unit) / geo.step);
     else view = zoom(view, geo.n, Math.exp(e.deltaY * unit * (e.ctrlKey ? 0.01 : 0.0015)), (e.clientX - r.left - PAD.l) / geo.plotW);
+    emitWindow();
     onMove(e);
   }
 
   function resetView() {
     view = full(candles.length);
     hover = null;
+    emitWindow();
+  }
+
+  function emitWindow() {
+    if (!onwindow) return;
+    const w = viewWindow(times, view);
+    if (w) onwindow(w);
   }
 
   type Tool = "cursor" | "hline" | "trend" | "text" | "ruler" | "pen";
@@ -774,6 +801,19 @@
   const drawingSymbol = $derived(chart?.meta.symbol.toUpperCase() ?? "");
   const list = $derived(drawings[drawingSymbol] ?? []);
   const times = $derived(candles.map((c) => c.t));
+  const linkedIndex = $derived(linkedTime == null ? -1 : barAt(times, linkedTime));
+  $effect(() => {
+    const t = hover != null ? (candles[hover]?.t ?? null) : null;
+    untrack(() => onhovertime?.(t));
+  });
+  $effect(() => {
+    const w = linkedWindow;
+    if (!w) return;
+    untrack(() => {
+      const next = windowView(times, w);
+      if (next) view = next;
+    });
+  });
   $effect(() => {
     void drawingSymbol;
     untrack(() => {
@@ -1044,6 +1084,7 @@
       view = pan(view, geo.n, (dragX - e.clientX) / geo.step);
       dragX = e.clientX;
       hover = null;
+      emitWindow();
       return;
     }
     const r = wrap!.getBoundingClientRect();
@@ -1075,6 +1116,7 @@
     else if (e.key === "0") resetView();
     else return;
     if (hover != null) view = reveal(view, geo.n, hover);
+    emitWindow();
     e.preventDefault();
     if (/^[-+=0]$/.test(e.key)) e.stopPropagation();
   }

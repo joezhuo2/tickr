@@ -11,6 +11,7 @@ const DEFAULTS: Keybinds = {
   draw_text: "3",
   draw_ruler: "4",
   draw_pen: "5",
+  chart_split: "j",
   refresh: "r",
   range: "v",
   technicals: "t",
@@ -84,6 +85,17 @@ describe("rebind", () => {
     expect(actionFor(next, "x")).toBe("toggle_watchlist");
     expect(actionFor(next, "w")).toBe("watchlist");
     expect(actionFor({ ...next, toggle_watchlist: "" }, "x")).toBeNull();
+  });
+});
+
+describe("chart_split", () => {
+  it("is a chart action on J that can be rebound and unbound", () => {
+    expect(actionFor(DEFAULTS, "j")).toBe("chart_split");
+    expect(ACTIONS.find((a) => a.id === "chart_split")?.category).toBe("chart");
+    const next = rebind(DEFAULTS, "chart_split", "c");
+    expect(actionFor(next, "c")).toBe("chart_split");
+    expect(actionFor(next, "j")).toBe("chart_mode");
+    expect(actionFor({ ...DEFAULTS, chart_split: "" }, "j")).toBeNull();
   });
 });
 
