@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.13] - 2026-11-04
+
+### Added
+- **Financials tab** ([#92](https://github.com/joezhuo2/tickr/issues/92)):
+  revenue, net income, gross, operating and net margins, and free cash flow
+  history, annual or quarterly, with a trend chart and table.
+
 ## [0.10.12] - 2026-11-04
 
 ### Added
