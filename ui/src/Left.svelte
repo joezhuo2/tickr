@@ -9,6 +9,7 @@
     quote,
     logo,
     analyst,
+    staleNote = null,
     starred,
     onanalysts,
     onstar,
@@ -17,6 +18,7 @@
     quote: Quote | null;
     logo: string | null | undefined;
     analyst: Consensus | null | undefined;
+    staleNote?: string | null;
     starred: boolean;
     onanalysts: () => void;
     onstar: () => void;
@@ -69,6 +71,7 @@
   {#if quote}
     <div class="price">{price(quote.price, quote.currency)}</div>
     <div class="chg {direction(quote.change)}">{change(quote.change, quote.change_pct)}</div>
+    {#if staleNote}<div class="stale" role="status">{staleNote}</div>{/if}
     <div class="session"><i class={quote.session}></i>{SESSION[quote.session]}</div>
     {#if quote.extended}
       <div class="ext">
@@ -258,6 +261,16 @@
   .chg {
     font-weight: 600;
     font-variant-numeric: tabular-nums;
+  }
+  .stale {
+    margin-top: 4px;
+    padding: 3px 6px;
+    border-left: 2px solid #ffb340;
+    border-radius: 3px;
+    background: var(--bg);
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.35;
   }
   .session {
     display: flex;

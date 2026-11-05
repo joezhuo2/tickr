@@ -22,6 +22,7 @@
     earnings = [],
     ratings = [],
     news = [],
+    staleNote = null,
   }: {
     chart: Chart | null;
     redrawKey?: number;
@@ -35,6 +36,7 @@
     earnings?: EarningsReport[];
     ratings?: RatingChange[];
     news?: Article[];
+    staleNote?: string | null;
   } = $props();
 
   let wrap: HTMLDivElement | undefined = $state();
@@ -1091,6 +1093,9 @@
       <button aria-label="Delete" aria-pressed={false} title="Delete (Delete / Backspace)" disabled={selected == null || drawingBusy} onclick={removeDrawing}>Delete</button>
     </div>
   {/if}
+  {#if staleNote}
+    <div class="stale-note" role="status">{staleNote}</div>
+  {/if}
   {#if editing}
     <input class="drawing-input" aria-label="Drawing text" maxlength="200" style:left={`${editing.x}px`} style:top={`${editing.y}px`} bind:value={inputText} onkeydown={textKey} use:focusInput />
   {/if}
@@ -1198,6 +1203,20 @@
   .drawing-tools button[aria-pressed="true"] { background: var(--surface); color: var(--text); }
   .drawing-tools button:disabled { opacity: 0.4; }
   .drawing-input { position: absolute; width: 200px; z-index: 2; }
+  .stale-note {
+    position: absolute;
+    left: 8px;
+    bottom: 30px;
+    max-width: min(420px, calc(100% - 16px));
+    padding: 3px 8px;
+    border-left: 2px solid #ffb340;
+    border-radius: 4px;
+    background: var(--tooltip-bg);
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.35;
+    pointer-events: none;
+  }
   .exports {
     position: absolute;
     top: 8px;
