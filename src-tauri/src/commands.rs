@@ -18,7 +18,7 @@ use crate::options::Options;
 use crate::stats::Section;
 use crate::news::Article;
 use crate::quote::{self, Chart, Quote, SearchHit};
-use crate::settings::{Theme, Palette, validate_text_size, RefreshMode, ChartMode, ChartScale, Dots, Group, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
+use crate::settings::{Theme, Palette, validate_text_size, RefreshMode, ChartMode, ChartScale, Dots, Group, WatchlistSort, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
 use crate::state::{lock, now_secs, QuoteState, Shared};
 
 #[derive(Serialize)]
@@ -49,6 +49,7 @@ pub struct Init {
     /// Starred symbols, in order.
     watchlist: Vec<String>,
     groups: Vec<Group>,
+    watchlist_sort: WatchlistSort,
     keybinds: Keybinds,
     dots: Dots,
     indicators: IndicatorConfig,
@@ -94,6 +95,7 @@ pub fn init_payload(shared: &Shared) -> Init {
         analyst: analyst.flatten(),
         watchlist: s.watchlist,
         groups: s.groups,
+        watchlist_sort: s.watchlist_sort,
         keybinds: s.keybinds,
         dots: s.dots,
         indicators: s.indicators,
@@ -557,6 +559,11 @@ pub fn set_watchlist(shared: State<'_, Arc<Shared>>, symbols: Vec<String>) -> Ve
 #[tauri::command]
 pub fn set_groups(shared: State<'_, Arc<Shared>>, groups: Vec<Group>) -> Vec<Group> {
     shared.update_settings(|s| s.groups = clean_groups(groups, &s.watchlist)).groups
+}
+
+#[tauri::command]
+pub fn set_watchlist_sort(shared: State<'_, Arc<Shared>>, sort: WatchlistSort) {
+    shared.update_settings(|s| s.watchlist_sort = sort);
 }
 
 #[derive(Serialize)]

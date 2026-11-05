@@ -6,6 +6,12 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.11] - 2026-11-04
+
+### Added
+- **Watchlist sorting**: the watchlist can be sorted by price, change or volume,
+  and your choice is saved.
+
 ## [0.10.10] - 2026-11-04
 
 ### Added

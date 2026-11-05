@@ -1,26 +1,31 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { untrack } from "svelte";
-  import { byGain, direction, price, sessionMove, signed } from "./lib/format";
-  import type { Group, RefreshMode, WatchQuote } from "./lib/types";
+  import { direction, price, sessionMove, signed, volume } from "./lib/format";
+  import { WATCHLIST_SORT_KEYS, nextSort, sortSymbols } from "./lib/watchlistSort";
+  import type { Group, RefreshMode, WatchQuote, WatchlistSort } from "./lib/types";
 
   let {
     symbols,
     refreshMode,
     groups,
     current,
+    sort,
     tab = $bindable(),
     onopen,
     ongroups,
+    onsort,
   }: {
     symbols: string[];
     refreshMode: RefreshMode;
     groups: Group[];
     /** The symbol shown in the chart, highlighted. */
     current: string;
+    sort: WatchlistSort;
     tab: string | null;
     onopen: (symbol: string) => void;
     ongroups: (groups: Group[]) => void;
+    onsort: (sort: WatchlistSort) => void;
   } = $props();
 
   const REFRESH_MS = 60_000;
@@ -81,8 +86,13 @@
     const next = has ? group.symbols.filter((s) => s !== symbol) : [...group.symbols, symbol];
     ongroups(groups.map((g) => (g.name === group.name ? { ...g, symbols: next } : g)));
   }
-  // Biggest gain first, by the move of the session now trading.
-  const order = $derived(byGain(shown, (s) => moves[s]?.pct));
+  const order = $derived(
+    sortSymbols(
+      shown,
+      (s, key) => (key === "volume" ? quotes[s]?.quote?.volume : key === "price" ? moves[s]?.price : moves[s]?.pct),
+      sort,
+    ),
+  );
 
   let loadedAt = 0;
   let loading = false;
@@ -186,6 +196,17 @@
       <p class="hint">Click Edit to pick some from your starred stocks.</p>
     </div>
   {:else}
+    <div class="sort" role="group" aria-label="Sort watchlist">
+      {#each WATCHLIST_SORT_KEYS as k (k.key)}
+        {@const on = sort.key === k.key}
+        <button
+          class:on
+          aria-pressed={on}
+          aria-label={on ? `${k.label}, sorted ${sort.dir === "desc" ? "high to low" : "low to high"}` : `Sort by ${k.label}`}
+          onclick={() => onsort(nextSort(sort, k.key))}
+        >{k.label}{on ? (sort.dir === "desc" ? " ↓" : " ↑") : ""}</button>
+      {/each}
+    </div>
     <div class="grid" class:editing>
       {#each order as symbol (symbol)}
         {@const w = quotes[symbol]}
@@ -201,6 +222,7 @@
           <span class="top">
             <span class="sym">{symbol}</span>
             {#if q}<span class="dot {q.session}"></span>{/if}
+            {#if q && sort.key === "volume"}<span class="vol">{volume(q.volume)}</span>{/if}
           </span>
           {#if q}
             <span class="name">{q.name || q.exchange || "—"}</span>
@@ -279,6 +301,37 @@
   .tabs button.on {
     background: var(--surface);
     color: var(--text);
+  }
+  .sort {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-top: 6px;
+    flex: none;
+  }
+  .sort button {
+    border: 0;
+    background: none;
+    padding: 2px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .sort button:hover {
+    color: var(--text);
+  }
+  .sort button.on {
+    background: var(--surface);
+    color: var(--text);
+  }
+  .vol {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
   }
   .grid {
     --gap: 8px;

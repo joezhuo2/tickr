@@ -40,6 +40,7 @@
     type Earnings,
     type EventsReport,
     type Group,
+    type WatchlistSort,
     type Init,
     type Keybinds,
     type IndicatorConfig,
@@ -56,6 +57,7 @@
   import { refreshOutcome, type RefreshView } from "./lib/refresh";
   import { paneIn } from "./lib/motion";
   import { emptyHistory, goBack, goForward, previous, pushRecent, visit, type History, type Move } from "./lib/history";
+  import { DEFAULT_WATCHLIST_SORT } from "./lib/watchlistSort";
 
   // Injected before load, so the first frame already has real content.
   const boot = window.__TICKR_INIT__ ?? null;
@@ -147,6 +149,7 @@
   let feedSeq = 0;
   let watchlist = $state<string[]>([]);
   let groups = $state<Group[]>([]);
+  let watchlistSort = $state<WatchlistSort>(DEFAULT_WATCHLIST_SORT);
   let groupTab = $state<string | null>(null);
   let alerts = $state<PriceAlert[]>([]);
   let recent = $state<string[]>([]);
@@ -251,6 +254,7 @@
     qs = init.quote;
     watchlist = init.watchlist ?? [];
     groups = init.groups ?? [];
+    watchlistSort = init.watchlist_sort ?? DEFAULT_WATCHLIST_SORT;
     alerts = init.alerts ?? [];
     recent = init.recent_symbols ?? [];
     if (init.logo_known) logo = init.logo;
@@ -489,6 +493,11 @@
   async function saveGroups(next: Group[]) {
     groups = next;
     groups = await invoke<Group[]>("set_groups", { groups: next }).catch(() => next);
+  }
+
+  function saveSort(next: WatchlistSort) {
+    watchlistSort = next;
+    invoke("set_watchlist_sort", { sort: next }).catch(console.warn);
   }
 
   function toggleStar() {
@@ -862,7 +871,7 @@
         {#key view}
           <div class="pane" in:paneIn={view === "watchlist" ? { y: 16, speed: "slow" } : {}}>
             {#if view === "watchlist"}
-              <Watchlist bind:this={watchlistView} {refreshMode} symbols={watchlist} {groups} current={symbol} bind:tab={groupTab} onopen={openWatched} ongroups={saveGroups} />
+              <Watchlist bind:this={watchlistView} {refreshMode} symbols={watchlist} {groups} current={symbol} sort={watchlistSort} bind:tab={groupTab} onopen={openWatched} ongroups={saveGroups} onsort={saveSort} />
             {:else if view === "alerts"}
               <Alerts {symbol} {quote} {alerts} onchange={(next) => (alerts = next)} />
             {:else if view === "analysts"}

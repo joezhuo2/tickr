@@ -7,6 +7,12 @@ export type TextSize = 100 | 110 | 125 | 150;
 export type Palette = "standard" | "accessible";
 export type ChartMode = "line" | "candles";
 export type ChartScale = "linear" | "log" | "percent";
+export type WatchlistSortKey = "change" | "price" | "volume";
+export type WatchlistSortDir = "desc" | "asc";
+export interface WatchlistSort {
+  key: WatchlistSortKey;
+  dir: WatchlistSortDir;
+}
 
 export interface Candle {
   t: number;
@@ -138,6 +144,7 @@ export interface Init {
   /** Starred symbols, in the user's order. */
   watchlist: string[];
   groups: Group[];
+  watchlist_sort: WatchlistSort;
   keybinds: Keybinds;
   dots: Dots;
   indicators: IndicatorConfig;
