@@ -39,6 +39,7 @@ pub struct Shared {
     /// Analyst consensus, with its own Yahoo session and cache.
     pub analysts: Analysts,
     pub financials: crate::financials::Cache,
+    pub calendar: crate::calendar::Cache,
     pub screener: crate::screener::Screener,
     pub quote: Mutex<QuoteState>,
     pub connections: Mutex<crate::connections::Connections>,
@@ -81,6 +82,7 @@ impl Shared {
             http: crate::quote::client(),
             analysts: Analysts::new(),
             financials: Default::default(),
+            calendar: Default::default(),
             screener: crate::screener::Screener::new(),
             quote: Mutex::new(QuoteState::default()),
             connections: Mutex::new(Default::default()),

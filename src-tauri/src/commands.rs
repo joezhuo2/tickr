@@ -20,7 +20,7 @@ use crate::stats::Section;
 use crate::news::Article;
 use crate::quote::{self, Chart, Quote, SearchHit};
 use crate::screener::{self, ScreenRow};
-use crate::settings::{Theme, Palette, validate_text_size, RefreshMode, ChartMode, ChartScale, Dots, Group, WatchlistSort, SavedScreen, ScreenRule, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
+use crate::settings::{EventFilter, Theme, Palette, validate_text_size, RefreshMode, ChartMode, ChartScale, Dots, Group, WatchlistSort, SavedScreen, ScreenRule, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
 use crate::state::{lock, now_secs, QuoteState, Shared};
 
 #[derive(Serialize)]
@@ -53,6 +53,7 @@ pub struct Init {
     groups: Vec<Group>,
     watchlist_sort: WatchlistSort,
     screens: Vec<SavedScreen>,
+    event_filter: EventFilter,
     keybinds: Keybinds,
     dots: Dots,
     indicators: IndicatorConfig,
@@ -100,6 +101,7 @@ pub fn init_payload(shared: &Shared) -> Init {
         groups: s.groups,
         watchlist_sort: s.watchlist_sort,
         screens: s.screens,
+        event_filter: s.event_filter,
         keybinds: s.keybinds,
         dots: s.dots,
         indicators: s.indicators,
@@ -431,7 +433,7 @@ pub async fn get_analyst(shared: State<'_, Arc<Shared>>, symbol: String, force: 
 
 #[tauri::command]
 pub async fn get_earnings(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<Option<Earnings>, String> {
-    crate::earnings::fetch(&shared.analysts, &symbol).await.inspect_err(|e| log::warn!("earnings {symbol}: {e}"))
+    crate::earnings::fetch(&shared.analysts, &shared.calendar, &symbol).await.inspect_err(|e| log::warn!("earnings {symbol}: {e}"))
 }
 
 #[tauri::command]
@@ -502,10 +504,38 @@ pub async fn get_news_feed(shared: State<'_, Arc<Shared>>, symbols: Vec<String>)
     Ok(crate::news::merge(lists))
 }
 
-/// US economic events for the next week from Yahoo's calendar, cached for 15 minutes unless `force`.
 #[tauri::command]
-pub async fn get_events(shared: State<'_, Arc<Shared>>, force: bool) -> Result<crate::events::EventsReport, String> {
-    crate::events::fetch(&shared.analysts, force).await.inspect_err(|e| log::warn!("events: {e}"))
+pub async fn get_events(shared: State<'_, Arc<Shared>>, force: bool, start: Option<String>) -> Result<crate::events::EventsReport, String> {
+    crate::events::fetch(&shared.analysts, start.as_deref(), force).await.inspect_err(|e| log::warn!("events: {e}"))
+}
+
+#[tauri::command]
+pub fn set_event_filter(shared: State<'_, Arc<Shared>>, filter: EventFilter) -> Result<EventFilter, String> {
+    let filter = filter.cleaned()?;
+    shared.update_settings(|s| s.event_filter = filter.clone());
+    Ok(filter)
+}
+
+#[tauri::command]
+pub async fn get_watch_calendar(shared: State<'_, Arc<Shared>>, force: Option<bool>) -> Result<Vec<crate::calendar::Dates>, String> {
+    let symbols = clean_symbols(lock(&shared.settings).watchlist.clone());
+    if symbols.len() > crate::calendar::MAX_SYMBOLS {
+        return Err(format!("The calendar supports at most {} watchlist symbols", crate::calendar::MAX_SYMBOLS));
+    }
+    let (now, force) = (now_secs(), force.unwrap_or(false));
+    let shared: Arc<Shared> = shared.inner().clone();
+    let tasks: Vec<_> = symbols
+        .into_iter()
+        .map(|symbol| {
+            let shared = shared.clone();
+            tauri::async_runtime::spawn(async move { shared.calendar.get(&shared.analysts, &symbol, now, force).await })
+        })
+        .collect();
+    let mut out = Vec::with_capacity(tasks.len());
+    for t in tasks {
+        out.push(t.await.map_err(|e| e.to_string())?);
+    }
+    Ok(out)
 }
 
 /// AI analysis of one event, run when the user opens it.
@@ -715,6 +745,18 @@ mod tests {
         let left = edit_screens(&shared, |s| { s.delete_screen("oversold"); Ok(()) }).unwrap();
         assert!(left.is_empty());
         assert!(Settings::load(&shared.settings_path).screens.is_empty());
+    }
+
+    #[test]
+    fn event_filter_is_saved_cleaned_and_sent_to_the_window() {
+        use crate::settings::EventImportance;
+        let dir = tempfile::tempdir().unwrap();
+        let shared = Shared::new(dir.path().join("settings.json"), Default::default());
+        assert_eq!(init_payload(&shared).event_filter, EventFilter::default());
+        let filter = EventFilter { countries: vec!["gb".into(), "US".into()], importance: EventImportance::Key }.cleaned().unwrap();
+        shared.update_settings(|s| s.event_filter = filter.clone());
+        assert_eq!(init_payload(&shared).event_filter, filter);
+        assert_eq!(Settings::load(&shared.settings_path).event_filter.countries, ["GB", "US"]);
     }
 
     #[test]

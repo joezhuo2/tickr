@@ -105,6 +105,49 @@ pub enum ScreenOp {
     Below,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum EventImportance {
+    #[default]
+    All,
+    Key,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct EventFilter {
+    pub countries: Vec<String>,
+    pub importance: EventImportance,
+}
+
+impl Default for EventFilter {
+    fn default() -> Self {
+        Self { countries: vec!["US".into()], importance: EventImportance::All }
+    }
+}
+
+const MAX_EVENT_COUNTRIES: usize = 100;
+
+impl EventFilter {
+    pub fn cleaned(self) -> Result<Self, String> {
+        let mut countries: Vec<String> = Vec::with_capacity(self.countries.len());
+        for c in self.countries {
+            let c = c.trim().to_uppercase();
+            if !(2..=3).contains(&c.len()) || !c.bytes().all(|b| b.is_ascii_uppercase()) {
+                return Err(format!("Invalid country code {c:?}"));
+            }
+            if !countries.contains(&c) {
+                countries.push(c);
+            }
+        }
+        if countries.len() > MAX_EVENT_COUNTRIES {
+            return Err(format!("At most {MAX_EVENT_COUNTRIES} countries can be selected"));
+        }
+        countries.sort();
+        Ok(Self { countries, importance: self.importance })
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ScreenRule {
     pub kind: ScreenKind,
@@ -410,6 +453,7 @@ pub struct Settings {
     pub groups: Vec<Group>,
     pub watchlist_sort: WatchlistSort,
     pub screens: Vec<SavedScreen>,
+    pub event_filter: EventFilter,
     /// Look for new releases in the background.
     pub auto_update: bool,
     pub keybinds: Keybinds,
@@ -459,6 +503,7 @@ impl Default for Settings {
             groups: Vec::new(),
             watchlist_sort: WatchlistSort::default(),
             screens: Vec::new(),
+            event_filter: EventFilter::default(),
             auto_update: true,
             keybinds: Keybinds::default(),
             dots: Dots::default(),
@@ -723,6 +768,37 @@ mod tests {
         let s = Settings { watchlist_sort: WatchlistSort { key: WatchlistSortKey::Price, dir: WatchlistSortDir::Asc }, ..Settings::default() };
         s.save(&p).unwrap();
         assert_eq!(Settings::load(&p), s);
+    }
+
+    #[test]
+    fn event_filter_defaults_for_old_settings_and_roundtrips() {
+        let old: Settings = serde_json::from_str(r#"{"symbol":"NVDA"}"#).unwrap();
+        assert_eq!(old.event_filter, EventFilter { countries: vec!["US".into()], importance: EventImportance::All });
+        let partial: Settings = serde_json::from_str(r#"{"event_filter":{"importance":"key"}}"#).unwrap();
+        assert_eq!(partial.event_filter, EventFilter { countries: vec!["US".into()], importance: EventImportance::Key });
+        let all: Settings = serde_json::from_str(r#"{"event_filter":{"countries":[]}}"#).unwrap();
+        assert!(all.event_filter.countries.is_empty());
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        let s = Settings { event_filter: EventFilter { countries: vec!["EU".into(), "GB".into()], importance: EventImportance::Key }, ..Settings::default() };
+        s.save(&p).unwrap();
+        assert_eq!(Settings::load(&p), s);
+        assert_eq!(serde_json::to_value(&s.event_filter).unwrap(), serde_json::json!({"countries":["EU","GB"],"importance":"key"}));
+    }
+
+    #[test]
+    fn event_filter_cleaning_normalizes_and_rejects() {
+        let filter = |countries: &[&str]| EventFilter { countries: countries.iter().map(|c| c.to_string()).collect(), importance: EventImportance::Key };
+        let cleaned = filter(&[" gb ", "US", "us", "eu"]).cleaned().unwrap();
+        assert_eq!(cleaned.countries, ["EU", "GB", "US"]);
+        assert_eq!(cleaned.importance, EventImportance::Key);
+        assert!(filter(&[]).cleaned().unwrap().countries.is_empty());
+        for bad in ["", "U", "USAA", "U1", "U S", "\u{e9}\u{e9}"] {
+            assert!(filter(&[bad]).cleaned().is_err(), "{bad:?}");
+        }
+        let many: Vec<String> = (0..101).map(|i| format!("{}{}", (b'A' + (i / 26) as u8) as char, (b'A' + (i % 26) as u8) as char)).collect();
+        assert!(EventFilter { countries: many.clone(), importance: EventImportance::All }.cleaned().is_err());
+        assert_eq!(EventFilter { countries: many[..100].to_vec(), importance: EventImportance::All }.cleaned().unwrap().countries.len(), 100);
     }
 
     fn rule(kind: ScreenKind, op: ScreenOp, value: f64) -> ScreenRule {
