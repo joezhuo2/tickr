@@ -6,6 +6,15 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.19] - 2026-11-04
+
+### Added
+- **Symbol search controls** ([#108](https://github.com/joezhuo2/tickr/issues/108)):
+  filter results by asset type and exchange, exact ticker matches rank first,
+  each result shows exchange, currency (when known) and instrument type, and
+  search returns up to 20 results. Typing a ticker and pressing Enter still
+  opens it directly.
+
 ## [0.10.18] - 2026-11-04
 
 ### Added
