@@ -20,6 +20,7 @@ pub mod options;
 pub mod news;
 pub mod poller;
 pub mod quote;
+pub mod screener;
 pub mod sentiment;
 pub mod settings;
 pub mod stats;
@@ -128,6 +129,9 @@ pub fn run() {
             commands::set_groups,
             commands::set_watchlist_sort,
             commands::get_watch_quotes,
+            commands::get_screener_data,
+            commands::save_screen,
+            commands::delete_screen,
             commands::get_news,
             commands::get_news_feed,
             commands::open_news,

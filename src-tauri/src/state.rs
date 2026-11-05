@@ -38,6 +38,7 @@ pub struct Shared {
     pub http: reqwest::Client,
     /// Analyst consensus, with its own Yahoo session and cache.
     pub analysts: Analysts,
+    pub screener: crate::screener::Screener,
     pub quote: Mutex<QuoteState>,
     pub connections: Mutex<crate::connections::Connections>,
     /// Wakes the poller early (symbol changed).
@@ -78,6 +79,7 @@ impl Shared {
             settings_path,
             http: crate::quote::client(),
             analysts: Analysts::new(),
+            screener: crate::screener::Screener::new(),
             quote: Mutex::new(QuoteState::default()),
             connections: Mutex::new(Default::default()),
             wake: Notify::new(),
