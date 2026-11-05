@@ -39,6 +39,7 @@
     type Consensus,
     type Dots,
     type Earnings,
+    type EventFilter,
     type EventsReport,
     type Financials,
     type Group,
@@ -53,6 +54,7 @@
     type PriceAlert,
     type RatingChange,
     type StatSection,
+    type WatchDates,
   } from "./lib/types";
   import { actionFor, bindKey, nextGroupTab } from "./lib/keybinds";
   import { overlayVisibility, shouldAnalyze } from "./lib/indicators";
@@ -62,6 +64,7 @@
   import { paneIn } from "./lib/motion";
   import { emptyHistory, goBack, goForward, previous, pushRecent, visit, type History, type Move } from "./lib/history";
   import { DEFAULT_WATCHLIST_SORT } from "./lib/watchlistSort";
+  import { DEFAULT_EVENT_FILTER, localDay, weekRange } from "./lib/calendar";
 
   // Injected before load, so the first frame already has real content.
   const boot = window.__TICKR_INIT__ ?? null;
@@ -130,6 +133,17 @@
   let eventsError = $state<string | null>(null);
   let eventsLoading = $state(false);
   let eventsSeq = 0;
+  let eventsTab = $state<"economic" | "watchlist">("economic");
+  let eventsWeek = $state(0);
+  const eventsCache = new Map<string, EventsReport>();
+  let eventFilter = $state<EventFilter>(DEFAULT_EVENT_FILTER);
+  let savedEventFilter = DEFAULT_EVENT_FILTER;
+  let eventFilterWrite = Promise.resolve();
+  let watchCal = $state<WatchDates[] | undefined>(undefined);
+  let watchCalError = $state<string | null>(null);
+  let watchCalLoading = $state(false);
+  let watchCalAt = $state(0);
+  let watchCalSeq = 0;
   let options = $state<Options | undefined>(undefined);
   let optionsError = $state<string | null>(null);
   let optionsLoading = $state(false);
@@ -212,6 +226,13 @@
   });
 
   $effect(() => {
+    void watchlist;
+    untrack(() => {
+      if (view === "events" && eventsTab === "watchlist" && watchCal) loadWatchCalendar();
+    });
+  });
+
+  $effect(() => {
     if (newsScope.startsWith("group:") && !groups.some((g) => `group:${g.name}` === newsScope)) newsScope = "symbol";
   });
 
@@ -265,6 +286,7 @@
     groups = init.groups ?? [];
     watchlistSort = init.watchlist_sort ?? DEFAULT_WATCHLIST_SORT;
     screens = init.screens ?? [];
+    eventFilter = savedEventFilter = init.event_filter ?? DEFAULT_EVENT_FILTER;
     alerts = init.alerts ?? [];
     recent = init.recent_symbols ?? [];
     if (init.logo_known) logo = init.logo;
@@ -593,12 +615,18 @@
     }
   }
 
+  const today = $derived(localDay(new Date(now * 1000)));
+  const eventsRange = $derived(weekRange(today, eventsWeek));
+  const shownEvents = $derived(events?.start === eventsRange.start ? events : undefined);
+
   async function loadEvents(force = false, manual = false) {
     const mine = ++eventsSeq;
+    const start = eventsRange.start;
     eventsError = null;
     eventsLoading = true;
     try {
-      const r = await invoke<EventsReport>("get_events", { force });
+      const r = await invoke<EventsReport>("get_events", { force, start });
+      eventsCache.set(r.start, r);
       if (mine === eventsSeq) events = r;
     } catch (e) {
       if ((!manual || !events) && mine === eventsSeq) eventsError = String(e);
@@ -608,9 +636,62 @@
     }
   }
 
+  function showEventsWeek(offset: number) {
+    eventsWeek = offset;
+    events = eventsCache.get(weekRange(today, offset).start);
+  }
+
+  $effect(() => {
+    void eventsRange.start;
+    untrack(() => {
+      if (view === "events" && eventsTab === "economic") loadEvents();
+    });
+  });
+
+  async function loadWatchCalendar(force = false, manual = false) {
+    const mine = ++watchCalSeq;
+    watchCalError = null;
+    watchCalLoading = true;
+    try {
+      const r = await invoke<WatchDates[]>("get_watch_calendar", { force });
+      if (mine === watchCalSeq) {
+        watchCal = r;
+        watchCalAt = Date.now() / 1000;
+      }
+    } catch (e) {
+      if ((!manual || !watchCal) && mine === watchCalSeq) watchCalError = String(e);
+      return String(e);
+    } finally {
+      if (mine === watchCalSeq) watchCalLoading = false;
+    }
+  }
+
+  function loadEventsView() {
+    if (eventsTab === "watchlist") loadWatchCalendar();
+    else loadEvents();
+  }
+
+  function showEventsTab(tab: "economic" | "watchlist") {
+    eventsTab = tab;
+    loadEventsView();
+  }
+
+  function saveEventFilter(next: EventFilter) {
+    eventFilter = next;
+    eventFilterWrite = eventFilterWrite
+      .then(() => invoke<EventFilter>("set_event_filter", { filter: next }))
+      .then((saved) => {
+        savedEventFilter = saved;
+      })
+      .catch((e) => {
+        console.warn(e);
+        eventFilter = savedEventFilter;
+      });
+  }
+
   function toggleEvents() {
     view = view === "events" ? "chart" : "events";
-    if (view === "events") loadEvents();
+    if (view === "events") loadEventsView();
   }
 
   async function loadOptions(date?: number, manual = false) {
@@ -663,7 +744,7 @@
       case "stats": panelDone = loadStats(true); break;
       case "financials": panelDone = loadFinancials(true); break;
       case "analysts": panelDone = Promise.all([loadAnalyst(true), loadRatingChanges(true)]).then((errors) => errors.find(Boolean)); break;
-      case "events": panelDone = loadEvents(true, true); break;
+      case "events": panelDone = eventsTab === "watchlist" ? loadWatchCalendar(true, true) : loadEvents(true, true); break;
       case "market": panelDone = loadMarket(true); break;
       case "options": panelDone = loadOptions(options?.expiry ?? undefined, true); break;
       case "watchlist": panelDone = watchlistView?.refresh() ?? Promise.resolve(); break;
@@ -907,7 +988,7 @@
             <button role="tab" aria-selected={view === "financials"} class:on={view === "financials"} onclick={toggleFinancials}>
               Financials
             </button>
-            {#if view === "news" ? (newsScope === "symbol" ? newsLoading : feedLoading) : view === "market" ? marketLoading : view === "events" ? eventsLoading : view === "options" ? optionsLoading : loading || (view === "technicals" && analyzing)}<span
+            {#if view === "news" ? (newsScope === "symbol" ? newsLoading : feedLoading) : view === "market" ? marketLoading : view === "events" ? (eventsTab === "watchlist" ? watchCalLoading : eventsLoading) : view === "options" ? optionsLoading : loading || (view === "technicals" && analyzing)}<span
                 class="spin"
                 aria-label="Loading"
               ></span>{/if}
@@ -936,7 +1017,28 @@
             {:else if view === "market"}
               <MarketView {market} error={marketError} onretry={() => loadMarket()} onopen={openWatched} />
             {:else if view === "events"}
-              <EventsView report={events} error={eventsError} loading={eventsLoading} {now} onrefresh={() => loadEvents(true)} />
+              <EventsView
+                report={shownEvents}
+                error={eventsError}
+                loading={eventsLoading}
+                {now}
+                tab={eventsTab}
+                week={eventsRange}
+                weekOffset={eventsWeek}
+                {today}
+                filter={eventFilter}
+                watchDates={watchCal}
+                watchError={watchCalError}
+                watchLoading={watchCalLoading}
+                watchAt={watchCalAt}
+                watchCount={watchlist.length}
+                onrefresh={() => loadEvents(true)}
+                onwatchrefresh={() => loadWatchCalendar(true)}
+                ontab={showEventsTab}
+                onweek={showEventsWeek}
+                onfilter={saveEventFilter}
+                onopensymbol={openWatched}
+              />
             {:else if view === "options"}
               <OptionsView {options} error={optionsError} onretry={() => loadOptions(options?.expiry ?? undefined)} onexpiry={loadOptions} bind:side={optionsSide} />
             {:else if view === "news"}

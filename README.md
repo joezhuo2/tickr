@@ -332,11 +332,24 @@ copies app and OS versions and connection details with credentials redacted.
 
 ### Market events
 
-The Events panel (header button or `K`) lists the next 7 days of US economic
-releases from Yahoo's economic calendar, grouped by day, each with its local
-release time and, where Yahoo has them, the actual, expected and prior figures.
-The list needs no AI and is refreshed every 15 minutes or with the Refresh
-button.
+The Events panel (header button or `K`) has two tabs.
+
+**Economic** lists seven days of releases from Yahoo's economic calendar,
+grouped by day, each with its local release time and, where Yahoo has them, the
+actual, expected and prior figures. It starts with the next 7 days; the arrows
+step a week back or forward (up to about a year either way) and **Today**
+returns. The country menu picks which countries to show (US by default, or all)
+and **All / Key** limits the list to headline releases (jobs, inflation, GDP,
+rates, PMIs, retail sales, confidence). Yahoo does not rate importance, so Key
+is decided by release name and is only a rough guide. Both choices are saved in
+settings. The list needs no AI and is refreshed every 15 minutes or with the
+Refresh button.
+
+**Watchlist** merges the upcoming earnings dates and ex-dividend dates of your
+starred symbols into one list by day, with an All / Earnings / Ex-dividend
+toggle. Click a row to open that symbol. Estimated earnings dates are marked and
+the EPS estimate is shown when Yahoo has one. Dates are cached for 6 hours and
+fetched three symbols at a time; ETFs, indices and crypto have none.
 
 Clicking an event asks the AI configured in Settings, as above, using the
 Events model or else Model, to analyze that
@@ -490,9 +503,9 @@ the Apple values as repository secrets (plus `APPLE_CERTIFICATE`, the base64
 ### Tests
 
 ```bash
-cd src-tauri && cargo test # technical analysis (indicators, patterns, Fibonacci, scoring), quote, analyst, earnings, rating change, stats, financials, market and news parsing, headline sentiment, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols and groups, update menu labels
-cd src-tauri && cargo test -- --ignored live   # analyst, market and financials fetches against Yahoo (network)
-npm test                   # formatters, watchlist sort, hotkey recording and display, keybinds
+cd src-tauri && cargo test # technical analysis (indicators, patterns, Fibonacci, scoring), quote, analyst, earnings, rating change, stats, financials, market and news parsing, headline sentiment, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols and groups, economic calendar and watchlist dates, update menu labels
+cd src-tauri && cargo test -- --ignored live   # analyst, market, financials, economic calendar and watchlist date fetches against Yahoo (network)
+npm test                   # formatters, watchlist sort, calendar filters and dates, hotkey recording and display, keybinds
 npm run check              # svelte-check
 ```
 
@@ -504,7 +517,8 @@ src-tauri/src/
   analysis/     local technical analysis: indicators (RSI, SMA/EMA, ATR, σ), patterns, Fibonacci swing, score and targets
   analyst.rs    Yahoo quoteSummary: cookie/crumb session, consensus and price targets, 12 h cache
   earnings.rs   Yahoo quoteSummary: past EPS reports and next report date
-  events.rs     Yahoo economic calendar: next 7 days of US releases; AI analysis of one event on demand, 6 h cache
+  events.rs     Yahoo economic calendar: any week, all countries, paged; AI analysis of one event on demand, 6 h cache
+  calendar.rs   Yahoo quoteSummary calendarEvents: earnings and ex-dividend dates per watchlist symbol, 6 h cache
   grades.rs     Yahoo quoteSummary: analyst upgrades, downgrades and initiations
   stats.rs      Yahoo quoteSummary: key statistics in labeled sections
   financials.rs Yahoo fundamentals-timeseries: annual and quarterly revenue, net income, gross and operating profit, free cash flow, 12 h cache
@@ -523,7 +537,7 @@ src-tauri/src/
   updater.rs    background update checks, tray menu state, install and restart
 src-tauri/windows/hooks.nsh   NSIS uninstall hook: autostart entry and app data
 .github/workflows/  ci.yml (checks on push/PR), release.yml (installers, updater bundles and latest.json on tag push)
-ui/src/         App, Left (ticker and details), Chart (canvas, analysis overlays), Technicals, Analysts, Earnings, Stats, Market, News, Watchlist, Search, Settings, Footer
+ui/src/         App, Left (ticker and details), Chart (canvas, analysis overlays), Technicals, Analysts, Earnings, Stats, Market, Events, WatchCalendar, News, Watchlist, Search, Settings, Footer
 ```
 
 ### Memory (Windows 11, release build)

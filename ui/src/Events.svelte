@@ -1,7 +1,22 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { ago, direction, sentimentLabel, sentimentTone, signed } from "./lib/format";
-  import type { EventAnalysis, EventsReport, MarketEvent } from "./lib/types";
+  import {
+    canShift,
+    countryName,
+    countryOptions,
+    countrySummary,
+    filterEvents,
+    formatDay,
+    groupByDay,
+    rangeLabel,
+    setCountries,
+    setImportance,
+    toggleCountry,
+    type WeekRange,
+  } from "./lib/calendar";
+  import type { EventAnalysis, EventFilter, EventsReport, MarketEvent, WatchDates } from "./lib/types";
+  import WatchCalendar from "./WatchCalendar.svelte";
 
   // report: undefined while loading with nothing cached.
   let {
@@ -9,15 +24,55 @@
     error,
     loading,
     now,
+    tab,
+    week,
+    weekOffset,
+    today,
+    filter,
+    watchDates,
+    watchError,
+    watchLoading,
+    watchAt,
+    watchCount,
     onrefresh,
+    onwatchrefresh,
+    ontab,
+    onweek,
+    onfilter,
+    onopensymbol,
   }: {
     report: EventsReport | undefined;
     error: string | null;
     loading: boolean;
     /** Unix seconds, for the relative times. */
     now: number;
+    tab: "economic" | "watchlist";
+    week: WeekRange;
+    weekOffset: number;
+    today: string;
+    filter: EventFilter;
+    watchDates: WatchDates[] | undefined;
+    watchError: string | null;
+    watchLoading: boolean;
+    watchAt: number;
+    watchCount: number;
     onrefresh: () => void;
+    onwatchrefresh: () => void;
+    ontab: (tab: "economic" | "watchlist") => void;
+    onweek: (offset: number) => void;
+    onfilter: (filter: EventFilter) => void;
+    onopensymbol: (symbol: string) => void;
   } = $props();
+
+  let menu: HTMLDetailsElement | undefined = $state();
+
+  function closeMenu(e: KeyboardEvent) {
+    if (e.key === "Escape" && menu?.open) menu.open = false;
+  }
+
+  function outside(e: MouseEvent) {
+    if (menu?.open && e.target instanceof Node && !menu.contains(e.target)) menu.open = false;
+  }
 
   let selected = $state<MarketEvent | null>(null);
   let summaryOpen = $state(false);
@@ -58,20 +113,16 @@
     analyzing = false;
   }
 
-  const dayKey = (t: number) => new Date(t * 1000).toDateString();
   const day = (t: number) => new Date(t * 1000).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
   const time = (t: number) => new Date(t * 1000).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
-  /** Events grouped by local day, in time order. */
-  const days = $derived.by(() => {
-    const out: { key: string; label: string; events: MarketEvent[] }[] = [];
-    for (const e of report?.events ?? []) {
-      const key = dayKey(e.at);
-      if (out.at(-1)?.key !== key) out.push({ key, label: day(e.at), events: [] });
-      out[out.length - 1].events.push(e);
-    }
-    return out;
-  });
+  const offsetFor = (t: number) => -new Date(t * 1000).getTimezoneOffset() * 60;
+  const visible = $derived(filterEvents(report?.events ?? [], filter));
+  const days = $derived(groupByDay(visible, offsetFor));
+  const options = $derived(countryOptions(report?.events ?? [], filter.countries));
+  const hidden = $derived((report?.events.length ?? 0) - visible.length);
+  const showCountry = $derived(filter.countries.length !== 1);
+  const chosen = (code: string) => filter.countries.length === 0 || filter.countries.includes(code);
 </script>
 
 {#snippet figures(e: MarketEvent)}
@@ -89,7 +140,8 @@
     <div class="scroll">
       <h2>{ev.name}</h2>
       <div class="meta">
-        {day(ev.at)} · {time(ev.at)}{#if ev.period}
+        {day(ev.at)} · {time(ev.at)}{#if ev.country}
+          · {countryName(ev.country)}{/if}{#if ev.period}
           · For {ev.period}{/if}
         {#if analysis}<span class="pill {sentimentTone(analysis.tone)}">{sentimentLabel(analysis.tone)}</span>{/if}
       </div>
@@ -150,9 +202,72 @@
   </div>
 {:else}
   <div class="bar">
-    <span class="muted">{report ? `US economic calendar · updated ${ago(report.fetched, now)}` : ""}</span>
-    <button class="btn" onclick={onrefresh} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</button>
+    <div class="tabs" role="tablist" aria-label="Calendar">
+      <button role="tab" class:on={tab === "economic"} aria-selected={tab === "economic"} onclick={() => ontab("economic")}>Economic</button>
+      <button role="tab" class:on={tab === "watchlist"} aria-selected={tab === "watchlist"} onclick={() => ontab("watchlist")}>Watchlist</button>
+    </div>
+    {#if tab === "economic"}
+      <button class="btn" onclick={onrefresh} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</button>
+    {:else}
+      <button class="btn" onclick={onwatchrefresh} disabled={watchLoading}>{watchLoading ? "Refreshing…" : "Refresh"}</button>
+    {/if}
   </div>
+  {#if tab === "watchlist"}
+    <WatchCalendar
+      dates={watchDates}
+      error={watchError}
+      loading={watchLoading}
+      at={watchAt}
+      count={watchCount}
+      {today}
+      {now}
+      onopen={onopensymbol}
+      onretry={onwatchrefresh}
+    />
+  {:else}
+  <div class="bar">
+    <div class="weeks">
+      <button class="btn icon" aria-label="Previous week" title="Previous week" disabled={!canShift(week.start, today, -1)} onclick={() => onweek(weekOffset - 1)}>‹</button>
+      <span class="range" title="Seven days from {week.start}">{rangeLabel(week)}</span>
+      <button class="btn icon" aria-label="Next week" title="Next week" disabled={!canShift(week.start, today, 1)} onclick={() => onweek(weekOffset + 1)}>›</button>
+      <button class="btn" disabled={weekOffset === 0} onclick={() => onweek(0)}>Today</button>
+    </div>
+    <div class="filters">
+      <details class="menu" bind:this={menu}>
+        <summary class="btn" aria-label="Countries: {countrySummary(filter)}">{countrySummary(filter)}</summary>
+        <div class="panel">
+          <div class="presets">
+            <button class="btn" disabled={filter.countries.length === 0} onclick={() => onfilter(setCountries(filter, []))}>All countries</button>
+            <button class="btn" onclick={() => onfilter(setCountries(filter, ["US"]))}>US only</button>
+          </div>
+          {#each options as code (code)}
+            <label class="opt">
+              <input type="checkbox" checked={chosen(code)} onchange={() => onfilter(toggleCountry(filter, code, options))} />
+              <span>{countryName(code)}</span>
+              <span class="muted">{code}</span>
+            </label>
+          {:else}
+            <span class="muted">No countries in this week</span>
+          {/each}
+        </div>
+      </details>
+      <div class="seg" role="group" aria-label="Releases">
+        <button class:on={filter.importance === "all"} aria-pressed={filter.importance === "all"} onclick={() => onfilter(setImportance(filter, "all"))}>All</button>
+        <button
+          class:on={filter.importance === "key"}
+          aria-pressed={filter.importance === "key"}
+          title="Headline releases such as jobs, inflation, GDP, rates, PMIs, retail sales and confidence, picked by name. Yahoo does not rate importance."
+          onclick={() => onfilter(setImportance(filter, "key"))}>Key</button
+        >
+      </div>
+    </div>
+  </div>
+  {#if report}
+    <p class="sub muted">
+      Updated {ago(report.fetched, now)} · {visible.length} of {report.events.length} events{#if hidden > 0 && visible.length === 0}, all hidden by filters{/if}{#if report.total > report.events.length}
+        · Yahoo lists {report.total}, showing the first {report.events.length}{/if}
+    </p>
+  {/if}
   {#if report === undefined && error}
     <div class="msg">
       Could not load events: {error}
@@ -170,16 +285,21 @@
   {:else}
     {#if error}<p class="err" role="alert">{error}</p>{/if}
     {#if report.events.length === 0}
-      <div class="msg">No US economic events in the next 7 days</div>
+      <div class="msg">No economic events for {rangeLabel(week)}</div>
+    {:else if visible.length === 0}
+      <div class="msg">
+        No events match these filters
+        <button class="btn" onclick={() => onfilter({ countries: [], importance: "all" })}>Show everything</button>
+      </div>
     {:else}
       <div class="list">
         {#each days as d (d.key)}
-          <h3 class="day">{d.label}</h3>
+          <h3 class="day">{formatDay(d.key, { weekday: "short", month: "short", day: "numeric" })}</h3>
           <ul>
-            {#each d.events as e (e.id)}
+            {#each d.items as e (e.id)}
               <li>
                 <button class="row" onclick={() => open(e)}>
-                  <span class="title">{e.name}</span>
+                  <span class="title">{#if showCountry && e.country}<span class="cc">{e.country}</span>{/if}{e.name}</span>
                   <span class="meta">
                     {time(e.at)}{#if e.period}
                       · For {e.period}{/if}
@@ -193,7 +313,10 @@
       </div>
     {/if}
   {/if}
+  {/if}
 {/if}
+
+<svelte:window onclick={outside} onkeydown={closeMenu} />
 
 <style>
   .bar {
@@ -215,6 +338,120 @@
   .btn:disabled {
     opacity: 0.6;
     cursor: default;
+  }
+  .tabs,
+  .seg {
+    display: flex;
+    background: var(--surface);
+    border: 1px solid var(--faint);
+    border-radius: 7px;
+    padding: 2px;
+  }
+  .tabs button,
+  .seg button {
+    border: 0;
+    background: none;
+    padding: 2px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    color: var(--muted);
+  }
+  .tabs button.on,
+  .seg button.on {
+    background: var(--bg);
+    color: var(--text);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  }
+  .tabs button:focus-visible,
+  .seg button:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .weeks,
+  .filters {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .range {
+    min-width: 120px;
+    text-align: center;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .btn.icon {
+    padding: 0 9px;
+    font-size: 15px;
+    line-height: 20px;
+  }
+  .menu {
+    position: relative;
+  }
+  summary.btn {
+    list-style: none;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  summary.btn::-webkit-details-marker {
+    display: none;
+  }
+  summary.btn::after {
+    content: " ▾";
+    color: var(--muted);
+  }
+  .panel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 240px;
+    max-height: 280px;
+    overflow: auto;
+    padding: 6px;
+    background: var(--bg);
+    border: 1px solid var(--faint);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+  }
+  .presets {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+  .opt {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 4px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .opt:hover {
+    background: var(--surface);
+  }
+  .opt span:nth-of-type(1) {
+    flex: 1;
+  }
+  .sub {
+    margin: 4px 0 0;
+    font-size: 11.5px;
+  }
+  .cc {
+    margin-right: 6px;
+    padding: 0 5px;
+    border-radius: 4px;
+    background: var(--surface);
+    border: 1px solid var(--faint);
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 650;
+    vertical-align: 1px;
   }
   .btn:focus-visible,
   .more:focus-visible,
