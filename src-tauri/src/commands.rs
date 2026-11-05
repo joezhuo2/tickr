@@ -808,6 +808,10 @@ mod tests {
             if kind == "trend" { bad.points.push(bad.points[0].clone()); }
             invalid.push(vec![bad]);
         }
+        for count in [0, 1, 501] {
+            let mut bad = d.clone(); bad.kind = "pen".into(); bad.points = vec![d.points[0].clone(); count]; invalid.push(vec![bad]);
+        }
+        let mut bad = d.clone(); bad.kind = "pen".into(); bad.points.push(bad.points[0].clone()); bad.text = "no".into(); invalid.push(vec![bad]);
         invalid.push(vec![d.clone(), d.clone()]);
         invalid.push((0..201).map(|id| Drawing { id, ..d.clone() }).collect());
         for drawings in invalid {
@@ -818,7 +822,8 @@ mod tests {
         assert!(edit_drawings(&shared, " ".into(), vec![]).is_err());
         let mut text = d.clone(); text.kind = "text".into(); text.text = "?".repeat(200);
         let mut trend = d.clone(); trend.id = 2; trend.kind = "trend".into(); trend.points.push(trend.points[0].clone());
-        edit_drawings(&shared, "AAPL".into(), vec![text, trend]).unwrap();
+        let mut pen = d.clone(); pen.id = 3; pen.kind = "pen".into(); pen.points = vec![d.points[0].clone(); 500];
+        edit_drawings(&shared, "AAPL".into(), vec![text, trend, pen]).unwrap();
         edit_drawings(&shared, "AAPL".into(), vec![]).unwrap();
         assert!(Settings::load(&shared.settings_path).drawings.is_empty());
         {

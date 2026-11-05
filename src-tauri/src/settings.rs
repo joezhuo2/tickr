@@ -220,6 +220,8 @@ pub struct Drawing {
     pub text: String,
 }
 
+const PEN_MAX_POINTS: usize = 500;
+
 pub fn validate_drawings(map: &HashMap<String, Vec<Drawing>>) -> Result<(), String> {
     if map.len() > 500 { return Err("At most 500 symbols can have drawings.".into()); }
     for (symbol, drawings) in map {
@@ -227,12 +229,13 @@ pub fn validate_drawings(map: &HashMap<String, Vec<Drawing>>) -> Result<(), Stri
         if drawings.len() > 200 { return Err("At most 200 drawings per symbol.".into()); }
         let mut ids = HashSet::new();
         for d in drawings {
-            let count = match d.kind.as_str() {
-                "hline" | "text" => 1,
-                "trend" => 2,
+            let valid = match d.kind.as_str() {
+                "hline" | "text" => d.points.len() == 1,
+                "trend" => d.points.len() == 2,
+                "pen" => (2..=PEN_MAX_POINTS).contains(&d.points.len()),
                 _ => return Err("Unknown drawing kind.".into()),
             };
-            if d.points.len() != count { return Err("Invalid drawing points.".into()); }
+            if !valid { return Err("Invalid drawing points.".into()); }
             if d.points.iter().any(|p| !p.price.is_finite() || p.price <= 0.0) { return Err("Invalid drawing price.".into()); }
             if d.text.chars().count() > 200 || (if d.kind == "text" { d.text.trim().is_empty() } else { !d.text.is_empty() }) { return Err("Invalid drawing text.".into()); }
             if !ids.insert(d.id) { return Err("Duplicate drawing ID.".into()); }
@@ -261,6 +264,7 @@ pub struct Keybinds {
     pub draw_trend: String,
     pub draw_text: String,
     pub draw_ruler: String,
+    pub draw_pen: String,
     pub refresh: String,
     pub range: String,
     pub technicals: String,
@@ -293,6 +297,7 @@ impl Default for Keybinds {
             draw_trend: "2".into(),
             draw_text: "3".into(),
             draw_ruler: "4".into(),
+            draw_pen: "5".into(),
             refresh: "r".into(),
             range: "v".into(),
             technicals: "t".into(),
@@ -755,6 +760,7 @@ mod tests {
         assert_eq!(s.keybinds.draw_trend, "2");
         assert_eq!(s.keybinds.draw_text, "3");
         assert_eq!(s.keybinds.draw_ruler, "4");
+        assert_eq!(s.keybinds.draw_pen, "5");
         assert_eq!(s.keybinds.settings, ",");
         assert_eq!(s.keybinds.toggle_watchlist, "w");
         assert_eq!(s.keybinds.watchlist, "x");
