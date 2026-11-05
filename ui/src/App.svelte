@@ -41,6 +41,8 @@
     type EventsReport,
     type Group,
     type WatchlistSort,
+    type SavedScreen,
+    type ScreenRule,
     type Init,
     type Keybinds,
     type IndicatorConfig,
@@ -150,6 +152,7 @@
   let watchlist = $state<string[]>([]);
   let groups = $state<Group[]>([]);
   let watchlistSort = $state<WatchlistSort>(DEFAULT_WATCHLIST_SORT);
+  let screens = $state<SavedScreen[]>([]);
   let groupTab = $state<string | null>(null);
   let alerts = $state<PriceAlert[]>([]);
   let recent = $state<string[]>([]);
@@ -255,6 +258,7 @@
     watchlist = init.watchlist ?? [];
     groups = init.groups ?? [];
     watchlistSort = init.watchlist_sort ?? DEFAULT_WATCHLIST_SORT;
+    screens = init.screens ?? [];
     alerts = init.alerts ?? [];
     recent = init.recent_symbols ?? [];
     if (init.logo_known) logo = init.logo;
@@ -498,6 +502,18 @@
   function saveSort(next: WatchlistSort) {
     watchlistSort = next;
     invoke("set_watchlist_sort", { sort: next }).catch(console.warn);
+  }
+
+  async function saveScreen(name: string, rules: ScreenRule[]): Promise<string | undefined> {
+    try {
+      screens = await invoke<SavedScreen[]>("save_screen", { name, rules });
+    } catch (e) {
+      return String(e);
+    }
+  }
+
+  async function deleteScreen(name: string) {
+    screens = await invoke<SavedScreen[]>("delete_screen", { name }).catch(() => screens);
   }
 
   function toggleStar() {
@@ -871,7 +887,7 @@
         {#key view}
           <div class="pane" in:paneIn={view === "watchlist" ? { y: 16, speed: "slow" } : {}}>
             {#if view === "watchlist"}
-              <Watchlist bind:this={watchlistView} {refreshMode} symbols={watchlist} {groups} current={symbol} sort={watchlistSort} bind:tab={groupTab} onopen={openWatched} ongroups={saveGroups} onsort={saveSort} />
+              <Watchlist bind:this={watchlistView} {refreshMode} symbols={watchlist} {groups} current={symbol} sort={watchlistSort} {screens} bind:tab={groupTab} onopen={openWatched} ongroups={saveGroups} onsort={saveSort} onsavescreen={saveScreen} ondeletescreen={deleteScreen} />
             {:else if view === "alerts"}
               <Alerts {symbol} {quote} {alerts} onchange={(next) => (alerts = next)} />
             {:else if view === "analysts"}
