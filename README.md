@@ -152,7 +152,7 @@ taskbar to keep it visible.
   high, low, close, volume). A button turns green once the copy lands.
 - **Refresh:** the button in the bottom bar fetches the quote and reloads the
   chart right away, then force-reloads the panel on screen (News, Earnings,
-  Stats, Analysts, Events, Market, Options or the Watchlist cards). The bar
+  Stats, Financials, Analysts, Events, Market, Options or the Watchlist cards). The bar
   says "<Panel> refreshed" or shows the error, and a failed refresh keeps what
   was already shown. **Background refresh** in Settings defaults to **Balanced**:
   quotes update every 15 seconds during regular trading, 60 seconds pre/post-market,
@@ -200,6 +200,11 @@ it is instant.
 - **Stats:** key statistics in Valuation, Trading, Dividends & splits, Shares
   & short interest, Profitability and Financials. ETFs get a Fund section and
   crypto a Crypto section. Changes, growth and returns are green or red.
+- **Financials:** revenue, net income, free cash flow and gross, operating and
+  net margins over the reported periods, with an Annual / Quarterly toggle, two
+  small trend charts and a table. Margins are computed from revenue, and
+  figures Yahoo does not report show as —. Cached for 12 hours; ETFs, indices
+  and crypto have no statements.
 - **News feed:** choose Watchlist or a named group in News to combine headlines,
   deduplicate stories and filter by ticker, publisher and topic.
 - **News:** the 20 latest headlines, newest first, with publisher, time and a
@@ -485,8 +490,8 @@ the Apple values as repository secrets (plus `APPLE_CERTIFICATE`, the base64
 ### Tests
 
 ```bash
-cd src-tauri && cargo test # technical analysis (indicators, patterns, Fibonacci, scoring), quote, analyst, earnings, rating change, stats, market and news parsing, headline sentiment, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols and groups, update menu labels
-cd src-tauri && cargo test -- --ignored live   # analyst and market fetches against Yahoo (network)
+cd src-tauri && cargo test # technical analysis (indicators, patterns, Fibonacci, scoring), quote, analyst, earnings, rating change, stats, financials, market and news parsing, headline sentiment, sessions, tray tooltip and title, icon compositing, settings, watchlist symbols and groups, update menu labels
+cd src-tauri && cargo test -- --ignored live   # analyst, market and financials fetches against Yahoo (network)
 npm test                   # formatters, watchlist sort, hotkey recording and display, keybinds
 npm run check              # svelte-check
 ```
@@ -502,6 +507,7 @@ src-tauri/src/
   events.rs     Yahoo economic calendar: next 7 days of US releases; AI analysis of one event on demand, 6 h cache
   grades.rs     Yahoo quoteSummary: analyst upgrades, downgrades and initiations
   stats.rs      Yahoo quoteSummary: key statistics in labeled sections
+  financials.rs Yahoo fundamentals-timeseries: annual and quarterly revenue, net income, gross and operating profit, free cash flow, 12 h cache
   market.rs     Yahoo batch quotes and screeners: indices, macro, sectors, top movers
   news.rs       Yahoo search news: 20 latest headlines, newest first, web links only
   sentiment.rs  headline tone (positive, negative, neutral) from a financial keyword list

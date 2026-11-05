@@ -335,6 +335,22 @@ export interface Earnings {
   history: EarningsReport[];
 }
 
+export interface FinancialPeriod {
+  date: string;
+  revenue: number | null;
+  net_income: number | null;
+  gross_profit: number | null;
+  operating_income: number | null;
+  free_cash_flow: number | null;
+}
+
+export interface Financials {
+  symbol: string;
+  currency: string | null;
+  annual: FinancialPeriod[];
+  quarterly: FinancialPeriod[];
+}
+
 export interface Mover {
   symbol: string;
   name: string;
