@@ -1,13 +1,15 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { ALERT_FILTERS, addedAlert, alertCounts, alertStatus, emptyMessage, levelError, toggleLabel, triggerInfo, visibleAlerts, type AlertFilter } from "./lib/alerts";
   import { alertSummary } from "./lib/format";
   import type { AlertKind, PriceAlert, Quote } from "./lib/types";
 
-  let { symbol, quote, alerts, onchange }: {
+  let { symbol, quote, alerts, onchange, onopen }: {
     symbol: string;
     quote: Quote | null;
     alerts: PriceAlert[];
     onchange: (alerts: PriceAlert[]) => void;
+    onopen: (symbol: string) => void;
   } = $props();
 
   let direction = $state<"above" | "below">("above");
@@ -28,17 +30,68 @@
   };
   const noun = $derived(kind === "price" ? "Price" : kind === "trail_amount" ? "Amount" : "Percent");
 
-  async function save(command: string, args: Record<string, unknown>) {
-    if (busy) return;
+  let filter = $state<AlertFilter>("all");
+  let editingId = $state<number | null>(null);
+  let editDirection = $state<"above" | "below">("above");
+  let editLevel = $state<number | undefined>(undefined);
+
+  const counts = $derived(alertCounts(alerts));
+  const shown = $derived(visibleAlerts(alerts, filter));
+
+  function unit(a: PriceAlert): string {
+    return a.kind === "price" || a.kind === "trail_amount" ? "" : "%";
+  }
+
+  function nounFor(a: PriceAlert): string {
+    return a.kind === "price" ? "Price" : a.kind === "trail_amount" ? "Amount" : "Percent";
+  }
+
+  async function save(command: string, args: Record<string, unknown>): Promise<PriceAlert[] | null> {
+    if (busy) return null;
     busy = true;
     error = null;
     try {
-      onchange(await invoke<PriceAlert[]>(command, args));
+      const next = await invoke<PriceAlert[]>(command, args);
+      onchange(next);
       if (command === "add_alert") level = undefined;
+      return next;
     } catch (e) {
       error = String(e);
+      return null;
     } finally {
       busy = false;
+    }
+  }
+
+  function startEdit(a: PriceAlert) {
+    error = null;
+    editingId = a.id;
+    editDirection = a.direction;
+    editLevel = a.level;
+  }
+
+  function cancelEdit() {
+    editingId = null;
+    error = null;
+  }
+
+  async function saveEdit(e: SubmitEvent, a: PriceAlert) {
+    e.preventDefault();
+    const invalid = levelError(editLevel, nounFor(a));
+    if (invalid) {
+      error = invalid;
+      return;
+    }
+    if (await save("update_alert", { id: a.id, level: editLevel, direction: editDirection })) editingId = null;
+  }
+
+  async function duplicate(a: PriceAlert) {
+    const before = alerts;
+    const next = await save("duplicate_alert", { id: a.id });
+    const copy = next && addedAlert(before, next);
+    if (copy) {
+      filter = "all";
+      startEdit(copy);
     }
   }
 
@@ -101,30 +154,64 @@
   </form>
   {#if error}<p class="error" role="alert">{error}</p>{/if}
   <p class="hint">Armed symbols are checked about every 15 seconds while tickr is running, even with the window closed. The first price after arming or restarting establishes a baseline; trailing alerts check a stop reached while tickr was closed. Allow tickr notifications in your system settings.</p>
-  {#if !alerts.length}
-    <div class="empty">No price alerts yet.</div>
+  {#if alerts.length}
+    <div class="filters" role="group" aria-label="Filter alerts">
+      {#each ALERT_FILTERS as f (f.key)}
+        <button type="button" class:on={filter === f.key} aria-pressed={filter === f.key} onclick={() => (filter = f.key)}>
+          {f.label} <span class="count">{counts[f.key]}</span>
+        </button>
+      {/each}
+    </div>
+  {/if}
+  {#if !shown.length}
+    <div class="empty">{emptyMessage(filter)}</div>
   {:else}
     <ul aria-label="Saved price alerts">
-      {#each alerts as alert (alert.id)}
+      {#each shown as alert (alert.id)}
+        {@const status = alertStatus(alert)}
+        {@const fired = triggerInfo(alert)}
+        {@const label = `${alert.symbol} ${alertSummary(alert)} alert`}
         <li>
           <div class="details">
-            <strong>{alert.symbol}</strong>
-            <span>{alertSummary(alert)}</span>
+            <button class="ticker" type="button" title={`Open ${alert.symbol} chart`} aria-label={`Open ${alert.symbol} chart`} onclick={() => onopen(alert.symbol)}>{alert.symbol}</button>
+            {#if editingId === alert.id}
+              <form class="edit" onsubmit={(e) => saveEdit(e, alert)}>
+                <label>
+                  <span class="sr-only">Direction for {label}</span>
+                  <select bind:value={editDirection} disabled={busy}>
+                    <option value="above">{labels[alert.kind][0]}</option>
+                    <option value="below">{labels[alert.kind][1]}</option>
+                  </select>
+                </label>
+                <label class="level">
+                  <span class="sr-only">{nounFor(alert)} for {label}</span>
+                  <input type="number" min="0" step="any" required bind:value={editLevel} disabled={busy} />
+                </label>
+                {#if unit(alert)}<span class="currency">{unit(alert)}</span>{/if}
+                <button class="add" type="submit" disabled={busy}>Save</button>
+                <button type="button" disabled={busy} onclick={cancelEdit}>Cancel</button>
+              </form>
+            {:else}
+              <span>{alertSummary(alert)}</span>
+            {/if}
             {#if alert.recurring}<span class="tag">Recurring, {alert.cooldown_mins} min cooldown</span>{/if}
             {#if alert.regular_only}<span class="tag">Regular only</span>{/if}
-            <span class="status" title={alert.triggered_at ? new Date(alert.triggered_at * 1000).toLocaleString() : undefined}>
-              {alert.enabled
-                ? alert.recurring && alert.triggered_at ? `Armed, last fired ${new Date(alert.triggered_at * 1000).toLocaleString()}` : "Armed"
-                : alert.triggered_at ? "Triggered" : "Paused"}
-            </span>
+            <span class="status {status}">{status === "armed" ? "Armed" : status === "triggered" ? "Triggered" : "Paused"}</span>
+            {#if fired}
+              <span class="fired">
+                {fired.label}{#if fired.price} at <strong>{fired.price}</strong>{/if} on <time datetime={new Date(alert.triggered_at! * 1000).toISOString()}>{fired.time}</time>
+              </span>
+            {/if}
           </div>
           <div class="actions">
+            <button disabled={busy || editingId === alert.id} onclick={() => startEdit(alert)} aria-label={`Edit ${label}`}>Edit</button>
+            <button disabled={busy} onclick={() => duplicate(alert)} aria-label={`Duplicate ${label}`}>Duplicate</button>
             <button disabled={busy} onclick={() => save("set_alert_enabled", { id: alert.id, enabled: !alert.enabled })}
-              aria-label={`${alert.enabled ? "Pause" : "Rearm"} ${alert.symbol} ${alertSummary(alert)} alert`}>
-              {alert.enabled ? "Pause" : "Rearm"}
+              aria-label={`${toggleLabel(status)} ${label}`}>
+              {toggleLabel(status)}
             </button>
             <button disabled={busy} onclick={() => save("delete_alert", { id: alert.id })}
-              aria-label={`Delete ${alert.symbol} ${alertSummary(alert)} alert`}>Delete</button>
+              aria-label={`Delete ${label}`}>Delete</button>
           </div>
         </li>
       {/each}
@@ -155,5 +242,16 @@
   li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--grid); }
   .details, .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
   .details { font-variant-numeric: tabular-nums; }
+  .filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+  .filters button { font-size: 12px; padding: 4px 10px; }
+  .filters button.on { background: var(--accent); color: white; border-color: var(--accent); }
+  .count { opacity: 0.75; font-variant-numeric: tabular-nums; }
+  .ticker { font-weight: 600; padding: 2px 6px; background: none; border-color: transparent; color: var(--accent); }
+  .ticker:hover { border-color: var(--faint); }
+  .edit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+  .status.armed { color: var(--up); }
+  .status.triggered { color: var(--down); }
+  .fired { flex-basis: 100%; font-size: 12px; color: var(--muted); }
+  .fired strong { color: var(--text); }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 </style>

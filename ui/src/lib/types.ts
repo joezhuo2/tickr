@@ -189,6 +189,7 @@ export interface PriceAlert {
   level: number;
   enabled: boolean;
   triggered_at: number | null;
+  triggered_price: number | null;
   kind: AlertKind;
   reference: number | null;
   recurring: boolean;

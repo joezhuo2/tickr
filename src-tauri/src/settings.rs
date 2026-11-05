@@ -888,9 +888,30 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("settings.json");
         let mut s = Settings::default();
-        s.alerts.push(PriceAlert { id: 1, symbol: "AAPL".into(), direction: Direction::Above, level: 250.0, enabled: true, triggered_at: None, kind: AlertKind::TrailPercent, reference: Some(251.5), recurring: true, cooldown_mins: 30, regular_only: true });
-        s.alerts.push(PriceAlert { id: 2, symbol: "BTC-USD".into(), direction: Direction::Below, level: 60000.0, enabled: false, triggered_at: Some(123), kind: AlertKind::Price, reference: None, recurring: false, cooldown_mins: 15, regular_only: false });
+        s.alerts.push(PriceAlert { id: 1, symbol: "AAPL".into(), direction: Direction::Above, level: 250.0, enabled: true, triggered_at: None, kind: AlertKind::TrailPercent, reference: Some(251.5), recurring: true, cooldown_mins: 30, regular_only: true, triggered_price: None });
+        s.alerts.push(PriceAlert { id: 2, symbol: "BTC-USD".into(), direction: Direction::Below, level: 60000.0, enabled: false, triggered_at: Some(123), kind: AlertKind::Price, reference: None, recurring: false, cooldown_mins: 15, regular_only: false, triggered_price: Some(59999.5) });
         s.save(&p).unwrap();
         assert_eq!(Settings::load(&p), s);
+    }
+
+    #[test]
+    fn settings_file_with_old_alerts_still_loads() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        std::fs::write(
+            &p,
+            r#"{"symbol":"NVDA","alerts":[
+                {"id":1,"symbol":"AAPL","direction":"above","level":250.0,"enabled":true,"triggered_at":null},
+                {"id":2,"symbol":"MSFT","direction":"below","level":300.0,"enabled":false,"triggered_at":1700000000,"kind":"price","recurring":false,"cooldown_mins":15,"regular_only":false}
+            ]}"#,
+        )
+        .unwrap();
+        let s = Settings::load(&p);
+        assert_eq!(s.symbol, "NVDA");
+        assert_eq!(s.alerts.len(), 2);
+        assert!(s.alerts[0].enabled);
+        assert_eq!(s.alerts[0].triggered_price, None);
+        assert_eq!(s.alerts[1].triggered_at, Some(1_700_000_000));
+        assert_eq!(s.alerts[1].triggered_price, None);
     }
 }
