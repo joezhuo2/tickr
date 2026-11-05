@@ -870,11 +870,12 @@
       case "draw_level":
       case "draw_trend":
       case "draw_text":
-      case "draw_ruler": {
+      case "draw_ruler":
+      case "draw_pen": {
         if (e.repeat) break;
         if (view !== "chart" && view !== "technicals") view = "chart";
         await tick();
-        const tools = { draw_level: "hline", draw_trend: "trend", draw_text: "text", draw_ruler: "ruler" } as const;
+        const tools = { draw_level: "hline", draw_trend: "trend", draw_text: "text", draw_ruler: "ruler", draw_pen: "pen" } as const;
         chartView?.drawTool(tools[action]);
         break;
       }

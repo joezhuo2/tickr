@@ -146,7 +146,7 @@ export interface Consensus {
 }
 
 export interface DrawingPoint { t: number; price: number }
-export interface Drawing { id: number; kind: "hline" | "trend" | "text"; points: DrawingPoint[]; text: string }
+export interface Drawing { id: number; kind: "hline" | "trend" | "text" | "pen"; points: DrawingPoint[]; text: string }
 
 export interface Init {
   theme: Theme;
@@ -222,6 +222,7 @@ export interface Keybinds {
   draw_trend: string;
   draw_text: string;
   draw_ruler: string;
+  draw_pen: string;
   refresh: string;
   range: string;
   technicals: string;

@@ -1,10 +1,10 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, num, price, quarterLabel, volume } from "./lib/format";
   import { classifyBars, displayOffset, isExtendedSession, isIntraday, zoneLabel, type Clock } from "./lib/session";
   import type { Analysis, Article, Chart, ChartMode, ChartScale, ChartTimeZone, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
   import { fitScale, forward, inverse, scaleLabel, scaleTicks } from "./lib/scale";
   import type { Drawing, DrawingPoint } from "./lib/types";
-  import { timeToIndex, indexToTime, hitTest, segmentDistance, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
+  import { timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
   import { paneLayout } from "./lib/indicators";
   import { untrack } from "svelte";
   import { fadeIn } from "./lib/motion";
@@ -755,13 +755,14 @@
     hover = null;
   }
 
-  type Tool = "cursor" | "hline" | "trend" | "text" | "ruler";
+  type Tool = "cursor" | "hline" | "trend" | "text" | "ruler" | "pen";
   const tools: { tool: Tool; label: string }[] = [
     { tool: "cursor", label: "Cursor" },
     { tool: "hline", label: "Level" },
     { tool: "trend", label: "Trend" },
     { tool: "text", label: "Text" },
     { tool: "ruler", label: "Ruler" },
+    { tool: "pen", label: "Pen" },
   ];
   let tool = $state<Tool>("cursor");
   let selected = $state<number | null>(null);
@@ -850,6 +851,10 @@
     const ctx = canvas?.getContext("2d");
     if (ctx) ctx.font = `11px ${getComputedStyle(canvas!).getPropertyValue("--font")}`;
     for (const d of [...list].reverse()) {
+      if (d.kind === "pen") {
+        if (hitPolyline(p, d.points.map(screen))) return { drawing: d, endpoint: -1 };
+        continue;
+      }
       const a = screen(d.points[0]);
       if (d.kind === "hline" && hitTest(p, a)) return { drawing: d, endpoint: -1 };
       if (d.kind === "text" && inPlot(a) && p.x >= a.x - 6 && p.x <= a.x + (ctx?.measureText(d.text).width ?? 0) + 6 && Math.abs(p.y - a.y) <= 12) return { drawing: d, endpoint: -1 };
@@ -886,6 +891,11 @@
     if (!Number.isFinite(point.price) || point.price <= 0) return;
     wrap!.setPointerCapture(e.pointerId);
     hover = null;
+    if (tool === "pen") {
+      preview = { id: 0, kind: "pen", points: [point], text: "" };
+      gesture = { start: p, original: null, endpoint: -1, moved: false, second: false };
+      return;
+    }
     if (tool === "hline") { addDrawing({ id: 0, kind: "hline", points: [point], text: "" }); return; }
     if (tool === "text") {
       editing = { point, x: Math.min(p.x, Math.max(PAD.l, width - 220)), y: p.y };
@@ -901,9 +911,37 @@
     }
   }
 
+  function extendStroke(p: Pixel) {
+    if (!preview || !gesture) return;
+    gesture.moved ||= Math.hypot(p.x - gesture.start.x, p.y - gesture.start.y) > 3;
+    const c = { x: Math.max(PAD.l, Math.min(width - PAD.r, p.x)), y: Math.max(PAD.t, Math.min(PAD.t + geo.priceH, p.y)) };
+    const from = screen(preview.points[preview.points.length - 1]);
+    if (Math.hypot(c.x - from.x, c.y - from.y) < 1 || preview.points.length >= 2000) return;
+    const point = anchor(c);
+    if (!Number.isFinite(point.price) || point.price <= 0) return;
+    preview = { ...preview, points: [...preview.points, point] };
+  }
+
+  function finishStroke() {
+    const stroke = preview;
+    const moved = gesture?.moved;
+    preview = null;
+    gesture = null;
+    if (!stroke || !moved) return;
+    const points = simplifyPath(stroke.points, screen);
+    if (points.length < 2) return;
+    addDrawing({ ...stroke, points });
+    tool = "pen";
+  }
+
   function moveDrawing(e: MouseEvent): boolean {
     if (!gesture && !preview) return false;
     const p = pixel(e);
+    if (tool === "pen" && preview && !gesture?.original) {
+      extendStroke(p);
+      hover = null;
+      return true;
+    }
     const point = anchor(p);
     if (!Number.isFinite(point.price) || point.price <= 0) return true;
     if (gesture) gesture.moved ||= Math.hypot(p.x - gesture.start.x, p.y - gesture.start.y) > 3;
@@ -927,7 +965,8 @@
       if (gesture.original) {
         if (gesture.moved && preview) void changeDrawings(list.map((d) => d.id === preview!.id ? preview! : d));
         preview = null;
-      } else if (tool === "ruler") cancelDrawing();
+      } else if (tool === "pen") finishStroke();
+      else if (tool === "ruler") cancelDrawing();
       else if (preview && (gesture.moved || gesture.second)) addDrawing(preview);
       gesture = null;
     }
@@ -952,9 +991,11 @@
     for (const d of items) {
       const a = screen(d.points[0]);
       const b = d.kind === "trend" ? screen(d.points[1]) : a;
+      const path = d.kind === "pen" ? d.points.map(screen) : null;
+      const box = path ? pathBounds(path) : { minX: Math.min(a.x, b.x), maxX: Math.max(a.x, b.x), minY: Math.min(a.y, b.y), maxY: Math.max(a.y, b.y) };
       const bottom = PAD.t + geo.priceH, right = width - PAD.r;
-      if (Math.max(a.y, b.y) < PAD.t || Math.min(a.y, b.y) > bottom) continue;
-      if (d.kind !== "hline" && (Math.max(a.x, b.x) < PAD.l || Math.min(a.x, b.x) > right)) continue;
+      if (box.maxY < PAD.t || box.minY > bottom) continue;
+      if (d.kind !== "hline" && (box.maxX < PAD.l || box.minX > right)) continue;
       ctx.save();
       ctx.beginPath();
       ctx.rect(PAD.l, PAD.t, geo.plotW, geo.priceH);
@@ -967,6 +1008,14 @@
       if (d.kind === "text") {
         ctx.fillText(d.text, a.x, a.y);
         if (d.id === selected) ctx.strokeRect(a.x - 2, a.y - 13, ctx.measureText(d.text).width + 4, 16);
+      } else if (path) {
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(path[0].x, path[0].y);
+        for (let i = 1; i < path.length - 1; i++) ctx.quadraticCurveTo(path[i].x, path[i].y, (path[i].x + path[i + 1].x) / 2, (path[i].y + path[i + 1].y) / 2);
+        ctx.lineTo(path[path.length - 1].x, path[path.length - 1].y);
+        ctx.stroke();
       } else {
         ctx.beginPath();
         ctx.moveTo(d.kind === "hline" ? PAD.l : a.x, a.y);
