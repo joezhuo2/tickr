@@ -5,7 +5,7 @@
   import { actionFor, bindKey, groupActions, keyLabel, rebind, type Action } from "./lib/keybinds";
   import { backdrop, dialog } from "./lib/motion";
   import { onMount } from "svelte";
-  import type { ConnectionsReport, ServiceStatus, AiConfig, AiTestResult, DataProvider, Dots, Keybinds, RefreshMode, Theme, TextSize, Palette } from "./lib/types";
+  import type { ChartTimeZone, ConnectionsReport, ServiceStatus, AiConfig, AiTestResult, DataProvider, Dots, Keybinds, RefreshMode, Theme, TextSize, Palette } from "./lib/types";
 
   let {
     theme = $bindable(),
@@ -17,6 +17,12 @@
     keybinds = $bindable(),
     dots = $bindable(),
     refreshMode = $bindable(),
+    extended,
+    shade,
+    timeZone,
+    onextended,
+    onshade,
+    ontimezone,
     onclose,
   }: {
     theme: Theme;
@@ -29,6 +35,12 @@
     keybinds: Keybinds;
     dots: Dots;
     refreshMode: RefreshMode;
+    extended: boolean;
+    shade: boolean;
+    timeZone: ChartTimeZone;
+    onextended: (enabled: boolean) => void;
+    onshade: (enabled: boolean) => void;
+    ontimezone: (zone: ChartTimeZone) => void;
     onclose: () => void;
   } = $props();
 
@@ -320,6 +332,23 @@
         </div>
       {/each}
     {/each}
+
+    <h3>Chart sessions</h3>
+    <label class="row">
+      <span>Extended-hours candles</span>
+      <input type="checkbox" checked={extended} onchange={(e) => onextended(e.currentTarget.checked)} />
+    </label>
+    <label class="row">
+      <span>Shade pre-market and after-hours</span>
+      <input type="checkbox" checked={shade} onchange={(e) => onshade(e.currentTarget.checked)} />
+    </label>
+    <label class="row">
+      <span>Chart times</span>
+      <select class="field" value={timeZone} onchange={(e) => ontimezone(e.currentTarget.value as ChartTimeZone)}>
+        <option value="exchange">Exchange time</option><option value="local">Local time</option>
+      </select>
+    </label>
+    <p class="hint">Extended-hours candles apply to the 1D chart. The tray quote has its own extended-hours setting. Local time applies to intraday candles; daily and longer candles keep exchange dates.</p>
 
     <h3>Chart dots</h3>
     {#each DOTS as d (d.id)}

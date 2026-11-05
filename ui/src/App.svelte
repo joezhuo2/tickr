@@ -34,6 +34,7 @@
     type ChartMode,
     type RefreshMode,
     type ChartScale,
+    type ChartTimeZone,
     type Market,
     type Options,
     type Consensus,
@@ -64,6 +65,7 @@
   import { refreshOutcome, type RefreshView } from "./lib/refresh";
   import { chartNote, chartSegment, chartTime, classifyChart, classifyQuote, delayLabel, localOffset, quoteNote, quoteSegment, quoteStatus, quoteTime, sourceName } from "./lib/freshness";
   import { paneIn } from "./lib/motion";
+  import { displayOffset } from "./lib/session";
   import { emptyHistory, goBack, goForward, previous, pushRecent, visit, type History, type Move } from "./lib/history";
   import { DEFAULT_WATCHLIST_SORT } from "./lib/watchlistSort";
   import { DEFAULT_EVENT_FILTER, localDay, weekRange } from "./lib/calendar";
@@ -106,6 +108,9 @@
   let mode = $state<ChartMode>("line");
   let refreshMode = $state<RefreshMode>("balanced");
   let scale = $state<ChartScale>("linear");
+  let chartExtended = $state(true);
+  let shadeSessions = $state(true);
+  let chartTimeZone = $state<ChartTimeZone>("exchange");
   let hotkey = $state("");
   let defaultHotkey = $state("");
   let hotkeyError = $state<string | null>(null);
@@ -210,7 +215,7 @@
   /** Charts fetched this session, keyed "SYMBOL|range|interval". */
   const cache = new Map<string, { chart: Chart; at: number }>();
   const FRESH_MS = 60_000;
-  const cacheKey = () => `${symbol}|${range}|${interval}`;
+  const cacheKey = () => `${symbol}|${range}|${interval}|${chartExtended && range === "1d"}`;
   /** Headlines fetched this session, keyed by symbol. */
   const newsCache = new Map<string, Article[]>();
   let newsSeq = 0;
@@ -277,6 +282,9 @@
     mode = init.chart_mode;
     refreshMode = init.refresh_mode ?? "balanced";
     scale = init.chart_scale;
+    chartExtended = init.chart_extended_hours ?? true;
+    shadeSessions = init.chart_shade_sessions ?? true;
+    chartTimeZone = init.chart_time_zone ?? "exchange";
     hotkey = init.hotkey;
     defaultHotkey = init.default_hotkey;
     hotkeyError = init.hotkey_error;
@@ -357,7 +365,7 @@
     }
     loading = true;
     try {
-      const c = await invoke<Chart>("get_chart", { symbol, range, interval });
+      const c = await invoke<Chart>("get_chart", { symbol, range, interval, extended: chartExtended });
       if (mine !== chartSeq) return;
       cache.set(key, { chart: c, at: Date.now() });
       chart = c;
@@ -472,6 +480,11 @@
   }
 
   const activeAnalysis = $derived(analysis && analysisKey === cacheKey() ? analysis : null);
+  const analysisOffset = $derived(
+    activeAnalysis && chart
+      ? displayOffset(activeAnalysis.as_of, chartTimeZone, { timezone: chart.meta.timezone, gmtoffset: chart.meta.gmtoffset }, activeAnalysis.interval)
+      : (chart?.meta.gmtoffset ?? 0),
+  );
 
   /** Runs the local technical analysis on the chart on screen. */
   async function runAnalysis(background = false) {
@@ -481,7 +494,7 @@
     analyzing = !background;
     analysisError = null;
     try {
-      const a = await invoke<Analysis>("analyze", { symbol, range, interval });
+      const a = await invoke<Analysis>("analyze", { symbol, range, interval, extended: chartExtended });
       if (mine !== analysisSeq || key !== cacheKey()) return;
       analysis = a;
       analysisKey = key;
@@ -797,6 +810,23 @@
     invoke("set_chart_scale", { scale: s }).catch(console.warn);
   }
 
+  function saveChartExtended(enabled: boolean) {
+    if (enabled === chartExtended) return;
+    chartExtended = enabled;
+    invoke("set_chart_extended_hours", { enabled }).catch(console.warn);
+    if (range === "1d") loadChart(true);
+  }
+
+  function saveShadeSessions(enabled: boolean) {
+    shadeSessions = enabled;
+    invoke("set_chart_shade_sessions", { enabled }).catch(console.warn);
+  }
+
+  function saveChartTimeZone(zone: ChartTimeZone) {
+    chartTimeZone = zone;
+    invoke("set_chart_time_zone", { zone }).catch(console.warn);
+  }
+
   function setMode(m: ChartMode) {
     if (view !== "technicals") view = "chart";
     mode = m;
@@ -1034,6 +1064,11 @@
               <option value={i}>{INTERVAL_LABELS[i] ?? i}</option>
             {/each}
           </select>
+          {#if range === "1d"}
+            <div class="seg" role="group" aria-label="Extended hours">
+              <button class:on={chartExtended} aria-pressed={chartExtended} title="Show pre-market and after-hours candles" onclick={() => saveChartExtended(!chartExtended)}>Ext</button>
+            </div>
+          {/if}
         </div>
         {#key view}
           <div class="pane" in:paneIn={view === "watchlist" ? { y: 16, speed: "slow" } : {}}>
@@ -1083,7 +1118,7 @@
             {:else if view === "technicals"}
               <div class="split">
                 {#if chart}
-                  <ChartView bind:this={chartView} redrawKey={displayKey} {chart} staleNote={chartStale} {mode} {scale} {drawings} {drawingBusy} {saveDrawings} analysis={activeAnalysis} {overlays} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
+                  <ChartView bind:this={chartView} redrawKey={displayKey} {chart} staleNote={chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={activeAnalysis} {overlays} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
                 {:else if chartError}
                   <div class="msg">
                     {chartError}
@@ -1097,7 +1132,7 @@
                   loading={analyzing}
                   error={analysisError}
                   bars={chart?.candles.length ?? 0}
-                  gmtoffset={chart?.meta.gmtoffset ?? 0}
+                  gmtoffset={analysisOffset}
                   {overlays}
                   config={indicators!}
                   presets={indicatorPresets}
@@ -1108,7 +1143,7 @@
                 />
               </div>
             {:else if chart}
-              <ChartView bind:this={chartView} redrawKey={displayKey} {chart} staleNote={chartStale} {mode} {scale} {drawings} {drawingBusy} {saveDrawings} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
+              <ChartView bind:this={chartView} redrawKey={displayKey} {chart} staleNote={chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} earnings={dots.earnings ? earnings?.history : []} ratings={dots.analysts ? ratingChanges : []} news={dots.news ? news : []} />
             {:else if chartError}
               <div class="msg">
                 {chartError}
@@ -1138,7 +1173,7 @@
       onrefresh={refresh}
     />
     {#if settingsOpen}
-      <Settings bind:theme bind:textSize bind:palette bind:refreshMode bind:hotkey bind:error={hotkeyError} {defaultHotkey} bind:keybinds bind:dots onclose={() => (settingsOpen = false)} />
+      <Settings bind:theme bind:textSize bind:palette bind:refreshMode extended={chartExtended} shade={shadeSessions} timeZone={chartTimeZone} onextended={saveChartExtended} onshade={saveShadeSessions} ontimezone={saveChartTimeZone} bind:hotkey bind:error={hotkeyError} {defaultHotkey} bind:keybinds bind:dots onclose={() => (settingsOpen = false)} />
     {/if}
   </div>
 {/if}

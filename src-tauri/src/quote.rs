@@ -34,11 +34,11 @@ pub fn intervals_for(range: &str) -> &'static [&'static str] {
     }
 }
 
-pub fn resolve_interval(range: &str, interval: &str) -> Option<(&'static str, bool)> {
-    let default = interval_for(range)?;
+pub fn resolve_interval(range: &str, interval: &str, extended: bool) -> Option<(&'static str, bool)> {
+    let (default, default_prepost) = interval_for(range)?;
     Some(match intervals_for(range).iter().find(|&&i| i == interval) {
-        Some(&i) => (i, range == "1d" && i.ends_with('m')),
-        None => default,
+        Some(&i) => (i, extended && range == "1d" && i.ends_with('m')),
+        None => (default, extended && default_prepost),
     })
 }
 
@@ -86,6 +86,7 @@ pub struct Meta {
     pub volume: Option<f64>,
     pub market_time: i64,
     pub gmtoffset: i64,
+    pub timezone: String,
     pub periods: Option<Periods>,
 }
 
@@ -95,6 +96,7 @@ pub struct Chart {
     pub meta: Meta,
     pub range: String,
     pub interval: String,
+    pub extended: bool,
     pub candles: Vec<Candle>,
     pub dividends: Vec<Dividend>,
     pub splits: Vec<Split>,
@@ -218,6 +220,7 @@ pub fn parse_chart(body: &[u8], range: &str, interval: &str) -> Result<Chart, St
         volume: f(&m["regularMarketVolume"]),
         market_time: m["regularMarketTime"].as_i64().unwrap_or_default(),
         gmtoffset: m["gmtoffset"].as_i64().unwrap_or_default(),
+        timezone: s(&m["exchangeTimezoneName"]),
         periods,
     };
 
@@ -251,7 +254,7 @@ pub fn parse_chart(body: &[u8], range: &str, interval: &str) -> Result<Chart, St
     splits.sort_by_key(|x| x.t);
     let last_bar_time = candles.last().map(|c| c.t);
     let delay_secs = yahoo_delay(&meta.symbol, &meta.exchange);
-    Ok(Chart { source: "yahoo".into(), meta, range: range.into(), interval: interval.into(), candles, dividends, splits, last_bar_time, delay_secs })
+    Ok(Chart { source: "yahoo".into(), meta, range: range.into(), interval: interval.into(), extended: false, candles, dividends, splits, last_bar_time, delay_secs })
 }
 
 const YAHOO_DELAY_MINUTES: &[(&str, i64)] = &[
@@ -387,13 +390,15 @@ pub(crate) async fn get(client: &reqwest::Client, url: &str, query: &[(&str, &st
     }
 }
 
-pub async fn fetch_chart(client: &reqwest::Client, symbol: &str, range: &str, interval: &str) -> Result<Chart, String> {
-    let (interval, prepost) = resolve_interval(range, interval).ok_or("unknown range")?;
+pub async fn fetch_chart(client: &reqwest::Client, symbol: &str, range: &str, interval: &str, extended: bool) -> Result<Chart, String> {
+    let (interval, prepost) = resolve_interval(range, interval, extended).ok_or("unknown range")?;
     let url = format!("{CHART_URL}/{}", symbol.trim().to_uppercase());
-    let prepost = if prepost { "true" } else { "false" };
-    let query = [("range", range), ("interval", interval), ("includePrePost", prepost), ("events", "div,split")];
+    let flag = if prepost { "true" } else { "false" };
+    let query = [("range", range), ("interval", interval), ("includePrePost", flag), ("events", "div,split")];
     let body = get(client, &url, &query).await?;
-    parse_chart(&body, range, interval)
+    let mut chart = parse_chart(&body, range, interval)?;
+    chart.extended = prepost;
+    Ok(chart)
 }
 
 /// 1-minute 1d chart, for the freshest price and extended-hours value.
@@ -562,16 +567,37 @@ mod tests {
     #[test]
     fn resolves_intervals_and_falls_back_to_auto() {
         for (range, expected) in RANGES.into_iter().zip(["5m", "15m", "60m", "1d", "1d", "1d", "1wk", "1mo"]) {
-            assert_eq!(resolve_interval(range, "auto"), Some((expected, range == "1d")));
-            assert_eq!(resolve_interval(range, "invalid"), interval_for(range));
+            assert_eq!(resolve_interval(range, "auto", true), Some((expected, range == "1d")));
+            assert_eq!(resolve_interval(range, "invalid", true), interval_for(range));
             for &interval in intervals_for(range) {
-                assert_eq!(resolve_interval(range, interval), Some((interval, range == "1d")));
+                assert_eq!(resolve_interval(range, interval, true), Some((interval, range == "1d")));
             }
         }
-        assert_eq!(resolve_interval("1y", "5m"), Some(("1d", false)));
-        assert_eq!(resolve_interval("1d", "1d"), Some(("5m", true)));
-        assert_eq!(resolve_interval("2h", "auto"), None);
-        assert_eq!(resolve_interval("2h", "1m"), None);
+        assert_eq!(resolve_interval("1y", "5m", true), Some(("1d", false)));
+        assert_eq!(resolve_interval("1d", "1d", true), Some(("5m", true)));
+        assert_eq!(resolve_interval("2h", "auto", true), None);
+        assert_eq!(resolve_interval("2h", "1m", true), None);
+    }
+
+    #[test]
+    fn extended_hours_off_drops_prepost_everywhere() {
+        for range in RANGES {
+            assert_eq!(resolve_interval(range, "auto", false).map(|(i, _)| i), interval_for(range).map(|(i, _)| i));
+            for interval in ["auto", "invalid"].into_iter().chain(intervals_for(range).iter().copied()) {
+                assert!(!resolve_interval(range, interval, false).unwrap().1, "{range} {interval}");
+            }
+        }
+        assert_eq!(resolve_interval("1d", "1m", false), Some(("1m", false)));
+        assert_eq!(resolve_interval("1d", "1m", true), Some(("1m", true)));
+    }
+
+    #[test]
+    fn carries_exchange_timezone() {
+        let c = day();
+        assert_eq!(c.meta.timezone, "America/New_York");
+        assert!(!c.extended);
+        let body = br#"{"chart":{"result":[{"meta":{"regularMarketPrice":1,"symbol":"X"}}]}}"#;
+        assert_eq!(parse_chart(body, "1d", "5m").unwrap().meta.timezone, "");
     }
 
     #[test]
