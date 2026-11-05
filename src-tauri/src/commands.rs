@@ -20,7 +20,7 @@ use crate::stats::Section;
 use crate::news::Article;
 use crate::quote::{self, Chart, Quote, SearchHit};
 use crate::screener::{self, ScreenRow};
-use crate::settings::{EventFilter, Theme, Palette, validate_text_size, RefreshMode, ChartMode, ChartScale, Dots, Group, WatchlistSort, SavedScreen, ScreenRule, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
+use crate::settings::{EventFilter, Theme, Palette, validate_text_size, RefreshMode, ChartMode, ChartScale, Dots, Group, WatchlistSort, WatchlistView, SavedScreen, ScreenRule, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
 use crate::state::{lock, now_secs, QuoteState, Shared};
 
 #[derive(Serialize)]
@@ -52,6 +52,7 @@ pub struct Init {
     watchlist: Vec<String>,
     groups: Vec<Group>,
     watchlist_sort: WatchlistSort,
+    watchlist_view: WatchlistView,
     screens: Vec<SavedScreen>,
     event_filter: EventFilter,
     keybinds: Keybinds,
@@ -100,6 +101,7 @@ pub fn init_payload(shared: &Shared) -> Init {
         watchlist: s.watchlist,
         groups: s.groups,
         watchlist_sort: s.watchlist_sort,
+        watchlist_view: s.watchlist_view,
         screens: s.screens,
         event_filter: s.event_filter,
         keybinds: s.keybinds,
@@ -605,6 +607,11 @@ pub fn set_groups(shared: State<'_, Arc<Shared>>, groups: Vec<Group>) -> Vec<Gro
 #[tauri::command]
 pub fn set_watchlist_sort(shared: State<'_, Arc<Shared>>, sort: WatchlistSort) {
     shared.update_settings(|s| s.watchlist_sort = sort);
+}
+
+#[tauri::command]
+pub fn set_watchlist_view(shared: State<'_, Arc<Shared>>, view: WatchlistView) {
+    shared.update_settings(|s| s.watchlist_view = view);
 }
 
 #[derive(Serialize)]

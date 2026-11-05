@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.15] - 2026-11-04
+
+### Added
+- **Watchlist heatmap** ([#98](https://github.com/joezhuo2/tickr/issues/98)):
+  toggle the watchlist between cards and a heatmap. Tiles are colored by day
+  change and sized by move magnitude, respect group tabs, and the choice is
+  saved.
+
 ## [0.10.14] - 2026-11-04
 
 ### Added

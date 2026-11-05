@@ -90,6 +90,14 @@ pub struct WatchlistSort {
     pub dir: WatchlistSortDir,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum WatchlistView {
+    #[default]
+    Cards,
+    Heatmap,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ScreenKind {
@@ -452,6 +460,7 @@ pub struct Settings {
     /// Watchlist groups, in tab order.
     pub groups: Vec<Group>,
     pub watchlist_sort: WatchlistSort,
+    pub watchlist_view: WatchlistView,
     pub screens: Vec<SavedScreen>,
     pub event_filter: EventFilter,
     /// Look for new releases in the background.
@@ -502,6 +511,7 @@ impl Default for Settings {
             watchlist: Vec::new(),
             groups: Vec::new(),
             watchlist_sort: WatchlistSort::default(),
+            watchlist_view: WatchlistView::default(),
             screens: Vec::new(),
             event_filter: EventFilter::default(),
             auto_update: true,
@@ -766,6 +776,20 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("settings.json");
         let s = Settings { watchlist_sort: WatchlistSort { key: WatchlistSortKey::Price, dir: WatchlistSortDir::Asc }, ..Settings::default() };
+        s.save(&p).unwrap();
+        assert_eq!(Settings::load(&p), s);
+    }
+
+    #[test]
+    fn watchlist_view_defaults_and_roundtrip() {
+        let old: Settings = serde_json::from_str(r#"{"symbol":"NVDA"}"#).unwrap();
+        assert_eq!(old.watchlist_view, WatchlistView::Cards);
+        let heatmap: Settings = serde_json::from_str(r#"{"watchlist_view":"heatmap"}"#).unwrap();
+        assert_eq!(heatmap.watchlist_view, WatchlistView::Heatmap);
+        assert_eq!(serde_json::to_value(WatchlistView::Heatmap).unwrap(), serde_json::json!("heatmap"));
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        let s = Settings { watchlist_view: WatchlistView::Heatmap, ..Settings::default() };
         s.save(&p).unwrap();
         assert_eq!(Settings::load(&p), s);
     }

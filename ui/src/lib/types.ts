@@ -9,6 +9,7 @@ export type ChartMode = "line" | "candles";
 export type ChartScale = "linear" | "log" | "percent";
 export type WatchlistSortKey = "change" | "price" | "volume";
 export type WatchlistSortDir = "desc" | "asc";
+export type WatchlistView = "cards" | "heatmap";
 export interface WatchlistSort {
   key: WatchlistSortKey;
   dir: WatchlistSortDir;
@@ -166,6 +167,7 @@ export interface Init {
   watchlist: string[];
   groups: Group[];
   watchlist_sort: WatchlistSort;
+  watchlist_view: WatchlistView;
   screens: SavedScreen[];
   event_filter: EventFilter;
   keybinds: Keybinds;
