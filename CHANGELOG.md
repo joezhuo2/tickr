@@ -6,6 +6,15 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.10.21] - 2026-11-05
+
+### Added
+- **Pen drawing tool** ([#139](https://github.com/joezhuo2/tickr/issues/139)):
+  draw freehand strokes on the chart. Strokes are anchored to time and price,
+  saved per symbol, and can be selected, erased and undone like other drawings.
+  The hotkey is rebindable (default 5), there is a toolbar button, and pen mode
+  stays on until Escape.
+
 ## [0.10.20] - 2026-11-04
 
 ### Added
