@@ -1040,7 +1040,7 @@
             {#if view === "watchlist"}
               <Watchlist bind:this={watchlistView} {refreshMode} symbols={watchlist} {groups} current={symbol} sort={watchlistSort} view={watchlistLayout} {screens} bind:tab={groupTab} onopen={openWatched} ongroups={saveGroups} onsort={saveSort} onview={saveWatchlistLayout} onsavescreen={saveScreen} ondeletescreen={deleteScreen} />
             {:else if view === "alerts"}
-              <Alerts {symbol} {quote} {alerts} onchange={(next) => (alerts = next)} />
+              <Alerts {symbol} {quote} {alerts} onchange={(next) => (alerts = next)} onopen={openWatched} />
             {:else if view === "analysts"}
               <Analysts {symbol} {quote} {analyst} />
             {:else if view === "earnings"}
