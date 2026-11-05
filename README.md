@@ -226,7 +226,9 @@ it is instant.
 Click the star next to the ticker to add or remove it. The star in the bottom
 bar shows starred stocks as cards, refreshed every minute: price and percent
 move for the session now trading (pre-market or after-hours when there is
-one), biggest gain first. Click a card to chart it.
+one), biggest gain first. Click a card to chart it. Switch to a heatmap to see
+the same stocks as tiles, colored by day change and sized by move size; the
+choice is saved.
 
 **Groups** split the watchlist into tabs such as "Tech" or "Crypto"; **All**
 always shows every starred stock. Click **+** and type a name to add a group.
@@ -428,8 +430,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.10.14
-git push origin v0.10.14
+git tag v0.10.15
+git push origin v0.10.15
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
