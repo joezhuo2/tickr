@@ -45,8 +45,8 @@ impl Provider {
         }
         Ok(quote)
     }
-    pub async fn fetch_chart(&self, client: &reqwest::Client, symbol: &str, range: &str, interval: &str) -> Result<Chart, String> {
-        let mut chart = quote::fetch_chart(client, symbol, range, interval).await?;
+    pub async fn fetch_chart(&self, client: &reqwest::Client, symbol: &str, range: &str, interval: &str, extended: bool) -> Result<Chart, String> {
+        let mut chart = quote::fetch_chart(client, symbol, range, interval, extended).await?;
         if let Self::Alpaca(keys, feed) = self {
             if eligible(symbol) {
                 let result = alpaca::bars(client, keys, *feed, &chart).await;

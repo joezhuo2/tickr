@@ -20,7 +20,7 @@ use crate::stats::Section;
 use crate::news::Article;
 use crate::quote::{self, Chart, Quote, SearchHit};
 use crate::screener::{self, ScreenRow};
-use crate::settings::{EventFilter, Theme, Palette, validate_text_size, RefreshMode, ChartMode, ChartScale, Dots, Group, WatchlistSort, WatchlistView, SavedScreen, ScreenRule, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
+use crate::settings::{EventFilter, ChartTimeZone, Theme, Palette, validate_text_size, RefreshMode, ChartMode, ChartScale, Dots, Group, WatchlistSort, WatchlistView, SavedScreen, ScreenRule, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
 use crate::state::{lock, now_secs, QuoteState, Shared};
 
 #[derive(Serialize)]
@@ -35,6 +35,9 @@ pub struct Init {
     chart_mode: ChartMode,
     refresh_mode: RefreshMode,
     chart_scale: ChartScale,
+    chart_extended_hours: bool,
+    chart_shade_sessions: bool,
+    chart_time_zone: ChartTimeZone,
     hotkey: String,
     default_hotkey: &'static str,
     /// Why the hotkey is not registered, if it is not.
@@ -75,7 +78,7 @@ pub fn init_payload(shared: &Shared) -> Init {
     let chart = lock(&shared.last_chart)
         .clone()
         .filter(|c| c.meta.symbol.eq_ignore_ascii_case(&s.symbol) && c.range == s.range
-            && quote::resolve_interval(&s.range, &s.interval).is_some_and(|(i, _)| c.interval == i));
+            && quote::resolve_interval(&s.range, &s.interval, s.chart_extended_hours).is_some_and(|(i, p)| c.interval == i && c.extended == p));
     let logo = lock(&shared.logo).clone().filter(|(sym, _)| *sym == s.symbol);
     let analyst = shared.analysts.cached(&s.symbol, now_secs());
     Init {
@@ -89,6 +92,9 @@ pub fn init_payload(shared: &Shared) -> Init {
         chart_mode: s.chart_mode,
         refresh_mode: s.refresh_mode,
         chart_scale: s.chart_scale,
+        chart_extended_hours: s.chart_extended_hours,
+        chart_shade_sessions: s.chart_shade_sessions,
+        chart_time_zone: s.chart_time_zone,
         hotkey: s.hotkey,
         default_hotkey: DEFAULT_HOTKEY,
         hotkey_error: lock(&shared.hotkey_error).clone(),
@@ -120,9 +126,9 @@ pub fn get_init(shared: State<'_, Arc<Shared>>) -> Init {
 }
 
 #[tauri::command]
-pub async fn get_chart(shared: State<'_, Arc<Shared>>, symbol: String, range: String, interval: String) -> Result<Chart, String> {
+pub async fn get_chart(shared: State<'_, Arc<Shared>>, symbol: String, range: String, interval: String, extended: bool) -> Result<Chart, String> {
     let revision = shared.revision();
-    let chart = crate::provider::Provider::current(&shared).fetch_chart(&shared.http, &symbol, &range, &interval).await?;
+    let chart = crate::provider::Provider::current(&shared).fetch_chart(&shared.http, &symbol, &range, &interval, extended).await?;
     let _settings = lock(&shared.settings);
     if shared.revision() != revision { return Err("Market data settings changed; try again".into()); }
     *lock(&shared.last_chart) = Some(chart.clone());
@@ -133,16 +139,16 @@ pub async fn get_chart(shared: State<'_, Arc<Shared>>, symbol: String, range: St
 /// Reuses the last fetched chart when it matches, so the analysis covers the
 /// same candles the window shows; fetches otherwise.
 #[tauri::command]
-pub async fn analyze(shared: State<'_, Arc<Shared>>, symbol: String, range: String, interval: String) -> Result<Analysis, String> {
+pub async fn analyze(shared: State<'_, Arc<Shared>>, symbol: String, range: String, interval: String, extended: bool) -> Result<Analysis, String> {
     let revision = shared.revision();
     let cached = lock(&shared.last_chart)
         .clone()
         .filter(|c| c.meta.symbol.eq_ignore_ascii_case(symbol.trim()) && c.range == range
-            && quote::resolve_interval(&range, &interval).is_some_and(|(i, _)| c.interval == i));
+            && quote::resolve_interval(&range, &interval, extended).is_some_and(|(i, p)| c.interval == i && c.extended == p));
     let chart = match cached {
         Some(c) => c,
         None => {
-            let c = crate::provider::Provider::current(&shared).fetch_chart(&shared.http, &symbol, &range, &interval).await?;
+            let c = crate::provider::Provider::current(&shared).fetch_chart(&shared.http, &symbol, &range, &interval, extended).await?;
             let _settings = lock(&shared.settings);
             if shared.revision() != revision { return Err("Market data settings changed; try again".into()); }
             *lock(&shared.last_chart) = Some(c.clone());
@@ -252,6 +258,21 @@ pub fn set_refresh_mode(shared: State<'_, Arc<Shared>>, mode: RefreshMode) {
 #[tauri::command]
 pub fn set_chart_scale(shared: State<'_, Arc<Shared>>, scale: ChartScale) {
     shared.update_settings(|s| s.chart_scale = scale);
+}
+
+#[tauri::command]
+pub fn set_chart_extended_hours(shared: State<'_, Arc<Shared>>, enabled: bool) {
+    shared.update_settings(|s| s.chart_extended_hours = enabled);
+}
+
+#[tauri::command]
+pub fn set_chart_shade_sessions(shared: State<'_, Arc<Shared>>, enabled: bool) {
+    shared.update_settings(|s| s.chart_shade_sessions = enabled);
+}
+
+#[tauri::command]
+pub fn set_chart_time_zone(shared: State<'_, Arc<Shared>>, zone: ChartTimeZone) {
+    shared.update_settings(|s| s.chart_time_zone = zone);
 }
 
 #[tauri::command]
@@ -647,7 +668,7 @@ async fn screen_symbol(shared: &Shared, provider: &crate::provider::Provider, sy
     if let Some(row) = shared.screener.cached(&symbol, now_secs(), revision) {
         return row;
     }
-    match provider.fetch_chart(&shared.http, &symbol, screener::RANGE, screener::INTERVAL).await {
+    match provider.fetch_chart(&shared.http, &symbol, screener::RANGE, screener::INTERVAL, false).await {
         Ok(chart) => {
             let row = ScreenRow::from_candles(symbol, &chart.candles);
             if row.error.is_none() && shared.revision() == revision {
@@ -842,13 +863,36 @@ mod tests {
     fn init_chart_matches_resolved_interval() {
         let dir = tempfile::tempdir().unwrap();
         let shared = Shared::new(dir.path().join("settings.json"), Default::default());
-        let chart = quote::parse_chart(include_bytes!("../../fixtures/chart-1d-post.json"), "1d", "5m").unwrap();
-        *lock(&shared.last_chart) = Some(chart);
+        let mut chart = quote::parse_chart(include_bytes!("../../fixtures/chart-1d-post.json"), "1d", "5m").unwrap();
+        chart.extended = true;
+        *lock(&shared.last_chart) = Some(chart.clone());
         for interval in ["auto", "5m", "invalid"] {
             lock(&shared.settings).interval = interval.into();
             assert!(init_payload(&shared).chart.is_some());
         }
         lock(&shared.settings).interval = "60m".into();
+        assert!(init_payload(&shared).chart.is_none());
+        lock(&shared.settings).interval = "5m".into();
+        lock(&shared.settings).chart_extended_hours = false;
+        assert!(init_payload(&shared).chart.is_none());
+        chart.extended = false;
+        *lock(&shared.last_chart) = Some(chart);
+        assert!(init_payload(&shared).chart.is_some());
+        lock(&shared.settings).chart_extended_hours = true;
+        assert!(init_payload(&shared).chart.is_none());
+    }
+
+    #[test]
+    fn tray_extended_setting_does_not_change_chart_candles() {
+        let dir = tempfile::tempdir().unwrap();
+        let shared = Shared::new(dir.path().join("settings.json"), Default::default());
+        let mut chart = quote::parse_chart(include_bytes!("../../fixtures/chart-1d-post.json"), "1d", "5m").unwrap();
+        chart.extended = true;
+        *lock(&shared.last_chart) = Some(chart);
+        lock(&shared.settings).show_extended = false;
+        assert!(init_payload(&shared).chart.is_some());
+        lock(&shared.settings).chart_extended_hours = false;
+        lock(&shared.settings).show_extended = true;
         assert!(init_payload(&shared).chart.is_none());
     }
 

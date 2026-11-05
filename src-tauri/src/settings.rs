@@ -68,6 +68,14 @@ pub enum ChartScale {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
+pub enum ChartTimeZone {
+    #[default]
+    Exchange,
+    Local,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
 pub enum WatchlistSortKey {
     #[default]
     Change,
@@ -443,6 +451,9 @@ pub struct Settings {
     pub chart_mode: ChartMode,
     pub refresh_mode: RefreshMode,
     pub chart_scale: ChartScale,
+    pub chart_extended_hours: bool,
+    pub chart_shade_sessions: bool,
+    pub chart_time_zone: ChartTimeZone,
     pub hotkey: String,
     pub geometry: Option<Geometry>,
     // Tray menu toggles.
@@ -499,6 +510,9 @@ impl Default for Settings {
             chart_mode: ChartMode::Line,
             refresh_mode: RefreshMode::Balanced,
             chart_scale: ChartScale::Linear,
+            chart_extended_hours: true,
+            chart_shade_sessions: true,
+            chart_time_zone: ChartTimeZone::Exchange,
             hotkey: DEFAULT_HOTKEY.into(),
             geometry: None,
             show_extended: true,
@@ -792,6 +806,26 @@ mod tests {
         let s = Settings { watchlist_view: WatchlistView::Heatmap, ..Settings::default() };
         s.save(&p).unwrap();
         assert_eq!(Settings::load(&p), s);
+    }
+
+    #[test]
+    fn chart_session_settings_default_and_roundtrip() {
+        let old: Settings = serde_json::from_str(r#"{"symbol":"NVDA"}"#).unwrap();
+        assert!(old.chart_extended_hours);
+        assert!(old.chart_shade_sessions);
+        assert_eq!(old.chart_time_zone, ChartTimeZone::Exchange);
+        let local: Settings = serde_json::from_str(r#"{"chart_extended_hours":false,"chart_shade_sessions":false,"chart_time_zone":"local"}"#).unwrap();
+        assert!(!local.chart_extended_hours);
+        assert!(!local.chart_shade_sessions);
+        assert_eq!(local.chart_time_zone, ChartTimeZone::Local);
+        assert_eq!(serde_json::to_value(ChartTimeZone::Local).unwrap(), serde_json::json!("local"));
+        assert!(serde_json::from_str::<Settings>(r#"{"chart_time_zone":"utc"}"#).is_err());
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        let s = Settings { chart_extended_hours: false, chart_shade_sessions: false, chart_time_zone: ChartTimeZone::Local, show_extended: false, ..Settings::default() };
+        s.save(&p).unwrap();
+        assert_eq!(Settings::load(&p), s);
+        assert!(!Settings::load(&p).show_extended);
     }
 
     #[test]

@@ -142,7 +142,7 @@ pub async fn bars(client: &reqwest::Client, keys: &AlpacaCreds, feed: Feed, char
     let timeframe = match chart.interval.as_str() {
         "1m" => "1Min", "5m" => "5Min", "15m" => "15Min", "30m" => "30Min", "60m" => "1Hour", "1d" => "1Day", "1wk" => "1Week", "1mo" => "1Month", _ => return Err("Unknown interval".into()),
     };
-    let prepost = crate::quote::resolve_interval(&chart.range, &chart.interval).is_some_and(|(_, p)| p);
+    let prepost = chart.extended;
     let intraday = chart.interval.ends_with('m');
     let mut token = String::new();
     let mut candles = Vec::new();
