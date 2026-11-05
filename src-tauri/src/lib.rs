@@ -94,6 +94,7 @@ pub fn run() {
             commands::clear_alpaca_keys,
             commands::test_alpaca,
             commands::get_chart,
+            commands::get_history,
             commands::set_chart_extended_hours,
             commands::set_chart_shade_sessions,
             commands::set_chart_time_zone,
