@@ -7,6 +7,7 @@ export type TextSize = 100 | 110 | 125 | 150;
 export type Palette = "standard" | "accessible";
 export type ChartMode = "line" | "candles";
 export type ChartScale = "linear" | "log" | "percent";
+export type ChartTimeZone = "exchange" | "local";
 export type WatchlistSortKey = "change" | "price" | "volume";
 export type WatchlistSortDir = "desc" | "asc";
 export type WatchlistView = "cards" | "heatmap";
@@ -59,6 +60,7 @@ export interface Meta {
   prev_close: number | null;
   market_time?: number;
   gmtoffset: number;
+  timezone?: string;
   periods: { pre: Period; regular: Period; post: Period } | null;
 }
 
@@ -67,6 +69,7 @@ export interface Chart {
   meta: Meta;
   range: string;
   interval: string;
+  extended?: boolean;
   candles: Candle[];
   dividends: { t: number; amount: number }[];
   splits: { t: number; ratio: string }[];
@@ -157,6 +160,9 @@ export interface Init {
   chart_mode: ChartMode;
   refresh_mode: RefreshMode;
   chart_scale: ChartScale;
+  chart_extended_hours: boolean;
+  chart_shade_sessions: boolean;
+  chart_time_zone: ChartTimeZone;
   hotkey: string;
   default_hotkey: string;
   /** Why the hotkey is not registered (taken at startup), if it is not. */

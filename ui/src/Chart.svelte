@@ -1,6 +1,7 @@
 <script lang="ts">
   import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, num, price, quarterLabel, volume } from "./lib/format";
-  import type { Analysis, Article, Chart, ChartMode, ChartScale, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
+  import { classifyBars, displayOffset, isExtendedSession, isIntraday, zoneLabel, type Clock } from "./lib/session";
+  import type { Analysis, Article, Chart, ChartMode, ChartScale, ChartTimeZone, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
   import { fitScale, forward, inverse, scaleLabel, scaleTicks } from "./lib/scale";
   import type { Drawing, DrawingPoint } from "./lib/types";
   import { timeToIndex, indexToTime, hitTest, segmentDistance, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
@@ -17,6 +18,8 @@
     saveDrawings,
     mode,
     scale = "linear",
+    shadeSessions = true,
+    timeZone = "exchange",
     analysis = null,
     overlays = null,
     earnings = [],
@@ -31,6 +34,8 @@
     saveDrawings: (symbol: string, drawings: Drawing[]) => Promise<boolean>;
     mode: ChartMode;
     scale?: ChartScale;
+    shadeSessions?: boolean;
+    timeZone?: ChartTimeZone;
     analysis?: Analysis | null;
     overlays?: Overlays | null;
     earnings?: EarningsReport[];
@@ -53,6 +58,9 @@
   const candles = $derived(chart?.candles ?? []);
   const isDay = $derived(chart?.range === "1d");
   const prevClose = $derived(isDay ? (chart?.meta.prev_close ?? null) : null);
+  const clock = $derived<Clock>({ timezone: chart?.meta.timezone, gmtoffset: chart?.meta.gmtoffset ?? 0 });
+  const sessions = $derived(chart ? classifyBars(candles.map((c) => c.t), clock, chart.meta.periods, chart.interval) : []);
+  const hasExtended = $derived(sessions.some(isExtendedSession));
 
   // Analysis overlays: only when there is an analysis and a toggle set.
   const show = $derived(analysis && overlays ? overlays : null);
@@ -215,11 +223,6 @@
     return candles[candles.length - 1].c >= base;
   });
 
-  function isExtended(t: number): boolean {
-    const p = chart?.meta.periods;
-    return isDay && !!p && (t < p.regular.start || t >= p.regular.end);
-  }
-
   function draw() {
     if (!canvas || width === 0 || height === 0) return;
     const dpr = window.devicePixelRatio || 1;
@@ -237,11 +240,11 @@
     ctx.font = `11px ${v("--font")}`;
 
     // Extended-hours shading.
-    if (isDay) {
+    if (shadeSessions && hasExtended) {
       clipPlot(ctx);
       ctx.fillStyle = v("--ext-shade");
-      candles.forEach((c, i) => {
-        if (isExtended(c.t)) ctx.fillRect(g.x(i) - g.step / 2, PAD.t, g.step + 0.5, bottom - PAD.t);
+      candles.forEach((_, i) => {
+        if (isExtendedSession(sessions[i])) ctx.fillRect(g.x(i) - g.step / 2, PAD.t, g.step + 0.5, bottom - PAD.t);
       });
       ctx.restore();
     }
@@ -272,7 +275,7 @@
       for (let i = off + Math.ceil((g.i0 - off) / every) * every; i <= g.i1; i += every) {
         const x = g.x(i);
         if (x < PAD.l || x > width - PAD.r) continue;
-        ctx.fillText(axisTime(candles[i].t, chart.meta.gmtoffset, chart.range, chart.interval), x, height - 6);
+        ctx.fillText(axisTime(candles[i].t, displayOffset(candles[i].t, timeZone, clock, chart.interval), chart.range, chart.interval), x, height - 6);
       }
     }
 
@@ -687,7 +690,7 @@
 
   $effect(() => {
     // Redraw when any of these change.
-    void [redrawKey, list, preview, selected, tool, candles, mode, width, height, hover, geo, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt];
+    void [redrawKey, list, preview, selected, tool, candles, mode, width, height, hover, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt];
     draw();
   });
 
@@ -1061,7 +1064,7 @@
     const rsi = show?.rsi && analysis ? valueAt(analysis.series.rsi, hover) : null;
     const macd = show?.macd && analysis ? analysis.series.macd.map((line) => ({ label: line.label, value: valueAt(line, hover!) })) : [];
     const pats = show?.patterns ? (patternsAt.get(hover) ?? []) : [];
-    return { c, x, left, ext: isExtended(c.t), rsi, macd, pats, earn: earningsAt.get(hover), grades: ratingsAt.get(hover) ?? [], heads: newsAt.get(hover) ?? [], div: dividendsAt.get(hover), split: splitsAt.get(hover) };
+    return { c, x, left, ext: isExtendedSession(sessions[hover]), rsi, macd, pats, earn: earningsAt.get(hover), grades: ratingsAt.get(hover) ?? [], heads: newsAt.get(hover) ?? [], div: dividendsAt.get(hover), split: splitsAt.get(hover) };
   });
 </script>
 
@@ -1128,7 +1131,7 @@
       style:right={tip.left ? `${width - tip.x + 14}px` : "auto"}
     >
       <div class="when">
-        {fullTime(tip.c.t, chart.meta.gmtoffset, chart.interval)}{#if tip.ext}<span class="ext">ext</span>{/if}
+        {fullTime(tip.c.t, displayOffset(tip.c.t, timeZone, clock, chart.interval), chart.interval)}{#if timeZone === "local" && isIntraday(chart.interval)} {zoneLabel(tip.c.t, timeZone, clock, chart.interval)}{/if}{#if tip.ext}<span class="ext">ext</span>{/if}
       </div>
       <dl>
         <dt>Open</dt><dd>{price(tip.c.o, chart.meta.currency)}</dd>
