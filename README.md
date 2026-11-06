@@ -22,14 +22,13 @@
   <a href="#license">License</a>
 </p>
 
-> A small stock watcher built with Tauri 2 and Svelte 5 for the Windows tray
-> and the macOS menu bar. The tray icon shows the company's logo with an up/down
-> badge. Hover over it for the current price, the day's change and the pre-market
-> or after-hours move. On macOS the price and change also sit next to the icon. A
-> global hotkey opens a window with a chart, the analyst consensus, earnings and
-> recent news.
+> tickr is a stock watcher and trading practice app for the Windows tray and
+> macOS menu bar. Hover over the tray icon for a quote, or use a global hotkey
+> to open charts, watchlists, alerts and market research. Compare two charts,
+> replay historical candles, and practice trades with simulated orders or
+> randomly selected setups.
 
-<p align="center"><img src="assets/screenshots/chart.png" alt="tickr window: AAPL five-year candle chart with the hover tooltip, event dots and PNG/CSV export buttons" width="85%"></p>
+<p align="center"><img src="assets/tickr-demo.gif" alt="Tickr demo showing linked chart crosshairs, candle-by-candle replay, a simulated order filling, and a historical practice result" width="100%"></p>
 
 ## Download
 
@@ -119,21 +118,8 @@ taskbar to keep it visible.
   sessions are shaded, and chart times can use the exchange or local time zone.
 - **Second chart:** the toggle (J by default) opens a second chart pane, side by
   side or stacked, with its own symbol and range. Crosshair time is linked
-  across both charts, and an optional sync toggle moves both to the same time
-  window. The layout is saved; a single chart is the default.
-- **Bar replay:** the toggle (Y by default) reveals the chart one candle at a
-  time from a chosen start date, with play/pause, stepping and playback speed.
-  Indicators and analysis use only revealed candles, and forward-looking panels
-  are hidden while replay is on. Nothing about replay is saved.
-- **Paper trading:** the Paper view (H by default) places simulated market, limit
-  and stop orders, long or short, with commission and slippage settings and
-  buying-power checks. The live account is saved to paper.json. During bar replay
-  a separate session-only account fills at the next revealed bar's open. All
-  results are simulated.
-- **Random practice:** the Q key (by default) starts a practice round that picks a random symbol
-  and start point from a watchlist group, shows the candles before it and lets
-  you choose Long, Short or Skip. The result card compares your trade with Skip.
-  Everything is labelled Simulated, and live quotes and news are hidden.
+  across both charts. Turn on **Sync** to pan and zoom both panes together.
+  tickr saves the layout across launches.
 - **Recent symbols and history:** focus the empty search box to see the last
   10 symbols you viewed. The Back and Forward buttons (or Alt+Left and
   Alt+Right) step through this session's symbols, and B jumps to the previous
@@ -182,6 +168,23 @@ taskbar to keep it visible.
   Armed alerts keep their usual 15-second cadence in either mode. Low-power pauses
   automatic minute chart and watchlist refreshes while hidden and refreshes stale
   data when shown. Quotes also refresh promptly after system wake or network recovery.
+
+### Replay and trading practice
+
+- **Bar replay** (`Y`) starts at a historical date you choose. Play at an
+  adjustable speed or step forward and back one candle at a time. Indicators
+  use only the candles you've revealed. tickr hides live quotes and research
+  panels during the session.
+- **Paper trading** (`H`) simulates market, limit and stop orders for long and
+  short positions. Set commission and slippage, track realized and unrealized
+  P&L, and review fills on the chart. The account used with current quotes is
+  saved to `paper.json`. Replay uses a separate account for the session, and
+  simulated market orders fill at the next revealed candle's open.
+- **Random historical practice** (`Q`) draws a symbol and starting point from
+  your watchlist or a group, using the candle interval and date range you pick.
+  Choose **Long**, **Short** or **Skip** with future candles hidden. Close at a
+  revealed candle's close to see your return, bars held and how you did against
+  skipping the trade.
 
 ### Views
 
@@ -248,11 +251,11 @@ it is instant.
 ### Watchlist
 
 Click the star next to the ticker to add or remove it. The star in the bottom
-bar shows starred stocks as cards, refreshed every minute: price and percent
-move for the session now trading (pre-market or after-hours when there is
-one), biggest gain first. Click a card to chart it. Switch to a heatmap to see
-the same stocks as tiles, colored by day change and sized by move size; the
-choice is saved.
+bar shows starred stocks as cards with price and percent move for the current
+session, including pre-market or after-hours when available. Sort by change,
+price or volume, or switch to a heatmap whose tiles are colored by day change
+and sized by the magnitude of the move. Use the screener to filter by RSI,
+moving averages and daily change, and save filters you want to reuse.
 
 **Groups** split the watchlist into tabs such as "Tech" or "Crypto"; **All**
 always shows every starred stock. Click **+** and type a name to add a group.
@@ -395,17 +398,15 @@ and generation time; **Regenerate** requests a fresh analysis for that event.
 
 ## Screenshots
 
-Captured with sample data. Quotes, headlines and alert levels are
-illustrative. Click an image to view it at full size.
+The demo and screenshots use sample data. Click an image to view it at full
+size.
 
 | | |
 | :---: | :---: |
-| <img src="assets/screenshots/alerts.png" alt="Price alerts with above and below thresholds, armed, paused and triggered states"><br>**Price alerts** — set levels and manage alerts across symbols | <img src="assets/screenshots/watchlist.png" alt="All starred stocks sorted by session gain, with named group tabs"><br>**Watchlist** — session prices and moves, biggest gain first |
-| <img src="assets/screenshots/watchlist-groups.png" alt="Tech watchlist group showing only its member stocks"><br>**Watchlist groups** — focus on a named set of stocks | <img src="assets/screenshots/watchlist-edit.png" alt="Editing the Tech group with selected cards, rename field and Delete button"><br>**Group editing** — select members, rename or delete a group |
-| <img src="assets/screenshots/chart.png" alt="AAPL five-year candle chart with OHLC tooltip, event dots and PNG/CSV export buttons"><br>**Chart and exports** — hover for details and copy PNG or CSV | <img src="assets/screenshots/technicals.webp" alt="Technicals with moving averages, Bollinger bands, Fibonacci levels, RSI, score and targets"><br>**Technicals** — local analysis, signals and chart overlays |
-| <img src="assets/screenshots/market.png" alt="Market overview with indices, macro quotes, sector ETFs and top gainers and losers"><br>**Market** — indices, sectors and the day's movers | <img src="assets/screenshots/news.png" alt="News headlines with publisher, time and positive, negative or neutral sentiment pills"><br>**News** — headlines with sentiment hints |
-| <img src="assets/screenshots/analysts.png" alt="Analyst price target range, current price and consensus rating distribution"><br>**Analysts** — target range and rating breakdown | <img src="assets/screenshots/earnings.png" alt="Next earnings date and estimates alongside four quarters of results and surprises"><br>**Earnings** — upcoming report and past results |
-| <img src="assets/screenshots/stats.png" alt="Key statistics grouped by valuation, trading, dividends, shares, profitability and financials"><br>**Stats** — fundamentals with color-coded changes and returns | <img src="assets/screenshots/settings.png" alt="Settings with global hotkey, all eighteen in-window keybinds including Alerts, Market, News and Analyze, and chart dot toggles" width="45%"><br>**Settings** — hotkey, keybinds and chart dots |
+| [![Five-year and one-year AAPL charts with linked crosshairs](assets/screenshots/split-charts.png)](assets/screenshots/split-charts.png)<br>**Linked charts** let you inspect the same date in two date ranges. | [![Historical AAPL chart with bar replay controls](assets/screenshots/bar-replay.png)](assets/screenshots/bar-replay.png)<br>**Bar replay** reveals candles at your pace. |
+| [![Replay chart with a buy fill and the simulated position panel](assets/screenshots/paper-trading.png)](assets/screenshots/paper-trading.png)<br>**Paper trading** shows the filled order and open position. | [![Historical practice result with return, bars held and a Skip comparison](assets/screenshots/historical-practice.png)](assets/screenshots/historical-practice.png)<br>**Historical practice** shows how a trade performed against skipping. |
+| [![AAPL candle chart with an OHLC tooltip and event markers](assets/screenshots/chart.png)](assets/screenshots/chart.png)<br>**Chart** shows candle details and lets you copy a PNG or CSV. | [![AAPL chart with indicator overlays, RSI and a technical analysis score](assets/screenshots/technicals.webp)](assets/screenshots/technicals.webp)<br>**Technicals** computes signals and targets from the chart's candles. |
+| [![Market overview with indices, macro quotes, sectors and movers](assets/screenshots/market.png)](assets/screenshots/market.png)<br>**Market** groups indices, sectors and daily movers. | [![Stock watchlist with session prices and named groups](assets/screenshots/watchlist.png)](assets/screenshots/watchlist.png)<br>**Watchlist** keeps prices and session moves for starred symbols together. |
 
 ## Data
 
