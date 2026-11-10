@@ -8,6 +8,7 @@ pub mod analysis;
 pub mod alerts;
 pub mod analyst;
 pub mod autostart;
+pub mod backup;
 pub mod calendar;
 pub mod commands;
 pub mod connections;
@@ -116,6 +117,8 @@ pub fn run() {
             commands::set_refresh_mode,
             commands::set_chart_scale,
             commands::set_hotkey,
+            commands::export_settings,
+            commands::import_settings,
             commands::set_keybinds,
             commands::set_dots,
             commands::get_ai_config,

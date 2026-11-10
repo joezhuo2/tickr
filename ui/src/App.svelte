@@ -84,7 +84,9 @@
   import type { TimeWindow } from "./lib/chartsync";
 
   // Injected before load, so the first frame already has real content.
-  const boot = window.__TICKR_INIT__ ?? null;
+  const reloaded = sessionStorage.getItem("tickr-reload-state") !== null;
+  sessionStorage.removeItem("tickr-reload-state");
+  const boot = reloaded ? null : (window.__TICKR_INIT__ ?? null);
 
   let dataProvider = $state<DataProvider>({ provider: "yahoo", feed: "iex", has_keys: false, stream: { kind: "off" } });
   let ready = $state(false);
