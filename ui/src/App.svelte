@@ -339,7 +339,6 @@
     loadNews();
     loadPaper();
   }
-  if (boot) apply(boot);
 
   const quote = $derived(qs.quote && qs.quote.symbol === symbol ? qs.quote : null);
 
@@ -1483,6 +1482,8 @@
     if (refreshMode === "low_power" && (document.hidden || loading)) return;
     if (/^\d+m$/.test(chart?.interval ?? "") && Date.now() - chartAt > FRESH_MS) loadChart(true);
   }
+
+  if (boot) apply(boot);
 
   onMount(() => {
     const onVisible = () => {
