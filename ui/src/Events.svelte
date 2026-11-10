@@ -9,10 +9,13 @@
     filterEvents,
     formatDay,
     groupByDay,
+    mergeCalendar,
     rangeLabel,
     setCountries,
     setImportance,
     toggleCountry,
+    watchEntries,
+    type EventsTab,
     type WeekRange,
   } from "./lib/calendar";
   import type { EventAnalysis, EventFilter, EventsReport, MarketEvent, WatchDates } from "./lib/types";
@@ -46,7 +49,7 @@
     loading: boolean;
     /** Unix seconds, for the relative times. */
     now: number;
-    tab: "economic" | "watchlist";
+    tab: EventsTab;
     week: WeekRange;
     weekOffset: number;
     today: string;
@@ -58,7 +61,7 @@
     watchCount: number;
     onrefresh: () => void;
     onwatchrefresh: () => void;
-    ontab: (tab: "economic" | "watchlist") => void;
+    ontab: (tab: EventsTab) => void;
     onweek: (offset: number) => void;
     onfilter: (filter: EventFilter) => void;
     onopensymbol: (symbol: string) => void;
@@ -119,6 +122,7 @@
   const offsetFor = (t: number) => -new Date(t * 1000).getTimezoneOffset() * 60;
   const visible = $derived(filterEvents(report?.events ?? [], filter));
   const days = $derived(groupByDay(visible, offsetFor));
+  const merged = $derived(mergeCalendar(report?.events ?? [], watchEntries(watchDates ?? [], today), week, filter, offsetFor));
   const options = $derived(countryOptions(report?.events ?? [], filter.countries));
   const hidden = $derived((report?.events.length ?? 0) - visible.length);
   const showCountry = $derived(filter.countries.length !== 1);
@@ -129,6 +133,17 @@
   {#if e.actual}<span>Actual <b>{e.actual}</b></span>{/if}
   {#if e.expected}<span>Expected <b>{e.expected}</b></span>{/if}
   {#if e.prior}<span>Prior <b>{e.prior}</b>{#if e.revised}<span class="muted"> (from {e.revised})</span>{/if}</span>{/if}
+{/snippet}
+
+{#snippet macroRow(e: MarketEvent)}
+  <button class="row" onclick={() => open(e)}>
+    <span class="title">{#if showCountry && e.country}<span class="cc">{e.country}</span>{/if}{e.name}</span>
+    <span class="meta">
+      {time(e.at)}{#if e.period}
+        · For {e.period}{/if}
+      {@render figures(e)}
+    </span>
+  </button>
 {/snippet}
 
 {#if selected}
@@ -205,9 +220,19 @@
     <div class="tabs" role="tablist" aria-label="Calendar">
       <button role="tab" class:on={tab === "economic"} aria-selected={tab === "economic"} onclick={() => ontab("economic")}>Economic</button>
       <button role="tab" class:on={tab === "watchlist"} aria-selected={tab === "watchlist"} onclick={() => ontab("watchlist")}>Watchlist</button>
+      <button role="tab" class:on={tab === "calendar"} aria-selected={tab === "calendar"} onclick={() => ontab("calendar")}>Calendar</button>
     </div>
     {#if tab === "economic"}
       <button class="btn" onclick={onrefresh} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</button>
+    {:else if tab === "calendar"}
+      <button
+        class="btn"
+        onclick={() => {
+          onrefresh();
+          onwatchrefresh();
+        }}
+        disabled={loading || watchLoading}>{loading || watchLoading ? "Refreshing…" : "Refresh"}</button
+      >
     {:else}
       <button class="btn" onclick={onwatchrefresh} disabled={watchLoading}>{watchLoading ? "Refreshing…" : "Refresh"}</button>
     {/if}
@@ -284,7 +309,39 @@
     </div>
   {:else}
     {#if error}<p class="err" role="alert">{error}</p>{/if}
-    {#if report.events.length === 0}
+    {#if tab === "calendar"}
+      {#if watchError}<p class="err" role="alert">{watchError}</p>{/if}
+      {#if merged.length === 0}
+        <div class="msg">
+          Nothing on your watchlist or the economic calendar for {rangeLabel(week)}
+          {#if hidden > 0}<button class="btn" onclick={() => onfilter({ countries: [], importance: "all" })}>Show everything</button>{/if}
+        </div>
+      {:else}
+        <div class="list">
+          {#each merged as d (d.key)}
+            <h3 class="day">{d.key === today ? "Today" : formatDay(d.key, { weekday: "short", month: "short", day: "numeric" })}</h3>
+            <ul>
+              {#each d.items as it (it.id)}
+                <li>
+                  {#if it.kind === "watch"}
+                    <button class="row" onclick={() => onopensymbol(it.entry.symbol)}>
+                      <span class="title">{it.entry.symbol}</span>
+                      <span class="meta">
+                        <span class="pill {it.entry.kind}">{it.entry.kind === "earnings" ? "Earnings" : "Ex-dividend"}</span>
+                        {#if it.entry.estimated}<span>Estimated date</span>{/if}
+                        {#if it.entry.eps != null}<span>EPS estimate <b>{it.entry.eps.toFixed(2)}</b></span>{/if}
+                      </span>
+                    </button>
+                  {:else}
+                    {@render macroRow(it.event)}
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          {/each}
+        </div>
+      {/if}
+    {:else if report.events.length === 0}
       <div class="msg">No economic events for {rangeLabel(week)}</div>
     {:else if visible.length === 0}
       <div class="msg">
@@ -298,14 +355,7 @@
           <ul>
             {#each d.items as e (e.id)}
               <li>
-                <button class="row" onclick={() => open(e)}>
-                  <span class="title">{#if showCountry && e.country}<span class="cc">{e.country}</span>{/if}{e.name}</span>
-                  <span class="meta">
-                    {time(e.at)}{#if e.period}
-                      · For {e.period}{/if}
-                    {@render figures(e)}
-                  </span>
-                </button>
+                {@render macroRow(e)}
               </li>
             {/each}
           </ul>
@@ -548,6 +598,12 @@
     vertical-align: 1px;
     color: #fff;
     background: var(--flat);
+  }
+  .pill.earnings {
+    background: var(--accent);
+  }
+  .pill.dividend {
+    background: var(--dividend);
   }
   .pill.up {
     background: var(--up);
