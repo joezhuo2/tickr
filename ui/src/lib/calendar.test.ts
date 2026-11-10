@@ -7,6 +7,7 @@ import {
   countryOptions,
   countrySummary,
   dayMs,
+  daysUntil,
   failedSymbols,
   filterEvents,
   filterKind,
@@ -71,6 +72,18 @@ describe("days", () => {
     expect(formatDay("2026-11-04", undefined, "en-US")).toBe("Nov 4");
     expect(formatDay("2026-11-04", { weekday: "short", month: "short", day: "numeric" }, "en-US")).toBe("Wed, Nov 4");
     expect(formatDay("junk")).toBe("junk");
+  });
+});
+
+describe("daysUntil", () => {
+  it("counts calendar days ahead and is blank for past or bad dates", () => {
+    expect(daysUntil("2026-11-10", "2026-11-10")).toBe(0);
+    expect(daysUntil("2026-11-11", "2026-11-10")).toBe(1);
+    expect(daysUntil("2027-01-05", "2026-12-30")).toBe(6);
+    expect(daysUntil("2028-03-01", "2028-02-28")).toBe(2);
+    expect(daysUntil("2026-11-09", "2026-11-10")).toBeNull();
+    expect(daysUntil("2026-02-30", "2026-02-01")).toBeNull();
+    expect(daysUntil("soon", "2026-11-10")).toBeNull();
   });
 });
 

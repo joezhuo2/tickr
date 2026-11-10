@@ -49,6 +49,7 @@
     type Group,
     type WatchlistSort,
     type WatchlistView,
+    type WatchlistColumns,
     type SavedScreen,
     type ScreenRule,
     type Init,
@@ -79,8 +80,8 @@
   import { paneIn } from "./lib/motion";
   import { displayOffset, isIntraday } from "./lib/session";
   import { emptyHistory, goBack, goForward, previous, pushRecent, visit, type History, type Move } from "./lib/history";
-  import { DEFAULT_WATCHLIST_SORT } from "./lib/watchlistSort";
   import { DEFAULT_EVENT_FILTER, localDay, weekRange, type EventsTab } from "./lib/calendar";
+  import { DEFAULT_WATCHLIST_COLUMNS, DEFAULT_WATCHLIST_SORT } from "./lib/watchlistSort";
   import type { TimeWindow } from "./lib/chartsync";
 
   // Injected before load, so the first frame already has real content.
@@ -201,6 +202,7 @@
   let groups = $state<Group[]>([]);
   let watchlistSort = $state<WatchlistSort>(DEFAULT_WATCHLIST_SORT);
   let watchlistLayout = $state<WatchlistView>("cards");
+  let watchlistColumns = $state<WatchlistColumns>(DEFAULT_WATCHLIST_COLUMNS);
   let screens = $state<SavedScreen[]>([]);
   let groupTab = $state<string | null>(null);
   let alerts = $state<PriceAlert[]>([]);
@@ -326,6 +328,7 @@
     groups = init.groups ?? [];
     watchlistSort = init.watchlist_sort ?? DEFAULT_WATCHLIST_SORT;
     watchlistLayout = init.watchlist_view ?? "cards";
+    watchlistColumns = init.watchlist_columns ?? DEFAULT_WATCHLIST_COLUMNS;
     screens = init.screens ?? [];
     eventFilter = savedEventFilter = init.event_filter ?? DEFAULT_EVENT_FILTER;
     alerts = init.alerts ?? [];
@@ -1110,6 +1113,11 @@
     invoke("set_watchlist_view", { view: next }).catch(console.warn);
   }
 
+  function saveWatchlistColumns(next: WatchlistColumns) {
+    watchlistColumns = next;
+    invoke("set_watchlist_columns", { columns: next }).catch(console.warn);
+  }
+
   async function saveScreen(name: string, rules: ScreenRule[]): Promise<string | undefined> {
     try {
       screens = await invoke<SavedScreen[]>("save_screen", { name, rules });
@@ -1724,7 +1732,7 @@
         {#key view}
           <div class="pane" in:paneIn={view === "watchlist" ? { y: 16, speed: "slow" } : {}}>
             {#if view === "watchlist"}
-              <Watchlist bind:this={watchlistView} {refreshMode} symbols={watchlist} {groups} current={symbol} sort={watchlistSort} view={watchlistLayout} {screens} bind:tab={groupTab} onopen={openWatched} ongroups={saveGroups} onsort={saveSort} onview={saveWatchlistLayout} onsavescreen={saveScreen} ondeletescreen={deleteScreen} />
+              <Watchlist bind:this={watchlistView} {refreshMode} symbols={watchlist} {groups} current={symbol} sort={watchlistSort} view={watchlistLayout} columns={watchlistColumns} {screens} bind:tab={groupTab} onopen={openWatched} ongroups={saveGroups} onsort={saveSort} onview={saveWatchlistLayout} oncolumns={saveWatchlistColumns} onsavescreen={saveScreen} ondeletescreen={deleteScreen} />
             {:else if view === "alerts"}
               <Alerts {symbol} {quote} {alerts} onchange={(next) => (alerts = next)} onopen={openWatched} />
             {:else if view === "analysts"}

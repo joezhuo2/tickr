@@ -22,6 +22,13 @@ export function addDays(day: string, days: number): string {
   return new Date(ms + days * DAY_MS).toISOString().slice(0, 10);
 }
 
+export function daysUntil(day: string, today: string): number | null {
+  const at = dayMs(day);
+  const from = dayMs(today);
+  if (at === null || from === null || at < from) return null;
+  return Math.round((at - from) / DAY_MS);
+}
+
 export interface WeekRange {
   start: string;
   last: string;

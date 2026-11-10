@@ -19,7 +19,13 @@ export interface ChartLayout {
 }
 export type WatchlistSortKey = "change" | "price" | "volume";
 export type WatchlistSortDir = "desc" | "asc";
-export type WatchlistView = "cards" | "heatmap";
+export type WatchlistView = "cards" | "heatmap" | "table";
+export interface WatchlistColumns {
+  score: boolean;
+  rsi: boolean;
+  earnings: boolean;
+  iv_rank: boolean;
+}
 export interface WatchlistSort {
   key: WatchlistSortKey;
   dir: WatchlistSortDir;
@@ -43,6 +49,14 @@ export interface ScreenRow {
   sma20: number | null;
   sma50: number | null;
   sma200: number | null;
+  score: number | null;
+  bias: Bias | null;
+  error: string | null;
+}
+export interface IvRank {
+  symbol: string;
+  iv: number | null;
+  rank: number | null;
   error: string | null;
 }
 
@@ -190,6 +204,7 @@ export interface Init {
   groups: Group[];
   watchlist_sort: WatchlistSort;
   watchlist_view: WatchlistView;
+  watchlist_columns: WatchlistColumns;
   screens: SavedScreen[];
   event_filter: EventFilter;
   keybinds: Keybinds;
