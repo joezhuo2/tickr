@@ -324,6 +324,7 @@ pub struct Keybinds {
     pub analyze: String,
     pub options: String,
     pub paper: String,
+    pub backtest: String,
     pub options_side: String,
     pub options_expiry: String,
     pub add_watchlist: String,
@@ -361,6 +362,7 @@ impl Default for Keybinds {
             analyze: "z".into(),
             options: "o".into(),
             paper: "h".into(),
+            backtest: ".".into(),
             options_side: "u".into(),
             options_expiry: "d".into(),
             add_watchlist: "f".into(),
@@ -816,6 +818,7 @@ mod tests {
         assert_eq!(s.keybinds.chart_replay, "y");
         assert_eq!(s.keybinds.practice, "q");
         assert_eq!(s.keybinds.paper, "h");
+        assert_eq!(s.keybinds.backtest, ".");
         assert_eq!(s.keybinds.settings, ",");
         assert_eq!(s.keybinds.toggle_watchlist, "w");
         assert_eq!(s.keybinds.watchlist, "x");

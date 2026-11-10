@@ -29,6 +29,7 @@ const DEFAULTS: Keybinds = {
   analyze: "z",
   options: "o",
   paper: "h",
+  backtest: ".",
   options_side: "u",
   options_expiry: "d",
   add_watchlist: "f",
@@ -169,7 +170,7 @@ describe("groupActions", () => {
   });
   it("keeps actions in their declared order within a group", () => {
     const panels = groupActions().find((g) => g.id === "panels")!;
-    expect(panels.actions.map((a) => a.id)).toEqual(["technicals", "analyze", "analysts", "earnings", "alerts", "market", "events", "news", "options", "paper"]);
+    expect(panels.actions.map((a) => a.id)).toEqual(["technicals", "analyze", "analysts", "earnings", "alerts", "market", "events", "news", "options", "paper", "backtest"]);
   });
   it("puts the options actions in their own group", () => {
     const options = groupActions().find((g) => g.id === "options")!;

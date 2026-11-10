@@ -38,6 +38,7 @@ export const ACTIONS: { id: Action; label: string; category: Category }[] = [
   { id: "news", label: "Open News", category: "panels" },
   { id: "options", label: "Open Options", category: "panels" },
   { id: "paper", label: "Open Paper trading", category: "panels" },
+  { id: "backtest", label: "Open Strategy backtest", category: "panels" },
   { id: "options_side", label: "Switch calls / puts", category: "options" },
   { id: "options_expiry", label: "Next expiry date", category: "options" },
   { id: "toggle_watchlist", label: "Toggle Watchlist", category: "watchlist" },
