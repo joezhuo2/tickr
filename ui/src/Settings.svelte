@@ -146,6 +146,55 @@
     }
   }
 
+  let backupStatus = $state("");
+  let backupError = $state(false);
+  let pendingImport = $state<string | null>(null);
+
+  async function exportBackup() {
+    backupStatus = "";
+    backupError = false;
+    try {
+      const text = await invoke<string>("export_settings");
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+      link.download = `tickr-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+      backupStatus = "Exported";
+    } catch (e) {
+      backupStatus = String(e);
+      backupError = true;
+    }
+  }
+
+  async function chooseBackup(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    backupStatus = "";
+    backupError = false;
+    if (!file) return;
+    try {
+      pendingImport = await file.text();
+    } catch (err) {
+      backupStatus = String(err);
+      backupError = true;
+    }
+  }
+
+  async function importBackup() {
+    const text = pendingImport;
+    pendingImport = null;
+    try {
+      await invoke("import_settings", { text });
+      sessionStorage.setItem("tickr-reload-state", "1");
+      location.reload();
+    } catch (e) {
+      backupStatus = String(e);
+      backupError = true;
+    }
+  }
+
   onMount(() => {
     loadConnections();
     invoke<DataProvider>("get_data_provider").then((c) => (market = c)).catch((e) => (marketStatus = { text: String(e), ok: false }));
@@ -415,6 +464,22 @@
     <p class:error={aiStatus && !aiStatus.ok} class="hint">
       {aiStatus ? aiStatus.text : "Any OpenAI-compatible endpoint. Leave a feature's model blank to use Model. Saved to .env.local; keyword tone is the fallback."}
     </p>
+    <h3>Backup</h3>
+    <div class="row">
+      <button class="link" onclick={exportBackup}>Export</button>
+      <label class="link">
+        Import
+        <input type="file" accept=".json,application/json" hidden onchange={chooseBackup} />
+      </label>
+    </div>
+    {#if pendingImport !== null}
+      <p class="hint" role="alert">Replace your settings, drawings and watchlists with this backup?</p>
+      <div class="row">
+        <button class="link" onclick={importBackup}>Replace</button>
+        <button class="link" onclick={() => (pendingImport = null)}>Cancel</button>
+      </div>
+    {/if}
+    <p class="hint" class:error={backupError} role="status">{backupStatus || "Saves settings, drawings, watchlists and alerts to a file. API keys are not included."}</p>
     <h3>Connections</h3>
     {#if connections}
       {#each connections.services as service (service.id)}
