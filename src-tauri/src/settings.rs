@@ -241,7 +241,7 @@ pub fn validate_screen_rules(rules: &[ScreenRule]) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_screen_name(name: &str) -> Result<String, String> {
+pub fn validate_screen_name(name: &str) -> Result<String, String> {
     let name = name.trim();
     if !(1..=40).contains(&name.chars().count()) { return Err("Filter names must contain 1 to 40 characters".into()); }
     Ok(name.into())
@@ -483,7 +483,7 @@ pub fn validate_indicators(config: &IndicatorConfig, presets: &[IndicatorPreset]
     Ok(())
 }
 
-fn validate_preset_name(name: &str) -> Result<String, String> {
+pub fn validate_preset_name(name: &str) -> Result<String, String> {
     let name = name.trim();
     if !(1..=40).contains(&name.chars().count()) { return Err("Preset names must contain 1 to 40 characters".into()); }
     Ok(name.into())

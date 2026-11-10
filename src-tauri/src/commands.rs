@@ -321,6 +321,39 @@ pub fn set_hotkey(app: AppHandle, shared: State<'_, Arc<Shared>>, hotkey: String
 }
 
 #[tauri::command]
+pub fn export_settings(shared: State<'_, Arc<Shared>>) -> Result<String, String> {
+    crate::backup::export(&lock(&shared.settings), env!("CARGO_PKG_VERSION"), now_secs())
+}
+
+#[tauri::command]
+pub fn import_settings(app: AppHandle, shared: State<'_, Arc<Shared>>, text: String) -> Result<(), String> {
+    let mut next = crate::backup::parse(&text)?;
+    let mut settings = lock(&shared.settings);
+    next.data_provider = settings.data_provider.clone();
+    next.alpaca_feed = settings.alpaca_feed.clone();
+    next.geometry = settings.geometry;
+    next.autostart = settings.autostart;
+    let old_hotkey = settings.hotkey.clone();
+    crate::hotkey::swap(&app, &old_hotkey, &next.hotkey)?;
+    if let Err(e) = next.save(&shared.settings_path) {
+        let _ = crate::hotkey::swap(&app, &next.hotkey, &old_hotkey);
+        return Err(format!("Could not save imported settings: {e}"));
+    }
+    *settings = next;
+    let (theme, text_size) = (settings.theme, settings.text_size);
+    drop(settings);
+    lock(&shared.alert_prices).clear();
+    *lock(&shared.hotkey_error) = None;
+    if let Some(win) = crate::window::get(&app) {
+        let _ = win.set_background_color(Some(crate::window::background(theme)));
+        let _ = win.set_zoom(f64::from(text_size) / 100.0);
+    }
+    crate::tray::update(&app, &shared);
+    shared.wake.notify_one();
+    Ok(())
+}
+
+#[tauri::command]
 pub fn set_keybinds(shared: State<'_, Arc<Shared>>, keybinds: Keybinds) {
     shared.update_settings(|s| s.keybinds = keybinds);
 }
@@ -613,7 +646,7 @@ pub fn open_news(url: String) -> Result<(), String> {
 }
 
 /// Upper-cased, trimmed, without blanks or repeats; order kept.
-fn clean_symbols(symbols: Vec<String>) -> Vec<String> {
+pub(crate) fn clean_symbols(symbols: Vec<String>) -> Vec<String> {
     let mut out: Vec<String> = Vec::with_capacity(symbols.len());
     for s in symbols {
         let s = s.trim().to_uppercase();
@@ -625,7 +658,7 @@ fn clean_symbols(symbols: Vec<String>) -> Vec<String> {
 }
 
 /// Trims and dedupes group names, and keeps only starred symbols in each.
-fn clean_groups(groups: Vec<Group>, watchlist: &[String]) -> Vec<Group> {
+pub(crate) fn clean_groups(groups: Vec<Group>, watchlist: &[String]) -> Vec<Group> {
     let mut out: Vec<Group> = Vec::with_capacity(groups.len());
     for g in groups {
         let name = g.name.trim().to_string();

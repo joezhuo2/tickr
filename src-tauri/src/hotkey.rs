@@ -14,7 +14,7 @@ pub fn plugin() -> TauriPlugin<Wry> {
         .build()
 }
 
-fn parse(accel: &str) -> Result<Shortcut, String> {
+pub fn parse(accel: &str) -> Result<Shortcut, String> {
     accel.parse::<Shortcut>().map_err(|e| format!("invalid hotkey \"{accel}\": {e}"))
 }
 
