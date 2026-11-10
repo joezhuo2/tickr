@@ -68,6 +68,8 @@
   import * as Practice from "./lib/practice";
   import PaperView from "./Paper.svelte";
   import * as Paper from "./lib/paper";
+  import BacktestView from "./Backtest.svelte";
+  import * as Backtest from "./lib/backtest";
   import { fullTime } from "./lib/format";
   import { overlayVisibility, shouldAnalyze } from "./lib/indicators";
   import { applyDisplay } from "./lib/display";
@@ -203,6 +205,7 @@
   let recent = $state<string[]>([]);
   let history = $state<History>(emptyHistory());
   let paper = $state.raw<Paper.Account>(Paper.newAccount());
+  let backtestRules = $state.raw<Backtest.Rules | null>(null);
   let paperLoaded = $state(false);
   let paperWrite = Promise.resolve();
   let paperError = $state<string | null>(null);
@@ -883,6 +886,11 @@
     });
   });
 
+  function chartWhen(t: number): string {
+    const c = mainChart;
+    return c ? fullTime(t, displayOffset(t, chartTimeZone, { timezone: c.meta.timezone, gmtoffset: c.meta.gmtoffset }, c.interval), c.interval) : "";
+  }
+
   function paperWhen(t: number): string {
     if (replay) return replayWhen(t);
     return fullTime(t, localOffset(t), "1m");
@@ -962,7 +970,15 @@
   const chartEarnings = $derived(dots.earnings && !practice ? (replay ? Replay.known(earnings?.history ?? [], (e) => e.reported, replayCutoff) : earnings?.history) : []);
   const chartRatings = $derived(dots.analysts && !practice ? (replay ? Replay.known(ratingChanges, (r) => r.date, replayCutoff) : ratingChanges) : []);
   const chartNews = $derived(dots.news && !practice ? (replay ? Replay.known(news ?? [], (a) => a.published, replayCutoff) : news) : []);
-  const chartFills = $derived(practice ? Practice.markers(practiceResult, replayBars) : paperFills);
+  const backtestReport = $derived.by(() => {
+    if (!backtestRules || !mainChart?.candles.length) return null;
+    try {
+      return Backtest.backtest(mainChart.candles, backtestRules);
+    } catch {
+      return null;
+    }
+  });
+  const chartFills = $derived(practice ? Practice.markers(practiceResult, replayBars) : view === "backtest" ? Backtest.markers(backtestReport) : paperFills);
 
   /** Runs the local technical analysis on the chart on screen. */
   async function runAnalysis(background = false) {
@@ -1115,7 +1131,7 @@
 
   function setRange(r: string) {
     // The Technicals view keeps its split chart across range changes.
-    if (view !== "technicals" && view !== "paper") view = "chart";
+    if (view !== "technicals" && view !== "paper" && view !== "backtest") view = "chart";
     if (r === range) return;
     exitReplay();
     range = r;
@@ -1334,7 +1350,7 @@
   }
 
   function setMode(m: ChartMode) {
-    if (view !== "technicals" && view !== "paper") view = "chart";
+    if (view !== "technicals" && view !== "paper" && view !== "backtest") view = "chart";
     mode = m;
     invoke("set_chart_mode", { mode: m }).catch(console.warn);
   }
@@ -1416,7 +1432,7 @@
       case "draw_ruler":
       case "draw_pen": {
         if (e.repeat) break;
-        if (view !== "chart" && view !== "technicals" && view !== "paper") view = "chart";
+        if (view !== "chart" && view !== "technicals" && view !== "paper" && view !== "backtest") view = "chart";
         await tick();
         const tools = { draw_level: "hline", draw_trend: "trend", draw_text: "text", draw_ruler: "ruler", draw_pen: "pen" } as const;
         chartView?.drawTool(tools[action]);
@@ -1436,6 +1452,9 @@
         break;
       case "paper":
         if (!e.repeat) view = view === "paper" ? "chart" : "paper";
+        break;
+      case "backtest":
+        if (!e.repeat) view = view === "backtest" ? "chart" : "backtest";
         break;
       case "market":
         if (!e.repeat) toggleMarket();
@@ -1581,7 +1600,7 @@
         <div class="range-controls">
           <div class="ranges" role="tablist">
             {#each RANGES as r (r.id)}
-              {@const on = !practice && (view === "chart" || view === "technicals" || view === "paper") && range === r.id}
+              {@const on = !practice && (view === "chart" || view === "technicals" || view === "paper" || view === "backtest") && range === r.id}
               <button role="tab" aria-selected={on} class:on disabled={!!practice} onclick={() => setRange(r.id)}>
                 {r.label}
               </button>
@@ -1612,6 +1631,9 @@
             </button>
             <button role="tab" aria-selected={view === "paper"} class:on={view === "paper"} title={`Simulated paper trading (${keyLabel(keybinds.paper)})`} disabled={!!practice} onclick={() => (view = view === "paper" ? "chart" : "paper")}>
               Paper
+            </button>
+            <button role="tab" aria-selected={view === "backtest"} class:on={view === "backtest"} title={`Backtest a rule-based strategy (${keyLabel(keybinds.backtest)})`} disabled={!!replay} onclick={() => (view = view === "backtest" ? "chart" : "backtest")}>
+              Strategy
             </button>
             {#if view === "news" ? (newsScope === "symbol" ? newsLoading : feedLoading) : view === "market" ? marketLoading : view === "events" ? (eventsTab === "watchlist" ? watchCalLoading : eventsLoading) : view === "options" ? optionsLoading : loading || (view === "technicals" && analyzing)}<span
                 class="spin"
@@ -1801,6 +1823,20 @@
                 {:else}
                   <div class="msg">{paperError ?? "Loading the simulated account…"}</div>
                 {/if}
+              </div>
+            {:else if view === "backtest"}
+              <div class="split">
+                {#if mainChart}
+                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} earnings={chartEarnings} ratings={chartRatings} news={chartNews} fills={chartFills} />
+                {:else if chartError}
+                  <div class="msg">
+                    {chartError}
+                    <button class="retry" onclick={() => loadChart(true)}>Retry</button>
+                  </div>
+                {:else}
+                  <ChartSkeleton />
+                {/if}
+                <BacktestView report={backtestReport} bars={mainChart?.candles.length ?? 0} currency={mainChart?.meta.currency ?? "USD"} when={chartWhen} onrun={(rules) => (backtestRules = rules)} />
               </div>
             {:else}
               <div class="charts" class:stacked={split && layout.orientation === "stacked"}>

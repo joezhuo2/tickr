@@ -251,6 +251,7 @@ export interface Keybinds {
   analyze: string;
   options: string;
   paper: string;
+  backtest: string;
   options_side: string;
   options_expiry: string;
   add_watchlist: string;

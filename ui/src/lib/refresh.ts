@@ -1,4 +1,4 @@
-export type RefreshView = "chart" | "alerts" | "technicals" | "analysts" | "earnings" | "stats" | "financials" | "options" | "market" | "events" | "news" | "watchlist" | "paper";
+export type RefreshView = "chart" | "alerts" | "technicals" | "analysts" | "earnings" | "stats" | "financials" | "options" | "market" | "events" | "news" | "watchlist" | "paper" | "backtest";
 
 export const REFRESH_LABELS: Record<RefreshView, string> = {
   chart: "Chart",
@@ -14,6 +14,7 @@ export const REFRESH_LABELS: Record<RefreshView, string> = {
   news: "News",
   watchlist: "Watchlist",
   paper: "Paper trading",
+  backtest: "Strategy backtest",
 };
 
 export function refreshOutcome(view: RefreshView, error?: string | null): { text: string; error: boolean } {
