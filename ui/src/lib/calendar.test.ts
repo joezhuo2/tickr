@@ -14,6 +14,7 @@ import {
   groupByDate,
   groupByDay,
   isKeyRelease,
+  mergeCalendar,
   localDay,
   rangeLabel,
   sameFilter,
@@ -344,5 +345,52 @@ describe("watchEntries", () => {
 
   it("names the symbols that failed", () => {
     expect(failedSymbols([dates("A"), dates("B", { error: "x" }), dates("C", { error: "y" })])).toEqual(["B", "C"]);
+  });
+});
+
+describe("mergeCalendar", () => {
+  const range = weekRange("2026-11-02", 0);
+  const noon = (day: string, h = 12) => Date.parse(`${day}T${String(h).padStart(2, "0")}:00:00Z`) / 1000;
+  const utc = () => 0;
+  const all: EventFilter = { countries: [], importance: "all" };
+  const entries = watchEntries(
+    [
+      dates("MSFT", { earnings: { date: "2026-11-04", estimated: false, eps_estimate: 1 }, ex_dividend: "2026-11-04" }),
+      dates("AAPL", { earnings: { date: "2026-11-04", estimated: true, eps_estimate: null } }),
+      dates("LATE", { earnings: { date: "2026-11-20", estimated: false, eps_estimate: null } }),
+    ],
+    "2026-11-02",
+  );
+  const events = [event("GDP", "US", noon("2026-11-04", 14)), event("CPI", "US", noon("2026-11-04", 9)), event("CPI", "GB", noon("2026-11-03")), event("Housing", "US", noon("2026-11-06"))];
+
+  it("orders days, then watch rows before macro rows by time", () => {
+    const days = mergeCalendar(events, entries, range, all, utc);
+    expect(days.map((d) => d.key)).toEqual(["2026-11-03", "2026-11-04", "2026-11-06"]);
+    expect(days[1].items.map((i) => (i.kind === "watch" ? `${i.entry.symbol}-${i.entry.kind}` : i.event.name))).toEqual([
+      "AAPL-earnings",
+      "MSFT-earnings",
+      "MSFT-dividend",
+      "CPI",
+      "GDP",
+    ]);
+  });
+
+  it("keeps only watch dates inside the week", () => {
+    const days = mergeCalendar([], entries, range, all, utc);
+    expect(days.flatMap((d) => d.items).some((i) => i.kind === "watch" && i.entry.symbol === "LATE")).toBe(false);
+    expect(mergeCalendar([], entries, weekRange("2026-11-02", 2), all, utc).map((d) => d.key)).toEqual(["2026-11-20"]);
+  });
+
+  it("applies country and key filters to macro rows only", () => {
+    const us = mergeCalendar(events, entries, range, { countries: ["US"], importance: "all" }, utc);
+    expect(us.map((d) => d.key)).toEqual(["2026-11-04", "2026-11-06"]);
+    const key = mergeCalendar(events, entries, range, { countries: ["US"], importance: "key" }, utc);
+    expect(key.map((d) => d.key)).toEqual(["2026-11-04"]);
+    expect(key[0].items.filter((i) => i.kind === "watch")).toHaveLength(3);
+  });
+
+  it("is empty with nothing to show", () => {
+    expect(mergeCalendar([], [], range, all, utc)).toEqual([]);
+    expect(mergeCalendar(events, [], range, { countries: ["JP"], importance: "all" }, utc)).toEqual([]);
   });
 });

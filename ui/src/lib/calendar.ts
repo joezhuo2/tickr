@@ -175,3 +175,26 @@ export function groupByDate(entries: WatchEntry[]): DayGroup<WatchEntry>[] {
 export function failedSymbols(dates: WatchDates[]): string[] {
   return dates.filter((d) => d.error).map((d) => d.symbol);
 }
+
+export type EventsTab = "economic" | "watchlist" | "calendar";
+
+export type CalendarItem = { kind: "macro"; id: string; event: MarketEvent } | { kind: "watch"; id: string; entry: WatchEntry };
+
+export function mergeCalendar(
+  events: MarketEvent[],
+  entries: WatchEntry[],
+  range: WeekRange,
+  filter: EventFilter,
+  offsetFor: (t: number) => number,
+): DayGroup<CalendarItem>[] {
+  const macro = groupByDay(filterEvents(events, filter), offsetFor);
+  const watch = groupByDate(entries.filter((e) => e.date >= range.start && e.date < range.end));
+  const keys = [...new Set([...macro, ...watch].map((g) => g.key))].sort();
+  return keys.map((key) => ({
+    key,
+    items: [
+      ...(watch.find((g) => g.key === key)?.items ?? []).map((entry): CalendarItem => ({ kind: "watch", id: entry.id, entry })),
+      ...(macro.find((g) => g.key === key)?.items ?? []).map((event): CalendarItem => ({ kind: "macro", id: event.id, event })),
+    ],
+  }));
+}

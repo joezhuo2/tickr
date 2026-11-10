@@ -80,7 +80,7 @@
   import { displayOffset, isIntraday } from "./lib/session";
   import { emptyHistory, goBack, goForward, previous, pushRecent, visit, type History, type Move } from "./lib/history";
   import { DEFAULT_WATCHLIST_SORT } from "./lib/watchlistSort";
-  import { DEFAULT_EVENT_FILTER, localDay, weekRange } from "./lib/calendar";
+  import { DEFAULT_EVENT_FILTER, localDay, weekRange, type EventsTab } from "./lib/calendar";
   import type { TimeWindow } from "./lib/chartsync";
 
   // Injected before load, so the first frame already has real content.
@@ -159,7 +159,7 @@
   let eventsError = $state<string | null>(null);
   let eventsLoading = $state(false);
   let eventsSeq = 0;
-  let eventsTab = $state<"economic" | "watchlist">("economic");
+  let eventsTab = $state<EventsTab>("economic");
   let eventsWeek = $state(0);
   const eventsCache = new Map<string, EventsReport>();
   let eventFilter = $state<EventFilter>(DEFAULT_EVENT_FILTER);
@@ -262,7 +262,7 @@
   $effect(() => {
     void watchlist;
     untrack(() => {
-      if (view === "events" && eventsTab === "watchlist" && watchCal) loadWatchCalendar();
+      if (view === "events" && eventsTab !== "economic" && watchCal) loadWatchCalendar();
     });
   });
 
@@ -1197,7 +1197,7 @@
   $effect(() => {
     void eventsRange.start;
     untrack(() => {
-      if (view === "events" && eventsTab === "economic") loadEvents();
+      if (view === "events" && eventsTab !== "watchlist") loadEvents();
     });
   });
 
@@ -1220,11 +1220,11 @@
   }
 
   function loadEventsView() {
-    if (eventsTab === "watchlist") loadWatchCalendar();
-    else loadEvents();
+    if (eventsTab !== "economic") loadWatchCalendar();
+    if (eventsTab !== "watchlist") loadEvents();
   }
 
-  function showEventsTab(tab: "economic" | "watchlist") {
+  function showEventsTab(tab: EventsTab) {
     eventsTab = tab;
     loadEventsView();
   }
@@ -1298,7 +1298,7 @@
       case "stats": panelDone = loadStats(true); break;
       case "financials": panelDone = loadFinancials(true); break;
       case "analysts": panelDone = Promise.all([loadAnalyst(true), loadRatingChanges(true)]).then((errors) => errors.find(Boolean)); break;
-      case "events": panelDone = eventsTab === "watchlist" ? loadWatchCalendar(true, true) : loadEvents(true, true); break;
+      case "events": panelDone = eventsTab === "watchlist" ? loadWatchCalendar(true, true) : eventsTab === "calendar" ? Promise.all([loadEvents(true, true), loadWatchCalendar(true, true)]).then((errors) => errors.find(Boolean)) : loadEvents(true, true); break;
       case "market": panelDone = loadMarket(true); break;
       case "options": panelDone = loadOptions(options?.expiry ?? undefined, true); break;
       case "watchlist": panelDone = watchlistView?.refresh() ?? Promise.resolve(); break;
@@ -1635,7 +1635,7 @@
             <button role="tab" aria-selected={view === "backtest"} class:on={view === "backtest"} title={`Backtest a rule-based strategy (${keyLabel(keybinds.backtest)})`} disabled={!!replay} onclick={() => (view = view === "backtest" ? "chart" : "backtest")}>
               Strategy
             </button>
-            {#if view === "news" ? (newsScope === "symbol" ? newsLoading : feedLoading) : view === "market" ? marketLoading : view === "events" ? (eventsTab === "watchlist" ? watchCalLoading : eventsLoading) : view === "options" ? optionsLoading : loading || (view === "technicals" && analyzing)}<span
+            {#if view === "news" ? (newsScope === "symbol" ? newsLoading : feedLoading) : view === "market" ? marketLoading : view === "events" ? (eventsTab === "watchlist" ? watchCalLoading : eventsTab === "calendar" ? eventsLoading || watchCalLoading : eventsLoading) : view === "options" ? optionsLoading : loading || (view === "technicals" && analyzing)}<span
                 class="spin"
                 aria-label="Loading"
               ></span>{/if}
