@@ -4,8 +4,9 @@
   import { direction, price, sessionMove, signed, volume } from "./lib/format";
   import { WATCHLIST_SORT_KEYS, nextSort, sortSymbols } from "./lib/watchlistSort";
   import { heatColor, heatWeights, layoutHeatmap, tileDetail } from "./lib/heatmap";
-  import type { Group, RefreshMode, SavedScreen, ScreenRule, WatchQuote, WatchlistSort, WatchlistView } from "./lib/types";
+  import type { Group, RefreshMode, SavedScreen, ScreenRule, WatchQuote, WatchlistColumns, WatchlistSort, WatchlistView } from "./lib/types";
   import Screener from "./Screener.svelte";
+  import WatchTable from "./WatchTable.svelte";
 
   let {
     symbols,
@@ -14,12 +15,14 @@
     current,
     sort,
     view,
+    columns,
     screens,
     tab = $bindable(),
     onopen,
     ongroups,
     onsort,
     onview,
+    oncolumns,
     onsavescreen,
     ondeletescreen,
   }: {
@@ -30,12 +33,14 @@
     current: string;
     sort: WatchlistSort;
     view: WatchlistView;
+    columns: WatchlistColumns;
     screens: SavedScreen[];
     tab: string | null;
     onopen: (symbol: string) => void;
     ongroups: (groups: Group[]) => void;
     onsort: (sort: WatchlistSort) => void;
     onview: (view: WatchlistView) => void;
+    oncolumns: (columns: WatchlistColumns) => void;
     onsavescreen: (name: string, rules: ScreenRule[]) => Promise<string | undefined>;
     ondeletescreen: (name: string) => void;
   } = $props();
@@ -120,13 +125,15 @@
     );
   });
 
-  function toggleMap() {
+  const tableOn = $derived(view === "table" && !editing && !screening);
+
+  function toggleView(next: WatchlistView) {
     if (screening) {
       screening = false;
-      if (view !== "heatmap") onview("heatmap");
+      if (view !== next) onview(next);
       return;
     }
-    onview(view === "heatmap" ? "cards" : "heatmap");
+    onview(view === next ? "cards" : next);
   }
 
   function tip(symbol: string): string {
@@ -255,13 +262,16 @@
       {/if}
       {#if !editing}
         <span class="tools">
-          <button class:on={mapOn} aria-pressed={mapOn} onclick={toggleMap}>Heatmap</button>
+          <button class:on={tableOn} aria-pressed={tableOn} onclick={() => toggleView("table")}>Table</button>
+          <button class:on={mapOn} aria-pressed={mapOn} onclick={() => toggleView("heatmap")}>Heatmap</button>
           <button class:on={screening} aria-pressed={screening} onclick={() => (screening = !screening)}>Screen</button>
         </span>
       {/if}
     </div>
     {#if screening && !editing}
       <Screener symbols={order} {screens} {onopen} onsave={onsavescreen} ondelete={ondeletescreen} />
+    {:else if tableOn}
+      <WatchTable symbols={order} {quotes} {moves} {current} {columns} {onopen} {oncolumns} />
     {:else if mapOn}
       <div class="map" bind:clientWidth={mapW} bind:clientHeight={mapH}>
         {#each tiles as t (t.id)}

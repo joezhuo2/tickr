@@ -41,6 +41,7 @@ pub struct Shared {
     pub financials: crate::financials::Cache,
     pub calendar: crate::calendar::Cache,
     pub screener: crate::screener::Screener,
+    pub ivrank: crate::ivrank::Cache,
     pub quote: Mutex<QuoteState>,
     pub connections: Mutex<crate::connections::Connections>,
     /// Wakes the poller early (symbol changed).
@@ -90,6 +91,7 @@ impl Shared {
             financials: Default::default(),
             calendar: Default::default(),
             screener: crate::screener::Screener::new(),
+            ivrank: Default::default(),
             quote: Mutex::new(QuoteState::default()),
             connections: Mutex::new(Default::default()),
             wake: Notify::new(),

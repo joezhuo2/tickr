@@ -19,8 +19,9 @@ use crate::options::Options;
 use crate::stats::Section;
 use crate::news::Article;
 use crate::quote::{self, Chart, Quote, SearchHit};
+use crate::ivrank::{self, IvRank};
 use crate::screener::{self, ScreenRow};
-use crate::settings::{EventFilter, ChartLayout, ChartTimeZone, Theme, Palette, validate_text_size, RefreshMode, ChartMode, ChartScale, Dots, Group, WatchlistSort, WatchlistView, SavedScreen, ScreenRule, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
+use crate::settings::{EventFilter, ChartLayout, ChartTimeZone, Theme, Palette, validate_text_size, RefreshMode, ChartMode, ChartScale, Dots, Group, WatchlistSort, WatchlistView, WatchlistColumns, SavedScreen, ScreenRule, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
 use crate::state::{lock, now_secs, QuoteState, Shared};
 use crate::paper::{Costs as PaperCosts, PaperAccount};
 
@@ -58,6 +59,7 @@ pub struct Init {
     groups: Vec<Group>,
     watchlist_sort: WatchlistSort,
     watchlist_view: WatchlistView,
+    watchlist_columns: WatchlistColumns,
     screens: Vec<SavedScreen>,
     event_filter: EventFilter,
     keybinds: Keybinds,
@@ -111,6 +113,7 @@ pub fn init_payload(shared: &Shared) -> Init {
         groups: s.groups,
         watchlist_sort: s.watchlist_sort,
         watchlist_view: s.watchlist_view,
+        watchlist_columns: s.watchlist_columns,
         screens: s.screens,
         event_filter: s.event_filter,
         keybinds: s.keybinds,
@@ -698,6 +701,11 @@ pub fn set_watchlist_view(shared: State<'_, Arc<Shared>>, view: WatchlistView) {
     shared.update_settings(|s| s.watchlist_view = view);
 }
 
+#[tauri::command]
+pub fn set_watchlist_columns(shared: State<'_, Arc<Shared>>, columns: WatchlistColumns) {
+    shared.update_settings(|s| s.watchlist_columns = columns);
+}
+
 #[derive(Serialize)]
 pub struct WatchQuote {
     symbol: String,
@@ -738,7 +746,10 @@ async fn screen_symbol(shared: &Shared, provider: &crate::provider::Provider, sy
     }
     match provider.fetch_chart(&shared.http, &symbol, screener::RANGE, screener::INTERVAL, false).await {
         Ok(chart) => {
-            let row = ScreenRow::from_candles(symbol, &chart.candles);
+            let mut row = ScreenRow::from_candles(symbol, &chart.candles);
+            if let Ok(a) = crate::analysis::analyze_with_config(&chart, &Default::default()) {
+                (row.score, row.bias) = (Some(a.score), Some(a.bias));
+            }
             if row.error.is_none() && shared.revision() == revision {
                 shared.screener.store(&row, now_secs(), revision);
             }
@@ -760,6 +771,37 @@ pub async fn get_screener_data(shared: State<'_, Arc<Shared>>, symbols: Vec<Stri
         .map(|symbol| {
             let (shared, provider) = (shared.clone(), provider.clone());
             tauri::async_runtime::spawn(async move { screen_symbol(&shared, &provider, symbol, revision).await })
+        })
+        .collect();
+    let mut out = Vec::with_capacity(tasks.len());
+    for t in tasks {
+        out.push(t.await.map_err(|e| e.to_string())?);
+    }
+    Ok(out)
+}
+
+#[tauri::command]
+pub async fn get_iv_ranks(shared: State<'_, Arc<Shared>>, symbols: Vec<String>) -> Result<Vec<IvRank>, String> {
+    let starred = lock(&shared.settings).watchlist.clone();
+    let symbols: Vec<String> = clean_symbols(symbols).into_iter().filter(|s| starred.contains(s)).collect();
+    let revision = shared.revision();
+    let provider = crate::provider::Provider::current(&shared);
+    let shared: Arc<Shared> = shared.inner().clone();
+    let tasks: Vec<_> = symbols
+        .into_iter()
+        .map(|symbol| {
+            let (shared, provider) = (shared.clone(), provider.clone());
+            tauri::async_runtime::spawn(async move {
+                let (iv, error) = match shared.ivrank.iv(&shared.analysts, &symbol, now_secs()).await {
+                    Ok(iv) => (iv, None),
+                    Err(e) => (None, Some(e)),
+                };
+                let range = match iv {
+                    Some(_) => screen_symbol(&shared, &provider, symbol.clone(), revision).await.rv_range,
+                    None => None,
+                };
+                IvRank { rank: iv.zip(range).map(|(iv, r)| ivrank::rank(iv, r)), symbol, iv, error }
+            })
         })
         .collect();
     let mut out = Vec::with_capacity(tasks.len());

@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use serde::Serialize;
 use tokio::sync::Semaphore;
 
-use crate::analysis::{indicators, RSI_LEN};
+use crate::analysis::{indicators, Bias, RSI_LEN};
 use crate::quote::Candle;
 use crate::state::lock;
 
@@ -22,12 +22,16 @@ pub struct ScreenRow {
     pub sma20: Option<f64>,
     pub sma50: Option<f64>,
     pub sma200: Option<f64>,
+    pub score: Option<i32>,
+    pub bias: Option<Bias>,
+    #[serde(skip)]
+    pub rv_range: Option<(f64, f64)>,
     pub error: Option<String>,
 }
 
 impl ScreenRow {
     pub fn failed(symbol: String, error: String) -> Self {
-        Self { symbol, price: None, change_pct: None, rsi: None, sma20: None, sma50: None, sma200: None, error: Some(error) }
+        Self { symbol, price: None, change_pct: None, rsi: None, sma20: None, sma50: None, sma200: None, score: None, bias: None, rv_range: None, error: Some(error) }
     }
 
     pub fn from_candles(symbol: String, candles: &[Candle]) -> Self {
@@ -45,6 +49,9 @@ impl ScreenRow {
             sma20: last_sma(20),
             sma50: last_sma(50),
             sma200: last_sma(200),
+            score: None,
+            bias: None,
+            rv_range: crate::ivrank::rv_range(&closes),
             error: None,
         }
     }
@@ -115,6 +122,10 @@ mod tests {
         let pct = row.change_pct.unwrap();
         assert!((pct - 100.0 / 249.0).abs() < 1e-9);
         assert_eq!(row.rsi, indicators::rsi(&closes, RSI_LEN).last().copied().flatten());
+        assert_eq!(row.rv_range, crate::ivrank::rv_range(&closes));
+        assert!(row.rv_range.is_some());
+        let json = serde_json::to_value(&row).unwrap();
+        assert!(json["score"].is_null() && json["bias"].is_null() && json.get("rv_range").is_none());
     }
 
     #[test]

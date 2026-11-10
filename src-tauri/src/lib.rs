@@ -17,6 +17,7 @@ pub mod events;
 pub mod financials;
 pub mod grades;
 pub mod hotkey;
+pub mod ivrank;
 pub mod logo;
 pub mod market;
 pub mod options;
@@ -143,8 +144,10 @@ pub fn run() {
             commands::set_groups,
             commands::set_watchlist_sort,
             commands::set_watchlist_view,
+            commands::set_watchlist_columns,
             commands::get_watch_quotes,
             commands::get_screener_data,
+            commands::get_iv_ranks,
             commands::save_screen,
             commands::delete_screen,
             commands::get_news,

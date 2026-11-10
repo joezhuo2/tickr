@@ -1,6 +1,7 @@
-import type { WatchlistSort, WatchlistSortKey } from "./types";
+import type { WatchlistColumns, WatchlistSort, WatchlistSortKey } from "./types";
 
 export const DEFAULT_WATCHLIST_SORT: WatchlistSort = { key: "change", dir: "desc" };
+export const DEFAULT_WATCHLIST_COLUMNS: WatchlistColumns = { score: false, rsi: false, earnings: false, iv_rank: false };
 
 export const WATCHLIST_SORT_KEYS: { key: WatchlistSortKey; label: string }[] = [
   { key: "price", label: "Price" },

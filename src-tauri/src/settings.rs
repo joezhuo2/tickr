@@ -145,6 +145,16 @@ pub enum WatchlistView {
     #[default]
     Cards,
     Heatmap,
+    Table,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct WatchlistColumns {
+    pub score: bool,
+    pub rsi: bool,
+    pub earnings: bool,
+    pub iv_rank: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -529,6 +539,7 @@ pub struct Settings {
     pub groups: Vec<Group>,
     pub watchlist_sort: WatchlistSort,
     pub watchlist_view: WatchlistView,
+    pub watchlist_columns: WatchlistColumns,
     pub screens: Vec<SavedScreen>,
     pub event_filter: EventFilter,
     /// Look for new releases in the background.
@@ -584,6 +595,7 @@ impl Default for Settings {
             groups: Vec::new(),
             watchlist_sort: WatchlistSort::default(),
             watchlist_view: WatchlistView::default(),
+            watchlist_columns: WatchlistColumns::default(),
             screens: Vec::new(),
             event_filter: EventFilter::default(),
             auto_update: true,
@@ -868,6 +880,25 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("settings.json");
         let s = Settings { watchlist_view: WatchlistView::Heatmap, ..Settings::default() };
+        s.save(&p).unwrap();
+        assert_eq!(Settings::load(&p), s);
+    }
+
+    #[test]
+    fn watchlist_columns_default_and_roundtrip() {
+        let old: Settings = serde_json::from_str(r#"{"symbol":"NVDA","watchlist_view":"heatmap"}"#).unwrap();
+        assert_eq!(old.watchlist_columns, WatchlistColumns::default());
+        assert!(!old.watchlist_columns.score && !old.watchlist_columns.iv_rank);
+        let partial: Settings = serde_json::from_str(r#"{"watchlist_view":"table","watchlist_columns":{"rsi":true,"bogus":1}}"#).unwrap();
+        assert_eq!(partial.watchlist_view, WatchlistView::Table);
+        assert_eq!(partial.watchlist_columns, WatchlistColumns { rsi: true, ..WatchlistColumns::default() });
+        assert_eq!(
+            serde_json::to_value(WatchlistColumns { score: true, iv_rank: true, ..WatchlistColumns::default() }).unwrap(),
+            serde_json::json!({"score": true, "rsi": false, "earnings": false, "iv_rank": true})
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        let s = Settings { watchlist_view: WatchlistView::Table, watchlist_columns: WatchlistColumns { score: true, rsi: true, earnings: true, iv_rank: true }, ..Settings::default() };
         s.save(&p).unwrap();
         assert_eq!(Settings::load(&p), s);
     }

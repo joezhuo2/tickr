@@ -13,7 +13,7 @@ import {
 import type { ScreenRow, ScreenRule } from "./types";
 
 function row(symbol: string, over: Partial<ScreenRow> = {}): ScreenRow {
-  return { symbol, price: 100, change_pct: 1, rsi: 50, sma20: 95, sma50: 90, sma200: 80, error: null, ...over };
+  return { symbol, price: 100, change_pct: 1, rsi: 50, sma20: 95, sma50: 90, sma200: 80, score: null, bias: null, error: null, ...over };
 }
 
 const rule = (kind: ScreenRule["kind"], op: ScreenRule["op"], value: number): ScreenRule => ({ kind, op, value });
