@@ -185,6 +185,14 @@ taskbar to keep it visible.
   Choose **Long**, **Short** or **Skip** with future candles hidden. Close at a
   revealed candle's close to see your return, bars held and how you did against
   skipping the trade.
+- **Strategy backtesting** (`.`) runs entry and exit rules over the loaded
+  chart. Build conditions from menus or type expressions such as
+  `crosses_above(sma(20), sma(50)) and rsi(14) < 70`, using price fields,
+  `sma`, `ema`, `rsi`, `crosses_above`, `crosses_below`, comparisons,
+  arithmetic and `and` / `or` / `not`. Entries and exits fill at the next
+  candle's open, with an optional stop-loss and take-profit. The report lists
+  each trade with win rate, total return, max drawdown, average trade and a
+  buy-and-hold comparison, and marks trades on the chart.
 
 ### Views
 
@@ -264,6 +272,13 @@ remove them, rename the group, or **Delete** it. Unstarring a stock removes it
 from every group. Press `G` to cycle through All and each group (opening the
 Watchlist if it is closed).
 
+**Table** shows the watchlist as rows with price and change, plus optional
+columns you switch on: analysis **Score**, **RSI** (14), **days to earnings**
+and **IV rank**. IV rank is an estimate: the at-the-money implied volatility
+placed within the past year's range of 30-day realized volatility, since Yahoo
+has no implied-volatility history. Column data is only fetched while the column
+is on.
+
 ### Price alerts
 
 Open **Alerts**, to the left of Technicals, to add an alert for the selected
@@ -340,6 +355,11 @@ typing in a text field.
 | Fixed | `Alt+←` | Back to the previous symbol in history |
 | | `Alt+→` | Forward in history |
 
+**Backup** exports your settings, watchlists, groups, drawings, alerts, saved
+screens, keybinds and indicator presets to a JSON file, and **Import** restores
+one after checking it. API keys stay in `.env` and are never exported; the data
+provider, window position and start-at-login setting are kept on import.
+
 ### AI news analysis
 
 Headline tone (the dots on the chart and the News view) comes from a local
@@ -369,7 +389,7 @@ copies app and OS versions and connection details with credentials redacted.
 
 ### Market events
 
-The Events panel (header button or `K`) has two tabs.
+The Events panel (header button or `K`) has three tabs.
 
 **Economic** lists seven days of releases from Yahoo's economic calendar,
 grouped by day, each with its local release time and, where Yahoo has them, the
@@ -387,6 +407,10 @@ starred symbols into one list by day, with an All / Earnings / Ex-dividend
 toggle. Click a row to open that symbol. Estimated earnings dates are marked and
 the EPS estimate is shown when Yahoo has one. Dates are cached for 6 hours and
 fetched three symbols at a time; ETFs, indices and crypto have none.
+
+**Calendar** combines both: your watchlist's earnings and ex-dividend dates
+next to the macro releases, grouped by day, with the same week arrows and the
+saved country and All / Key filters applied to the macro rows.
 
 Clicking an event asks the AI configured in Settings, as above, using the
 Events model or else Model, to analyze that
@@ -463,8 +487,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.2
-git push origin v0.11.2
+git tag v0.11.3
+git push origin v0.11.3
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

@@ -6,6 +6,27 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.3] - 2026-11-10
+
+### Added
+- **Strategy backtesting** ([#102](https://github.com/joezhuo2/tickr/issues/102)):
+  a Strategy panel (`.`) runs entry and exit rules over the loaded chart. Build
+  conditions from menus or type expressions with price fields, `sma`, `ema`,
+  `rsi`, `crosses_above`, `crosses_below`, comparisons, arithmetic and
+  `and` / `or` / `not`. Fills at the next candle's open with optional stop-loss
+  and take-profit. The report shows each trade, win rate, total return, max
+  drawdown, average trade and buy-and-hold, with trades marked on the chart.
+- **Watchlist table** with optional columns: analysis score, RSI (14), days to
+  earnings and an estimated IV rank. Column choices are saved.
+- **Calendar tab** in the Events panel that puts your watchlist's earnings and
+  ex-dividend dates next to macro releases by day.
+- **Backup**: export and import settings, watchlists, groups, drawings, alerts,
+  screens, keybinds and indicator presets as JSON from Settings.
+
+### Fixed
+- The chart no longer stays on the loading skeleton after opening the app
+  until the range is changed ([#152](https://github.com/joezhuo2/tickr/issues/152)).
+
 ## [0.11.2] - 2026-11-05
 
 ### Added
