@@ -4,31 +4,32 @@ import type { Keybinds, Overlays } from "./types";
 
 export type Action = keyof Keybinds;
 
-export type Category = "chart" | "indicators" | "panels" | "options" | "watchlist" | "general";
+export type Category = "general" | "chart" | "draw" | "indicators" | "panels" | "options" | "watchlist";
 
 export const CATEGORIES: { id: Category; label: string }[] = [
+  { id: "general", label: "General" },
   { id: "chart", label: "Chart" },
+  { id: "draw", label: "Draw" },
   { id: "indicators", label: "Indicators" },
   { id: "panels", label: "Panels" },
   { id: "options", label: "Options" },
   { id: "watchlist", label: "Watchlist" },
-  { id: "general", label: "General" },
 ];
 
 export const ACTIONS: { id: Action; label: string; category: Category }[] = [
   { id: "chart_mode", label: "Switch line / candles", category: "chart" },
   { id: "chart_scale", label: "Cycle price scale", category: "chart" },
   { id: "chart_interval", label: "Cycle candle length", category: "chart" },
-  { id: "draw_level", label: "Draw level", category: "chart" },
-  { id: "draw_trend", label: "Draw trendline", category: "chart" },
-  { id: "draw_text", label: "Draw text", category: "chart" },
-  { id: "draw_ruler", label: "Ruler", category: "chart" },
-  { id: "draw_pen", label: "Draw freehand", category: "chart" },
-  { id: "draw_rect", label: "Draw box", category: "chart" },
-  { id: "draw_ray", label: "Draw ray", category: "chart" },
-  { id: "draw_fib", label: "Draw Fibonacci retracement", category: "chart" },
-  { id: "draw_position", label: "Draw long / short position", category: "chart" },
-  { id: "draw_avwap", label: "Anchored VWAP", category: "chart" },
+  { id: "draw_level", label: "Draw level", category: "draw" },
+  { id: "draw_trend", label: "Draw trendline", category: "draw" },
+  { id: "draw_text", label: "Draw text", category: "draw" },
+  { id: "draw_ruler", label: "Ruler", category: "draw" },
+  { id: "draw_pen", label: "Draw freehand", category: "draw" },
+  { id: "draw_rect", label: "Draw box", category: "draw" },
+  { id: "draw_ray", label: "Draw ray", category: "draw" },
+  { id: "draw_fib", label: "Draw Fibonacci retracement", category: "draw" },
+  { id: "draw_position", label: "Draw long / short position", category: "draw" },
+  { id: "draw_avwap", label: "Anchored VWAP", category: "draw" },
   { id: "chart_split", label: "Toggle second chart", category: "chart" },
   { id: "chart_replay", label: "Toggle bar replay", category: "chart" },
   { id: "practice", label: "Practice on a random setup", category: "chart" },
