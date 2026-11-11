@@ -6,6 +6,12 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.16] - 2026-11-11
+
+### Added
+- **Drawing tools:** box, ray, Fibonacci retracement, long / short position with
+  a 2R target, and anchored VWAP, each with a rebindable hotkey.
+
 ## [0.11.15] - 2026-11-11
 
 ### Added
