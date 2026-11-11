@@ -2,7 +2,7 @@
   import { biasLabel, biasTone, direction, fullTime, num, price, signed, upside } from "./lib/format";
   import type { Analysis, Direction, Overlays, Target, IndicatorConfig, IndicatorPreset } from "./lib/types";
 
-  import { clampPanel, toggleOverlay } from "./lib/indicators";
+  import { alertLevels, clampPanel, toggleOverlay, type AlertLevel } from "./lib/indicators";
 
   let {
     analysis,
@@ -12,6 +12,7 @@
     gmtoffset,
     overlays, config, presets, onsave, onsavepreset, ondeletepreset,
     onanalyze,
+    onalert,
   }: {
     analysis: Analysis | null;
     loading: boolean;
@@ -26,7 +27,18 @@
     onsavepreset: (name: string) => Promise<void>;
     ondeletepreset: (name: string) => Promise<void>;
     onanalyze: () => void;
+    onalert?: (level: AlertLevel) => Promise<void>;
   } = $props();
+
+  const levels = $derived(analysis ? alertLevels(analysis.series) : []);
+  let alerted = $state<string | null>(null);
+
+  function addAlert(l: AlertLevel) {
+    void edit(async () => {
+      await onalert?.(l);
+      alerted = `Alert set: ${l.label} ${l.direction} ${price(l.level, cur)}`;
+    });
+  }
 
   const tone = (d: Direction) => (d === "bullish" ? "up" : d === "bearish" ? "down" : "flat");
   const mark = (d: Direction) => (d === "bullish" ? "▲" : d === "bearish" ? "▼" : "•");
@@ -233,6 +245,16 @@
         </ul>
       </div>
     </div>
+
+    {#if onalert && levels.length}
+      <div class="indicator-row" role="group" aria-label="Alerts at key levels">
+        <span class="muted">Alert when price crosses</span>
+        {#each levels as l (l.label)}
+          <button disabled={saving} title={`Price alert when ${analysis.symbol} is at or ${l.direction} ${price(l.level, cur)} (regular session, fires once)`} onclick={() => addAlert(l)}>{l.label} {price(l.level, cur)}</button>
+        {/each}
+        {#if alerted}<span class="muted" role="status">{alerted}</span>{/if}
+      </div>
+    {/if}
 
     <div class="foot">
       <fieldset>

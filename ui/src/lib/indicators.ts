@@ -1,4 +1,4 @@
-import type { Candle, IndicatorConfig, Overlays } from "./types";
+import type { Analysis, Candle, IndicatorConfig, Overlays } from "./types";
 
 export function overlayVisibility(c: IndicatorConfig): Overlays {
   return {
@@ -33,6 +33,26 @@ export function volumeProfile(candles: readonly Candle[], i0: number, i1: number
     for (let k = a; k <= b; k++) volumes[k] += c.v / (b - a + 1);
   }
   return { lo, step, volumes };
+}
+
+export interface AlertLevel {
+  label: string;
+  level: number;
+  direction: "above" | "below";
+}
+
+/** Breakout levels worth an alert: the latest opening range, prior-day and premarket highs and lows. */
+export function alertLevels(series: Pick<Analysis["series"], "opening_range" | "levels">): AlertLevel[] {
+  const last = (key: string) => [...series.opening_range, ...series.levels].find((l) => l.key === key)?.values.filter((v) => v != null).pop() ?? null;
+  const all: [string, string, AlertLevel["direction"]][] = [
+    ["or_high", "OR high", "above"], ["or_low", "OR low", "below"],
+    ["pd_high", "PDH", "above"], ["pd_low", "PDL", "below"],
+    ["pm_high", "PMH", "above"], ["pm_low", "PML", "below"],
+  ];
+  return all.flatMap(([key, label, direction]) => {
+    const level = last(key);
+    return level != null && level > 0 ? [{ label, level, direction }] : [];
+  });
 }
 
 export const PANEL_MIN = 92;

@@ -6,6 +6,15 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.17] - 2026-11-11
+
+### Added
+- **Alerts at key levels:** one-click price alerts in Technicals for the opening
+  range, prior-day and premarket highs and lows.
+
+### Changed
+- Alerts on the selected symbol are checked on every streamed Alpaca trade.
+
 ## [0.11.16] - 2026-11-11
 
 ### Added

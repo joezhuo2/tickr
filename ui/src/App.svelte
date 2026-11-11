@@ -1813,6 +1813,9 @@
                   onsavepreset={savePreset}
                   ondeletepreset={deletePreset}
                   onanalyze={() => runAnalysis()}
+                  onalert={replay ? undefined : async (l) => {
+                    alerts = await invoke<PriceAlert[]>("add_alert", { symbol, kind: "price", direction: l.direction, level: l.level, recurring: false, cooldownMins: 15, regularOnly: true });
+                  }}
                 />
               </div>
             {:else if view === "paper"}
