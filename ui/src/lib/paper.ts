@@ -27,6 +27,15 @@ export interface Order {
   kind: OrderKind;
   price: number | null;
   created: number;
+  /** Orders sharing this number cancel each other when one fills. */
+  oco?: number;
+  /** Exit orders to place when this order fills. */
+  bracket?: Bracket;
+}
+
+export interface Bracket {
+  stop: number | null;
+  target: number | null;
 }
 
 export interface Fill {
@@ -79,6 +88,7 @@ export interface OrderRequest {
   qty: number;
   kind: OrderKind;
   price?: number | null;
+  bracket?: Bracket | null;
 }
 
 export type Outcome = { ok: true; account: Account; fill?: Fill; order?: Order } | { ok: false; error: string };
@@ -290,10 +300,40 @@ export function marketFillPrice(side: Side, reference: number, costs: Costs): nu
   return slipped(side, reference, costs.slippage_bps);
 }
 
-export function marketOrder(a: Account, symbol: string, side: Side, qty: number, reference: number, time: number): Outcome {
-  const error = priceError(reference, "Reference price");
+/** Why a stop-loss / take-profit pair cannot bracket an entry on `side` near `reference`; null when it can. */
+export function bracketError(side: Side, bracket: Bracket | null | undefined, reference: number | null = null): string | null {
+  if (!bracket) return null;
+  const { stop, target } = bracket;
+  for (const [p, label] of [[stop, "Stop-loss"], [target, "Take-profit"]] as const) {
+    if (p != null && priceError(p, label)) return priceError(p, label);
+  }
+  const long = side === "buy";
+  const below = (a: number | null, b: number | null) => a == null || b == null || (long ? a < b : a > b);
+  if (!below(stop, target)) return `Stop-loss must be ${long ? "below" : "above"} take-profit`;
+  if (!below(stop, reference)) return `Stop-loss must be ${long ? "below" : "above"} the entry price`;
+  if (!below(reference, target)) return `Take-profit must be ${long ? "above" : "below"} the entry price`;
+  return null;
+}
+
+/** After `order` fills: cancels its one-cancels-other siblings and places its bracket's exit orders. */
+function afterFill(a: Account, order: Pick<Order, "symbol" | "side" | "qty" | "oco" | "bracket">, time: number): Account {
+  const next = order.oco != null ? { ...a, orders: a.orders.filter((o) => o.oco !== order.oco) } : a;
+  const { stop = null, target = null } = order.bracket ?? {};
+  if (stop == null && target == null) return next;
+  const base = { symbol: order.symbol, side: order.side === "buy" ? ("sell" as const) : ("buy" as const), qty: order.qty, created: time, oco: next.next_id };
+  let id = next.next_id;
+  const exits: Order[] = [];
+  if (stop != null) exits.push({ ...base, id: id++, kind: "stop", price: stop });
+  if (target != null) exits.push({ ...base, id: id++, kind: "limit", price: target });
+  return { ...next, orders: [...next.orders, ...exits], next_id: id };
+}
+
+export function marketOrder(a: Account, symbol: string, side: Side, qty: number, reference: number, time: number, bracket: Bracket | null = null): Outcome {
+  const error = priceError(reference, "Reference price") ?? bracketError(side, bracket, reference);
   if (error) return { ok: false, error };
-  return applyFill(a, symbol, side, qty, marketFillPrice(side, reference, a.costs), time);
+  if (bracket && a.orders.length + 2 > LIMITS.maxOrders) return { ok: false, error: `At most ${LIMITS.maxOrders} open orders are allowed` };
+  const r = applyFill(a, symbol, side, qty, marketFillPrice(side, reference, a.costs), time);
+  return r.ok && bracket ? { ...r, account: afterFill(r.account, { symbol, side, qty, bracket }, time) } : r;
 }
 
 export function placeOrder(a: Account, req: OrderRequest, time: number, estimate: number | null = null): Outcome {
@@ -307,13 +347,16 @@ export function placeOrder(a: Account, req: OrderRequest, time: number, estimate
     const error = priceError(price, req.kind === "limit" ? "Limit price" : "Stop price");
     if (error) return { ok: false, error };
   }
-  if (a.orders.length >= LIMITS.maxOrders) return { ok: false, error: `At most ${LIMITS.maxOrders} open orders are allowed` };
+  const bracket = req.bracket && (req.bracket.stop != null || req.bracket.target != null) ? req.bracket : undefined;
+  const bErr = bracketError(req.side, bracket, price ?? estimate);
+  if (bErr) return { ok: false, error: bErr };
+  if (a.orders.length + (bracket ? 3 : 1) > LIMITS.maxOrders) return { ok: false, error: `At most ${LIMITS.maxOrders} open orders are allowed` };
   const check = req.kind === "limit" ? price! : req.kind === "stop" ? slipped(req.side, price!, a.costs.slippage_bps) : estimate != null ? marketFillPrice(req.side, estimate, a.costs) : null;
   if (check != null) {
     const trial = applyFill(a, req.symbol, req.side, req.qty, check, time);
     if (!trial.ok) return trial;
   }
-  const order: Order = { id: a.next_id, symbol: req.symbol, side: req.side, qty: req.qty, kind: req.kind, price, created: time };
+  const order: Order = { id: a.next_id, symbol: req.symbol, side: req.side, qty: req.qty, kind: req.kind, price, created: time, ...(bracket ? { bracket } : {}) };
   return { ok: true, account: { ...a, orders: [...a.orders, order], next_id: a.next_id + 1 }, order };
 }
 
@@ -336,13 +379,13 @@ export function processBar(a: Account, symbol: string, bar: Bar): { account: Acc
   let account = a;
   const events: BarEvent[] = [];
   for (const order of a.orders) {
-    if (order.symbol !== symbol || !(bar.t > order.created)) continue;
+    if (order.symbol !== symbol || !(bar.t > order.created) || !account.orders.some((o) => o.id === order.id)) continue;
     const price = triggerPrice(order, bar, account.costs);
     if (price == null) continue;
     const rest = cancelOrder(account, order.id);
     const result = applyFill(rest, symbol, order.side, order.qty, price, bar.t, order.id);
     if (result.ok) {
-      account = result.account;
+      account = afterFill(result.account, order, bar.t);
       events.push({ kind: "fill", order, fill: result.fill! });
     } else {
       account = rest;

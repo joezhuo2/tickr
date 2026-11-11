@@ -6,6 +6,12 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.15] - 2026-11-11
+
+### Added
+- **Bracket orders** in Paper trading: an optional stop-loss and take-profit are
+  placed when the entry fills, and filling one cancels the other.
+
 ## [0.11.14] - 2026-11-11
 
 ### Added

@@ -40,6 +40,8 @@
   let kind = $state<OrderKind>("market");
   let qty = $state<number | undefined>(1);
   let limit = $state<number | undefined>(undefined);
+  let stopLoss = $state<number | undefined>(undefined);
+  let takeProfit = $state<number | undefined>(undefined);
   let confirming = $state(false);
   let showSettings = $state(false);
   let startCash = $state<number | undefined>(undefined);
@@ -66,6 +68,8 @@
     if (!sizing || sizing.shares < 1) return;
     side = sizing.side;
     qty = Math.min(sizing.shares, LIMITS.maxQty);
+    stopLoss = Number(sizeStop);
+    takeProfit = sizing.target;
   }
 
   function money(v: number): string {
@@ -92,7 +96,8 @@
     formError = qtyError(Number(qty));
     if (!formError && kind !== "market" && !(Number(limit) > 0)) formError = `${kind === "limit" ? "Limit" : "Stop"} price must be a positive number`;
     if (formError || ticketOff) return;
-    onorder({ symbol, side, qty: Number(qty), kind, price: kind === "market" ? null : Number(limit) });
+    const exit = (v: number | undefined) => (v == null || (v as unknown) === "" ? null : Number(v));
+    onorder({ symbol, side, qty: Number(qty), kind, price: kind === "market" ? null : Number(limit), bracket: { stop: exit(stopLoss), target: exit(takeProfit) } });
   }
 
   function saveCosts(e: SubmitEvent) {
@@ -201,6 +206,8 @@
       {#if kind !== "market"}
         <label>{kind === "limit" ? "Limit" : "Stop"} <input class="px" type="number" min="0" step="any" required bind:value={limit} /></label>
       {/if}
+      <label title="Optional. Placed as a stop order when the entry fills.">Stop-loss <input class="px" type="number" min="0" step="any" placeholder="none" bind:value={stopLoss} /></label>
+      <label title="Optional. Placed as a limit order when the entry fills; filling one exit cancels the other.">Take-profit <input class="px" type="number" min="0" step="any" placeholder="none" bind:value={takeProfit} /></label>
       <button type="submit" class="place" disabled={ticketOff} title={disabled ?? (marketOff ? marketBlock : undefined) ?? undefined}>Place simulated order</button>
     </form>
   </div>
@@ -225,7 +232,7 @@
             <tr>
               <td class={o.side === "buy" ? "up" : "down"}>{o.side === "buy" ? "Buy" : "Sell"}</td>
               <td>{num(o.qty, 0)}</td>
-              <td>{o.kind === "market" ? "Market (next open)" : o.kind === "limit" ? "Limit" : "Stop"}</td>
+              <td>{o.kind === "market" ? "Market (next open)" : o.kind === "limit" ? "Limit" : "Stop"}{o.oco != null ? " · OCO" : ""}{o.bracket ? ` · bracket ${[o.bracket.stop, o.bracket.target].map((p) => (p != null ? price(p, currency) : "—")).join(" / ")}` : ""}</td>
               <td>{o.price != null ? price(o.price, currency) : "—"}</td>
               <td><button class="ghost" aria-label={`Cancel ${o.side} ${o.qty} ${o.kind} order`} onclick={() => oncancel(o.id)}>Cancel</button></td>
             </tr>

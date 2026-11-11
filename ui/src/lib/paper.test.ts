@@ -499,3 +499,47 @@ describe("positionSize", () => {
     }
   });
 });
+
+describe("bracket orders", () => {
+  const bar = (t: number, o: number, h: number, l: number, c: number) => ({ t, o, h, l, c });
+
+  it("places a stop and a target when the entry fills, and one cancels the other", async () => {
+    const P = await import("./paper");
+    const placed = P.placeOrder(P.newAccount(), { symbol: "AAPL", side: "buy", qty: 10, kind: "stop", price: 104, bracket: { stop: 101, target: 110 } }, 0);
+    if (!placed.ok) throw new Error(placed.error);
+    expect(placed.account.orders).toHaveLength(1);
+    const entered = P.processBar(placed.account, "AAPL", bar(1, 103, 105, 102, 104.5)).account;
+    expect(entered.orders.map((o) => [o.side, o.kind, o.price, o.oco === entered.orders[0].oco])).toEqual([["sell", "stop", 101, true], ["sell", "limit", 110, true]]);
+    expect(P.positionOf(entered, "AAPL")?.qty).toBe(10);
+    expect(P.processBar(entered, "AAPL", bar(1, 100, 120, 90, 100)).account.orders).toHaveLength(2);
+    const won = P.processBar(entered, "AAPL", bar(2, 105, 111, 104, 110)).account;
+    expect([won.orders.length, P.positionOf(won, "AAPL"), won.trades.length]).toEqual([0, null, 1]);
+    expect(won.fills[won.fills.length - 1].price).toBe(110);
+    const both = P.processBar(entered, "AAPL", bar(2, 105, 111, 100, 110)).account;
+    expect([both.orders.length, P.positionOf(both, "AAPL"), both.fills[both.fills.length - 1].price]).toEqual([0, null, 101]);
+  });
+
+  it("brackets a short market fill and leaves an unrelated order alone", async () => {
+    const P = await import("./paper");
+    const resting = P.placeOrder(P.newAccount(), { symbol: "AAPL", side: "buy", qty: 1, kind: "limit", price: 50 }, 0);
+    if (!resting.ok) throw new Error(resting.error);
+    const r = P.marketOrder(resting.account, "AAPL", "sell", 5, 100, 1, { stop: 102, target: null });
+    if (!r.ok) throw new Error(r.error);
+    expect(r.account.orders.map((o) => [o.side, o.kind, o.price])).toEqual([["buy", "limit", 50], ["buy", "stop", 102]]);
+    const stopped = P.processPrice(r.account, "AAPL", 103, 2).account;
+    expect([stopped.orders.length, P.positionOf(stopped, "AAPL")]).toEqual([1, null]);
+  });
+
+  it("rejects brackets on the wrong side of the entry", async () => {
+    const P = await import("./paper");
+    expect(P.bracketError("buy", { stop: 105, target: 110 }, 104)).toMatch(/below the entry/);
+    expect(P.bracketError("buy", { stop: 100, target: 103 }, 104)).toMatch(/above the entry/);
+    expect(P.bracketError("sell", { stop: 100, target: 90 }, 104)).toMatch(/above the entry/);
+    expect(P.bracketError("buy", { stop: 111, target: 110 })).toMatch(/below take-profit/);
+    expect(P.bracketError("buy", { stop: -1, target: null })).not.toBeNull();
+    expect(P.bracketError("sell", { stop: 106, target: 100 }, 104)).toBeNull();
+    expect(P.bracketError("buy", null)).toBeNull();
+    expect(P.marketOrder(P.newAccount(), "AAPL", "buy", 1, 100, 1, { stop: 101, target: null }).ok).toBe(false);
+    expect(P.placeOrder(P.newAccount(), { symbol: "AAPL", side: "buy", qty: 1, kind: "limit", price: 100, bracket: { stop: 101, target: null } }, 0).ok).toBe(false);
+  });
+});

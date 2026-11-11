@@ -828,7 +828,7 @@
         paperError = liveBlock ?? "No live quote yet";
         return;
       }
-      r = Paper.marketOrder(account, req.symbol, req.side, req.qty, quote.price, quoteTime(quote) ?? quote.market_time);
+      r = Paper.marketOrder(account, req.symbol, req.side, req.qty, quote.price, quoteTime(quote) ?? quote.market_time, req.bracket ?? null);
     } else {
       r = Paper.placeOrder(account, req, quote ? (quoteTime(quote) ?? quote.market_time) : 0);
     }
