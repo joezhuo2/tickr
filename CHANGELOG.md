@@ -6,6 +6,12 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.8] - 2026-11-11
+
+### Added
+- **Volume average** line over the volume bars (20 bars by default) and a
+  **Relative volume** reading in Technicals.
+
 ## [0.11.7] - 2026-11-11
 
 ### Added
