@@ -570,11 +570,11 @@ pub fn analyze_with_config(chart: &Chart, config: &crate::settings::IndicatorCon
     let mut rsi = line("rsi", format!("RSI {}", config.rsi.length), config.rsi.length,
         indicators::rsi(&closes, config.rsi.length), &config.rsi.color, config.rsi.visible);
     rsi.full_from = config.rsi.length;
-    let (open, close) = chart.meta.periods.map_or((0, 86_400), |p| {
-        let (open, close) = ((p.regular.start + gmt).rem_euclid(86_400), (p.regular.end + gmt).rem_euclid(86_400));
-        (open, if close > open { close } else { 86_400 })
+    let (session_open, session_close) = chart.meta.periods.map_or((0, 86_400), |p| {
+        let (start, end) = ((p.regular.start + gmt).rem_euclid(86_400), (p.regular.end + gmt).rem_euclid(86_400));
+        (start, if end > start { end } else { 86_400 })
     });
-    let key_levels = if intraday { indicators::key_levels(c, gmt, open, close) } else { vec![(None, None); n] };
+    let key_levels = if intraday { indicators::key_levels(c, gmt, session_open, session_close) } else { vec![(None, None); n] };
     let series = Series {
         t: c.iter().map(|k| k.t).collect(),
         mas: display_mas,
@@ -588,7 +588,7 @@ pub fn analyze_with_config(chart: &Chart, config: &crate::settings::IndicatorCon
         vwap: line("vwap", vwap_label.into(), 1, vwap_s, &config.vwap.color, config.vwap.visible),
         opening_range: {
             let or = &config.opening_range;
-            let ranges = if intraday { indicators::opening_range(c, gmt, open, or.minutes as i64 * 60) } else { vec![None; n] };
+            let ranges = if intraday { indicators::opening_range(c, gmt, session_open, or.minutes as i64 * 60) } else { vec![None; n] };
             let ext = or.extension;
             let level = |f: fn(f64, f64, f64) -> f64| ranges.iter().map(|r| r.map(|(h, l)| f(h, l, ext))).collect::<Vec<_>>();
             let mut lines = vec![
