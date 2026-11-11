@@ -126,8 +126,12 @@ taskbar to keep it visible.
   one, so pressing it again toggles between two.
 - **Price scales:** linear, logarithmic, or percentage change rebased to the
   first visible candle as you pan and zoom. Press L to cycle scales.
-- **Drawings:** the toolbar places levels, trendlines, text and freehand pen strokes, saved per symbol.
-  Keys 1 to 5 pick the level, trendline, text, ruler and pen tools.
+- **Drawings:** the toolbar places levels, trendlines, text, freehand pen strokes, boxes, rays,
+  Fibonacci retracements, long / short positions and anchored VWAPs, saved per symbol.
+  Keys 1 to 5 pick the level, trendline, text, ruler and pen tools; `[` `]` `;` `'` `/` pick
+  box, ray, Fibonacci, position (R:R) and anchored VWAP. A position is drawn from the entry to
+  the stop and shows the stop distance and the 2R target; an anchored VWAP starts at the candle
+  you click.
   Drag to move them or adjust trend endpoints, and Delete removes the selection.
   Ctrl+Z undoes, Ctrl+Shift+Z redoes, and Escape returns to Cursor. The ruler
   measures price, percent, bars and elapsed time without saving.
@@ -376,6 +380,11 @@ typing in a text field.
 | | `3` | Draw text |
 | | `4` | Ruler |
 | | `5` | Pen |
+| | `[` | Draw box |
+| | `]` | Draw ray |
+| | `;` | Draw Fibonacci retracement |
+| | `'` | Draw long / short position |
+| | `/` | Anchored VWAP |
 | | `J` | Toggle second chart |
 | | `Y` | Toggle bar replay |
 | | `H` | Open Paper trading |
@@ -539,8 +548,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.15
-git push origin v0.11.15
+git tag v0.11.16
+git push origin v0.11.16
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

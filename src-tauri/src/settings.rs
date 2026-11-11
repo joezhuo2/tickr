@@ -281,8 +281,8 @@ pub fn validate_drawings(map: &HashMap<String, Vec<Drawing>>) -> Result<(), Stri
         let mut ids = HashSet::new();
         for d in drawings {
             let valid = match d.kind.as_str() {
-                "hline" | "text" => d.points.len() == 1,
-                "trend" => d.points.len() == 2,
+                "hline" | "text" | "avwap" => d.points.len() == 1,
+                "trend" | "rect" | "ray" | "fib" | "position" => d.points.len() == 2,
                 "pen" => (2..=PEN_MAX_POINTS).contains(&d.points.len()),
                 _ => return Err("Unknown drawing kind.".into()),
             };
@@ -316,6 +316,11 @@ pub struct Keybinds {
     pub draw_text: String,
     pub draw_ruler: String,
     pub draw_pen: String,
+    pub draw_rect: String,
+    pub draw_ray: String,
+    pub draw_fib: String,
+    pub draw_position: String,
+    pub draw_avwap: String,
     pub chart_split: String,
     pub chart_replay: String,
     pub practice: String,
@@ -358,6 +363,11 @@ impl Default for Keybinds {
             draw_text: "3".into(),
             draw_ruler: "4".into(),
             draw_pen: "5".into(),
+            draw_rect: "[".into(),
+            draw_ray: "]".into(),
+            draw_fib: ";".into(),
+            draw_position: "'".into(),
+            draw_avwap: "/".into(),
             chart_split: "j".into(),
             chart_replay: "y".into(),
             practice: "q".into(),
@@ -858,6 +868,7 @@ mod tests {
         assert_eq!(s.keybinds.draw_text, "3");
         assert_eq!(s.keybinds.draw_ruler, "4");
         assert_eq!(s.keybinds.draw_pen, "5");
+        assert_eq!([&s.keybinds.draw_rect, &s.keybinds.draw_ray, &s.keybinds.draw_fib, &s.keybinds.draw_position, &s.keybinds.draw_avwap], ["[", "]", ";", "'", "/"]);
         assert_eq!(s.keybinds.chart_split, "j");
         assert_eq!(s.keybinds.chart_replay, "y");
         assert_eq!(s.keybinds.practice, "q");
