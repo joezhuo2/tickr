@@ -6,6 +6,12 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.9] - 2026-11-11
+
+### Added
+- **VWAP bands**, a **volume profile** overlay and an **ADX 14** reading in
+  Technicals.
+
 ## [0.11.8] - 2026-11-11
 
 ### Added

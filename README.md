@@ -208,7 +208,7 @@ it is instant.
   −100 to +100 with a bias and confidence, upside and downside targets for the
   next 10 bars, an invalidation level and the signals behind the score.
   Checkboxes toggle moving averages, Bollinger bands, VWAP, the opening range,
-  key levels, the volume average, Fibonacci levels, targets, pattern markers, RSI and MACD panes. Indicator settings let you edit
+  key levels, the volume average, the volume profile, Fibonacci levels, targets, pattern markers, RSI and MACD panes. Indicator settings let you edit
   lengths, colors (or reset to the theme), and individual line visibility, with
   up to eight SMA and eight EMA lines. MACD defaults to 12/26/9 and starts hidden.
   Settings and up to 50 named presets persist across launches; saving an existing
@@ -232,6 +232,11 @@ it is instant.
   latest bar's volume divided by the average of the 20 bars before it. The
   latest bar is still forming on a live chart, so its relative volume reads low
   until the bar closes.
+  **VWAP bands** (Bands σ in Indicator settings, 0 to 5, off at 0) draw lines
+  that many volume-weighted standard deviations above and below VWAP.
+  **Volume profile** (off by default) shows volume by price for the candles on
+  screen as bars along the right edge, with the busiest price band darker. The
+  Indicators list also shows **ADX 14** next to the existing ATR 14.
   **Opening range** (off by default, intraday charts only) draws the high, low
   and midpoint of the first minutes of each regular session, 15 by default and
   1 to 240 in Indicator settings. The lines grow while the range forms and then
@@ -509,8 +514,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.8
-git push origin v0.11.8
+git tag v0.11.9
+git push origin v0.11.9
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
