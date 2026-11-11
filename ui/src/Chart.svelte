@@ -1,6 +1,6 @@
 ﻿<script lang="ts">
   import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, num, price, quarterLabel, volume } from "./lib/format";
-  import { classifyBars, displayOffset, isExtendedSession, isIntraday, zoneLabel, type Clock } from "./lib/session";
+  import { candleCountdown, classifyBars, displayOffset, isExtendedSession, isIntraday, zoneLabel, type Clock } from "./lib/session";
   import type { Analysis, Article, Chart, ChartMode, ChartScale, ChartTimeZone, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
   import { fitScale, forward, inverse, scaleLabel, scaleTicks } from "./lib/scale";
   import type { Drawing, DrawingPoint } from "./lib/types";
@@ -67,6 +67,14 @@
   let dragX = $state<number | null>(null);
 
   const PAD = { l: 6, r: 62, t: 38, b: 22 };
+
+  let nowSec = $state(Date.now() / 1000);
+  const countdown = $derived(chart && !replay ? candleCountdown(chart.interval, chart.candles[chart.candles.length - 1]?.t, nowSec) : null);
+  $effect(() => {
+    if (!chart || replay || !isIntraday(chart.interval)) return;
+    const tick = setInterval(() => (nowSec = Date.now() / 1000), 1000);
+    return () => clearInterval(tick);
+  });
 
   const candles = $derived(chart?.candles ?? []);
   const isDay = $derived(chart?.range === "1d");
@@ -1323,6 +1331,9 @@
   {#if staleNote}
     <div class="stale-note" role="status">{staleNote}</div>
   {/if}
+  {#if countdown}
+    <div class="countdown" title="Time until this candle closes">{countdown}</div>
+  {/if}
   {#if editing}
     <input class="drawing-input" aria-label="Drawing text" maxlength="200" style:left={`${editing.x}px`} style:top={`${editing.y}px`} bind:value={inputText} onkeydown={textKey} use:focusInput />
   {/if}
@@ -1430,6 +1441,18 @@
   .drawing-tools button[aria-pressed="true"] { background: var(--surface); color: var(--text); }
   .drawing-tools button:disabled { opacity: 0.4; }
   .drawing-input { position: absolute; width: 200px; z-index: 2; }
+  .countdown {
+    position: absolute;
+    right: 4px;
+    bottom: 26px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--tooltip-bg);
+    color: var(--muted);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
   .stale-note {
     position: absolute;
     left: 8px;

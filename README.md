@@ -134,6 +134,8 @@ taskbar to keep it visible.
 - **Candle interval:** choose Auto to keep the default resolution for each
   range, or select a supported interval independently. The choice is saved
   and resets to Auto when switching to a range that does not support it.
+- **Candle countdown:** on a live intraday chart, the bottom right corner shows
+  the time left until the forming candle closes.
 - **Tooltip:** hover the chart, or use ← and →, for time, open, high, low,
   close and volume.
 - **Zoom and pan:** scroll or pinch to zoom at the cursor (down to 10 bars),
@@ -514,8 +516,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.9
-git push origin v0.11.9
+git tag v0.11.10
+git push origin v0.11.10
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

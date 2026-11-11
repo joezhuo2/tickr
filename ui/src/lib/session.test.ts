@@ -314,3 +314,15 @@ describe("display time zone", () => {
     expect(offsetLabel(-12600)).toBe("UTC-03:30");
   });
 });
+
+it("counts down to the close of the forming intraday candle", async () => {
+  const { candleCountdown } = await import("./session");
+  expect(candleCountdown("5m", 1000, 1000)).toBe("5:00");
+  expect(candleCountdown("5m", 1000, 1234.2)).toBe("1:06");
+  expect(candleCountdown("60m", 0, 3599)).toBe("0:01");
+  expect(candleCountdown("5m", 1000, 1300)).toBeNull();
+  expect(candleCountdown("5m", 1000, 990)).toBeNull();
+  expect(candleCountdown("1d", 1000, 1001)).toBeNull();
+  expect(candleCountdown("1mo", 1000, 1001)).toBeNull();
+  expect(candleCountdown("1m", undefined, 1001)).toBeNull();
+});
