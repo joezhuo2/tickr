@@ -25,6 +25,7 @@ pub const RSI_LEN: usize = 14;
 pub const ATR_LEN: usize = 14;
 pub const STDEV_LEN: usize = 20;
 pub const BB_LEN: usize = 20;
+pub const RVOL_LEN: usize = 20;
 pub const BB_K: f64 = 2.0;
 pub const SMA_LENS: [usize; 3] = [20, 50, 200];
 pub const EMA_LENS: [usize; 2] = [9, 21];
@@ -146,6 +147,7 @@ pub struct Series {
     pub opening_range: Vec<Line>,
     /// Prior-day high and low, then premarket high and low.
     pub levels: Vec<Line>,
+    pub volume_ma: Line,
 }
 
 /// An indicator's latest value.
@@ -550,6 +552,7 @@ pub fn analyze_with_config(chart: &Chart, config: &crate::settings::IndicatorCon
             limited: n < BB_LEN,
         });
     }
+    readings.push(Reading { key: "rvol", label: format!("Relative volume ({RVOL_LEN})"), value: indicators::rvol(c, RVOL_LEN)[last], needed: RVOL_LEN + 1, limited: n <= RVOL_LEN });
     readings.push(Reading { key: "vwap", label: vwap_label.into(), value: vwap_s[last], needed: 1, limited: false });
 
     let line = |key, label: String, period: usize, values: Vec<Option<f64>>, color: &str, visible| Line {
@@ -601,6 +604,11 @@ pub fn analyze_with_config(chart: &Chart, config: &crate::settings::IndicatorCon
                 lines.push(("or_ext_down", format!("OR -{ext}x"), level(|h, l, e| l - (h - l) * e)));
             }
             lines.into_iter().map(|(key, label, values)| line(key, label, 1, values, &or.color, or.visible)).collect()
+        },
+        volume_ma: {
+            let vm = &config.volume_ma;
+            let volumes: Vec<f64> = c.iter().map(|k| k.v).collect();
+            line("volume_ma", format!("Vol avg {}", vm.length), vm.length, indicators::sma(&volumes, vm.length).into_iter().map(Some).collect(), &vm.color, vm.visible)
         },
         levels: [("pd_high", "PDH"), ("pd_low", "PDL"), ("pm_high", "PMH"), ("pm_low", "PML")].into_iter().enumerate()
             .map(|(i, (key, label))| {
@@ -804,6 +812,7 @@ mod tests {
         let prior = |a: &Analysis, k: usize| a.series.levels[k].values[119];
         assert_eq!([prior(&a, 0), prior(&a, 1)], [Some(c.candles[118].h), Some(c.candles[118].l)]);
         assert_eq!((single_day(&c), a.series.levels.len()), (None, 4));
+        assert_eq!((a.series.volume_ma.values[119], a.readings.iter().find(|r| r.key == "rvol").unwrap().value), (Some(1000.0), Some(1.0)));
         c.candles.iter_mut().enumerate().for_each(|(i, k)| k.t = 5 * 86_400 + i as i64 * 60);
         let mut a = analyze(&c).unwrap();
         assert_eq!((single_day(&c), prior(&a, 0)), (Some(5), None));

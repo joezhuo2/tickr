@@ -453,6 +453,7 @@ pub struct IndicatorConfig {
     pub vwap: IndicatorStyle,
     pub opening_range: OpeningRangeConfig,
     pub levels: IndicatorStyle,
+    pub volume_ma: LengthIndicator,
     pub rsi: LengthIndicator,
     pub macd: MacdConfig,
     pub fib: bool,
@@ -471,6 +472,7 @@ impl Default for IndicatorConfig {
             vwap: IndicatorStyle { color: String::new(), visible: true },
             opening_range: OpeningRangeConfig { minutes: 15, extension: 1.0, color: String::new(), visible: false },
             levels: IndicatorStyle { color: String::new(), visible: false },
+            volume_ma: line(20),
             rsi: line(14),
             macd: MacdConfig { fast: 12, slow: 26, signal: 9, color: String::new(), signal_color: String::new(), visible: false },
             fib: true, targets: true, patterns: true, keep_analysis: false,
@@ -489,7 +491,7 @@ pub fn validate_indicators(config: &IndicatorConfig, presets: &[IndicatorPreset]
     for c in std::iter::once(config).chain(presets.iter().map(|p| &p.config)) {
         if c.sma.len() > 8 || c.ema.len() > 8 { return Err("At most 8 SMA and 8 EMA lines are allowed".into()); }
         for length in c.sma.iter().chain(&c.ema).map(|l| l.length)
-            .chain([c.bollinger.length, c.rsi.length, c.macd.fast, c.macd.slow, c.macd.signal]) {
+            .chain([c.bollinger.length, c.volume_ma.length, c.rsi.length, c.macd.fast, c.macd.slow, c.macd.signal]) {
             if !(1..=500).contains(&length) { return Err("Indicator lengths must be from 1 to 500".into()); }
         }
         if c.macd.fast >= c.macd.slow { return Err("MACD fast must be less than slow".into()); }
@@ -497,7 +499,7 @@ pub fn validate_indicators(config: &IndicatorConfig, presets: &[IndicatorPreset]
         if !(1..=240).contains(&c.opening_range.minutes) { return Err("Opening range must be from 1 to 240 minutes".into()); }
         if !c.opening_range.extension.is_finite() || !(0.0..=5.0).contains(&c.opening_range.extension) { return Err("Opening range extension must be from 0 to 5".into()); }
         for color in c.sma.iter().chain(&c.ema).map(|l| l.color.as_str())
-            .chain([c.bollinger.color.as_str(), &c.vwap.color, &c.opening_range.color, &c.levels.color, &c.rsi.color, &c.macd.color, &c.macd.signal_color]) {
+            .chain([c.bollinger.color.as_str(), &c.vwap.color, &c.opening_range.color, &c.levels.color, &c.volume_ma.color, &c.rsi.color, &c.macd.color, &c.macd.signal_color]) {
             if !color.is_empty() && !(color.len() == 7 && color.starts_with('#') && color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)) {
                 return Err("Colors must be empty or #rrggbb".into());
             }
