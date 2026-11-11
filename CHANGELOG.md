@@ -6,6 +6,11 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Releases publish automatically: CI tags a new version once it passes on
+  `main`, and the Release workflow publishes the release after its updater
+  check.
+
 ## [0.11.3] - 2026-11-10
 
 ### Added
