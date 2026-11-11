@@ -363,6 +363,10 @@ typing in a text field.
 | | `Q` | Start random practice |
 | | `V` | Cycle date range |
 | | `R` | Refresh |
+| Indicators | `6` | Toggle opening range |
+| | `7` | Toggle key levels |
+| | `8` | Toggle volume average |
+| | `9` | Toggle volume profile |
 | Panels | `T` | Open Technicals |
 | | `Z` | Analyze / re-analyze |
 | | `A` | Open Analysts |
@@ -516,8 +520,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.10
-git push origin v0.11.10
+git tag v0.11.11
+git push origin v0.11.11
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
