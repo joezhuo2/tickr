@@ -221,6 +221,9 @@ it is instant.
   anchored to the first candle on daily and longer intervals. Short histories
   show warm-up estimates and reduced confidence. Computed locally; not
   investment advice.
+  Once analyzed, the overlays and RSI / MACD panes stay on the chart after you
+  close the Technicals tab, including in Paper trading and Strategy. Press `Z`
+  there to analyze or re-analyze without opening the tab.
   Drag the border above the Technicals panel, or focus it and press ↑ or ↓, to
   resize the panel; double-click the border to reset it. The height is
   remembered.
@@ -495,8 +498,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.5
-git push origin v0.11.5
+git tag v0.11.6
+git push origin v0.11.6
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
