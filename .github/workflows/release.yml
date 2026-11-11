@@ -3,6 +3,8 @@ name: Release
 on:
   push:
     tags: ['v*']
+  # Started by CI on main with the new tag as the ref.
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -94,3 +96,4 @@ jobs:
             jq -e --arg p "$p" '.platforms[$p].signature' latest.json > /dev/null || { echo "latest.json is missing $p"; exit 1; }
           done
           jq . latest.json
+          gh release edit "${{ github.ref_name }}" --repo "${{ github.repository }}" --draft=false --latest
