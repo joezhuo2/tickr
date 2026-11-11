@@ -1,12 +1,32 @@
 import type { Candle } from "./types";
 
 export type Field = "close" | "open" | "high" | "low" | "volume";
-export type Indicator = "sma" | "ema" | "rsi";
-type Kind = "num" | "bool";
+export type Indicator = "sma" | "ema" | "rsi" | "atr" | "or_high" | "or_low";
+export type Derived = "time" | "vwap" | "day_high" | "day_low" | "prev_high" | "prev_low" | "prev_close";
+export type Kind = "num" | "bool";
+
+/** Exchange clock for session terms: UTC offset and regular hours, in seconds past local midnight. */
+export interface SessionClock {
+  gmtoffset: number;
+  open: number;
+  close: number;
+}
+
+export const DEFAULT_CLOCK: SessionClock = { gmtoffset: 0, open: 34_200, close: 57_600 };
+
+export function clockFor(meta: { gmtoffset: number; periods?: { regular: { start: number; end: number } } | null }): SessionClock {
+  const tod = (t: number) => (((t + meta.gmtoffset) % 86_400) + 86_400) % 86_400;
+  const regular = meta.periods?.regular;
+  if (!regular) return { gmtoffset: meta.gmtoffset, open: 0, close: 86_400 };
+  const open = tod(regular.start);
+  const close = tod(regular.end);
+  return { gmtoffset: meta.gmtoffset, open, close: close > open ? close : 86_400 };
+}
 
 export type Expr =
   | { k: "num"; v: number }
   | { k: "field"; name: Field }
+  | { k: "derived"; name: Derived }
   | { k: "ind"; fn: Indicator; n: number }
   | { k: "cross"; dir: "above" | "below"; a: Expr; b: Expr }
   | { k: "cmp"; op: ">" | "<" | ">=" | "<=" | "=="; a: Expr; b: Expr }
@@ -24,7 +44,8 @@ export class ParseError extends Error {
 type Token = { t: "num" | "id" | "op" | "end"; v: string; pos: number };
 
 const FIELDS: Field[] = ["close", "open", "high", "low", "volume"];
-const INDICATORS: Indicator[] = ["sma", "ema", "rsi"];
+const INDICATORS: Indicator[] = ["sma", "ema", "rsi", "atr", "or_high", "or_low"];
+const DERIVED: Derived[] = ["time", "vwap", "day_high", "day_low", "prev_high", "prev_low", "prev_close"];
 const MAX_PERIOD = 1000;
 
 function tokenize(src: string): Token[] {
@@ -47,7 +68,7 @@ function tokenize(src: string): Token[] {
   return out;
 }
 
-export function parse(src: string): Expr {
+export function parse(src: string, kind: Kind = "bool"): Expr {
   const tokens = tokenize(src);
   let p = 0;
   const peek = () => tokens[p];
@@ -149,6 +170,7 @@ export function parse(src: string): Expr {
     if (tok.t === "id") {
       p++;
       if ((FIELDS as string[]).includes(tok.v)) return { e: { k: "field", name: tok.v as Field }, kind: "num", pos: tok.pos };
+      if ((DERIVED as string[]).includes(tok.v)) return { e: { k: "derived", name: tok.v as Derived }, kind: "num", pos: tok.pos };
       if ((INDICATORS as string[]).includes(tok.v)) {
         expect("(");
         const arg = peek();
@@ -175,13 +197,13 @@ export function parse(src: string): Expr {
   if (peek().t === "end") throw new ParseError("Expression is empty", 0);
   const root = or();
   if (peek().t !== "end") throw new ParseError(`Unexpected ${describe(peek())}`, peek().pos);
-  need(root, "bool", "The expression");
+  need(root, kind, "The expression");
   return root.e;
 }
 
-export function check(src: string): string | null {
+export function check(src: string, kind: Kind = "bool"): string | null {
   try {
-    parse(src);
+    parse(src, kind);
     return null;
   } catch (e) {
     return e instanceof ParseError ? e.message : String(e);
@@ -228,7 +250,69 @@ export function rsi(closes: number[], n: number): number[] {
   })];
 }
 
-export function evaluate(expr: Expr, candles: readonly Candle[]): boolean[] {
+export function atr(candles: readonly Candle[], n: number): number[] {
+  return smoothed(candles.map((c, i) => (i ? Math.max(c.h - c.l, Math.abs(c.h - candles[i - 1].c), Math.abs(c.l - candles[i - 1].c)) : c.h - c.l)), n, 1 / n);
+}
+
+/** Session terms per bar. Highs and lows cover earlier bars only, so a bar can break them. */
+export function sessionTerms(candles: readonly Candle[], clock: SessionClock, name: Derived | "or_high" | "or_low", minutes = 0): number[] {
+  let day = NaN;
+  let hi = NaN;
+  let lo = NaN;
+  let last = NaN;
+  let prev = { hi: NaN, lo: NaN, close: NaN };
+  let pv = 0;
+  let vol = 0;
+  const grow = (a: number, b: number, f: (x: number, y: number) => number) => (Number.isNaN(a) ? b : f(a, b));
+  return candles.map((c) => {
+    const local = c.t + clock.gmtoffset;
+    const d = Math.floor(local / 86_400);
+    const tod = local - d * 86_400;
+    if (d !== day) {
+      if (!Number.isNaN(hi)) prev = { hi, lo, close: last };
+      day = d;
+      hi = lo = last = NaN;
+      pv = vol = 0;
+    }
+    const regular = tod >= clock.open && tod < clock.close;
+    const inRange = regular && tod < clock.open + minutes * 60;
+    const rangeDone = tod >= clock.open + minutes * 60;
+    const before = { hi, lo };
+    pv += ((c.h + c.l + c.c) / 3) * c.v;
+    vol += c.v;
+    if (name === "or_high" || name === "or_low" ? inRange : regular) {
+      hi = grow(hi, c.h, Math.max);
+      lo = grow(lo, c.l, Math.min);
+      last = c.c;
+    }
+    switch (name) {
+      case "time":
+        return Math.floor(tod / 3600) * 100 + Math.floor((tod % 3600) / 60);
+      case "vwap":
+        return vol > 0 ? pv / vol : NaN;
+      case "day_high":
+        return before.hi;
+      case "day_low":
+        return before.lo;
+      case "prev_high":
+        return prev.hi;
+      case "prev_low":
+        return prev.lo;
+      case "prev_close":
+        return prev.close;
+      case "or_high":
+        return rangeDone ? hi : NaN;
+      case "or_low":
+        return rangeDone ? lo : NaN;
+    }
+  });
+}
+
+export function evaluate(expr: Expr, candles: readonly Candle[], clock: SessionClock = DEFAULT_CLOCK): boolean[] {
+  return values(expr, candles, clock).map((x) => x === 1);
+}
+
+export function values(expr: Expr, candles: readonly Candle[], clock: SessionClock = DEFAULT_CLOCK): number[] {
   const cache = new Map<string, number[]>();
   const closes = () => candles.map((c) => c.c);
   const key: Record<Field, keyof Candle> = { close: "c", open: "o", high: "h", low: "l", volume: "v" };
@@ -243,8 +327,17 @@ export function evaluate(expr: Expr, candles: readonly Candle[]): boolean[] {
         const id = `${e.fn}:${e.n}`;
         let s = cache.get(id);
         if (!s) {
-          s = e.fn === "sma" ? sma(closes(), e.n) : e.fn === "ema" ? ema(closes(), e.n) : rsi(closes(), e.n);
+          s = e.fn === "sma" ? sma(closes(), e.n) : e.fn === "ema" ? ema(closes(), e.n) : e.fn === "rsi" ? rsi(closes(), e.n)
+            : e.fn === "atr" ? atr(candles, e.n) : sessionTerms(candles, clock, e.fn, e.n);
           cache.set(id, s);
+        }
+        return s;
+      }
+      case "derived": {
+        let s = cache.get(e.name);
+        if (!s) {
+          s = sessionTerms(candles, clock, e.name);
+          cache.set(e.name, s);
         }
         return s;
       }
@@ -269,7 +362,7 @@ export function evaluate(expr: Expr, candles: readonly Candle[]): boolean[] {
     }
   }
 
-  return series(expr).map((x) => x === 1);
+  return series(expr);
 }
 
 const OPS: Record<string, (a: number, b: number) => number> = {
@@ -286,7 +379,7 @@ const OPS: Record<string, (a: number, b: number) => number> = {
   or: (a, b) => +(a === 1 || b === 1),
 };
 
-export type Operand = { kind: Field | Indicator | "value"; n: number };
+export type Operand = { kind: Field | Indicator | Derived | "value"; n: number };
 export type Condition = ">" | "<" | ">=" | "<=" | "crosses_above" | "crosses_below";
 
 export function operandText(o: Operand): string {
