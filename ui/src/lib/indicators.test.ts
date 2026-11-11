@@ -6,7 +6,7 @@ const config = (): IndicatorConfig => ({
   sma: [{ length: 20, color: "#123456", visible: true }, { length: 50, color: "", visible: false }],
   ema: [{ length: 9, color: "", visible: true }],
   bollinger: { length: 20, k: 2, color: "", visible: true },
-  vwap: { color: "", visible: true }, opening_range: { minutes: 15, extension: 1, color: "", visible: false }, rsi: { length: 14, color: "", visible: true },
+  vwap: { color: "", visible: true }, opening_range: { minutes: 15, extension: 1, color: "", visible: false }, levels: { color: "", visible: false }, rsi: { length: 14, color: "", visible: true },
   macd: { fast: 12, slow: 26, signal: 9, color: "", signal_color: "", visible: false },
   fib: true, targets: true, patterns: true, keep_analysis: false,
 });
@@ -24,7 +24,7 @@ it("toggles all moving averages without changing lengths, colors or the saved in
 });
 
 it("persists each group toggle without changing the other settings", () => {
-  for (const key of ["bollinger", "vwap", "opening_range", "rsi", "macd", "fib", "targets", "patterns"] as (keyof Overlays)[]) {
+  for (const key of ["bollinger", "vwap", "opening_range", "levels", "rsi", "macd", "fib", "targets", "patterns"] as (keyof Overlays)[]) {
     const saved = config();
     const next = toggleOverlay(saved, key, !overlayVisibility(saved)[key]);
     expect(overlayVisibility(next)).toEqual({ ...overlayVisibility(saved), [key]: !overlayVisibility(saved)[key] });

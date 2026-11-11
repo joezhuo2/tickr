@@ -144,6 +144,8 @@ pub struct Series {
     pub bollinger: Vec<Line>,
     pub vwap: Line,
     pub opening_range: Vec<Line>,
+    /// Prior-day high and low, then premarket high and low.
+    pub levels: Vec<Line>,
 }
 
 /// An indicator's latest value.
@@ -336,6 +338,23 @@ pub fn reveal_until(chart: &Chart, until: i64) -> Chart {
         splits: chart.splits.iter().filter(|s| s.t <= until).cloned().collect(),
         last_bar_time: chart.candles.iter().map(|k| k.t).filter(|&t| t <= until).max(),
         ..chart.clone()
+    }
+}
+
+/// The chart's day number when it is intraday and covers a single day, which
+/// leaves no earlier session to read the prior-day levels from.
+pub fn single_day(chart: &Chart) -> Option<i64> {
+    let intraday = chart.interval.ends_with('m') && !chart.interval.ends_with("mo");
+    let day = |k: &crate::quote::Candle| (k.t + chart.meta.gmtoffset).div_euclid(86_400);
+    let (first, last) = (chart.candles.first()?, chart.candles.last()?);
+    (intraday && day(first) == day(last)).then(|| day(first))
+}
+
+/// Sets the prior-day high and low from the last daily candle before `day`.
+pub fn fill_prior_day(analysis: &mut Analysis, daily: &Chart, day: i64) {
+    let Some(k) = daily.candles.iter().rev().find(|k| (k.t + daily.meta.gmtoffset).div_euclid(86_400) < day) else { return };
+    for (line, level) in analysis.series.levels.iter_mut().zip([k.h, k.l]) {
+        line.values.iter_mut().for_each(|v| *v = Some(level));
     }
 }
 
@@ -551,6 +570,11 @@ pub fn analyze_with_config(chart: &Chart, config: &crate::settings::IndicatorCon
     let mut rsi = line("rsi", format!("RSI {}", config.rsi.length), config.rsi.length,
         indicators::rsi(&closes, config.rsi.length), &config.rsi.color, config.rsi.visible);
     rsi.full_from = config.rsi.length;
+    let (session_open, session_close) = chart.meta.periods.map_or((0, 86_400), |p| {
+        let (start, end) = ((p.regular.start + gmt).rem_euclid(86_400), (p.regular.end + gmt).rem_euclid(86_400));
+        (start, if end > start { end } else { 86_400 })
+    });
+    let key_levels = if intraday { indicators::key_levels(c, gmt, session_open, session_close) } else { vec![(None, None); n] };
     let series = Series {
         t: c.iter().map(|k| k.t).collect(),
         mas: display_mas,
@@ -564,8 +588,7 @@ pub fn analyze_with_config(chart: &Chart, config: &crate::settings::IndicatorCon
         vwap: line("vwap", vwap_label.into(), 1, vwap_s, &config.vwap.color, config.vwap.visible),
         opening_range: {
             let or = &config.opening_range;
-            let open = chart.meta.periods.map_or(0, |p| (p.regular.start + gmt).rem_euclid(86_400));
-            let ranges = if intraday { indicators::opening_range(c, gmt, open, or.minutes as i64 * 60) } else { vec![None; n] };
+            let ranges = if intraday { indicators::opening_range(c, gmt, session_open, or.minutes as i64 * 60) } else { vec![None; n] };
             let ext = or.extension;
             let level = |f: fn(f64, f64, f64) -> f64| ranges.iter().map(|r| r.map(|(h, l)| f(h, l, ext))).collect::<Vec<_>>();
             let mut lines = vec![
@@ -579,6 +602,11 @@ pub fn analyze_with_config(chart: &Chart, config: &crate::settings::IndicatorCon
             }
             lines.into_iter().map(|(key, label, values)| line(key, label, 1, values, &or.color, or.visible)).collect()
         },
+        levels: [("pd_high", "PDH"), ("pd_low", "PDL"), ("pm_high", "PMH"), ("pm_low", "PML")].into_iter().enumerate()
+            .map(|(i, (key, label))| {
+                let values = key_levels.iter().map(|&(prior, pre)| (if i < 2 { prior } else { pre }).map(|(h, l)| if i % 2 == 0 { h } else { l })).collect();
+                line(key, label.into(), 1, values, &config.levels.color, config.levels.visible)
+            }).collect(),
     };
 
     Ok(Analysis {
@@ -773,6 +801,17 @@ mod tests {
         let [hi, lo, mid, up, down] = [0, 1, 2, 3, 4].map(|k| a.series.opening_range[k].values[119].unwrap());
         assert_eq!((hi, lo, mid), (c.candles[119].h, c.candles[119].l, (hi + lo) / 2.0));
         assert_eq!((up, down), (hi + (hi - lo), lo - (hi - lo)));
+        let prior = |a: &Analysis, k: usize| a.series.levels[k].values[119];
+        assert_eq!([prior(&a, 0), prior(&a, 1)], [Some(c.candles[118].h), Some(c.candles[118].l)]);
+        assert_eq!((single_day(&c), a.series.levels.len()), (None, 4));
+        c.candles.iter_mut().enumerate().for_each(|(i, k)| k.t = 5 * 86_400 + i as i64 * 60);
+        let mut a = analyze(&c).unwrap();
+        assert_eq!((single_day(&c), prior(&a, 0)), (Some(5), None));
+        let mut daily = c.clone();
+        daily.candles.iter_mut().enumerate().for_each(|(i, k)| k.t = i as i64 * 86_400);
+        fill_prior_day(&mut a, &daily, 5);
+        assert_eq!([prior(&a, 0), prior(&a, 1)], [Some(daily.candles[4].h), Some(daily.candles[4].l)]);
+        assert_eq!(a.series.levels[2].values[119], None);
     }
 
     #[test]

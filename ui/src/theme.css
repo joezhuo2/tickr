@@ -29,6 +29,7 @@
   --bb-fill: rgba(0, 122, 204, 0.06);
   --vwap: #d81b60;
   --or: #00897b;
+  --levels: #7e57c2;
   --rating: #f07800;
   --news: #c9a000;
   --dividend: #00a37a;
@@ -69,6 +70,7 @@
   --dark-bb-fill: rgba(100, 180, 255, 0.07);
   --dark-vwap: #ff5c93;
   --dark-or: #4db6ac;
+  --dark-levels: #b39ddb;
   --dark-rating: #ff9f0a;
   --dark-news: #ffd60a;
   --dark-dividend: #30d1a0;
@@ -104,6 +106,7 @@
     --bb-fill: var(--dark-bb-fill);
     --vwap: var(--dark-vwap);
     --or: var(--dark-or);
+    --levels: var(--dark-levels);
     --rating: var(--dark-rating);
     --news: var(--dark-news);
     --dividend: var(--dark-dividend);
@@ -140,6 +143,7 @@
   --bb-fill: var(--dark-bb-fill);
   --vwap: var(--dark-vwap);
   --or: var(--dark-or);
+  --levels: var(--dark-levels);
   --rating: var(--dark-rating);
   --news: var(--dark-news);
   --dividend: var(--dark-dividend);

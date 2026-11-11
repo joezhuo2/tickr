@@ -608,6 +608,27 @@
     }
     if (s.opening_range && a.series.opening_range.some((l) => l.values.some((x) => x != null))) {
       const col = a.series.opening_range[0].color || v("--or");
+      const [orHigh, orLow] = a.series.opening_range;
+      ctx.fillStyle = col;
+      ctx.globalAlpha = 0.08;
+      let box: [number, number, number][] = [];
+      for (let i = 0; i <= g.n; i++) {
+        const hi = i < g.n ? valueAt(orHigh, i) : null;
+        const lo = i < g.n ? valueAt(orLow, i) : null;
+        if (hi != null && lo != null) {
+          box.push([g.x(i), g.y(hi), g.y(lo)]);
+          continue;
+        }
+        if (box.length > 1) {
+          ctx.beginPath();
+          box.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+          for (let k = box.length - 1; k >= 0; k--) ctx.lineTo(box[k][0], box[k][2]);
+          ctx.closePath();
+          ctx.fill();
+        }
+        box = [];
+      }
+      ctx.globalAlpha = 1;
       ctx.strokeStyle = col;
       a.series.opening_range.forEach((line, k) => {
         ctx.lineWidth = k < 2 ? 1.4 : 1;
@@ -616,6 +637,26 @@
       });
       ctx.globalAlpha = 1;
       legend(a.series.opening_range[0].label, col);
+    }
+
+    if (s.levels) {
+      ctx.lineWidth = 1;
+      ctx.textAlign = "right";
+      ctx.textBaseline = "bottom";
+      for (const line of a.series.levels) {
+        const col = line.color || v("--levels");
+        ctx.strokeStyle = col;
+        ctx.fillStyle = col;
+        strokeLine(ctx, line, g.y, g);
+        let at = -1;
+        for (let i = g.i1; i >= g.i0 && at < 0; i--) if (valueAt(line, i) != null) at = i;
+        if (at < 0) continue;
+        const val = valueAt(line, at)!;
+        const y = g.y(val);
+        if (y >= PAD.t && y <= priceBottom) ctx.fillText(`${line.label} ${num(val)}`, Math.min(g.x(at), right) - 4, y - 2);
+      }
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
     }
 
     // Targets: full-width levels, labeled inside the plot.
