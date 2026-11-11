@@ -50,6 +50,7 @@
     { key: "mas", label: "Moving averages" },
     { key: "bollinger", label: "Bollinger bands" },
     { key: "vwap", label: "VWAP" },
+    { key: "opening_range", label: "Opening range" },
     { key: "fib", label: "Fibonacci" },
     { key: "targets", label: "Targets" },
     { key: "patterns", label: "Patterns" },
@@ -228,6 +229,14 @@
           <label><input type="checkbox" aria-label={`${group} visible`} checked={config[group].visible} onchange={(e) => change((c) => c[group].visible = e.currentTarget.checked)} /> Visible</label>
         </div>
       {/each}
+      <div class="indicator-row">
+        <b>OPENING RANGE</b>
+        <label>Minutes <input type="number" aria-label="Opening range minutes" min="1" max="240" value={config.opening_range.minutes} onchange={(e) => change((c) => c.opening_range.minutes = e.currentTarget.valueAsNumber)} /></label>
+        <label title="Target lines this many range heights beyond the high and low; 0 hides them">Extension <input type="number" aria-label="Opening range extension" min="0" max="5" step="0.5" value={config.opening_range.extension} onchange={(e) => change((c) => c.opening_range.extension = e.currentTarget.valueAsNumber)} /></label>
+        <label>Color <input type="color" aria-label="Opening range color" value={config.opening_range.color || "#808080"} onchange={(e) => change((c) => c.opening_range.color = e.currentTarget.value)} /></label>
+        <button aria-label="Reset opening range color to theme" onclick={() => change((c) => c.opening_range.color = "")}>Theme</button>
+        <label><input type="checkbox" aria-label="Opening range visible" checked={config.opening_range.visible} onchange={(e) => change((c) => c.opening_range.visible = e.currentTarget.checked)} /> Visible</label>
+      </div>
       <div class="indicator-row">
         <label>Preset <select bind:value={selectedPreset}><option value="">Select preset</option>{#each presets as p (p.name)}<option value={p.name}>{p.name}</option>{/each}</select></label>
         <button disabled={!presets.some((p) => p.name === selectedPreset)} onclick={() => edit(() => onsave(presets.find((p) => p.name === selectedPreset)!.config))}>Apply</button>

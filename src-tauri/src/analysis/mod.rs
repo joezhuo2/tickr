@@ -143,6 +143,7 @@ pub struct Series {
     pub macd: Vec<Line>,
     pub bollinger: Vec<Line>,
     pub vwap: Line,
+    pub opening_range: Vec<Line>,
 }
 
 /// An indicator's latest value.
@@ -561,6 +562,23 @@ pub fn analyze_with_config(chart: &Chart, config: &crate::settings::IndicatorCon
         bollinger: [("bb_upper", "BB upper".into(), up), ("bb_mid", format!("BB {}, {}", bb.length, bb.k), mid), ("bb_lower", "BB lower".into(), lo)]
             .into_iter().map(|(key, label, values)| line(key, label, bb.length, values.into_iter().map(Some).collect(), &bb.color, bb.visible)).collect(),
         vwap: line("vwap", vwap_label.into(), 1, vwap_s, &config.vwap.color, config.vwap.visible),
+        opening_range: {
+            let or = &config.opening_range;
+            let open = chart.meta.periods.map_or(0, |p| (p.regular.start + gmt).rem_euclid(86_400));
+            let ranges = if intraday { indicators::opening_range(c, gmt, open, or.minutes as i64 * 60) } else { vec![None; n] };
+            let ext = or.extension;
+            let level = |f: fn(f64, f64, f64) -> f64| ranges.iter().map(|r| r.map(|(h, l)| f(h, l, ext))).collect::<Vec<_>>();
+            let mut lines = vec![
+                ("or_high", format!("OR {}m", or.minutes), level(|h, _, _| h)),
+                ("or_low", "OR low".into(), level(|_, l, _| l)),
+                ("or_mid", "OR mid".into(), level(|h, l, _| (h + l) / 2.0)),
+            ];
+            if ext > 0.0 {
+                lines.push(("or_ext_up", format!("OR +{ext}x"), level(|h, l, e| h + (h - l) * e)));
+                lines.push(("or_ext_down", format!("OR -{ext}x"), level(|h, l, e| l - (h - l) * e)));
+            }
+            lines.into_iter().map(|(key, label, values)| line(key, label, 1, values, &or.color, or.visible)).collect()
+        },
     };
 
     Ok(Analysis {
@@ -747,8 +765,14 @@ mod tests {
         let r = |k| a.readings.iter().find(|r| r.key == k).unwrap().value;
         assert_eq!(r("bb_upper"), up.values[119]);
         assert_eq!(r("vwap"), a.series.vwap.values[119]);
+        assert_eq!(a.series.opening_range.len(), 5);
+        assert!(a.series.opening_range.iter().all(|l| l.values.iter().all(Option::is_none)));
         c.interval = "5m".into();
-        assert_eq!(analyze(&c).unwrap().series.vwap.label, "VWAP");
+        let a = analyze(&c).unwrap();
+        assert_eq!(a.series.vwap.label, "VWAP");
+        let [hi, lo, mid, up, down] = [0, 1, 2, 3, 4].map(|k| a.series.opening_range[k].values[119].unwrap());
+        assert_eq!((hi, lo, mid), (c.candles[119].h, c.candles[119].l, (hi + lo) / 2.0));
+        assert_eq!((up, down), (hi + (hi - lo), lo - (hi - lo)));
     }
 
     #[test]

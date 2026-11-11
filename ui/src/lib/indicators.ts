@@ -3,7 +3,7 @@ import type { IndicatorConfig, Overlays } from "./types";
 export function overlayVisibility(c: IndicatorConfig): Overlays {
   return {
     mas: [...c.sma, ...c.ema].some((l) => l.visible),
-    bollinger: c.bollinger.visible, vwap: c.vwap.visible, rsi: c.rsi.visible, macd: c.macd.visible,
+    bollinger: c.bollinger.visible, vwap: c.vwap.visible, opening_range: c.opening_range.visible, rsi: c.rsi.visible, macd: c.macd.visible,
     fib: c.fib, targets: c.targets, patterns: c.patterns,
   };
 }

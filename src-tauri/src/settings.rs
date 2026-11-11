@@ -437,12 +437,21 @@ pub struct MacdConfig {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OpeningRangeConfig {
+    pub minutes: usize,
+    pub extension: f64,
+    pub color: String,
+    pub visible: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct IndicatorConfig {
     pub sma: Vec<LengthIndicator>,
     pub ema: Vec<LengthIndicator>,
     pub bollinger: BollingerConfig,
     pub vwap: IndicatorStyle,
+    pub opening_range: OpeningRangeConfig,
     pub rsi: LengthIndicator,
     pub macd: MacdConfig,
     pub fib: bool,
@@ -459,6 +468,7 @@ impl Default for IndicatorConfig {
             ema: [9, 21].into_iter().map(line).collect(),
             bollinger: BollingerConfig { length: 20, k: 2.0, color: String::new(), visible: true },
             vwap: IndicatorStyle { color: String::new(), visible: true },
+            opening_range: OpeningRangeConfig { minutes: 15, extension: 1.0, color: String::new(), visible: false },
             rsi: line(14),
             macd: MacdConfig { fast: 12, slow: 26, signal: 9, color: String::new(), signal_color: String::new(), visible: false },
             fib: true, targets: true, patterns: true, keep_analysis: false,
@@ -482,8 +492,10 @@ pub fn validate_indicators(config: &IndicatorConfig, presets: &[IndicatorPreset]
         }
         if c.macd.fast >= c.macd.slow { return Err("MACD fast must be less than slow".into()); }
         if !c.bollinger.k.is_finite() || !(0.5..=5.0).contains(&c.bollinger.k) { return Err("Bollinger k must be from 0.5 to 5.0".into()); }
+        if !(1..=240).contains(&c.opening_range.minutes) { return Err("Opening range must be from 1 to 240 minutes".into()); }
+        if !c.opening_range.extension.is_finite() || !(0.0..=5.0).contains(&c.opening_range.extension) { return Err("Opening range extension must be from 0 to 5".into()); }
         for color in c.sma.iter().chain(&c.ema).map(|l| l.color.as_str())
-            .chain([c.bollinger.color.as_str(), &c.vwap.color, &c.rsi.color, &c.macd.color, &c.macd.signal_color]) {
+            .chain([c.bollinger.color.as_str(), &c.vwap.color, &c.opening_range.color, &c.rsi.color, &c.macd.color, &c.macd.signal_color]) {
             if !color.is_empty() && !(color.len() == 7 && color.starts_with('#') && color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)) {
                 return Err("Colors must be empty or #rrggbb".into());
             }
@@ -714,17 +726,19 @@ mod tests {
             |c| c.bollinger.k = 0.49, |c| c.bollinger.k = 5.01,
             |c| c.bollinger.k = f64::NAN, |c| c.bollinger.k = f64::INFINITY,
             |c| c.sma = vec![c.sma[0].clone(); 9], |c| c.ema = vec![c.ema[0].clone(); 9],
+            |c| c.opening_range.minutes = 0, |c| c.opening_range.minutes = 241,
+            |c| c.opening_range.extension = -0.1, |c| c.opening_range.extension = f64::NAN,
         ];
         for edit in invalid {
             let mut c = defaults.clone(); edit(&mut c);
             assert!(validate_indicators(&c, &[]).is_err(), "{c:?}");
         }
         for color in ["red", "ffffff", "#fff", "#1234567", "#gg1234", "#???"] {
-            for field in 0..7 {
+            for field in 0..8 {
                 let mut c = defaults.clone();
                 let dest = match field { 0 => &mut c.sma[0].color, 1 => &mut c.ema[0].color,
                     2 => &mut c.bollinger.color, 3 => &mut c.vwap.color, 4 => &mut c.rsi.color,
-                    5 => &mut c.macd.color, _ => &mut c.macd.signal_color };
+                    5 => &mut c.macd.color, 6 => &mut c.opening_range.color, _ => &mut c.macd.signal_color };
                 *dest = color.into();
                 assert!(validate_indicators(&c, &[]).is_err());
             }

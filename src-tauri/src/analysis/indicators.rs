@@ -54,6 +54,29 @@ pub fn vwap(c: &[Candle], session: impl Fn(i64) -> i64) -> Vec<Option<f64>> {
         .collect()
 }
 
+/// Opening range per day as (high, low): it grows through the first `window`
+/// seconds after `open` (seconds past local midnight), then holds for the day.
+pub fn opening_range(c: &[Candle], gmt: i64, open: i64, window: i64) -> Vec<Option<(f64, f64)>> {
+    let (mut day, mut range) = (None, None::<(f64, f64)>);
+    c.iter()
+        .map(|k| {
+            let local = k.t + gmt;
+            let (d, tod) = (local.div_euclid(86_400), local.rem_euclid(86_400));
+            if day != Some(d) {
+                day = Some(d);
+                range = None;
+            }
+            if tod < open {
+                return None;
+            }
+            if tod < open + window {
+                range = Some(range.map_or((k.h, k.l), |(h, l)| (h.max(k.h), l.min(k.l))));
+            }
+            range
+        })
+        .collect()
+}
+
 /// Exponential smoothing with `alpha`, seeded with the SMA of the first `n`
 /// values (expanding mean before that).
 fn smoothed(src: &[f64], n: usize, alpha: f64) -> Vec<f64> {
@@ -224,6 +247,27 @@ pub(crate) mod tests {
         assert!(close_enough(lo[2], 2.0 - 2.0 * (2.0f64 / 3.0).sqrt(), 1e-12));
         assert_eq!((up[0], lo[0]), (1.0, 1.0));
         assert_eq!((mid[5], up[5], lo[5]), (5.0, 5.0, 5.0));
+    }
+
+    #[test]
+    fn opening_range_grows_then_holds_and_resets_each_day() {
+        let bar = |t: i64, h: f64, l: f64| Candle { t, o: l, h, l, c: h, v: 1.0 };
+        let open = 34_200;
+        let bars = [
+            bar(open - 300, 99.0, 1.0),
+            bar(open, 10.0, 8.0),
+            bar(open + 300, 12.0, 9.0),
+            bar(open + 600, 11.0, 7.0),
+            bar(open + 900, 20.0, 2.0),
+            bar(86_400 + open - 300, 50.0, 40.0),
+            bar(86_400 + open + 900, 30.0, 25.0),
+            bar(86_400 + open, 5.0, 4.0),
+        ];
+        let got = opening_range(&bars, 0, open, 900);
+        assert_eq!(got[..5], [None, Some((10.0, 8.0)), Some((12.0, 8.0)), Some((12.0, 7.0)), Some((12.0, 7.0))]);
+        assert_eq!(got[5..7], [None, None]);
+        assert_eq!(got[7], Some((5.0, 4.0)));
+        assert_eq!(opening_range(&bars[1..2], -3_600, open - 3_600, 900), [Some((10.0, 8.0))]);
     }
 
     #[test]

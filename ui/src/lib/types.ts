@@ -585,7 +585,7 @@ export interface Analysis {
   };
   fib: Swing | null;
   patterns: Pattern[];
-  series: { t: number[]; mas: Line[]; rsi: Line; macd: Line[]; bollinger: Line[]; vwap: Line };
+  series: { t: number[]; mas: Line[]; rsi: Line; macd: Line[]; bollinger: Line[]; vwap: Line; opening_range: Line[] };
 }
 
 /** Which analysis layers the chart draws. */
@@ -593,6 +593,7 @@ export interface Overlays {
   mas: boolean;
   bollinger: boolean;
   vwap: boolean;
+  opening_range: boolean;
   fib: boolean;
   targets: boolean;
   patterns: boolean;
@@ -655,6 +656,7 @@ export interface IndicatorConfig {
   ema: LengthIndicator[];
   bollinger: LengthIndicator & { k: number };
   vwap: IndicatorStyle;
+  opening_range: IndicatorStyle & { minutes: number; extension: number };
   rsi: LengthIndicator;
   macd: IndicatorStyle & { fast: number; slow: number; signal: number; signal_color: string };
   fib: boolean;

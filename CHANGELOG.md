@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.4] - 2026-11-11
+
+### Added
+- **Opening range** overlay in Technicals for intraday charts: the high, low and
+  midpoint of the first 1 to 240 minutes of each regular session (15 by
+  default), with optional extension targets above and below. Off by default.
+
 ## [0.11.3] - 2026-11-10
 
 ### Added
