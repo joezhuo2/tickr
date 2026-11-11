@@ -6,6 +6,12 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.12] - 2026-11-11
+
+### Changed
+- **Settings** has a left menu that switches between Display, Hotkeys, Chart,
+  Market data, AI, Backup and Connections.
+
 ## [0.11.11] - 2026-11-11
 
 ### Added
