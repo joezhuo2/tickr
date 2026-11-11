@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { overlayVisibility, paneLayout, shouldAnalyze, toggleOverlay } from "./indicators";
+import { clampPanel, overlayVisibility, paneLayout, shouldAnalyze, toggleOverlay } from "./indicators";
 import type { IndicatorConfig, Overlays } from "./types";
 
 const config = (): IndicatorConfig => ({
@@ -30,6 +30,10 @@ it("persists each group toggle without changing the other settings", () => {
     expect(overlayVisibility(next)).toEqual({ ...overlayVisibility(saved), [key]: !overlayVisibility(saved)[key] });
     expect(next.sma).toEqual(saved.sma);
   }
+});
+
+it("keeps a dragged panel between its minimum and 85% of the space", () => {
+  expect([clampPanel(10, 600), clampPanel(300.4, 600), clampPanel(900, 600), clampPanel(50, 100)]).toEqual([92, 300, 510, 92]);
 });
 
 it("recalculates only when results are shown or keep analysis is enabled", () => {

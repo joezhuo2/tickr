@@ -18,6 +18,12 @@ export function shouldAnalyze(shown: boolean, keep: boolean): boolean {
   return shown || keep;
 }
 
+export const PANEL_MIN = 92;
+
+export function clampPanel(height: number, total: number): number {
+  return Math.round(Math.max(PANEL_MIN, Math.min(height, total * 0.85)));
+}
+
 export function paneLayout(height: number, rsi: boolean, macd: boolean) {
   const count = Number(rsi) + Number(macd);
   const priceH = height * (count === 2 ? 0.42 : count === 1 ? 0.6 : 0.8);
