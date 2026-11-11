@@ -207,8 +207,8 @@ it is instant.
   range, on your machine (same candles, same result). You get a score from
   −100 to +100 with a bias and confidence, upside and downside targets for the
   next 10 bars, an invalidation level and the signals behind the score.
-  Checkboxes toggle moving averages, Bollinger bands, VWAP, Fibonacci levels,
-  targets, pattern markers, RSI and MACD panes. Indicator settings let you edit
+  Checkboxes toggle moving averages, Bollinger bands, VWAP, the opening range,
+  Fibonacci levels, targets, pattern markers, RSI and MACD panes. Indicator settings let you edit
   lengths, colors (or reset to the theme), and individual line visibility, with
   up to eight SMA and eight EMA lines. MACD defaults to 12/26/9 and starts hidden.
   Settings and up to 50 named presets persist across launches; saving an existing
@@ -221,6 +221,11 @@ it is instant.
   anchored to the first candle on daily and longer intervals. Short histories
   show warm-up estimates and reduced confidence. Computed locally; not
   investment advice.
+  **Opening range** (off by default, intraday charts only) draws the high, low
+  and midpoint of the first minutes of each regular session, 15 by default and
+  1 to 240 in Indicator settings. The lines grow while the range forms and then
+  hold for the rest of the day. **Extension** adds target lines that many range
+  heights above the high and below the low; 0 hides them.
 
 - **Analysts:** the rating (Strong buy to Sell), average 12-month target and
   its upside also sit under the price on the left. The tab adds the target
@@ -487,8 +492,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.3
-git push origin v0.11.3
+git tag v0.11.4
+git push origin v0.11.4
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
