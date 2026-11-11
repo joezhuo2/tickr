@@ -6,6 +6,12 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.5] - 2026-11-11
+
+### Added
+- **Resizable Technicals panel:** drag the border above it (or focus it and press
+  ↑ / ↓) to change its height; double-click resets. The height is remembered.
+
 ## [0.11.4] - 2026-11-11
 
 ### Added
