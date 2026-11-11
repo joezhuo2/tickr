@@ -107,6 +107,47 @@ pub fn key_levels(c: &[Candle], gmt: i64, open: i64, close: i64) -> Vec<(Range, 
         .collect()
 }
 
+/// VWAP with its volume-weighted standard deviation, reset per session.
+pub fn vwap_sd(c: &[Candle], session: impl Fn(i64) -> i64) -> Vec<Option<(f64, f64)>> {
+    let (mut pv, mut pv2, mut vol, mut cur) = (0.0, 0.0, 0.0, None);
+    c.iter()
+        .map(|k| {
+            let s = session(k.t);
+            if cur != Some(s) {
+                cur = Some(s);
+                pv = 0.0;
+                pv2 = 0.0;
+                vol = 0.0;
+            }
+            let tp = (k.h + k.l + k.c) / 3.0;
+            pv += tp * k.v;
+            pv2 += tp * tp * k.v;
+            vol += k.v;
+            (vol > 0.0).then(|| {
+                let mean = pv / vol;
+                (mean, (pv2 / vol - mean * mean).max(0.0).sqrt())
+            })
+        })
+        .collect()
+}
+
+/// Average directional index (Wilder), 0..100.
+pub fn adx(c: &[Candle], n: usize) -> Vec<f64> {
+    let (mut plus, mut minus) = (vec![0.0; c.len()], vec![0.0; c.len()]);
+    for (i, w) in c.windows(2).enumerate() {
+        let (up, down) = (w[1].h - w[0].h, w[0].l - w[1].l);
+        if up > down && up > 0.0 {
+            plus[i + 1] = up;
+        }
+        if down > up && down > 0.0 {
+            minus[i + 1] = down;
+        }
+    }
+    let (plus, minus) = (rma(&plus, n), rma(&minus, n));
+    let dx: Vec<f64> = plus.iter().zip(&minus).map(|(&p, &m)| if p + m > 0.0 { 100.0 * (p - m).abs() / (p + m) } else { 0.0 }).collect();
+    rma(&dx, n)
+}
+
 /// Relative volume: each bar's volume over the mean of the `n` bars before it.
 pub fn rvol(c: &[Candle], n: usize) -> Vec<Option<f64>> {
     (0..c.len())
@@ -337,6 +378,23 @@ pub(crate) mod tests {
     fn rvol_compares_with_the_bars_before() {
         let bars: Vec<Candle> = [10.0, 30.0, 40.0, 0.0, 0.0, 5.0].iter().map(|&v| Candle { t: 0, o: 1.0, h: 1.0, l: 1.0, c: 1.0, v }).collect();
         assert_eq!(rvol(&bars, 2), [None, Some(3.0), Some(2.0), Some(0.0), Some(0.0), None]);
+    }
+
+    #[test]
+    fn adx_is_high_in_a_trend_and_zero_when_flat() {
+        let bar = |p: f64| Candle { t: 0, o: p, h: p + 1.0, l: p - 1.0, c: p, v: 1.0 };
+        let up: Vec<Candle> = (0..60).map(|i| bar(100.0 + i as f64)).collect();
+        let flat: Vec<Candle> = (0..60).map(|_| bar(100.0)).collect();
+        assert!(adx(&up, 14)[59] > 90.0);
+        assert_eq!(adx(&flat, 14)[59], 0.0);
+        assert!(adx(&[], 14).is_empty());
+    }
+
+    #[test]
+    fn vwap_sd_measures_spread_around_vwap() {
+        let bar = |t: i64, p: f64, v: f64| Candle { t, o: p, h: p, l: p, c: p, v };
+        let got = vwap_sd(&[bar(0, 10.0, 1.0), bar(1, 20.0, 1.0), bar(100, 7.0, 0.0), bar(101, 7.0, 2.0)], |t| t / 100);
+        assert_eq!(got, [Some((10.0, 0.0)), Some((15.0, 5.0)), None, Some((7.0, 0.0))]);
     }
 
     #[test]

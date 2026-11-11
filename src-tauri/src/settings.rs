@@ -451,6 +451,8 @@ pub struct IndicatorConfig {
     pub ema: Vec<LengthIndicator>,
     pub bollinger: BollingerConfig,
     pub vwap: IndicatorStyle,
+    pub vwap_bands: f64,
+    pub volume_profile: bool,
     pub opening_range: OpeningRangeConfig,
     pub levels: IndicatorStyle,
     pub volume_ma: LengthIndicator,
@@ -470,6 +472,8 @@ impl Default for IndicatorConfig {
             ema: [9, 21].into_iter().map(line).collect(),
             bollinger: BollingerConfig { length: 20, k: 2.0, color: String::new(), visible: true },
             vwap: IndicatorStyle { color: String::new(), visible: true },
+            vwap_bands: 0.0,
+            volume_profile: false,
             opening_range: OpeningRangeConfig { minutes: 15, extension: 1.0, color: String::new(), visible: false },
             levels: IndicatorStyle { color: String::new(), visible: false },
             volume_ma: line(20),
@@ -496,6 +500,7 @@ pub fn validate_indicators(config: &IndicatorConfig, presets: &[IndicatorPreset]
         }
         if c.macd.fast >= c.macd.slow { return Err("MACD fast must be less than slow".into()); }
         if !c.bollinger.k.is_finite() || !(0.5..=5.0).contains(&c.bollinger.k) { return Err("Bollinger k must be from 0.5 to 5.0".into()); }
+        if !c.vwap_bands.is_finite() || !(0.0..=5.0).contains(&c.vwap_bands) { return Err("VWAP bands must be from 0 to 5 deviations".into()); }
         if !(1..=240).contains(&c.opening_range.minutes) { return Err("Opening range must be from 1 to 240 minutes".into()); }
         if !c.opening_range.extension.is_finite() || !(0.0..=5.0).contains(&c.opening_range.extension) { return Err("Opening range extension must be from 0 to 5".into()); }
         for color in c.sma.iter().chain(&c.ema).map(|l| l.color.as_str())
@@ -730,6 +735,7 @@ mod tests {
             |c| c.bollinger.k = 0.49, |c| c.bollinger.k = 5.01,
             |c| c.bollinger.k = f64::NAN, |c| c.bollinger.k = f64::INFINITY,
             |c| c.sma = vec![c.sma[0].clone(); 9], |c| c.ema = vec![c.ema[0].clone(); 9],
+            |c| c.vwap_bands = -1.0, |c| c.vwap_bands = 5.5,
             |c| c.opening_range.minutes = 0, |c| c.opening_range.minutes = 241,
             |c| c.opening_range.extension = -0.1, |c| c.opening_range.extension = f64::NAN,
         ];

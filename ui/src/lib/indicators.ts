@@ -1,21 +1,38 @@
-import type { IndicatorConfig, Overlays } from "./types";
+import type { Candle, IndicatorConfig, Overlays } from "./types";
 
 export function overlayVisibility(c: IndicatorConfig): Overlays {
   return {
     mas: [...c.sma, ...c.ema].some((l) => l.visible),
     bollinger: c.bollinger.visible, vwap: c.vwap.visible, opening_range: c.opening_range.visible, levels: c.levels.visible, volume_ma: c.volume_ma.visible, rsi: c.rsi.visible, macd: c.macd.visible,
-    fib: c.fib, targets: c.targets, patterns: c.patterns,
+    fib: c.fib, targets: c.targets, patterns: c.patterns, volume_profile: c.volume_profile,
   };
 }
 
 export function toggleOverlay(c: IndicatorConfig, key: keyof Overlays, visible: boolean): IndicatorConfig {
   if (key === "mas") return { ...c, sma: c.sma.map((l) => ({ ...l, visible })), ema: c.ema.map((l) => ({ ...l, visible })) };
-  if (key === "fib" || key === "targets" || key === "patterns") return { ...c, [key]: visible };
+  if (key === "fib" || key === "targets" || key === "patterns" || key === "volume_profile") return { ...c, [key]: visible };
   return { ...c, [key]: { ...c[key], visible } };
 }
 
 export function shouldAnalyze(shown: boolean, keep: boolean): boolean {
   return shown || keep;
+}
+
+/** Volume by price over candles i0..i1: each candle's volume is spread evenly over the bins its range touches. */
+export function volumeProfile(candles: readonly Candle[], i0: number, i1: number, bins = 24): { lo: number; step: number; volumes: number[] } | null {
+  const shown = candles.slice(Math.max(0, i0), i1 + 1);
+  if (!shown.length) return null;
+  const lo = Math.min(...shown.map((c) => c.l));
+  const hi = Math.max(...shown.map((c) => c.h));
+  if (!(hi > lo)) return null;
+  const step = (hi - lo) / bins;
+  const volumes = Array<number>(bins).fill(0);
+  const bin = (p: number) => Math.min(bins - 1, Math.max(0, Math.floor((p - lo) / step)));
+  for (const c of shown) {
+    const [a, b] = [bin(c.l), bin(c.h)];
+    for (let k = a; k <= b; k++) volumes[k] += c.v / (b - a + 1);
+  }
+  return { lo, step, volumes };
 }
 
 export const PANEL_MIN = 92;
