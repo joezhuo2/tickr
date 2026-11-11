@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampPanel, overlayVisibility, paneLayout, volumeProfile, shouldAnalyze, toggleOverlay } from "./indicators";
+import { alertLevels, clampPanel, overlayVisibility, paneLayout, volumeProfile, shouldAnalyze, toggleOverlay } from "./indicators";
 import type { IndicatorConfig, Overlays } from "./types";
 
 const config = (): IndicatorConfig => ({
@@ -39,6 +39,21 @@ it("spreads each candle's volume over the price bins it touches", () => {
   expect(volumeProfile(candles, 1, 1, 4)?.volumes.reduce((a, b) => a + b)).toBe(100);
   expect(volumeProfile([bar(5, 5, 10)], 0, 0)).toBeNull();
   expect(volumeProfile([], 0, 0)).toBeNull();
+});
+
+it("lists the latest known breakout levels with their alert direction", () => {
+  const line = (key: string, values: (number | null)[]) => ({ key, label: key, color: "", visible: true, period: 1, full_from: 0, values });
+  const series = {
+    opening_range: [line("or_high", [null, 104, 104]), line("or_low", [null, 98, 98]), line("or_mid", [null, 101, 101])],
+    levels: [line("pd_high", [110, 110, null]), line("pd_low", [null, null, null]), line("pm_high", [0, 0, 0]), line("pm_low", [97, 96, 95])],
+  };
+  expect(alertLevels(series)).toEqual([
+    { label: "OR high", level: 104, direction: "above" },
+    { label: "OR low", level: 98, direction: "below" },
+    { label: "PDH", level: 110, direction: "above" },
+    { label: "PML", level: 95, direction: "below" },
+  ]);
+  expect(alertLevels({ opening_range: [], levels: [] })).toEqual([]);
 });
 
 it("keeps a dragged panel between its minimum and 85% of the space", () => {

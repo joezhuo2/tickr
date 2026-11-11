@@ -82,6 +82,7 @@ async fn connection(app: &AppHandle, shared: &Shared, config: &Config<'_>, live_
                     drop(settings);
                     crate::tray::update(app, shared);
                     crate::poller::emit(app, shared);
+                    crate::alerts::observe_selected(app, shared, symbol);
                 }
             }
             message = socket.next() => {

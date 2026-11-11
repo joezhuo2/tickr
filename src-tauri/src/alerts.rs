@@ -376,6 +376,15 @@ fn observe(app: &AppHandle, shared: &Shared, symbol: &str, q: &Quote) {
     }
 }
 
+/// Checks the selected symbol's alerts against its streamed quote, so a
+/// crossing is caught between polls.
+pub fn observe_selected(app: &AppHandle, shared: &Shared, symbol: &str) {
+    let quote = lock(&shared.quote).quote.clone().filter(|q| q.symbol == symbol);
+    if let Some(q) = quote {
+        observe(app, shared, symbol, &q);
+    }
+}
+
 /// Reuse the selected symbol's fresh quote; fetch other alert symbols once each,
 /// at most four at a time. Failed requests leave crossing baselines untouched.
 pub async fn poll(app: &AppHandle, shared: &Shared, selected: &str, fresh: Option<&Quote>) {
