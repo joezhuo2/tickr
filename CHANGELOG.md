@@ -6,6 +6,12 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.10] - 2026-11-11
+
+### Added
+- **Candle countdown** on live intraday charts: time left until the forming
+  candle closes.
+
 ## [0.11.9] - 2026-11-11
 
 ### Added
