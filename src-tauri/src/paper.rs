@@ -64,6 +64,18 @@ pub struct Order {
     pub price: Option<f64>,
     #[serde(default)]
     pub created: i64,
+    /// Orders sharing this number cancel each other when one fills.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oco: Option<u64>,
+    /// Exit orders to place when this order fills.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bracket: Option<Bracket>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Bracket {
+    pub stop: Option<f64>,
+    pub target: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -194,6 +206,9 @@ impl PaperAccount {
             if !valid_symbol(&o.symbol) || !valid_qty(o.qty) {
                 return Err(format!("Invalid order for {}", o.symbol));
             }
+            if o.bracket.is_some_and(|b| [b.stop, b.target].into_iter().flatten().any(|p| !positive(p))) {
+                return Err("Bracket prices must be positive".into());
+            }
             match (o.kind, o.price) {
                 (OrderKind::Market, _) => return Err("Market orders cannot rest on the saved account".into()),
                 (_, Some(p)) if positive(p) => {}
@@ -250,7 +265,7 @@ mod tests {
                 Position { symbol: "AAPL".into(), qty: 10, avg_price: 100.0, entry_costs: 1.0, opened: 1_700_000_000 },
                 Position { symbol: "BRK-B".into(), qty: -3, avg_price: 400.0, entry_costs: 0.0, opened: 1_700_000_100 },
             ],
-            orders: vec![Order { id: 5, symbol: "AAPL".into(), side: Side::Sell, qty: 5, kind: OrderKind::Limit, price: Some(120.0), created: 1_700_000_200 }],
+            orders: vec![Order { id: 5, symbol: "AAPL".into(), side: Side::Sell, qty: 5, kind: OrderKind::Limit, price: Some(120.0), created: 1_700_000_200, oco: Some(4), bracket: Some(Bracket { stop: Some(110.0), target: None }) }],
             fills: vec![Fill { id: 1, order_id: None, symbol: "AAPL".into(), side: Side::Buy, qty: 10, price: 100.0, commission: 1.0, time: 1_700_000_000 }],
             trades: vec![ClosedTrade { id: 3, symbol: "MSFT".into(), direction: Direction::Short, qty: 2, entry_price: 300.0, exit_price: 293.75, pnl: 12.5, costs: 0.0, opened: 1, closed: 2 }],
             costs: Costs { commission: 1.0, commission_bps: 0.5, slippage_bps: 2.0 },
