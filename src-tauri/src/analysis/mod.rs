@@ -26,6 +26,7 @@ pub const ATR_LEN: usize = 14;
 pub const STDEV_LEN: usize = 20;
 pub const BB_LEN: usize = 20;
 pub const RVOL_LEN: usize = 20;
+pub const ADX_LEN: usize = 14;
 pub const BB_K: f64 = 2.0;
 pub const SMA_LENS: [usize; 3] = [20, 50, 200];
 pub const EMA_LENS: [usize; 2] = [9, 21];
@@ -144,6 +145,8 @@ pub struct Series {
     pub macd: Vec<Line>,
     pub bollinger: Vec<Line>,
     pub vwap: Line,
+    /// Upper and lower VWAP deviation bands.
+    pub vwap_bands: Vec<Line>,
     pub opening_range: Vec<Line>,
     /// Prior-day high and low, then premarket high and low.
     pub levels: Vec<Line>,
@@ -552,6 +555,7 @@ pub fn analyze_with_config(chart: &Chart, config: &crate::settings::IndicatorCon
             limited: n < BB_LEN,
         });
     }
+    readings.push(Reading { key: "adx", label: format!("ADX {ADX_LEN}"), value: indicators::adx(c, ADX_LEN).last().copied(), needed: 2 * ADX_LEN, limited: n < 2 * ADX_LEN });
     readings.push(Reading { key: "rvol", label: format!("Relative volume ({RVOL_LEN})"), value: indicators::rvol(c, RVOL_LEN)[last], needed: RVOL_LEN + 1, limited: n <= RVOL_LEN });
     readings.push(Reading { key: "vwap", label: vwap_label.into(), value: vwap_s[last], needed: 1, limited: false });
 
@@ -604,6 +608,13 @@ pub fn analyze_with_config(chart: &Chart, config: &crate::settings::IndicatorCon
                 lines.push(("or_ext_down", format!("OR -{ext}x"), level(|h, l, e| l - (h - l) * e)));
             }
             lines.into_iter().map(|(key, label, values)| line(key, label, 1, values, &or.color, or.visible)).collect()
+        },
+        vwap_bands: {
+            let k = config.vwap_bands;
+            let sd = indicators::vwap_sd(c, |t| if intraday { (t + gmt).div_euclid(86_400) } else { 0 });
+            [("vwap_upper", k), ("vwap_lower", -k)].into_iter()
+                .map(|(key, k)| line(key, format!("VWAP {k:+}σ"), 1, sd.iter().map(|v| v.map(|(mean, sd)| mean + k * sd)).collect(), &config.vwap.color, config.vwap.visible && config.vwap_bands > 0.0))
+                .collect()
         },
         volume_ma: {
             let vm = &config.volume_ma;
@@ -812,6 +823,8 @@ mod tests {
         let prior = |a: &Analysis, k: usize| a.series.levels[k].values[119];
         assert_eq!([prior(&a, 0), prior(&a, 1)], [Some(c.candles[118].h), Some(c.candles[118].l)]);
         assert_eq!((single_day(&c), a.series.levels.len()), (None, 4));
+        assert!(a.series.vwap_bands.iter().all(|l| !l.visible && l.values == a.series.vwap.values));
+        assert!(a.readings.iter().any(|r| r.key == "adx" && r.value.is_some()));
         assert_eq!((a.series.volume_ma.values[119], a.readings.iter().find(|r| r.key == "rvol").unwrap().value), (Some(1000.0), Some(1.0)));
         c.candles.iter_mut().enumerate().for_each(|(i, k)| k.t = 5 * 86_400 + i as i64 * 60);
         let mut a = analyze(&c).unwrap();

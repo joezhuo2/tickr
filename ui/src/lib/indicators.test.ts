@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { clampPanel, overlayVisibility, paneLayout, shouldAnalyze, toggleOverlay } from "./indicators";
+import { clampPanel, overlayVisibility, paneLayout, volumeProfile, shouldAnalyze, toggleOverlay } from "./indicators";
 import type { IndicatorConfig, Overlays } from "./types";
 
 const config = (): IndicatorConfig => ({
   sma: [{ length: 20, color: "#123456", visible: true }, { length: 50, color: "", visible: false }],
   ema: [{ length: 9, color: "", visible: true }],
   bollinger: { length: 20, k: 2, color: "", visible: true },
-  vwap: { color: "", visible: true }, opening_range: { minutes: 15, extension: 1, color: "", visible: false }, levels: { color: "", visible: false }, volume_ma: { length: 20, color: "", visible: true }, rsi: { length: 14, color: "", visible: true },
+  vwap: { color: "", visible: true }, vwap_bands: 0, volume_profile: false, opening_range: { minutes: 15, extension: 1, color: "", visible: false }, levels: { color: "", visible: false }, volume_ma: { length: 20, color: "", visible: true }, rsi: { length: 14, color: "", visible: true },
   macd: { fast: 12, slow: 26, signal: 9, color: "", signal_color: "", visible: false },
   fib: true, targets: true, patterns: true, keep_analysis: false,
 });
@@ -24,12 +24,21 @@ it("toggles all moving averages without changing lengths, colors or the saved in
 });
 
 it("persists each group toggle without changing the other settings", () => {
-  for (const key of ["bollinger", "vwap", "opening_range", "levels", "volume_ma", "rsi", "macd", "fib", "targets", "patterns"] as (keyof Overlays)[]) {
+  for (const key of ["bollinger", "vwap", "opening_range", "levels", "volume_ma", "rsi", "macd", "fib", "targets", "patterns", "volume_profile"] as (keyof Overlays)[]) {
     const saved = config();
     const next = toggleOverlay(saved, key, !overlayVisibility(saved)[key]);
     expect(overlayVisibility(next)).toEqual({ ...overlayVisibility(saved), [key]: !overlayVisibility(saved)[key] });
     expect(next.sma).toEqual(saved.sma);
   }
+});
+
+it("spreads each candle's volume over the price bins it touches", () => {
+  const bar = (l: number, h: number, v: number) => ({ t: 0, o: l, h, l, c: h, v });
+  const candles = [bar(0, 4, 400), bar(0, 1, 100), bar(3, 4, 50), bar(9, 99, 1)];
+  expect(volumeProfile(candles, 0, 2, 4)).toEqual({ lo: 0, step: 1, volumes: [150, 150, 100, 150] });
+  expect(volumeProfile(candles, 1, 1, 4)?.volumes.reduce((a, b) => a + b)).toBe(100);
+  expect(volumeProfile([bar(5, 5, 10)], 0, 0)).toBeNull();
+  expect(volumeProfile([], 0, 0)).toBeNull();
 });
 
 it("keeps a dragged panel between its minimum and 85% of the space", () => {

@@ -5,7 +5,7 @@
   import { fitScale, forward, inverse, scaleLabel, scaleTicks } from "./lib/scale";
   import type { Drawing, DrawingPoint } from "./lib/types";
   import { timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
-  import { paneLayout } from "./lib/indicators";
+  import { volumeProfile, paneLayout } from "./lib/indicators";
   import { untrack } from "svelte";
   import { fadeIn } from "./lib/motion";
   import { follow, full, isFull, pan, reveal, visible, zoom, type View } from "./lib/viewport";
@@ -604,6 +604,10 @@
       ctx.lineWidth = 1.4;
       ctx.strokeStyle = (a.series.vwap.color || v("--vwap"));
       strokeLine(ctx, a.series.vwap, g.y, g);
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.55;
+      for (const band of a.series.vwap_bands) if (band.visible) strokeLine(ctx, band, g.y, g);
+      ctx.globalAlpha = 1;
       legend(a.series.vwap.label, (a.series.vwap.color || v("--vwap")));
     }
     if (s.opening_range && a.series.opening_range.some((l) => l.values.some((x) => x != null))) {
@@ -639,6 +643,19 @@
       legend(a.series.opening_range[0].label, col);
     }
 
+    const profile = s.volume_profile ? volumeProfile(candles, g.i0, g.i1) : null;
+    if (profile) {
+      const peak = Math.max(...profile.volumes);
+      ctx.fillStyle = v("--muted");
+      profile.volumes.forEach((vol, k) => {
+        const top = g.y(profile.lo + (k + 1) * profile.step);
+        const bottom = g.y(profile.lo + k * profile.step);
+        const w = peak > 0 ? (vol / peak) * g.plotW * 0.25 : 0;
+        ctx.globalAlpha = vol === peak ? 0.45 : 0.2;
+        ctx.fillRect(right - w, top, w, Math.max(1, bottom - top - 1));
+      });
+      ctx.globalAlpha = 1;
+    }
     if (s.levels) {
       ctx.lineWidth = 1;
       ctx.textAlign = "right";

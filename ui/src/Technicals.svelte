@@ -41,7 +41,7 @@
 
   function reading(key: string, v: number | null): string {
     if (v == null) return "—";
-    if (key === "rsi") return num(v, 1);
+    if (key === "rsi" || key === "adx") return num(v, 1);
     if (key === "rvol") return `${num(v, 2)}×`;
     if (key === "sigma") return `${num(v, 2)}%`;
     return price(v, cur);
@@ -54,6 +54,7 @@
     { key: "opening_range", label: "Opening range" },
     { key: "levels", label: "Key levels" },
     { key: "volume_ma", label: "Volume average" },
+    { key: "volume_profile", label: "Volume profile" },
     { key: "fib", label: "Fibonacci" },
     { key: "targets", label: "Targets" },
     { key: "patterns", label: "Patterns" },
@@ -269,6 +270,9 @@
           {/if}
           {#if group === "bollinger"}
             <label>Multiplier <input type="number" min="0.5" max="5" step="0.1" value={config.bollinger.k} onchange={(e) => change((c) => c.bollinger.k = e.currentTarget.valueAsNumber)} /></label>
+          {/if}
+          {#if group === "vwap"}
+            <label title="Bands this many volume-weighted standard deviations from VWAP; 0 hides them">Bands σ <input type="number" aria-label="VWAP bands deviations" min="0" max="5" step="0.5" value={config.vwap_bands} onchange={(e) => change((c) => c.vwap_bands = e.currentTarget.valueAsNumber)} /></label>
           {/if}
           {#if group === "macd"}
             {#each ["fast", "slow", "signal"] as field}
