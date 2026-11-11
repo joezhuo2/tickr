@@ -51,6 +51,7 @@
     { key: "bollinger", label: "Bollinger bands" },
     { key: "vwap", label: "VWAP" },
     { key: "opening_range", label: "Opening range" },
+    { key: "levels", label: "Key levels" },
     { key: "fib", label: "Fibonacci" },
     { key: "targets", label: "Targets" },
     { key: "patterns", label: "Patterns" },
@@ -257,8 +258,8 @@
         {/each}
         <button disabled={config[group].length >= 8} onclick={() => change((c) => c[group].push({ length: 20, color: "", visible: true }))}>Add {group.toUpperCase()}</button>
       {/each}
-      {#each ["bollinger", "vwap", "rsi", "macd"] as kind}
-        {@const group = kind as "bollinger" | "vwap" | "rsi" | "macd"}
+      {#each ["bollinger", "vwap", "levels", "rsi", "macd"] as kind}
+        {@const group = kind as "bollinger" | "vwap" | "levels" | "rsi" | "macd"}
         <div class="indicator-row">
           <b>{group.toUpperCase()}</b>
           {#if group === "bollinger" || group === "rsi"}

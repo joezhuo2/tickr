@@ -10,6 +10,9 @@
 
 use crate::quote::Candle;
 
+/// A (high, low) pair, once known.
+pub type Range = Option<(f64, f64)>;
+
 /// Simple moving average; the mean of all bars so far before `n` bars exist.
 pub fn sma(src: &[f64], n: usize) -> Vec<f64> {
     let n = n.max(1);
@@ -73,6 +76,33 @@ pub fn opening_range(c: &[Candle], gmt: i64, open: i64, window: i64) -> Vec<Opti
                 range = Some(range.map_or((k.h, k.l), |(h, l)| (h.max(k.h), l.min(k.l))));
             }
             range
+        })
+        .collect()
+}
+
+/// Per bar: the prior day's regular-session (high, low) and today's premarket
+/// (high, low) so far. `open` and `close` are seconds past local midnight.
+pub fn key_levels(c: &[Candle], gmt: i64, open: i64, close: i64) -> Vec<(Range, Range)> {
+    let grow = |r: Range, k: &Candle| Some(r.map_or((k.h, k.l), |(h, l)| (h.max(k.h), l.min(k.l))));
+    let (mut day, mut prior, mut regular, mut pre): (Option<i64>, Range, Range, Range) = (None, None, None, None);
+    c.iter()
+        .map(|k| {
+            let local = k.t + gmt;
+            let (d, tod) = (local.div_euclid(86_400), local.rem_euclid(86_400));
+            if day != Some(d) {
+                day = Some(d);
+                if regular.is_some() {
+                    prior = regular;
+                }
+                regular = None;
+                pre = None;
+            }
+            if tod < open {
+                pre = grow(pre, k);
+            } else if tod < close {
+                regular = grow(regular, k);
+            }
+            (prior, pre)
         })
         .collect()
 }
@@ -268,6 +298,28 @@ pub(crate) mod tests {
         assert_eq!(got[5..7], [None, None]);
         assert_eq!(got[7], Some((5.0, 4.0)));
         assert_eq!(opening_range(&bars[1..2], -3_600, open - 3_600, 900), [Some((10.0, 8.0))]);
+    }
+
+    #[test]
+    fn key_levels_track_prior_day_and_premarket() {
+        let bar = |t: i64, h: f64, l: f64| Candle { t, o: l, h, l, c: h, v: 1.0 };
+        let (open, close, day) = (34_200, 57_600, 86_400);
+        let bars = [
+            bar(open - 600, 9.0, 8.0),
+            bar(open, 12.0, 10.0),
+            bar(close - 300, 15.0, 11.0),
+            bar(close, 99.0, 1.0),
+            bar(day + open - 600, 14.0, 13.0),
+            bar(day + open - 300, 16.0, 12.5),
+            bar(day + open, 20.0, 5.0),
+            bar(3 * day + open, 7.0, 6.0),
+        ];
+        let got = key_levels(&bars, 0, open, close);
+        assert_eq!(got[0], (None, Some((9.0, 8.0))));
+        assert_eq!(got[3], (None, Some((9.0, 8.0))));
+        assert_eq!(got[4], (Some((15.0, 10.0)), Some((14.0, 13.0))));
+        assert_eq!(got[6], (Some((15.0, 10.0)), Some((16.0, 12.5))));
+        assert_eq!(got[7], (Some((20.0, 5.0)), None));
     }
 
     #[test]

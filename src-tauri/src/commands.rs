@@ -186,7 +186,15 @@ pub async fn analyze(shared: State<'_, Arc<Shared>>, symbol: String, range: Stri
         Some(t) => crate::analysis::reveal_until(&chart, t),
         None => chart,
     };
-    crate::analysis::analyze_with_config(&chart, &lock(&shared.settings).indicators).inspect_err(|e| log::info!("analyze {symbol} {range}: {e}"))
+    let config = lock(&shared.settings).indicators.clone();
+    let mut analysis = crate::analysis::analyze_with_config(&chart, &config).inspect_err(|e| log::info!("analyze {symbol} {range}: {e}"))?;
+    if let Some(day) = crate::analysis::single_day(&chart).filter(|_| config.levels.visible) {
+        let daily = crate::provider::Provider::current(&shared).fetch_chart(&shared.http, &symbol, "1mo", "1d", false).await;
+        if let Ok(daily) = daily {
+            crate::analysis::fill_prior_day(&mut analysis, &daily, day);
+        }
+    }
+    Ok(analysis)
 }
 
 #[tauri::command]

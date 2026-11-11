@@ -452,6 +452,7 @@ pub struct IndicatorConfig {
     pub bollinger: BollingerConfig,
     pub vwap: IndicatorStyle,
     pub opening_range: OpeningRangeConfig,
+    pub levels: IndicatorStyle,
     pub rsi: LengthIndicator,
     pub macd: MacdConfig,
     pub fib: bool,
@@ -469,6 +470,7 @@ impl Default for IndicatorConfig {
             bollinger: BollingerConfig { length: 20, k: 2.0, color: String::new(), visible: true },
             vwap: IndicatorStyle { color: String::new(), visible: true },
             opening_range: OpeningRangeConfig { minutes: 15, extension: 1.0, color: String::new(), visible: false },
+            levels: IndicatorStyle { color: String::new(), visible: false },
             rsi: line(14),
             macd: MacdConfig { fast: 12, slow: 26, signal: 9, color: String::new(), signal_color: String::new(), visible: false },
             fib: true, targets: true, patterns: true, keep_analysis: false,
@@ -495,7 +497,7 @@ pub fn validate_indicators(config: &IndicatorConfig, presets: &[IndicatorPreset]
         if !(1..=240).contains(&c.opening_range.minutes) { return Err("Opening range must be from 1 to 240 minutes".into()); }
         if !c.opening_range.extension.is_finite() || !(0.0..=5.0).contains(&c.opening_range.extension) { return Err("Opening range extension must be from 0 to 5".into()); }
         for color in c.sma.iter().chain(&c.ema).map(|l| l.color.as_str())
-            .chain([c.bollinger.color.as_str(), &c.vwap.color, &c.opening_range.color, &c.rsi.color, &c.macd.color, &c.macd.signal_color]) {
+            .chain([c.bollinger.color.as_str(), &c.vwap.color, &c.opening_range.color, &c.levels.color, &c.rsi.color, &c.macd.color, &c.macd.signal_color]) {
             if !color.is_empty() && !(color.len() == 7 && color.starts_with('#') && color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)) {
                 return Err("Colors must be empty or #rrggbb".into());
             }
