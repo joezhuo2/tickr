@@ -182,6 +182,10 @@ taskbar to keep it visible.
   P&L, and review fills on the chart. The account used with current quotes is
   saved to `paper.json`. Replay uses a separate account for the session, and
   simulated market orders fill at the next revealed candle's open.
+  The **Position size** row turns an account size, risk %, entry and stop into
+  a share count, the amount at risk and the 2R target; it defaults to the paper
+  account's equity and the current price, and **Use in ticket** copies the side
+  and quantity into the order ticket.
 - **Random historical practice** (`Q`) draws a symbol and starting point from
   your watchlist or a group, using the candle interval and date range you pick.
   Choose **Long**, **Short** or **Skip** with future candles hidden. Close at a
@@ -531,8 +535,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.13
-git push origin v0.11.13
+git tag v0.11.14
+git push origin v0.11.14
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

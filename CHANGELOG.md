@@ -6,6 +6,12 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.14] - 2026-11-11
+
+### Added
+- **Position size calculator** in Paper trading: account size, risk %, entry and
+  stop give the share count, amount at risk and 2R target.
+
 ## [0.11.13] - 2026-11-11
 
 ### Added
