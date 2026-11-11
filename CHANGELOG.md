@@ -6,6 +6,12 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.6] - 2026-11-11
+
+### Changed
+- **Indicators stay on the chart** after the Technicals tab is closed, including
+  in Paper trading and Strategy, and `Z` analyzes or re-analyzes from those views.
+
 ## [0.11.5] - 2026-11-11
 
 ### Added
