@@ -301,6 +301,16 @@
     const key = bindKey(e);
     if (key) saveKeybinds(rebind(keybinds, recording, key));
   }
+  const TABS = [
+    { id: "display", label: "Display" },
+    { id: "hotkeys", label: "Hotkeys" },
+    { id: "chart", label: "Chart" },
+    { id: "data", label: "Market data" },
+    { id: "ai", label: "AI" },
+    { id: "backup", label: "Backup" },
+    { id: "connections", label: "Connections" },
+  ] as const;
+  let tab = $state<(typeof TABS)[number]["id"]>("display");
 </script>
 
 <svelte:window onkeydown={onKey} />
@@ -314,6 +324,14 @@
       <button class="close" aria-label="Close" onclick={onclose}>×</button>
     </header>
 
+    <div class="body">
+      <div class="nav" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
+        {#each TABS as t (t.id)}
+          <button role="tab" aria-selected={tab === t.id} class:on={tab === t.id} onclick={() => (tab = t.id)}>{t.label}</button>
+        {/each}
+      </div>
+      <div class="content" role="tabpanel">
+    {#if tab === "display"}
     <h3>Display</h3>
     <label class="row">
       <span>Theme</span>
@@ -344,6 +362,8 @@
     </div>
     <p class="hint">Low-power slows updates while the window is hidden, and alerts keep their usual cadence.</p>
 
+    {/if}
+    {#if tab === "hotkeys"}
     <h3>Global hotkey</h3>
     <div class="row">
       <span>Show or hide tickr</span>
@@ -382,6 +402,8 @@
       {/each}
     {/each}
 
+    {/if}
+    {#if tab === "chart"}
     <h3>Chart sessions</h3>
     <label class="row">
       <span>Extended-hours candles</span>
@@ -407,6 +429,8 @@
       </label>
     {/each}
 
+    {/if}
+    {#if tab === "data"}
     <h3>Market data</h3>
     <label class="row">
       <span>Provider</span>
@@ -429,6 +453,8 @@
     <p class="hint">Free Alpaca keys give real-time IEX trades for US stocks. Watchlist and alerts still use Yahoo.</p>
     {#if marketStatus}<p class="hint" class:error={!marketStatus.ok}>{marketStatus.text}</p>{/if}
 
+    {/if}
+    {#if tab === "ai"}
     <h3>AI</h3>
     <label class="row">
       <span>News analysis</span>
@@ -464,6 +490,8 @@
     <p class:error={aiStatus && !aiStatus.ok} class="hint">
       {aiStatus ? aiStatus.text : "Any OpenAI-compatible endpoint. Leave a feature's model blank to use Model. Saved to .env.local; keyword tone is the fallback."}
     </p>
+    {/if}
+    {#if tab === "backup"}
     <h3>Backup</h3>
     <div class="row">
       <button class="link" onclick={exportBackup}>Export</button>
@@ -480,6 +508,8 @@
       </div>
     {/if}
     <p class="hint" class:error={backupError} role="status">{backupStatus || "Saves settings, drawings, watchlists and alerts to a file. API keys are not included."}</p>
+    {/if}
+    {#if tab === "connections"}
     <h3>Connections</h3>
     {#if connections}
       {#each connections.services as service (service.id)}
@@ -500,6 +530,9 @@
     {#if connectionError}<p class="hint error" role="status">{connectionError}</p>{/if}
     <button class="link" onclick={copyDiagnostics}>Copy diagnostics</button>
     <p class="hint" class:error={copyError} role="status">{copyStatus}</p>
+    {/if}
+      </div>
+    </div>
   </div>
 </div>
 
@@ -513,7 +546,7 @@
     background: rgba(0, 0, 0, 0.35);
   }
   .panel {
-    width: min(420px, calc(100% - 32px));
+    width: min(600px, calc(100% - 32px));
     max-height: calc(100% - 32px);
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -521,6 +554,62 @@
     border-radius: 10px;
     background: var(--bg);
     box-shadow: var(--shadow);
+  }
+  .body {
+    display: flex;
+    gap: 14px;
+    min-height: 340px;
+    margin-top: 8px;
+  }
+  .nav {
+    flex: 0 0 112px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-right: 10px;
+    border-right: 1px solid var(--faint);
+  }
+  .nav button {
+    border: 0;
+    border-radius: 6px;
+    padding: 5px 8px;
+    background: none;
+    color: var(--muted);
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+  }
+  .nav button:hover {
+    color: var(--text);
+  }
+  .nav button.on {
+    background: var(--surface);
+    color: var(--text);
+    font-weight: 600;
+  }
+  .nav button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .content {
+    flex: 1;
+    min-width: 0;
+  }
+  .content > h3:first-child {
+    margin-top: 2px;
+  }
+  @media (max-width: 520px) {
+    .body {
+      flex-direction: column;
+    }
+    .nav {
+      flex: none;
+      flex-direction: row;
+      flex-wrap: wrap;
+      padding: 0 0 8px;
+      border-right: 0;
+      border-bottom: 1px solid var(--faint);
+    }
   }
   header {
     display: flex;

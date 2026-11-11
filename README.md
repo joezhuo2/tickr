@@ -339,9 +339,11 @@ polls can be missed.
 
 ### Settings and keybinds
 
-The gear at the bottom left opens Settings: the global hotkey (click the field
-and press a new combination; **Reset** restores the default), in-window
-keybinds and the chart dot toggles. Esc or a click outside closes it.
+The gear at the bottom left opens Settings. A menu on the left switches between
+Display, Hotkeys, Chart, Market data, AI, Backup and Connections. Hotkeys holds
+the global hotkey (click the field and press a new combination; **Reset**
+restores the default) and the in-window keybinds; Chart holds the session
+shading and chart dot toggles. Esc or a click outside closes it.
 
 Keybinds are grouped by category. Click a keybind and press a new key to rebind it (an action already on that
 key takes the old one), or Backspace to unbind it. Keybinds are ignored while
@@ -520,8 +522,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.11
-git push origin v0.11.11
+git tag v0.11.12
+git push origin v0.11.12
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
