@@ -62,7 +62,7 @@
     type StatSection,
     type WatchDates,
   } from "./lib/types";
-  import { actionFor, bindKey, keyLabel, nextGroupTab, practiceAllows, replayAllows } from "./lib/keybinds";
+  import { actionFor, bindKey, keyLabel, nextGroupTab, overlayFor, practiceAllows, replayAllows } from "./lib/keybinds";
   import ReplayBar from "./ReplayBar.svelte";
   import * as Replay from "./lib/replay";
   import PracticeView from "./Practice.svelte";
@@ -72,7 +72,7 @@
   import BacktestView from "./Backtest.svelte";
   import * as Backtest from "./lib/backtest";
   import { fullTime } from "./lib/format";
-  import { overlayVisibility, shouldAnalyze } from "./lib/indicators";
+  import { overlayVisibility, shouldAnalyze, toggleOverlay } from "./lib/indicators";
   import { applyDisplay } from "./lib/display";
   import type { Theme, TextSize, Palette } from "./lib/types";
   import { refreshOutcome, type RefreshView } from "./lib/refresh";
@@ -1463,6 +1463,14 @@
       case "paper":
         if (!e.repeat) view = view === "paper" ? "chart" : "paper";
         break;
+      case "toggle_opening_range":
+      case "toggle_levels":
+      case "toggle_volume_ma":
+      case "toggle_volume_profile": {
+        const overlay = overlayFor(action);
+        if (!e.repeat && overlay && indicators && overlays) saveIndicators(toggleOverlay(indicators, overlay, !overlays[overlay])).catch(console.warn);
+        break;
+      }
       case "backtest":
         if (!e.repeat) view = view === "backtest" ? "chart" : "backtest";
         break;

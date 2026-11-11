@@ -267,6 +267,10 @@ export interface Keybinds {
   options: string;
   paper: string;
   backtest: string;
+  toggle_opening_range: string;
+  toggle_levels: string;
+  toggle_volume_ma: string;
+  toggle_volume_profile: string;
   options_side: string;
   options_expiry: string;
   add_watchlist: string;

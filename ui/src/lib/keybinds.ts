@@ -1,13 +1,14 @@
 // In-window shortcuts: single keys, matched without Ctrl, Alt or Cmd.
 
-import type { Keybinds } from "./types";
+import type { Keybinds, Overlays } from "./types";
 
 export type Action = keyof Keybinds;
 
-export type Category = "chart" | "panels" | "options" | "watchlist" | "general";
+export type Category = "chart" | "indicators" | "panels" | "options" | "watchlist" | "general";
 
 export const CATEGORIES: { id: Category; label: string }[] = [
   { id: "chart", label: "Chart" },
+  { id: "indicators", label: "Indicators" },
   { id: "panels", label: "Panels" },
   { id: "options", label: "Options" },
   { id: "watchlist", label: "Watchlist" },
@@ -28,6 +29,10 @@ export const ACTIONS: { id: Action; label: string; category: Category }[] = [
   { id: "practice", label: "Practice on a random setup", category: "chart" },
   { id: "range", label: "Cycle date range", category: "chart" },
   { id: "refresh", label: "Refresh", category: "chart" },
+  { id: "toggle_opening_range", label: "Toggle opening range", category: "indicators" },
+  { id: "toggle_levels", label: "Toggle key levels", category: "indicators" },
+  { id: "toggle_volume_ma", label: "Toggle volume average", category: "indicators" },
+  { id: "toggle_volume_profile", label: "Toggle volume profile", category: "indicators" },
   { id: "technicals", label: "Open Technicals", category: "panels" },
   { id: "analyze", label: "Analyze / re-analyze", category: "panels" },
   { id: "analysts", label: "Open Analysts", category: "panels" },
@@ -76,7 +81,7 @@ export function rebind(binds: Keybinds, id: Action, key: string): Keybinds {
   return next;
 }
 
-const REPLAY_ACTIONS = new Set<Action>(["chart_mode", "chart_scale", "chart_interval", "chart_replay", "practice", "range", "refresh", "technicals", "paper", "analyze", "search", "previous_symbol", "watchlist", "add_watchlist", "settings"]);
+const REPLAY_ACTIONS = new Set<Action>(["chart_mode", "chart_scale", "chart_interval", "chart_replay", "practice", "range", "refresh", "technicals", "paper", "analyze", "toggle_opening_range", "toggle_levels", "toggle_volume_ma", "toggle_volume_profile", "search", "previous_symbol", "watchlist", "add_watchlist", "settings"]);
 
 export function replayAllows(action: Action): boolean {
   return REPLAY_ACTIONS.has(action);
@@ -86,6 +91,11 @@ const PRACTICE_ACTIONS = new Set<Action>(["chart_mode", "chart_scale", "practice
 
 export function practiceAllows(action: Action): boolean {
   return PRACTICE_ACTIONS.has(action);
+}
+
+/** The overlay an indicator toggle action switches. */
+export function overlayFor(action: Action): keyof Overlays | null {
+  return action.startsWith("toggle_") && action !== "toggle_watchlist" ? (action.slice(7) as keyof Overlays) : null;
 }
 
 export function keyLabel(key: string): string {
