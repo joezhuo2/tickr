@@ -144,3 +144,12 @@ export function classifyBars(times: readonly number[], clock: Clock, periods: Tr
 export function isExtendedSession(session: Session): boolean {
   return session !== "regular";
 }
+
+/** Time left in the candle that started at `lastBar`, as m:ss; null when that candle is not forming now. */
+export function candleCountdown(interval: string, lastBar: number | undefined, now: number): string | null {
+  if (!isIntraday(interval) || lastBar == null) return null;
+  const length = parseInt(interval) * 60;
+  const left = Math.ceil(lastBar + length - now);
+  if (!(left > 0 && left <= length)) return null;
+  return `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
+}
