@@ -70,6 +70,7 @@
   import PaperView from "./Paper.svelte";
   import * as Paper from "./lib/paper";
   import BacktestView from "./Backtest.svelte";
+  import { clockFor } from "./lib/strategy";
   import * as Backtest from "./lib/backtest";
   import { fullTime } from "./lib/format";
   import { overlayVisibility, shouldAnalyze, toggleOverlay } from "./lib/indicators";
@@ -978,7 +979,7 @@
   const backtestReport = $derived.by(() => {
     if (!backtestRules || !mainChart?.candles.length) return null;
     try {
-      return Backtest.backtest(mainChart.candles, backtestRules);
+      return Backtest.backtest(mainChart.candles, backtestRules, clockFor(mainChart.meta));
     } catch {
       return null;
     }

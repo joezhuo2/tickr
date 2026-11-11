@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.13] - 2026-11-11
+
+### Added
+- **Backtester session terms and stop entries:** `time`, `vwap`, `atr(n)`,
+  `or_high(minutes)`, `or_low(minutes)`, day and prior-day levels, plus an
+  optional entry stop price that fills where a bar breaks the level.
+
 ## [0.11.12] - 2026-11-11
 
 ### Changed

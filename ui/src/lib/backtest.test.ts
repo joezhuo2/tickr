@@ -84,3 +84,46 @@ describe("metrics", () => {
     expect(markers(r)).toEqual([{ t: 1, side: "buy", price: 11 }, { t: 2, side: "sell", price: 12 }]);
   });
 });
+
+describe("opening range breakout", () => {
+  const OPEN = 34_200;
+  const at = (min: number, o: number, h: number, l: number, c: number, day = 0) => ({ t: day * 86_400 + OPEN + min * 60, o, h, l, c, v: 100 });
+  const day = [
+    at(-5, 50, 60, 40, 50),
+    at(0, 100, 102, 99, 101),
+    at(5, 101, 104, 100, 103),
+    at(10, 103, 103.5, 98, 102),
+    at(15, 102, 103, 101, 102.5),
+    at(20, 102.5, 106, 102, 105.5),
+    at(25, 105.5, 108, 105, 107),
+    at(30, 107, 107.5, 106, 106.5),
+  ];
+
+  it("exposes time and session terms without looking ahead", async () => {
+    const { parse, values, sessionTerms, DEFAULT_CLOCK, clockFor, check } = await import("./strategy");
+    expect(values(parse("time", "num"), day)).toEqual([925, 930, 935, 940, 945, 950, 955, 1000]);
+    expect(values(parse("or_high(15)", "num"), day)).toEqual([NaN, NaN, NaN, NaN, 104, 104, 104, 104]);
+    expect(values(parse("or_low(15)", "num"), day)[7]).toBe(98);
+    expect(sessionTerms(day, DEFAULT_CLOCK, "day_high")).toEqual([NaN, NaN, 102, 104, 104, 104, 106, 108]);
+    expect(values(parse("vwap", "num"), [at(0, 9, 12, 6, 9), at(5, 9, 12, 6, 12)])).toEqual([9, 9.5]);
+    const next = [...day, at(-5, 1, 2, 1, 1, 1), at(0, 110, 111, 109, 110, 1)];
+    expect(["prev_high", "prev_low", "prev_close"].map((n) => values(parse(n, "num"), next)[9])).toEqual([108, 98, 106.5]);
+    expect(values(parse("prev_high", "num"), day)[7]).toBeNaN();
+    expect(values(parse("atr(2)", "num"), [at(0, 10, 12, 8, 10), at(5, 10, 16, 10, 14)])).toEqual([NaN, 5]);
+    expect(clockFor({ gmtoffset: -18_000, periods: { regular: { start: 5 * 86_400 + OPEN + 18_000, end: 5 * 86_400 + 57_600 + 18_000 } } })).toEqual({ gmtoffset: -18_000, open: OPEN, close: 57_600 });
+    expect(clockFor({ gmtoffset: 0, periods: null })).toEqual({ gmtoffset: 0, open: 0, close: 86_400 });
+    expect(check("or_high(15)")).toMatch(/true\/false/);
+    expect(check("close > 1", "num")).toMatch(/number/);
+    expect(check("or_high(15)", "num")).toBeNull();
+  });
+
+  it("fills a stop entry where the bar breaks the level", () => {
+    const r = backtest(day, { entry: "time >= 945 and time < 1100", entry_stop: "or_high(15)", exit: "time >= 955", stop_pct: null, target_pct: null });
+    expect(r.trades).toHaveLength(1);
+    expect(r.trades[0]).toMatchObject({ entry_time: day[5].t, entry_price: 104, exit_time: day[7].t, exit_price: 107, reason: "signal" });
+    const gap = backtest([...day.slice(0, 5), at(20, 105, 106, 104.5, 105.5)], { entry: "time >= 945", entry_stop: "or_high(15)", exit: "", stop_pct: null, target_pct: null });
+    expect(gap.trades[0].entry_price).toBe(105);
+    expect(backtest(day.slice(0, 5), { entry: "time >= 930", entry_stop: "or_high(15)", exit: "", stop_pct: null, target_pct: null }).count).toBe(0);
+    expect(() => backtest(day, { entry: "close > 1", entry_stop: "close > 1", exit: "", stop_pct: null, target_pct: null })).toThrow();
+  });
+});

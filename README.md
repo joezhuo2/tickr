@@ -191,8 +191,17 @@ taskbar to keep it visible.
   chart. Build conditions from menus or type expressions such as
   `crosses_above(sma(20), sma(50)) and rsi(14) < 70`, using price fields,
   `sma`, `ema`, `rsi`, `crosses_above`, `crosses_below`, comparisons,
-  arithmetic and `and` / `or` / `not`. Entries and exits fill at the next
-  candle's open, with an optional stop-loss and take-profit. The report lists
+  arithmetic and `and` / `or` / `not`. Session terms cover intraday setups:
+  `time` (exchange time as HHMM, so 945 is 9:45), `vwap`, `atr(n)`,
+  `or_high(minutes)` and `or_low(minutes)` for the opening range once it is
+  complete, `day_high` and `day_low` for the regular session before the current
+  bar, and `prev_high`, `prev_low`, `prev_close` for the prior day on the chart.
+  Entries and exits fill at the next candle's open, with an optional stop-loss
+  and take-profit. Set an **Entry stop price** such as `or_high(15)` to buy
+  where a bar trades up through that level instead (at the open if it gaps
+  above); the entry condition then only arms the order. The **ORB example**
+  link fills in a 15-minute opening range breakout. A stop-loss can trigger on
+  the entry bar, since the order of prices inside one candle is unknown. The report lists
   each trade with win rate, total return, max drawdown, average trade and a
   buy-and-hold comparison, and marks trades on the chart.
 
@@ -522,8 +531,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.12
-git push origin v0.11.12
+git tag v0.11.13
+git push origin v0.11.13
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

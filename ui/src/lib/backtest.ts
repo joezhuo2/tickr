@@ -1,8 +1,10 @@
-import { evaluate, parse } from "./strategy";
+import { DEFAULT_CLOCK, evaluate, parse, values, type SessionClock } from "./strategy";
 import type { Candle } from "./types";
 
 export interface Rules {
   entry: string;
+  /** Optional price expression: buy when a bar trades up through it, instead of at the next open. */
+  entry_stop?: string;
   exit: string;
   stop_pct: number | null;
   target_pct: number | null;
@@ -29,9 +31,10 @@ export interface Report {
   avg_trade: number | null;
 }
 
-export function backtest(candles: readonly Candle[], rules: Rules): Report {
-  const entry = evaluate(parse(rules.entry), candles);
-  const exit = rules.exit.trim() ? evaluate(parse(rules.exit), candles) : candles.map(() => false);
+export function backtest(candles: readonly Candle[], rules: Rules, clock: SessionClock = DEFAULT_CLOCK): Report {
+  const entry = evaluate(parse(rules.entry), candles, clock);
+  const exit = rules.exit.trim() ? evaluate(parse(rules.exit), candles, clock) : candles.map(() => false);
+  const level = rules.entry_stop?.trim() ? values(parse(rules.entry_stop, "num"), candles, clock) : null;
   const trades: Trade[] = [];
   let pos: { t: number; price: number } | null = null;
   let pending = false;
@@ -50,7 +53,8 @@ export function backtest(candles: readonly Candle[], rules: Rules): Report {
     const c = candles[i];
     if (pending) {
       if (pos) close(c.t, c.o, "signal");
-      else pos = { t: c.t, price: c.o };
+      else if (!level) pos = { t: c.t, price: c.o };
+      else if (c.h >= level[i - 1]) pos = { t: c.t, price: Math.max(c.o, level[i - 1]) };
       pending = false;
     }
     if (pos) {
