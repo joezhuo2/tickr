@@ -2,7 +2,7 @@
   import { biasLabel, biasTone, direction, fullTime, num, price, signed, upside } from "./lib/format";
   import type { Analysis, Direction, Overlays, Target, IndicatorConfig, IndicatorPreset } from "./lib/types";
 
-  import { toggleOverlay } from "./lib/indicators";
+  import { clampPanel, toggleOverlay } from "./lib/indicators";
 
   let {
     analysis,
@@ -57,6 +57,42 @@
     { key: "rsi", label: "RSI pane" },
     { key: "macd", label: "MACD pane" },
   ];
+  const HEIGHT_KEY = "tickr.technicalsHeight";
+  let panel = $state<HTMLDivElement>();
+  let height = $state<number | null>(savedHeight());
+  let dragFrom: { y: number; h: number } | null = null;
+
+  function savedHeight(): number | null {
+    try {
+      const h = Number(localStorage.getItem(HEIGHT_KEY));
+      return h > 0 ? h : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function resize(h: number | null) {
+    const total = panel?.parentElement?.clientHeight ?? 0;
+    height = h == null || !total ? null : clampPanel(h, total);
+    try {
+      if (height == null) localStorage.removeItem(HEIGHT_KEY);
+      else localStorage.setItem(HEIGHT_KEY, String(height));
+    } catch {}
+  }
+
+  function gripDown(e: PointerEvent) {
+    if (!panel) return;
+    dragFrom = { y: e.clientY, h: panel.offsetHeight };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
+
+  function gripKey(e: KeyboardEvent) {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    e.preventDefault();
+    e.stopPropagation();
+    resize((panel?.offsetHeight ?? 0) + (e.key === "ArrowUp" ? 16 : -16));
+  }
+
   let settingsError = $state<string | null>(null);
   let saving = $state(false);
   let presetName = $state("");
@@ -77,7 +113,22 @@
   }
 </script>
 
-<div class="tech" aria-busy={loading}>
+<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+<div
+  class="grip"
+  role="separator"
+  aria-orientation="horizontal"
+  aria-label="Resize Technicals"
+  title="Drag to resize; double-click to reset"
+  tabindex="0"
+  onpointerdown={gripDown}
+  onpointermove={(e) => dragFrom && resize(dragFrom.h + dragFrom.y - e.clientY)}
+  onpointerup={() => (dragFrom = null)}
+  onpointercancel={() => (dragFrom = null)}
+  ondblclick={() => resize(null)}
+  onkeydown={gripKey}
+></div>
+<div class="tech" class:sized={height != null} style:height={height == null ? undefined : `${height}px`} bind:this={panel} aria-busy={loading}>
   {#if !analysis}
     <div class="start">
       <p>
@@ -263,9 +314,23 @@
     min-height: 92px;
     overflow: auto;
     overscroll-behavior: contain;
-    border-top: 1px solid var(--faint);
-    padding: 8px 4px 2px;
+    padding: 6px 4px 2px;
     font-size: 12px;
+  }
+  .tech.sized {
+    flex: 0 0 auto;
+    max-height: 85%;
+  }
+  .grip {
+    flex: 0 0 7px;
+    border-top: 1px solid var(--faint);
+    cursor: ns-resize;
+    touch-action: none;
+  }
+  .grip:hover,
+  .grip:focus-visible {
+    border-top: 2px solid var(--accent);
+    outline: none;
   }
   .start {
     display: flex;

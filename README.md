@@ -221,6 +221,9 @@ it is instant.
   anchored to the first candle on daily and longer intervals. Short histories
   show warm-up estimates and reduced confidence. Computed locally; not
   investment advice.
+  Drag the border above the Technicals panel, or focus it and press ↑ or ↓, to
+  resize the panel; double-click the border to reset it. The height is
+  remembered.
   **Opening range** (off by default, intraday charts only) draws the high, low
   and midpoint of the first minutes of each regular session, 15 by default and
   1 to 240 in Indicator settings. The lines grow while the range forms and then
@@ -492,8 +495,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.4
-git push origin v0.11.4
+git tag v0.11.5
+git push origin v0.11.5
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
