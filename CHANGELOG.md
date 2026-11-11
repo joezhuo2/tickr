@@ -6,6 +6,12 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.11] - 2026-11-11
+
+### Added
+- **Indicator hotkeys:** `6` to `9` toggle the opening range, key levels,
+  volume average and volume profile; rebind them under Indicators in Settings.
+
 ## [0.11.10] - 2026-11-11
 
 ### Added

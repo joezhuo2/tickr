@@ -341,6 +341,10 @@ pub struct Keybinds {
     pub events: String,
     pub next_group: String,
     pub previous_symbol: String,
+    pub toggle_opening_range: String,
+    pub toggle_levels: String,
+    pub toggle_volume_ma: String,
+    pub toggle_volume_profile: String,
 }
 
 impl Default for Keybinds {
@@ -379,6 +383,10 @@ impl Default for Keybinds {
             events: "k".into(),
             next_group: "g".into(),
             previous_symbol: "b".into(),
+            toggle_opening_range: "6".into(),
+            toggle_levels: "7".into(),
+            toggle_volume_ma: "8".into(),
+            toggle_volume_profile: "9".into(),
         }
     }
 }
@@ -864,6 +872,7 @@ mod tests {
         assert_eq!(s.keybinds.add_watchlist, "f");
         assert_eq!(s.keybinds.next_group, "g");
         assert_eq!(s.keybinds.previous_symbol, "b");
+        assert_eq!([&s.keybinds.toggle_opening_range, &s.keybinds.toggle_levels, &s.keybinds.toggle_volume_ma, &s.keybinds.toggle_volume_profile], ["6", "7", "8", "9"]);
         assert!(!s.dots.news);
         assert!(s.dots.earnings && s.dots.analysts);
     }

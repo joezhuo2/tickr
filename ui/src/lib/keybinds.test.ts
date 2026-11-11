@@ -36,6 +36,10 @@ const DEFAULTS: Keybinds = {
   events: "k",
   next_group: "g",
   previous_symbol: "b",
+  toggle_opening_range: "6",
+  toggle_levels: "7",
+  toggle_volume_ma: "8",
+  toggle_volume_profile: "9",
 };
 
 const down = (key: string, mods: Partial<Record<"ctrlKey" | "altKey" | "metaKey", boolean>> = {}) => ({
@@ -64,7 +68,7 @@ describe("actionFor", () => {
     expect(actionFor(DEFAULTS, ",")).toBe("settings");
     expect(actionFor(DEFAULTS, "w")).toBe("toggle_watchlist");
     expect(actionFor(DEFAULTS, "x")).toBe("watchlist");
-    expect(actionFor(DEFAULTS, "6")).toBeNull();
+    expect(actionFor(DEFAULTS, "0")).toBeNull();
     expect(actionFor({ ...DEFAULTS, search: "" }, "")).toBeNull();
   });
 });
@@ -194,5 +198,15 @@ describe("nextGroupTab", () => {
   it("stays on All with no groups", () => {
     expect(nextGroupTab([], null)).toBeNull();
     expect(nextGroupTab([], "Old")).toBeNull();
+  });
+});
+
+describe("indicator toggles", () => {
+  it("binds 6 to 9 to overlay toggles that stay available in replay", async () => {
+    const { overlayFor } = await import("./keybinds");
+    expect(["6", "7", "8", "9"].map((k) => overlayFor(actionFor(DEFAULTS, k)!))).toEqual(["opening_range", "levels", "volume_ma", "volume_profile"]);
+    expect([overlayFor("toggle_watchlist"), overlayFor("technicals")]).toEqual([null, null]);
+    expect(replayAllows("toggle_levels")).toBe(true);
+    expect(ACTIONS.filter((a) => a.category === "indicators")).toHaveLength(4);
   });
 });
