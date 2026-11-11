@@ -42,6 +42,7 @@
   function reading(key: string, v: number | null): string {
     if (v == null) return "—";
     if (key === "rsi") return num(v, 1);
+    if (key === "rvol") return `${num(v, 2)}×`;
     if (key === "sigma") return `${num(v, 2)}%`;
     return price(v, cur);
   }
@@ -52,6 +53,7 @@
     { key: "vwap", label: "VWAP" },
     { key: "opening_range", label: "Opening range" },
     { key: "levels", label: "Key levels" },
+    { key: "volume_ma", label: "Volume average" },
     { key: "fib", label: "Fibonacci" },
     { key: "targets", label: "Targets" },
     { key: "patterns", label: "Patterns" },
@@ -258,11 +260,11 @@
         {/each}
         <button disabled={config[group].length >= 8} onclick={() => change((c) => c[group].push({ length: 20, color: "", visible: true }))}>Add {group.toUpperCase()}</button>
       {/each}
-      {#each ["bollinger", "vwap", "levels", "rsi", "macd"] as kind}
-        {@const group = kind as "bollinger" | "vwap" | "levels" | "rsi" | "macd"}
+      {#each ["bollinger", "vwap", "levels", "volume_ma", "rsi", "macd"] as kind}
+        {@const group = kind as "bollinger" | "vwap" | "levels" | "volume_ma" | "rsi" | "macd"}
         <div class="indicator-row">
-          <b>{group.toUpperCase()}</b>
-          {#if group === "bollinger" || group === "rsi"}
+          <b>{group === "levels" ? "KEY LEVELS" : group === "volume_ma" ? "VOLUME AVERAGE" : group.toUpperCase()}</b>
+          {#if group === "bollinger" || group === "rsi" || group === "volume_ma"}
             <label>Length <input type="number" aria-label={`${group} length`} min="1" max="500" value={config[group].length} onchange={(e) => change((c) => c[group].length = e.currentTarget.valueAsNumber)} /></label>
           {/if}
           {#if group === "bollinger"}

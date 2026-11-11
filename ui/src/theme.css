@@ -30,6 +30,7 @@
   --vwap: #d81b60;
   --or: #00897b;
   --levels: #7e57c2;
+  --vol-ma: #ef6c00;
   --rating: #f07800;
   --news: #c9a000;
   --dividend: #00a37a;
@@ -71,6 +72,7 @@
   --dark-vwap: #ff5c93;
   --dark-or: #4db6ac;
   --dark-levels: #b39ddb;
+  --dark-vol-ma: #ffb74d;
   --dark-rating: #ff9f0a;
   --dark-news: #ffd60a;
   --dark-dividend: #30d1a0;
@@ -107,6 +109,7 @@
     --vwap: var(--dark-vwap);
     --or: var(--dark-or);
     --levels: var(--dark-levels);
+    --vol-ma: var(--dark-vol-ma);
     --rating: var(--dark-rating);
     --news: var(--dark-news);
     --dividend: var(--dark-dividend);
@@ -144,6 +147,7 @@
   --vwap: var(--dark-vwap);
   --or: var(--dark-or);
   --levels: var(--dark-levels);
+  --vol-ma: var(--dark-vol-ma);
   --rating: var(--dark-rating);
   --news: var(--dark-news);
   --dividend: var(--dark-dividend);

@@ -107,6 +107,17 @@ pub fn key_levels(c: &[Candle], gmt: i64, open: i64, close: i64) -> Vec<(Range, 
         .collect()
 }
 
+/// Relative volume: each bar's volume over the mean of the `n` bars before it.
+pub fn rvol(c: &[Candle], n: usize) -> Vec<Option<f64>> {
+    (0..c.len())
+        .map(|i| {
+            let w = &c[i.saturating_sub(n.max(1))..i];
+            let mean = w.iter().map(|k| k.v).sum::<f64>() / w.len().max(1) as f64;
+            (mean > 0.0).then(|| c[i].v / mean)
+        })
+        .collect()
+}
+
 /// Exponential smoothing with `alpha`, seeded with the SMA of the first `n`
 /// values (expanding mean before that).
 fn smoothed(src: &[f64], n: usize, alpha: f64) -> Vec<f64> {
@@ -320,6 +331,12 @@ pub(crate) mod tests {
         assert_eq!(got[4], (Some((15.0, 10.0)), Some((14.0, 13.0))));
         assert_eq!(got[6], (Some((15.0, 10.0)), Some((16.0, 12.5))));
         assert_eq!(got[7], (Some((20.0, 5.0)), None));
+    }
+
+    #[test]
+    fn rvol_compares_with_the_bars_before() {
+        let bars: Vec<Candle> = [10.0, 30.0, 40.0, 0.0, 0.0, 5.0].iter().map(|&v| Candle { t: 0, o: 1.0, h: 1.0, l: 1.0, c: 1.0, v }).collect();
+        assert_eq!(rvol(&bars, 2), [None, Some(3.0), Some(2.0), Some(0.0), Some(0.0), None]);
     }
 
     #[test]

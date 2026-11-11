@@ -707,6 +707,13 @@
     }
     ctx.restore();
 
+    if (s.volume_ma) {
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = a.series.volume_ma.color || v("--vol-ma");
+      strokeLine(ctx, a.series.volume_ma, (x) => Math.max(g.vy(x), g.volTop), g);
+      ctx.setLineDash([]);
+    }
+
     // Target prices on the axis (outside the clip).
     ctx.font = `11px ${v("--font")}`;
     for (const t of targetLevels) {

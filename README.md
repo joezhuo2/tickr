@@ -208,7 +208,7 @@ it is instant.
   −100 to +100 with a bias and confidence, upside and downside targets for the
   next 10 bars, an invalidation level and the signals behind the score.
   Checkboxes toggle moving averages, Bollinger bands, VWAP, the opening range,
-  key levels, Fibonacci levels, targets, pattern markers, RSI and MACD panes. Indicator settings let you edit
+  key levels, the volume average, Fibonacci levels, targets, pattern markers, RSI and MACD panes. Indicator settings let you edit
   lengths, colors (or reset to the theme), and individual line visibility, with
   up to eight SMA and eight EMA lines. MACD defaults to 12/26/9 and starts hidden.
   Settings and up to 50 named presets persist across launches; saving an existing
@@ -227,6 +227,11 @@ it is instant.
   Drag the border above the Technicals panel, or focus it and press ↑ or ↓, to
   resize the panel; double-click the border to reset it. The height is
   remembered.
+  **Volume average** draws a moving average of volume (20 bars by default) over
+  the volume bars, and the Indicators list shows **Relative volume**: the
+  latest bar's volume divided by the average of the 20 bars before it. The
+  latest bar is still forming on a live chart, so its relative volume reads low
+  until the bar closes.
   **Opening range** (off by default, intraday charts only) draws the high, low
   and midpoint of the first minutes of each regular session, 15 by default and
   1 to 240 in Indicator settings. The lines grow while the range forms and then
@@ -504,8 +509,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.7
-git push origin v0.11.7
+git tag v0.11.8
+git push origin v0.11.8
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
