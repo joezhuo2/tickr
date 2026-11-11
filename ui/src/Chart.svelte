@@ -196,6 +196,7 @@
         ...(show.mas ? analysis.series.mas : []),
         ...(show.bollinger ? analysis.series.bollinger : []),
         ...(show.vwap ? [analysis.series.vwap] : []),
+        ...(show.opening_range ? analysis.series.opening_range.slice(0, 2) : []),
       ];
       for (const line of fit.filter((l) => l.visible)) {
         for (let i = i0; i <= i1; i++) {
@@ -604,6 +605,17 @@
       ctx.strokeStyle = (a.series.vwap.color || v("--vwap"));
       strokeLine(ctx, a.series.vwap, g.y, g);
       legend(a.series.vwap.label, (a.series.vwap.color || v("--vwap")));
+    }
+    if (s.opening_range && a.series.opening_range.some((l) => l.values.some((x) => x != null))) {
+      const col = a.series.opening_range[0].color || v("--or");
+      ctx.strokeStyle = col;
+      a.series.opening_range.forEach((line, k) => {
+        ctx.lineWidth = k < 2 ? 1.4 : 1;
+        ctx.globalAlpha = k < 2 ? 1 : 0.6;
+        strokeLine(ctx, line, g.y, g);
+      });
+      ctx.globalAlpha = 1;
+      legend(a.series.opening_range[0].label, col);
     }
 
     // Targets: full-width levels, labeled inside the plot.
