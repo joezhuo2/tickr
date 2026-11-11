@@ -260,6 +260,9 @@ it is instant.
   **Volume profile** (off by default) shows volume by price for the candles on
   screen as bars along the right edge, with the busiest price band darker. The
   Indicators list also shows **ADX 14** next to the existing ATR 14.
+  With the opening range or key levels computed, an **Alert when price crosses**
+  row offers one-click price alerts at the opening range high and low, PDH, PDL,
+  PMH and PML (regular session only, firing once).
   **Opening range** (off by default, intraday charts only) draws the high, low
   and midpoint of the first minutes of each regular session, 15 by default and
   1 to 240 in Indicator settings. The lines grow while the range forms and then
@@ -346,6 +349,8 @@ price and time. By default an alert fires once and then shows
 crossing to fire again. **Regular session only** ignores extended-hours
 prices and checks nothing outside the regular session.
 
+With an Alpaca stream connected, alerts on the symbol on screen are also
+checked on each streamed trade, about four times a second.
 Armed symbols are checked about every 15 seconds while tickr is running,
 including with the window closed and when viewing a different stock. The
 first successful price after arming or restarting establishes a baseline;
@@ -548,8 +553,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.16
-git push origin v0.11.16
+git tag v0.11.17
+git push origin v0.11.17
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
