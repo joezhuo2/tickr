@@ -1491,7 +1491,7 @@
         if (!e.repeat) toggleNews();
         break;
       case "analyze":
-        if (!e.repeat && view === "technicals" && !analyzing) runAnalysis();
+        if (!e.repeat && ["technicals", "chart", "paper", "backtest"].includes(view) && !analyzing) runAnalysis();
         break;
       case "watchlist": {
         const next = watchlist[(watchlist.indexOf(symbol) + 1) % watchlist.length];
@@ -1804,7 +1804,7 @@
             {:else if view === "paper"}
               <div class="split">
                 {#if mainChart}
-                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={chartFills} />
+                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={chartFills} />
                 {:else if chartError}
                   <div class="msg">
                     {chartError}
@@ -1837,7 +1837,7 @@
             {:else if view === "backtest"}
               <div class="split">
                 {#if mainChart}
-                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} earnings={chartEarnings} ratings={chartRatings} news={chartNews} fills={chartFills} />
+                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} fills={chartFills} />
                 {:else if chartError}
                   <div class="msg">
                     {chartError}
@@ -1863,6 +1863,8 @@
                     {drawings}
                     {drawingBusy}
                     {saveDrawings}
+                    analysis={techAnalysis}
+                    {overlays}
                     earnings={chartEarnings}
                     ratings={chartRatings}
                     news={chartNews}
