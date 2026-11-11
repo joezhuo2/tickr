@@ -111,3 +111,32 @@ describe("freehand pen", () => {
     for (const p of stroke) expect(Math.round(indexToTime(times, timeToIndex(times, p.t)))).toBe(p.t);
   });
 });
+describe("box, ray, Fibonacci, position and anchored VWAP helpers", () => {
+  it("computes retracement levels from the end of the move", async () => {
+    const { fibLevels } = await import("./drawing");
+    const levels = fibLevels(100, 200);
+    expect(levels.map((l) => l.price)).toEqual([200, 176.4, 161.8, 150, 138.2, 121.4, 100].map((p) => expect.closeTo(p, 6)));
+    expect(fibLevels(200, 100)[4].price).toBeCloseTo(161.8);
+  });
+
+  it("derives a long or short position with its reward target", async () => {
+    const { positionLevels } = await import("./drawing");
+    expect(positionLevels(50, 49)).toEqual({ long: true, risk: 1, riskPct: 2, target: 52, reward: 2 });
+    expect(positionLevels(50, 52, 3)).toMatchObject({ long: false, risk: 2, target: 44 });
+  });
+
+  it("anchors VWAP at the first candle on or after the anchor time", async () => {
+    const { anchoredVwap } = await import("./drawing");
+    const bar = (t: number, p: number, v: number) => ({ t, o: p, h: p, l: p, c: p, v });
+    expect(anchoredVwap([bar(0, 5, 9), bar(10, 10, 0), bar(20, 10, 1), bar(30, 20, 3)], 5)).toEqual([null, null, 10, 17.5]);
+  });
+
+  it("extends rays to the plot edge and hits box outlines only", async () => {
+    const { rayEnd, hitBox } = await import("./drawing");
+    expect(rayEnd({ x: 10, y: 10 }, { x: 20, y: 15 }, 0, 110)).toEqual({ x: 110, y: 60 });
+    expect(rayEnd({ x: 50, y: 10 }, { x: 40, y: 20 }, 0, 110)).toEqual({ x: 0, y: 60 });
+    expect(rayEnd({ x: 50, y: 10 }, { x: 50, y: 20 }, 0, 110)).toEqual({ x: 50, y: 20 });
+    expect(hitBox({ x: 10, y: 52 }, { x: 10, y: 10 }, { x: 100, y: 100 })).toBe(true);
+    expect(hitBox({ x: 55, y: 55 }, { x: 10, y: 10 }, { x: 100, y: 100 })).toBe(false);
+  });
+});

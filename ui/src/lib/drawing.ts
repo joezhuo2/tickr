@@ -1,4 +1,4 @@
-﻿import type { Drawing, DrawingPoint } from "./types";
+﻿import type { Candle, Drawing, DrawingPoint } from "./types";
 
 function spacing(times: number[]): number {
   return times.length > 1 ? (times[times.length - 1] - times[0]) / (times.length - 1) || 1 : 1;
@@ -92,4 +92,46 @@ export function rulerMeasurement(a: DrawingPoint, b: DrawingPoint, times: number
   const elapsed = seconds >= 86400 ? `${+(seconds / 86400).toFixed(1)}d` : seconds >= 3600 ? `${+(seconds / 3600).toFixed(1)}h` : seconds >= 60 ? `${+(seconds / 60).toFixed(1)}m` : `${Math.round(seconds)}s`;
   const signed = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}`;
   return { delta, percent, bars, elapsed, label: `${signed(delta)} (${signed(percent)}%) · ${bars} bars · ${elapsed}` };
+}
+
+/** Kinds drawn from two anchor points. */
+export const TWO_POINT: ReadonlySet<Drawing["kind"]> = new Set(["trend", "rect", "ray", "fib", "position"] as const);
+
+export const FIB_RATIOS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+
+/** Retracement levels of the move from `from` to `to`: 0 sits at `to`, 1 back at `from`. */
+export function fibLevels(from: number, to: number): { ratio: number; price: number }[] {
+  return FIB_RATIOS.map((ratio) => ({ ratio, price: to - (to - from) * ratio }));
+}
+
+/** A long (stop below entry) or short trade with its target `reward` times the risk away. */
+export function positionLevels(entry: number, stop: number, reward = 2) {
+  const risk = Math.abs(entry - stop);
+  return { long: stop < entry, risk, riskPct: (risk / entry) * 100, target: entry + (entry - stop) * reward, reward };
+}
+
+/** VWAP of typical price from the first candle at or after `from`; null before it or until volume trades. */
+export function anchoredVwap(candles: readonly Candle[], from: number): (number | null)[] {
+  let pv = 0;
+  let vol = 0;
+  return candles.map((c) => {
+    if (c.t < from) return null;
+    pv += ((c.h + c.l + c.c) / 3) * c.v;
+    vol += c.v;
+    return vol > 0 ? pv / vol : null;
+  });
+}
+
+/** Where the ray from `a` through `b` leaves the span left..right; `b` itself when vertical. */
+export function rayEnd(a: Pixel, b: Pixel, left: number, right: number): Pixel {
+  const dx = b.x - a.x;
+  if (!dx) return b;
+  const k = ((dx > 0 ? right : left) - a.x) / dx;
+  return k > 1 ? { x: a.x + dx * k, y: a.y + (b.y - a.y) * k } : b;
+}
+
+/** True within 6px of the outline of the box spanned by `a` and `b`. */
+export function hitBox(p: Pixel, a: Pixel, b: Pixel): boolean {
+  const corners = [a, { x: b.x, y: a.y }, b, { x: a.x, y: b.y }, a];
+  return hitPolyline(p, corners);
 }

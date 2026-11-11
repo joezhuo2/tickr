@@ -4,7 +4,7 @@
   import type { Analysis, Article, Chart, ChartMode, ChartScale, ChartTimeZone, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
   import { fitScale, forward, inverse, scaleLabel, scaleTicks } from "./lib/scale";
   import type { Drawing, DrawingPoint } from "./lib/types";
-  import { timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
+  import { TWO_POINT, anchoredVwap, fibLevels, hitBox, positionLevels, rayEnd, timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
   import { volumeProfile, paneLayout } from "./lib/indicators";
   import { untrack } from "svelte";
   import { fadeIn } from "./lib/motion";
@@ -920,7 +920,7 @@
     if (w) onwindow(w);
   }
 
-  type Tool = "cursor" | "hline" | "trend" | "text" | "ruler" | "pen";
+  type Tool = "cursor" | "ruler" | Drawing["kind"];
   const tools: { tool: Tool; label: string }[] = [
     { tool: "cursor", label: "Cursor" },
     { tool: "hline", label: "Level" },
@@ -928,6 +928,11 @@
     { tool: "text", label: "Text" },
     { tool: "ruler", label: "Ruler" },
     { tool: "pen", label: "Pen" },
+    { tool: "rect", label: "Box" },
+    { tool: "ray", label: "Ray" },
+    { tool: "fib", label: "Fib" },
+    { tool: "position", label: "R:R" },
+    { tool: "avwap", label: "AVWAP" },
   ];
   let tool = $state<Tool>("cursor");
   let selected = $state<number | null>(null);
@@ -1022,6 +1027,18 @@
     return { x: geo.x(timeToIndex(times, p.t)), y: geo.y(p.price) };
   }
 
+  function avwapPath(d: Drawing): Pixel[] {
+    return anchoredVwap(candles, d.points[0].t).flatMap((val, i) => (val == null ? [] : [{ x: geo.x(i), y: geo.y(val) }]));
+  }
+
+  function positionTargetY(d: Drawing): number {
+    return geo.y(positionLevels(d.points[0].price, d.points[1].price).target);
+  }
+
+  function positionRight(a: Pixel, b: Pixel): number {
+    return Math.max(a.x, b.x, Math.min(a.x, b.x) + 90);
+  }
+
   function inPlot(p: Pixel) {
     return p.x >= PAD.l && p.x <= width - PAD.r && p.y >= PAD.t && p.y <= PAD.t + geo.priceH;
   }
@@ -1037,12 +1054,21 @@
       const a = screen(d.points[0]);
       if (d.kind === "hline" && hitTest(p, a)) return { drawing: d, endpoint: -1 };
       if (d.kind === "text" && inPlot(a) && p.x >= a.x - 6 && p.x <= a.x + (ctx?.measureText(d.text).width ?? 0) + 6 && Math.abs(p.y - a.y) <= 12) return { drawing: d, endpoint: -1 };
-      if (d.kind === "trend") {
+      if (d.kind === "avwap" && hitPolyline(p, avwapPath(d))) return { drawing: d, endpoint: -1 };
+      if (TWO_POINT.has(d.kind)) {
         const b = screen(d.points[1]);
+        const right = width - PAD.r;
         if (d.id === selected) {
           for (const [i, point] of [a, b].entries()) if (segmentDistance(p, point, point) <= 6) return { drawing: d, endpoint: i };
         }
-        if (hitTest(p, a, b)) return { drawing: d, endpoint: -1 };
+        const left = Math.min(a.x, b.x);
+        const hit =
+          d.kind === "trend" ? hitTest(p, a, b)
+          : d.kind === "ray" ? hitTest(p, a, rayEnd(a, b, PAD.l, right))
+          : d.kind === "rect" ? hitBox(p, a, b)
+          : d.kind === "fib" ? p.x >= left - 6 && fibLevels(d.points[0].price, d.points[1].price).some((l) => Math.abs(p.y - geo.y(l.price)) <= 6)
+          : p.x >= left - 6 && p.x <= positionRight(a, b) + 6 && p.y >= Math.min(b.y, positionTargetY(d)) - 6 && p.y <= Math.max(b.y, positionTargetY(d)) + 6;
+        if (hit) return { drawing: d, endpoint: -1 };
       }
     }
     return null;
@@ -1075,15 +1101,15 @@
       gesture = { start: p, original: null, endpoint: -1, moved: false, second: false };
       return;
     }
-    if (tool === "hline") { addDrawing({ id: 0, kind: "hline", points: [point], text: "" }); return; }
+    if (tool === "hline" || tool === "avwap") { addDrawing({ id: 0, kind: tool, points: [point], text: "" }); return; }
     if (tool === "text") {
       editing = { point, x: Math.min(p.x, Math.max(PAD.l, width - 220)), y: p.y };
       inputText = "";
       return;
     }
-    if (tool === "trend" || tool === "ruler") {
+    if (tool === "ruler" || TWO_POINT.has(tool as Drawing["kind"])) {
       const second = preview != null;
-      if (!preview) preview = { id: 0, kind: "trend", points: [point, point], text: "" };
+      if (!preview) preview = { id: 0, kind: tool === "ruler" ? "trend" : (tool as Drawing["kind"]), points: [point, point], text: "" };
       else preview = { ...preview, points: [preview.points[0], point] };
       gesture = { start: p, original: null, endpoint: -1, moved: false, second };
       return;
@@ -1169,12 +1195,14 @@
     const items = [...list.filter((d) => !preview || !gesture?.original || d.id !== preview.id), ...(preview ? [preview] : [])];
     for (const d of items) {
       const a = screen(d.points[0]);
-      const b = d.kind === "trend" ? screen(d.points[1]) : a;
+      const two = TWO_POINT.has(d.kind);
+      const b = two ? screen(d.points[1]) : a;
+      const wide = d.kind === "ray" || d.kind === "fib" || d.kind === "position" || d.kind === "avwap";
       const path = d.kind === "pen" ? d.points.map(screen) : null;
       const box = path ? pathBounds(path) : { minX: Math.min(a.x, b.x), maxX: Math.max(a.x, b.x), minY: Math.min(a.y, b.y), maxY: Math.max(a.y, b.y) };
       const bottom = PAD.t + geo.priceH, right = width - PAD.r;
-      if (box.maxY < PAD.t || box.minY > bottom) continue;
-      if (d.kind !== "hline" && (box.maxX < PAD.l || box.minX > right)) continue;
+      if (!wide && (box.maxY < PAD.t || box.minY > bottom)) continue;
+      if (d.kind !== "hline" && !wide && (box.maxX < PAD.l || box.minX > right)) continue;
       ctx.save();
       ctx.beginPath();
       ctx.rect(PAD.l, PAD.t, geo.plotW, geo.priceH);
@@ -1195,13 +1223,53 @@
         for (let i = 1; i < path.length - 1; i++) ctx.quadraticCurveTo(path[i].x, path[i].y, (path[i].x + path[i + 1].x) / 2, (path[i].y + path[i + 1].y) / 2);
         ctx.lineTo(path[path.length - 1].x, path[path.length - 1].y);
         ctx.stroke();
+      } else if (d.kind === "avwap") {
+        const line = avwapPath(d);
+        ctx.strokeStyle = v("--vwap");
+        ctx.beginPath();
+        line.forEach((p, k) => (k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        ctx.stroke();
+        if (line.length) ctx.fillText("AVWAP", line[0].x + 3, line[0].y - 3);
+      } else if (d.kind === "rect") {
+        ctx.globalAlpha = 0.08;
+        ctx.fillRect(box.minX, box.minY, box.maxX - box.minX, box.maxY - box.minY);
+        ctx.globalAlpha = 1;
+        ctx.strokeRect(box.minX, box.minY, box.maxX - box.minX, box.maxY - box.minY);
+      } else if (d.kind === "fib") {
+        for (const l of fibLevels(d.points[0].price, d.points[1].price)) {
+          const y = Math.round(geo.y(l.price)) + 0.5;
+          ctx.beginPath();
+          ctx.moveTo(box.minX, y);
+          ctx.lineTo(right, y);
+          ctx.stroke();
+          ctx.fillText(`${l.ratio} ${num(l.price)}`, box.minX + 3, y - 1);
+        }
+      } else if (d.kind === "position") {
+        const pos = positionLevels(d.points[0].price, d.points[1].price);
+        const targetY = positionTargetY(d);
+        const x1 = positionRight(a, b);
+        ctx.globalAlpha = 0.14;
+        ctx.fillStyle = v("--down");
+        ctx.fillRect(box.minX, Math.min(a.y, b.y), x1 - box.minX, Math.abs(a.y - b.y));
+        ctx.fillStyle = v("--up");
+        ctx.fillRect(box.minX, Math.min(a.y, targetY), x1 - box.minX, Math.abs(a.y - targetY));
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = v("--text");
+        for (const [y, label] of [[a.y, `${pos.long ? "Long" : "Short"} ${num(d.points[0].price)}`], [b.y, `Stop ${num(d.points[1].price)} (${num(pos.riskPct, 2)}%)`], [targetY, `${pos.reward}R ${num(pos.target)}`]] as const) {
+          ctx.beginPath();
+          ctx.moveTo(box.minX, y);
+          ctx.lineTo(x1, y);
+          ctx.stroke();
+          ctx.fillText(label, box.minX + 3, y - 2);
+        }
       } else {
+        const end = d.kind === "ray" ? rayEnd(a, b, PAD.l, right) : b;
         ctx.beginPath();
         ctx.moveTo(d.kind === "hline" ? PAD.l : a.x, a.y);
-        ctx.lineTo(d.kind === "hline" ? right : b.x, b.y);
+        ctx.lineTo(d.kind === "hline" ? right : end.x, end.y);
         ctx.stroke();
-        if (d.kind === "trend" && d.id === selected) for (const p of [a, b]) { ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill(); }
       }
+      if (two && d.id === selected) for (const p of [a, b]) { ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill(); }
       if (tool === "ruler" && d === preview) {
         const label = rulerMeasurement(d.points[0], d.points[1], times).label;
         const x = Math.max(PAD.l + 3, Math.min(b.x, right - ctx.measureText(label).width - 3));

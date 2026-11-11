@@ -169,7 +169,7 @@ export interface Consensus {
 }
 
 export interface DrawingPoint { t: number; price: number }
-export interface Drawing { id: number; kind: "hline" | "trend" | "text" | "pen"; points: DrawingPoint[]; text: string }
+export interface Drawing { id: number; kind: "hline" | "trend" | "text" | "pen" | "rect" | "ray" | "fib" | "position" | "avwap"; points: DrawingPoint[]; text: string }
 
 export interface Init {
   theme: Theme;
@@ -248,6 +248,11 @@ export interface Keybinds {
   draw_text: string;
   draw_ruler: string;
   draw_pen: string;
+  draw_rect: string;
+  draw_ray: string;
+  draw_fib: string;
+  draw_position: string;
+  draw_avwap: string;
   chart_split: string;
   chart_replay: string;
   practice: string;
