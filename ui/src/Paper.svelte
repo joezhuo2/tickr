@@ -1,6 +1,6 @@
 <script lang="ts">
   import { num, price, signed } from "./lib/format";
-  import { LIMITS, cashError, costsError, positionOf, qtyError, summary, unrealized, type Account, type Costs, type OrderKind, type OrderRequest, type Side } from "./lib/paper";
+  import { LIMITS, cashError, costsError, positionOf, positionSize, qtyError, summary, unrealized, type Account, type Costs, type OrderKind, type OrderRequest, type Side } from "./lib/paper";
 
   let {
     account,
@@ -47,6 +47,10 @@
   let commissionBps = $state<number | undefined>(undefined);
   let slippageBps = $state<number | undefined>(undefined);
   let formError = $state<string | null>(null);
+  let sizeAccount = $state<number | undefined>(undefined);
+  let riskPct = $state<number | undefined>(1);
+  let sizeEntry = $state<number | undefined>(undefined);
+  let sizeStop = $state<number | undefined>(undefined);
 
   const marks = $derived<Record<string, number>>(mark != null ? { [symbol]: mark } : {});
   const sum = $derived(summary(account, marks));
@@ -56,6 +60,13 @@
   const trades = $derived([...account.trades].reverse());
   const marketOff = $derived(kind === "market" && !!marketBlock);
   const ticketOff = $derived(!!disabled || marketOff);
+  const sizing = $derived(positionSize(Number(sizeAccount ?? sum.equity), Number(riskPct), Number(sizeEntry ?? mark), Number(sizeStop)));
+
+  function useSizing() {
+    if (!sizing || sizing.shares < 1) return;
+    side = sizing.side;
+    qty = Math.min(sizing.shares, LIMITS.maxQty);
+  }
 
   function money(v: number): string {
     return `${v < 0 ? "−" : ""}${price(Math.abs(v), "USD")}`;
@@ -140,6 +151,23 @@
       {/if}
     </form>
   {/if}
+
+  <div class="settings" role="group" aria-label="Position size calculator">
+    <strong>Position size</strong>
+    <label>Account <input type="number" min="0" step="any" placeholder={num(sum.equity, 0)} bind:value={sizeAccount} /></label>
+    <label>Risk % <input type="number" min="0" max="100" step="any" bind:value={riskPct} /></label>
+    <label>Entry <input type="number" min="0" step="any" placeholder={mark != null ? String(mark) : ""} bind:value={sizeEntry} /></label>
+    <label>Stop <input type="number" min="0" step="any" bind:value={sizeStop} /></label>
+    {#if sizing}
+      <span role="status">
+        <strong class={sizing.side === "buy" ? "up" : "down"}>{sizing.side === "buy" ? "Buy" : "Short"} {num(sizing.shares, 0)} shares</strong>
+        · risk {money(sizing.risk)} ({price(sizing.per_share, currency)} a share) · cost {money(sizing.cost)} · 2R target {price(sizing.target, currency)}
+      </span>
+      <button type="button" disabled={sizing.shares < 1} onclick={useSizing}>Use in ticket</button>
+    {:else}
+      <span class="muted">Enter a stop to size the trade.</span>
+    {/if}
+  </div>
 
   <div class="row">
     <section class="position" aria-label="Simulated position">

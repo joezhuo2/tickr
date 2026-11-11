@@ -482,3 +482,20 @@ describe("replay book", () => {
     expect(live).toEqual(newAccount());
   });
 });
+
+describe("positionSize", () => {
+  it("sizes a long and a short from account risk and gives the 2R target", async () => {
+    const { positionSize } = await import("./paper");
+    expect(positionSize(25_000, 1, 50, 49.5)).toEqual({ side: "buy", shares: 500, per_share: 0.5, risk: 250, cost: 25_000, target: 51 });
+    expect(positionSize(10_000, 2, 20, 20.75)).toMatchObject({ side: "sell", shares: 266, target: 18.5 });
+    expect(positionSize(10_000, 1, 100, 97, 3)?.target).toBe(109);
+    expect(positionSize(100, 1, 500, 400)?.shares).toBe(0);
+  });
+
+  it("rejects inputs that cannot be sized", async () => {
+    const { positionSize } = await import("./paper");
+    for (const args of [[0, 1, 10, 9], [1000, 0, 10, 9], [1000, 101, 10, 9], [1000, 1, 10, 10], [1000, 1, -1, 9], [1000, 1, 10, 0], [1000, 1, NaN, 9]] as const) {
+      expect(positionSize(...(args as unknown as [number, number, number, number]))).toBeNull();
+    }
+  });
+});

@@ -135,6 +135,25 @@ export function setCosts(a: Account, costs: Costs): Outcome {
   return error ? { ok: false, error } : { ok: true, account: { ...a, costs: { ...costs } } };
 }
 
+export interface Sizing {
+  side: Side;
+  shares: number;
+  /** Loss per share and in total if the stop is hit. */
+  per_share: number;
+  risk: number;
+  cost: number;
+  target: number;
+}
+
+/** Whole shares that lose at most `riskPct` of `account` between `entry` and `stop`, with the target `reward` times that distance away. */
+export function positionSize(account: number, riskPct: number, entry: number, stop: number, reward = 2): Sizing | null {
+  if (![account, riskPct, entry, stop, reward].every(Number.isFinite)) return null;
+  if (account <= 0 || riskPct <= 0 || riskPct > 100 || entry <= 0 || stop <= 0 || entry === stop) return null;
+  const per_share = Math.abs(entry - stop);
+  const shares = Math.floor((account * riskPct) / 100 / per_share);
+  return { side: entry > stop ? "buy" : "sell", shares, per_share, risk: shares * per_share, cost: shares * entry, target: entry + (entry - stop) * reward };
+}
+
 export function slipped(side: Side, price: number, bps: number): number {
   return side === "buy" ? price * (1 + bps / 10_000) : price * (1 - bps / 10_000);
 }
