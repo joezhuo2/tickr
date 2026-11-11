@@ -47,3 +47,26 @@ jobs:
         working-directory: src-tauri
       - run: cargo test
         working-directory: src-tauri
+
+  # After CI passes on main, tag the version in package.json if it has no tag
+  # yet and start the Release workflow for it. A tag pushed with GITHUB_TOKEN
+  # does not trigger workflows, so the release is dispatched explicitly.
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [frontend, rust]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="v$(jq -r .version package.json)"
+          if gh api "repos/${{ github.repository }}/git/ref/tags/$tag" > /dev/null 2>&1; then
+            echo "$tag already exists; nothing to release."
+            exit 0
+          fi
+          gh api "repos/${{ github.repository }}/git/refs" -f ref="refs/tags/$tag" -f sha="${{ github.sha }}"
+          gh workflow run release.yml --repo "${{ github.repository }}" --ref "$tag"

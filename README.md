@@ -523,10 +523,14 @@ universal macOS `.app`/`.dmg` with `tauri-apps/tauri-action`, and attaches them
 to a **draft** release for that tag, along with the signed updater bundles and
 `latest.json`. Failed asset uploads are retried twice. A last job checks that
 `latest.json` lists Windows and both macOS architectures; if it fails, re-run
-the failed jobs from the Actions tab, which re-uploads into the same draft. Review the notes and publish the release from the
-Releases page. Installed copies only see it once it is published and marked
+the failed jobs from the Actions tab, which re-uploads into the same draft. Once that check passes the workflow publishes the
+release and marks it latest. Installed copies only see it once it is published and marked
 latest (not a pre-release), because the updater reads
 `releases/latest/download/latest.json`.
+
+You rarely need to push the tag yourself: when CI passes on `main` and the
+version in `package.json` has no tag yet, CI creates the tag and starts the
+Release workflow, so merging a version bump publishes it.
 
 #### Updater key
 
