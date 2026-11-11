@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.7] - 2026-11-11
+
+### Added
+- **Key levels** overlay in Technicals for intraday charts: the prior day's high
+  and low and today's premarket high and low, labeled on the chart. Off by default.
+- The opening range is shaded as a box between its high and low.
+
 ## [0.11.6] - 2026-11-11
 
 ### Changed
