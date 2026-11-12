@@ -162,7 +162,9 @@ taskbar to keep it visible.
   width (1 to 3 px), a dashed line, and **Lock**, which stops it being moved or
   deleted until unlocked. **Magnet** snaps new points and dragged endpoints to
   the open, high, low or close of the candle under the cursor when within 12
-  pixels, and **Hide** hides every drawing until you click it again.
+  pixels, and **Hide** hides every drawing until you click it again. Drawings,
+  Magnet, Hide, the study toggles and the Technicals panel (height and whether
+  Indicator settings is open) are all restored when you relaunch tickr.
 - **Candle interval:** choose Auto to keep the default resolution for each
   range, or pick any interval from 1m to 1M at any time. If the current range
   cannot show that interval, tickr moves to the nearest range that can (5m on
@@ -530,7 +532,7 @@ typing in a text field.
 
 **Backup** exports your settings, watchlists, groups, drawings, alerts, saved
 screens, keybinds, indicator presets, indicator alerts, study toggles, theme
-colors and fonts and the magnet toggle to a JSON file, and **Import** restores
+colors and fonts, and the magnet, hide-drawings and Indicator settings toggles to a JSON file, and **Import** restores
 one after checking it (older backups without those parts leave them as they are). API keys stay in `.env` and are never exported; the data
 provider, window position and start-at-login setting are kept on import.
 
