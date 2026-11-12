@@ -1,3 +1,4 @@
+import { num } from "./format";
 import type { Analysis, Candle, IndicatorConfig, Overlays } from "./types";
 
 export function overlayVisibility(c: IndicatorConfig): Overlays {
@@ -69,4 +70,9 @@ export function paneLayout(height: number, rsi: boolean, macd: boolean) {
   const paneH = height * (count === 2 ? 0.19 : 0.22);
   const first = height * (count === 2 ? 0.6 : 0.78);
   return { priceH, volTop, volH, rsiTop: first, rsiH: paneH, macdTop: first + (rsi ? paneH + height * 0.02 : 0), macdH: paneH };
+}
+
+export function legendText(label: string, values: (number | null)[], digits?: number): string {
+  const shown = values.filter((v): v is number => v != null && Number.isFinite(v)).map((v) => num(v, digits));
+  return shown.length ? `${label}  ${shown.join(" / ")}` : label;
 }

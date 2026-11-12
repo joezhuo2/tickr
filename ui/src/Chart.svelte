@@ -5,7 +5,7 @@
   import { fitScale, forward, inverse, scaleLabel, scaleTicks } from "./lib/scale";
   import type { Drawing, DrawingPoint } from "./lib/types";
   import { TWO_POINT, anchoredVwap, fibLevels, hitBox, positionLevels, rayEnd, timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
-  import { volumeProfile, paneLayout } from "./lib/indicators";
+  import { legendText, volumeProfile, paneLayout } from "./lib/indicators";
   import { untrack } from "svelte";
   import { fadeIn } from "./lib/motion";
   import { follow, full, isFull, pan, reveal, visible, zoom, type View } from "./lib/viewport";
@@ -573,10 +573,15 @@
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     let lx = PAD.l + 4;
-    const legend = (label: string, col: string) => {
+    let ly = PAD.t + 2;
+    const at = hover != null && candles[hover] ? hover : g.i1;
+    const legend = (label: string, col: string, lines: Line[]) => {
+      const text = legendText(label, lines.map((l) => (l.visible ? valueAt(l, at) : null)));
+      const w = ctx.measureText(text).width;
+      if (lx + w > right && lx > PAD.l + 4) { lx = PAD.l + 4; ly += 12; }
       ctx.fillStyle = col;
-      ctx.fillText(label, lx, PAD.t + 2);
-      lx += ctx.measureText(label).width + 10;
+      ctx.fillText(text, lx, ly);
+      lx += w + 10;
     };
     if (s.bollinger) {
       const [up, mid, lo] = a.series.bollinger;
@@ -596,7 +601,7 @@
       ctx.lineWidth = 1;
       ctx.strokeStyle = mid.color || v("--bb");
       for (const line of [up, mid, lo]) strokeLine(ctx, line, g.y, g);
-      legend(mid.label, mid.color || v("--bb"));
+      legend(mid.label, mid.color || v("--bb"), [up, mid, lo]);
     }
     if (s.mas) {
       ctx.lineWidth = 1.2;
@@ -605,7 +610,7 @@
         const col = line.color || v(`--ma-${k % 5 + 1}`);
         ctx.strokeStyle = col;
         strokeLine(ctx, line, g.y, g);
-        legend(line.label, col);
+        legend(line.label, col, [line]);
       });
     }
     if (s.vwap) {
@@ -616,7 +621,7 @@
       ctx.globalAlpha = 0.55;
       for (const band of a.series.vwap_bands) if (band.visible) strokeLine(ctx, band, g.y, g);
       ctx.globalAlpha = 1;
-      legend(a.series.vwap.label, (a.series.vwap.color || v("--vwap")));
+      legend(a.series.vwap.label, (a.series.vwap.color || v("--vwap")), [a.series.vwap]);
     }
     if (s.opening_range && a.series.opening_range.some((l) => l.values.some((x) => x != null))) {
       const col = a.series.opening_range[0].color || v("--or");
@@ -648,7 +653,7 @@
         strokeLine(ctx, line, g.y, g);
       });
       ctx.globalAlpha = 1;
-      legend(a.series.opening_range[0].label, col);
+      legend(a.series.opening_range[0].label, col, [orHigh, orLow]);
     }
 
     const profile = s.volume_profile ? volumeProfile(candles, g.i0, g.i1) : null;
@@ -778,10 +783,9 @@
       ctx.lineWidth = 1.3;
       strokeLine(ctx, a.series.rsi, g.ry, g);
       ctx.restore();
-      const lastRsi = a.series.rsi.values[a.series.rsi.values.length - 1];
       ctx.fillStyle = (a.series.rsi.color || v("--rsi"));
       ctx.textBaseline = "top";
-      ctx.fillText(`${a.series.rsi.label}${lastRsi != null ? `  ${num(lastRsi, 1)}` : ""}`, PAD.l + 4, top + 2);
+      ctx.fillText(legendText(a.series.rsi.label, [valueAt(a.series.rsi, at)], 1), PAD.l + 4, top + 2);
     }
     if (s.macd) {
       const [line, signal, histogram] = a.series.macd;
@@ -818,7 +822,7 @@
       ctx.fillStyle = line.color || v("--rsi");
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
-      ctx.fillText(line.label, PAD.l + 4, g.macdTop + 2);
+      ctx.fillText(legendText(line.label, a.series.macd.map((l) => valueAt(l, at)), 2), PAD.l + 4, g.macdTop + 2);
       ctx.restore();
       ctx.fillStyle = v("--muted");
       ctx.textBaseline = "middle";

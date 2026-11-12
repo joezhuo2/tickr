@@ -142,6 +142,10 @@ taskbar to keep it visible.
   the time left until the forming candle closes.
 - **Tooltip:** hover the chart, or use ← and →, for time, open, high, low,
   close and volume.
+- **Legend:** each indicator label on the chart shows its value at the
+  crosshair, or at the latest bar on screen when nothing is hovered. Bollinger
+  shows upper / middle / lower, the opening range high / low, and MACD its
+  line / signal / histogram.
 - **Zoom and pan:** scroll or pinch to zoom at the cursor (down to 10 bars),
   drag or scroll sideways to pan, and double-click to see the whole range
   again. With the chart focused, + and - zoom and 0 resets. The price axis
