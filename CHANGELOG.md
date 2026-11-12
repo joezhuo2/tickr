@@ -6,6 +6,10 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.30] - 2026-11-11
+
+### Changed\n- Settings keeps one size and scrolls inside; sections slide in and the Hotkeys\n  categories fold open and shut.
+
 ## [0.11.29] - 2026-11-11
 
 ### Added\n- **Scroll back:** pan past the left edge of the chart to load older candles.\n\n### Changed\n- Every candle interval can be picked at any time; tickr moves to the nearest\n  range that supports it.

@@ -3,7 +3,7 @@
   import { ago } from "./lib/format";
   import { accelerator, display } from "./lib/hotkey";
   import { actionFor, bindKey, groupActions, keyLabel, rebind, type Action, type Category } from "./lib/keybinds";
-  import { backdrop, dialog } from "./lib/motion";
+  import { backdrop, dialog, expand, paneIn } from "./lib/motion";
   import { onMount } from "svelte";
   import type { ChartTimeZone, ConnectionsReport, ServiceStatus, AiConfig, AiTestResult, DataProvider, Dots, Keybinds, RefreshMode, Theme, TextSize, Palette } from "./lib/types";
 
@@ -313,6 +313,12 @@
   let tab = $state<(typeof TABS)[number]["id"]>("display");
   const KEY_GROUPS = groupActions();
   let keyGroup = $state<Category>(KEY_GROUPS[0].id);
+  let keysOpen = $state(true);
+
+  function openHotkeys() {
+    keysOpen = tab === "hotkeys" ? !keysOpen : true;
+    tab = "hotkeys";
+  }
   const keys = $derived(KEY_GROUPS.find((g) => g.id === keyGroup) ?? KEY_GROUPS[0]);
 </script>
 
@@ -331,11 +337,13 @@
       <div class="nav" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
         {#each TABS as t (t.id)}
           {#if t.id === "hotkeys"}
-            <button aria-expanded={tab === "hotkeys"} class:open={tab === "hotkeys"} onclick={() => (tab = "hotkeys")}>{t.label}<span class="caret" aria-hidden="true">{tab === "hotkeys" ? "▾" : "▸"}</span></button>
-            {#if tab === "hotkeys"}
-              {#each KEY_GROUPS as g (g.id)}
-                <button role="tab" class="sub" aria-selected={keyGroup === g.id} class:on={keyGroup === g.id} onclick={() => (keyGroup = g.id)}>{g.label}</button>
-              {/each}
+            <button aria-expanded={tab === "hotkeys" && keysOpen} class:open={tab === "hotkeys"} onclick={openHotkeys}>{t.label}<span class="caret" class:turned={tab === "hotkeys" && keysOpen} aria-hidden="true">▸</span></button>
+            {#if tab === "hotkeys" && keysOpen}
+              <div class="subnav" transition:expand>
+                {#each KEY_GROUPS as g (g.id)}
+                  <button role="tab" class="sub" aria-selected={keyGroup === g.id} class:on={keyGroup === g.id} onclick={() => (keyGroup = g.id)}>{g.label}</button>
+                {/each}
+              </div>
             {/if}
           {:else}
             <button role="tab" aria-selected={tab === t.id} class:on={tab === t.id} onclick={() => (tab = t.id)}>{t.label}</button>
@@ -343,6 +351,8 @@
         {/each}
       </div>
       <div class="content" role="tabpanel">
+      {#key `${tab} ${tab === "hotkeys" ? keyGroup : ""}`}
+      <div class="section" in:paneIn={{ y: 8 }}>
     {#if tab === "display"}
     <h3>Display</h3>
     <label class="row">
@@ -541,6 +551,8 @@
     <p class="hint" class:error={copyError} role="status">{copyStatus}</p>
     {/if}
       </div>
+      {/key}
+      </div>
     </div>
   </div>
 </div>
@@ -556,19 +568,30 @@
   }
   .panel {
     width: min(600px, calc(100% - 32px));
-    max-height: calc(100% - 32px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
+    height: min(480px, calc(100% - 32px));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     padding: 14px 16px 16px;
     border-radius: 10px;
     background: var(--bg);
     box-shadow: var(--shadow);
   }
   .body {
+    flex: 1;
     display: flex;
     gap: 14px;
-    min-height: 340px;
+    min-height: 0;
     margin-top: 8px;
+  }
+  .subnav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+  }
+  .caret.turned {
+    transform: rotate(90deg);
   }
   .nav {
     flex: 0 0 112px;
@@ -577,6 +600,8 @@
     gap: 2px;
     padding-right: 10px;
     border-right: 1px solid var(--faint);
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
   .nav button {
     border: 0;
@@ -608,6 +633,7 @@
     float: right;
     font-size: 9px;
     line-height: 16px;
+    transition: transform var(--motion-base) var(--ease-out);
   }
   .nav button:focus-visible {
     outline: 2px solid var(--accent);
@@ -616,8 +642,12 @@
   .content {
     flex: 1;
     min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 6px;
   }
-  .content > h3:first-child {
+  .section > :global(h3:first-child) {
     margin-top: 2px;
   }
   @media (max-width: 520px) {
@@ -631,6 +661,11 @@
       padding: 0 0 8px;
       border-right: 0;
       border-bottom: 1px solid var(--faint);
+      overflow: visible;
+    }
+    .subnav {
+      flex-direction: row;
+      flex-wrap: wrap;
     }
   }
   header {

@@ -1,5 +1,5 @@
 import { cubicOut } from "svelte/easing";
-import { fade, fly, scale } from "svelte/transition";
+import { fade, fly, scale, slide } from "svelte/transition";
 
 export type Speed = "fast" | "base" | "slow";
 
@@ -33,4 +33,8 @@ export function dialog(node: Element) {
 export function fadeIn(el: Element | undefined) {
   const d = duration("base");
   if (el && d) el.animate([{ opacity: 0.25 }, { opacity: 1 }], { duration: d, easing: token("--ease-out").trim() || "ease-out" });
+}
+
+export function expand(node: Element) {
+  return slide(node, { duration: duration("base"), easing: cubicOut });
 }
