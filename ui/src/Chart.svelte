@@ -1855,6 +1855,7 @@
 >
   <canvas bind:this={canvas} style:width="{width}px" style:height="{height}px"></canvas>
   {#if chart && !replay}
+    <div class="drawing-bar">
     <div class="drawing-tools" role="toolbar" aria-label="Drawing tools">
       {#each tools as item}
         <button aria-label={item.label} aria-pressed={tool === item.tool} title={item.label} onclick={() => chooseTool(item.tool)}>{item.label}</button>
@@ -1881,6 +1882,7 @@
         <button aria-label="Lock" aria-pressed={!!d.locked} title="Locked drawings cannot be moved or deleted" disabled={drawingBusy} onclick={() => restyle({ locked: !d.locked })}>Lock</button>
       </div>
     {/if}
+    </div>
   {/if}
   {#if candles.length}
     <div class="axis-grip" style:top="{PAD.t}px" style:width="{PAD.r}px" style:height="{geo.priceH}px"></div>
@@ -2007,13 +2009,25 @@
     right: 0;
     cursor: ns-resize;
   }
-  .drawing-tools {
+  .drawing-bar {
     position: absolute;
     top: 5px;
     left: 6px;
+    right: 96px;
     display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    pointer-events: none;
+  }
+  .drawing-tools {
+    display: flex;
+    flex-wrap: wrap;
     gap: 2px;
     cursor: default;
+    pointer-events: auto;
+    background: var(--bg);
+    border-radius: 4px;
   }
   .drawing-tools button {
     border: 0;
@@ -2026,7 +2040,7 @@
   .drawing-tools button[aria-pressed="true"] { background: var(--surface); color: var(--text); }
   .drawing-tools button:disabled { opacity: 0.4; }
   .drawing-tools select { font-size: 10px; padding: 2px 4px; }
-  .drawing-style { top: 25px; align-items: center; }
+  .drawing-style { align-items: center; }
   .drawing-style .swatch { width: 14px; height: 14px; padding: 0; background: var(--swatch); }
   .drawing-style .swatch[aria-pressed="true"] { background: var(--swatch); box-shadow: 0 0 0 2px var(--text); }
   .drawing-input { position: absolute; width: 200px; z-index: 2; }
