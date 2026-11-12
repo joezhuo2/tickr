@@ -6,6 +6,10 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.32] - 2026-11-11
+
+### Added\n- **Settings search:** a search box beside the Settings title suggests\n  settings by name, opens the chosen one and flashes it.
+
 ## [0.11.31] - 2026-11-11
 
 ### Changed\n- The list under the search box slides open on focus and shut on blur.
