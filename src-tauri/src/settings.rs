@@ -296,7 +296,7 @@ pub fn validate_drawings(map: &HashMap<String, Vec<Drawing>>) -> Result<(), Stri
         for d in drawings {
             let valid = match d.kind.as_str() {
                 "hline" | "text" | "avwap" | "vline" | "hray" => d.points.len() == 1,
-                "trend" | "rect" | "ray" | "fib" | "position" | "arrow" | "prange" | "drange" => d.points.len() == 2,
+                "trend" | "rect" | "ray" | "fib" | "position" | "arrow" | "prange" | "drange" | "vprofile" => d.points.len() == 2,
                 "channel" | "fibext" | "pitchfork" => d.points.len() == 3,
                 "pen" => (2..=PEN_MAX_POINTS).contains(&d.points.len()),
                 _ => return Err("Unknown drawing kind.".into()),

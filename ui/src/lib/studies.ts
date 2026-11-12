@@ -8,6 +8,7 @@ export const STUDIES = [
   { id: "supertrend", label: "Supertrend" },
   { id: "obv", label: "OBV" },
   { id: "pivots", label: "Pivot points" },
+  { id: "svp", label: "Session volume profile" },
 ] as const;
 
 export type StudyId = (typeof STUDIES)[number]["id"];

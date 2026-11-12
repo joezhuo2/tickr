@@ -150,7 +150,7 @@ export function snapPrice(price: number, candle: Pick<Candle, "o" | "h" | "l" | 
 
 export const POINT_COUNT: Partial<Record<Drawing["kind"], number>> = {
   hline: 1, text: 1, avwap: 1, vline: 1, hray: 1,
-  trend: 2, rect: 2, ray: 2, fib: 2, position: 2, arrow: 2, prange: 2, drange: 2,
+  trend: 2, rect: 2, ray: 2, fib: 2, position: 2, arrow: 2, prange: 2, drange: 2, vprofile: 2,
   channel: 3, fibext: 3, pitchfork: 3,
 };
 

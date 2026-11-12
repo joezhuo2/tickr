@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clamp, follow, full, isFull, MIN_BARS, pan, reveal, visible, zoom } from "./viewport";
+import { center, firstAtOrAfter, clamp, follow, full, isFull, MIN_BARS, pan, reveal, visible, zoom } from "./viewport";
 
 describe("clamp", () => {
   it("keeps the view inside the data", () => {
@@ -104,5 +104,20 @@ describe("isFull", () => {
   it("detects the full view", () => {
     expect(isFull(full(30), 30)).toBe(true);
     expect(isFull({ start: 0, count: 29 }, 30)).toBe(false);
+  });
+});
+
+describe("go to date", () => {
+  it("centers a bar, zooming in first when the whole range is shown", () => {
+    expect(center(full(500), 500, 250)).toEqual({ start: 210.5, count: 80 });
+    expect(center({ start: 0, count: 20 }, 500, 499)).toEqual({ start: 480, count: 20 });
+    expect(center(full(30), 30, 3)).toEqual({ start: 0, count: 30 });
+  });
+
+  it("finds the first bar at or after a time, or the last bar", () => {
+    expect(firstAtOrAfter([10, 20, 30], 15)).toBe(1);
+    expect(firstAtOrAfter([10, 20, 30], 20)).toBe(1);
+    expect(firstAtOrAfter([10, 20, 30], 99)).toBe(2);
+    expect(firstAtOrAfter([10, 20, 30], 1)).toBe(0);
   });
 });

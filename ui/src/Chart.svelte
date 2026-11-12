@@ -11,7 +11,7 @@
   import { studies } from "./lib/studyStore.svelte";
   import { displayCandles, isOhlc } from "./lib/charttypes";
   import { fadeIn } from "./lib/motion";
-  import { follow, full, isFull, pan, reveal, visible, zoom, type View } from "./lib/viewport";
+  import { center, firstAtOrAfter, follow, full, isFull, pan, reveal, visible, zoom, type View } from "./lib/viewport";
   import { barAt, viewWindow, windowView, type TimeWindow } from "./lib/chartsync";
 
   let {
@@ -97,7 +97,51 @@
   const trendLine = $derived(studies.supertrend ? supertrend(candles) : null);
   const onBalance = $derived(studies.obv ? obv(candles) : null);
   const pivotLevels = $derived(studies.pivots && chart ? pivots(candles, pivotPeriod(chart.interval, chart.meta.gmtoffset ?? 0)) : null);
+  const sessionKeys = $derived.by(() => {
+    if (!studies.svp || !chart) return null;
+    const period = pivotPeriod(chart.interval, chart.meta.gmtoffset ?? 0);
+    return candles.map((c) => period(c.t));
+  });
   let legendY = 0;
+  let gotoOpen = $state(false);
+
+  function dateOffset() {
+    const last = candles[candles.length - 1]?.t ?? 0;
+    return chart ? displayOffset(last, timeZone, clock, chart.interval) : 0;
+  }
+
+  function dateValue(t: number | undefined) {
+    if (t == null || !chart) return "";
+    return new Date((t + dateOffset()) * 1000).toISOString().slice(0, isIntraday(chart.interval) ? 16 : 10);
+  }
+
+  function goToDate(value: string) {
+    const t = Date.parse(`${value}${value.length === 10 ? "T00:00" : ""}Z`) / 1000 - dateOffset();
+    if (!Number.isFinite(t) || !candles.length) return;
+    const i = firstAtOrAfter(times, t);
+    view = center(view, candles.length, i);
+    hover = i;
+    gotoOpen = false;
+    emitWindow();
+    wrap?.focus();
+  }
+
+  function drawProfile(ctx: CanvasRenderingContext2D, g: Geo, i0: number, i1: number, v: (name: string) => string, bins = 24) {
+    const profile = volumeProfile(candles, i0, i1, bins);
+    if (!profile) return;
+    const peak = Math.max(...profile.volumes);
+    const x0 = g.x(i0) - g.step / 2;
+    const maxW = (g.x(i1) + g.step / 2 - x0) * 0.6;
+    ctx.save();
+    ctx.fillStyle = v("--muted");
+    profile.volumes.forEach((vol, k) => {
+      const top = g.y(profile.lo + (k + 1) * profile.step);
+      const bottom = g.y(profile.lo + k * profile.step);
+      ctx.globalAlpha = vol === peak ? 0.45 : 0.2;
+      ctx.fillRect(x0, top, peak > 0 ? (vol / peak) * maxW : 0, Math.max(1, bottom - top - 1));
+    });
+    ctx.restore();
+  }
   const rsiOn = $derived(!!show?.rsi);
   const macdOn = $derived(!!show?.macd);
   /** Series index for each candle on screen (-1 for candles newer than the analysis). */
@@ -900,7 +944,7 @@
   }
 
   function drawStudies(ctx: CanvasRenderingContext2D, g: Geo, v: (name: string) => string) {
-    if (g.n === 0 || !(stoch || ichi || trendLine || onBalance || pivotLevels)) return;
+    if (g.n === 0 || !(stoch || ichi || trendLine || onBalance || pivotLevels || sessionKeys)) return;
     const at = hover != null && candles[hover] ? hover : g.i1;
     const right = width - PAD.r;
     ctx.save();
@@ -919,6 +963,16 @@
       ctx.fillText(text, lx, legendY);
       lx += w + 10;
     };
+    if (sessionKeys) {
+      let i = g.i0;
+      while (i > 0 && sessionKeys[i - 1] === sessionKeys[i]) i--;
+      for (let drawn = 0; i <= g.i1 && drawn < 80; drawn++) {
+        let j = i;
+        while (j + 1 < g.n && sessionKeys[j + 1] === sessionKeys[i]) j++;
+        drawProfile(ctx, g, i, j, v, 16);
+        i = j + 1;
+      }
+    }
     if (ichi) {
       for (let i = Math.max(1, g.i0); i <= g.i1; i++) {
         const a0 = ichi.spanA[i - 1], a1 = ichi.spanA[i], b0 = ichi.spanB[i - 1], b1 = ichi.spanB[i];
@@ -1023,7 +1077,7 @@
 
   $effect(() => {
     // Redraw when any of these change.
-    void [stoch, ichi, trendLine, onBalance, pivotLevels, redrawKey, list, preview, selected, tool, hideDrawings, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt, fillMarks];
+    void [stoch, ichi, trendLine, onBalance, pivotLevels, sessionKeys, redrawKey, list, preview, selected, tool, hideDrawings, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt, fillMarks];
     draw();
   });
 
@@ -1144,6 +1198,7 @@
     { tool: "drange", label: "Date range" },
     { tool: "fibext", label: "Fib extension" },
     { tool: "pitchfork", label: "Pitchfork" },
+    { tool: "vprofile", label: "Volume profile (range)" },
   ];
   const multi = (kind: string) => (POINT_COUNT[kind as Drawing["kind"]] ?? 0) >= 2;
   let placed = 0;
@@ -1308,7 +1363,7 @@
         const left = Math.min(a.x, b.x);
         const hit =
           d.kind === "trend" || d.kind === "arrow" ? hitTest(p, a, b)
-          : d.kind === "prange" || d.kind === "drange" ? hitBox(p, a, b)
+          : d.kind === "prange" || d.kind === "drange" || d.kind === "vprofile" ? hitBox(p, a, b)
           : d.kind === "channel" ? channelLines(a, b, c).some(([s, e]) => hitTest(p, s, e))
           : d.kind === "pitchfork" ? pitchforkLines(a, b, c, PAD.l, right).some(([s, e]) => hitTest(p, s, e))
           : d.kind === "fibext" ? p.x >= c.x - 6 && fibExtLevels(d.points[0].price, d.points[1].price, d.points[2].price).some((l) => Math.abs(p.y - geo.y(l.price)) <= 6)
@@ -1535,6 +1590,11 @@
         ctx.lineTo(right, a.y);
         ctx.stroke();
         ctx.fillText(num(d.points[0].price), a.x + 3, a.y - 2);
+      } else if (d.kind === "vprofile") {
+        const clampIndex = (t: number) => Math.max(0, Math.min(geo.n - 1, Math.round(timeToIndex(times, t))));
+        const [i0, i1] = [clampIndex(Math.min(d.points[0].t, d.points[1].t)), clampIndex(Math.max(d.points[0].t, d.points[1].t))];
+        drawProfile(ctx, geo, i0, i1, v);
+        ctx.strokeRect(box.minX, box.minY, Math.max(1, box.maxX - box.minX), Math.max(1, box.maxY - box.minY));
       } else if (d.kind === "prange" || d.kind === "drange") {
         const m = rulerMeasurement(d.points[0], d.points[1], times);
         const x0 = box.minX, x1 = box.maxX;
@@ -1789,6 +1849,9 @@
       <button class:done={copied === "csv"} title="Copy candles as CSV" aria-label="Copy candles as CSV" onclick={copyCsv}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6M8 13h8M8 17h8" /></svg>
       </button>
+      <button title="Go to date" aria-label="Go to date" aria-pressed={gotoOpen} onclick={() => (gotoOpen = !gotoOpen)}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
+      </button>
       {#if manual}
         <button title="Auto price scale (double-click the price axis)" aria-label="Auto price scale" onclick={() => (manual = null)}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4" /></svg>
@@ -1800,6 +1863,18 @@
         </button>
       {/if}
     </div>
+  {/if}
+  {#if gotoOpen && chart && candles.length}
+    <input
+      class="goto"
+      type={isIntraday(chart.interval) ? "datetime-local" : "date"}
+      aria-label="Go to date"
+      min={dateValue(candles[0].t)}
+      max={dateValue(candles[candles.length - 1].t)}
+      onchange={(e) => goToDate(e.currentTarget.value)}
+      onkeydown={(e) => { e.stopPropagation(); if (e.key === "Escape") gotoOpen = false; }}
+      use:focusInput
+    />
   {/if}
   {#if tip && chart}
     <div
@@ -1892,6 +1967,7 @@
   .drawing-style .swatch { width: 14px; height: 14px; padding: 0; background: var(--swatch); }
   .drawing-style .swatch[aria-pressed="true"] { background: var(--swatch); box-shadow: 0 0 0 2px var(--text); }
   .drawing-input { position: absolute; width: 200px; z-index: 2; }
+  .goto { position: absolute; top: 34px; right: 8px; z-index: 2; cursor: default; }
   .countdown {
     position: absolute;
     right: 4px;
