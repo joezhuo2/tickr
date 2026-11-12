@@ -6,6 +6,17 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.50] - 2026-11-12
+
+### Added
+- **Background chart alerts:** Settings > Chart > Chart alerts has "Check
+  indicator and drawing alerts in the background" (off by default). When on,
+  every indicator and drawing alert is checked for its own symbol and interval
+  while tickr runs, even from the tray: once per bar for 1m, 5m and 15m, and
+  every 15 minutes for longer intervals. The main window then stays loaded
+  when minimized or closed. The Alerts panel shows which alerts are checked in
+  the background.
+
 ## [0.11.49] - 2026-11-12
 
 ### Added

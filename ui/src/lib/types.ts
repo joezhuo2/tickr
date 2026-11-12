@@ -182,6 +182,7 @@ export interface Init {
   interval: string;
   chart_mode: ChartMode;
   refresh_mode: RefreshMode;
+  background_chart_alerts: boolean;
   chart_scale: ChartScale;
   chart_extended_hours: boolean;
   chart_shade_sessions: boolean;

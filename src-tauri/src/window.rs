@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::{Duration, Instant};
 
+use tauri::utils::config::BackgroundThrottlingPolicy;
 use tauri::window::Color;
 use tauri::{
     AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
@@ -42,9 +43,23 @@ pub fn open(app: &AppHandle) {
         visibility_changed(&w.state::<Arc<Shared>>(), shown(&w));
         return;
     }
-    if let Err(e) = create(app) {
+    if let Err(e) = create(app, true) {
         log::error!("main window: {e}");
     }
+}
+
+/// Loads the window hidden so background chart alerts can run.
+pub fn preload(app: &AppHandle) {
+    if get(app).is_some() {
+        return;
+    }
+    if let Err(e) = create(app, false) {
+        log::error!("main window: {e}");
+    }
+}
+
+fn keep_loaded(settings: &crate::settings::Settings) -> bool {
+    settings.background_chart_alerts || !settings.unload_on_minimize
 }
 
 /// Hotkey action: minimize when focused, otherwise open.
@@ -82,7 +97,7 @@ fn dismiss(w: &WebviewWindow) {
 #[cfg(target_os = "macos")]
 fn dismiss(w: &WebviewWindow) {
     let shared = w.state::<Arc<Shared>>().inner().clone();
-    if lock(&shared.settings).unload_on_minimize {
+    if !keep_loaded(&lock(&shared.settings)) {
         // Moved and Resized events keep the geometry current.
         persist_geometry(&shared);
         let _ = w.destroy();
@@ -104,6 +119,12 @@ fn build(app: &AppHandle, label: &str, title: &str, script: &str) -> tauri::Resu
     let builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()));
     #[cfg(windows)]
     let builder = builder.additional_browser_args(BROWSER_ARGS);
+    // shortcut: applies from the next window creation (restart), re-create the window on toggle if macOS users report stalls
+    let builder = if label == LABEL && settings.background_chart_alerts {
+        builder.background_throttling(BackgroundThrottlingPolicy::Disabled)
+    } else {
+        builder
+    };
     let win = builder
         .title(title)
         .inner_size(800.0, 420.0)
@@ -127,7 +148,7 @@ pub fn open_chart(app: &AppHandle, symbol: &str) -> tauri::Result<()> {
     Ok(())
 }
 
-fn create(app: &AppHandle) -> tauri::Result<()> {
+fn create(app: &AppHandle, show: bool) -> tauri::Result<()> {
     let shared = app.state::<Arc<Shared>>().inner().clone();
     let geometry = *lock(&shared.geometry);
     let win = build(app, LABEL, "tickr", "")?;
@@ -138,9 +159,11 @@ fn create(app: &AppHandle) -> tauri::Result<()> {
         }
         None => win.center()?,
     }
-    win.show()?;
-    visibility_changed(&shared, shown(&win));
-    win.set_focus()?;
+    if show {
+        win.show()?;
+        visibility_changed(&shared, shown(&win));
+        win.set_focus()?;
+    }
     Ok(())
 }
 
@@ -242,7 +265,7 @@ pub fn on_event(win: &Window, ev: &WindowEvent) {
         WindowEvent::Focused(false) => *lock(&BLURRED_AT) = Some(Instant::now()),
         WindowEvent::Resized(_) => {
             if win.is_minimized().unwrap_or(false) {
-                if lock(&shared.settings).unload_on_minimize {
+                if !keep_loaded(&lock(&shared.settings)) {
                     persist_geometry(&shared);
                     let w = win.clone();
                     // Destroy outside the event callback.
@@ -254,7 +277,15 @@ pub fn on_event(win: &Window, ev: &WindowEvent) {
                 record_geometry(win, &shared);
             }
         }
-        WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed => persist_geometry(&shared),
+        WindowEvent::CloseRequested { api, .. } => {
+            persist_geometry(&shared);
+            if lock(&shared.settings).background_chart_alerts {
+                api.prevent_close();
+                let _ = win.hide();
+                visibility_changed(&shared, false);
+            }
+        }
+        WindowEvent::Destroyed => persist_geometry(&shared),
         _ => {}
     }
 }

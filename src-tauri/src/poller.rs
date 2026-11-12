@@ -130,6 +130,17 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
     });
 }
 
+pub fn spawn_chart_alert_tick(app: AppHandle, shared: Arc<Shared>) {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(15)).await;
+            if lock(&shared.settings).background_chart_alerts {
+                let _ = app.emit_to(crate::window::LABEL, "chart-alerts-tick", ());
+            }
+        }
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

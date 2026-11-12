@@ -37,6 +37,7 @@ pub struct Init {
     palette: Palette,
     chart_mode: ChartMode,
     refresh_mode: RefreshMode,
+    background_chart_alerts: bool,
     chart_scale: ChartScale,
     chart_extended_hours: bool,
     chart_shade_sessions: bool,
@@ -96,6 +97,7 @@ pub fn init_payload(shared: &Shared) -> Init {
         palette: s.palette,
         chart_mode: s.chart_mode,
         refresh_mode: s.refresh_mode,
+        background_chart_alerts: s.background_chart_alerts,
         chart_scale: s.chart_scale,
         chart_extended_hours: s.chart_extended_hours,
         chart_shade_sessions: s.chart_shade_sessions,
@@ -307,6 +309,11 @@ pub fn set_chart_mode(shared: State<'_, Arc<Shared>>, mode: ChartMode) {
 pub fn set_refresh_mode(shared: State<'_, Arc<Shared>>, mode: RefreshMode) {
     shared.update_settings(|s| s.refresh_mode = mode);
     shared.wake.notify_one();
+}
+
+#[tauri::command]
+pub fn set_background_chart_alerts(shared: State<'_, Arc<Shared>>, enabled: bool) {
+    shared.update_settings(|s| s.background_chart_alerts = enabled);
 }
 
 #[tauri::command]

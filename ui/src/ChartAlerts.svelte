@@ -1,6 +1,7 @@
 <script lang="ts">
   import { PRESETS, addError, type ChartAlert, type LineSpec } from "./lib/chartAlerts";
   import { chartAlerts, setChartAlerts } from "./lib/chartAlertStore.svelte";
+  import { inBackground } from "./lib/chartAlertSchedule";
   import { fireTime } from "./lib/alerts";
   import { num } from "./lib/format";
   import type { Drawing } from "./lib/types";
@@ -54,7 +55,7 @@
     <button type="submit" disabled={!lines.length}>Add line alert</button>
   </form>
   {#if error}<p class="error" role="alert">{error}</p>{/if}
-  <p class="hint">Conditions use the Strategy syntax (sma, ema, rsi, atr, vwap, crosses_above, crosses_below). They are checked each time the chart refreshes, only while this symbol and candle interval are on the main chart with the window open, and fire once. Unlike price alerts they do not run in the background. A line alert keeps the line as it was when added.</p>
+  <p class="hint">Conditions use the Strategy syntax (sma, ema, rsi, atr, vwap, crosses_above, crosses_below). They are checked each time the chart refreshes while this symbol and candle interval are on the main chart, and fire once. Turn on Settings, Chart, "Check indicator and drawing alerts in the background" to check every symbol and interval while tickr runs, even with the window hidden. A line alert keeps the line as it was when added.</p>
   {#if chartAlerts.list.length}
     <ul aria-label="Saved chart alerts">
       {#each chartAlerts.list as a (a.id)}
@@ -62,6 +63,7 @@
           <div class="details">
             <strong>{a.symbol}</strong> <span class="muted">{a.interval}</span> {a.label}
             <span class="muted">{a.enabled ? "Armed" : a.fired_at != null ? `Triggered ${fireTime(a.fired_at)}` : "Paused"}</span>
+            {#if a.enabled}<span class="muted">{chartAlerts.background && inBackground(a) ? "Checked in the background" : "Checked only on screen"}</span>{/if}
           </div>
           <button type="button" onclick={() => patch(a.id, { enabled: !a.enabled })}>{a.enabled ? "Pause" : "Rearm"}</button>
           <button type="button" aria-label={`Delete ${a.symbol} ${a.label}`} onclick={() => setChartAlerts(chartAlerts.list.filter((x) => x.id !== a.id))}>Delete</button>
