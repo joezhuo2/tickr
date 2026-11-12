@@ -147,3 +147,34 @@ export function snapPrice(price: number, candle: Pick<Candle, "o" | "h" | "l" | 
   }
   return best;
 }
+
+export const POINT_COUNT: Partial<Record<Drawing["kind"], number>> = {
+  hline: 1, text: 1, avwap: 1, vline: 1, hray: 1,
+  trend: 2, rect: 2, ray: 2, fib: 2, position: 2, arrow: 2, prange: 2, drange: 2,
+  channel: 3, fibext: 3, pitchfork: 3,
+};
+
+export const FIB_EXT_RATIOS = [0, 0.618, 1, 1.618, 2.618];
+
+export function fibExtLevels(a: number, b: number, c: number): { ratio: number; price: number }[] {
+  return FIB_EXT_RATIOS.map((ratio) => ({ ratio, price: c + (b - a) * ratio }));
+}
+
+export function channelLines(a: Pixel, b: Pixel, c: Pixel): [Pixel, Pixel][] {
+  const dx = b.x - a.x;
+  const o = dx ? { x: 0, y: c.y - (a.y + ((b.y - a.y) * (c.x - a.x)) / dx) } : { x: c.x - a.x, y: 0 };
+  return [[a, b], [{ x: a.x + o.x, y: a.y + o.y }, { x: b.x + o.x, y: b.y + o.y }]];
+}
+
+export function pitchforkLines(a: Pixel, b: Pixel, c: Pixel, left: number, right: number): [Pixel, Pixel][] {
+  const mid = { x: (b.x + c.x) / 2, y: (b.y + c.y) / 2 };
+  const d = { x: mid.x - a.x, y: mid.y - a.y };
+  const tine = (p: Pixel): [Pixel, Pixel] => [p, rayEnd(p, { x: p.x + d.x, y: p.y + d.y }, left, right)];
+  return [[a, rayEnd(a, mid, left, right)], tine(b), tine(c), [b, c]];
+}
+
+export function arrowHead(a: Pixel, b: Pixel, size = 9): [Pixel, Pixel] {
+  const angle = Math.atan2(b.y - a.y, b.x - a.x);
+  const wing = (turn: number) => ({ x: b.x - size * Math.cos(angle + turn), y: b.y - size * Math.sin(angle + turn) });
+  return [wing(0.45), wing(-0.45)];
+}

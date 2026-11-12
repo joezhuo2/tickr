@@ -6,6 +6,10 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.23] - 2026-11-11
+
+### Added\n- **More drawing tools:** parallel channel, vertical line, horizontal ray,\n  arrow, price range, date range, Fibonacci extension and pitchfork, in the\n  More menu of the drawing toolbar.
+
 ## [0.11.22] - 2026-11-11
 
 ### Added\n- **Drawing style:** select a drawing to set its color, width and dash, or lock\n  it against moves and deletion.\n- **Magnet:** snaps drawing points to the open, high, low or close.\n- **Hide drawings:** hides every drawing until toggled back.

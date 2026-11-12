@@ -4,7 +4,7 @@
   import type { Analysis, Article, Chart, ChartMode, ChartScale, ChartTimeZone, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
   import { fitScale, forward, inverse, scaleLabel, scaleTicks, shiftRange, stretchRange } from "./lib/scale";
   import type { Drawing, DrawingPoint } from "./lib/types";
-  import { DRAWING_COLORS, TWO_POINT, snapPrice, anchoredVwap, fibLevels, hitBox, positionLevels, rayEnd, timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
+  import { DRAWING_COLORS, POINT_COUNT, arrowHead, channelLines, fibExtLevels, pitchforkLines, snapPrice, anchoredVwap, fibLevels, hitBox, positionLevels, rayEnd, timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
   import { legendText, volumeProfile, paneLayout } from "./lib/indicators";
   import { untrack } from "svelte";
   import { displayCandles, isOhlc } from "./lib/charttypes";
@@ -984,6 +984,18 @@
     { tool: "position", label: "R:R" },
     { tool: "avwap", label: "AVWAP" },
   ];
+  const moreTools: { tool: Drawing["kind"]; label: string }[] = [
+    { tool: "channel", label: "Channel" },
+    { tool: "vline", label: "Vertical line" },
+    { tool: "hray", label: "Horizontal ray" },
+    { tool: "arrow", label: "Arrow" },
+    { tool: "prange", label: "Price range" },
+    { tool: "drange", label: "Date range" },
+    { tool: "fibext", label: "Fib extension" },
+    { tool: "pitchfork", label: "Pitchfork" },
+  ];
+  const multi = (kind: string) => (POINT_COUNT[kind as Drawing["kind"]] ?? 0) >= 2;
+  let placed = 0;
   let tool = $state<Tool>("cursor");
   let selected = $state<number | null>(null);
   let hideDrawings = $state(false);
@@ -1031,6 +1043,7 @@
   function cancelDrawing() {
     tool = "cursor";
     preview = null;
+    placed = 0;
     editing = null;
     gesture = null;
     dragX = null;
@@ -1131,15 +1144,23 @@
       if (d.kind === "hline" && hitTest(p, a)) return { drawing: d, endpoint: -1 };
       if (d.kind === "text" && inPlot(a) && p.x >= a.x - 6 && p.x <= a.x + (ctx?.measureText(d.text).width ?? 0) + 6 && Math.abs(p.y - a.y) <= 12) return { drawing: d, endpoint: -1 };
       if (d.kind === "avwap" && hitPolyline(p, avwapPath(d))) return { drawing: d, endpoint: -1 };
-      if (TWO_POINT.has(d.kind)) {
-        const b = screen(d.points[1]);
+      if (d.kind === "vline" && Math.abs(p.x - a.x) <= 6) return { drawing: d, endpoint: -1 };
+      if (d.kind === "hray" && p.x >= a.x - 6 && Math.abs(p.y - a.y) <= 6) return { drawing: d, endpoint: -1 };
+      if (multi(d.kind)) {
+        const pts = d.points.map(screen);
+        const b = pts[1];
+        const c = pts[2] ?? b;
         const right = width - PAD.r;
         if (d.id === selected) {
-          for (const [i, point] of [a, b].entries()) if (segmentDistance(p, point, point) <= 6) return { drawing: d, endpoint: i };
+          for (const [i, point] of pts.entries()) if (segmentDistance(p, point, point) <= 6) return { drawing: d, endpoint: i };
         }
         const left = Math.min(a.x, b.x);
         const hit =
-          d.kind === "trend" ? hitTest(p, a, b)
+          d.kind === "trend" || d.kind === "arrow" ? hitTest(p, a, b)
+          : d.kind === "prange" || d.kind === "drange" ? hitBox(p, a, b)
+          : d.kind === "channel" ? channelLines(a, b, c).some(([s, e]) => hitTest(p, s, e))
+          : d.kind === "pitchfork" ? pitchforkLines(a, b, c, PAD.l, right).some(([s, e]) => hitTest(p, s, e))
+          : d.kind === "fibext" ? p.x >= c.x - 6 && fibExtLevels(d.points[0].price, d.points[1].price, d.points[2].price).some((l) => Math.abs(p.y - geo.y(l.price)) <= 6)
           : d.kind === "ray" ? hitTest(p, a, rayEnd(a, b, PAD.l, right))
           : d.kind === "rect" ? hitBox(p, a, b)
           : d.kind === "fib" ? p.x >= left - 6 && fibLevels(d.points[0].price, d.points[1].price).some((l) => Math.abs(p.y - geo.y(l.price)) <= 6)
@@ -1180,17 +1201,23 @@
       gesture = { start: p, original: null, endpoint: -1, moved: false, second: false };
       return;
     }
-    if (tool === "hline" || tool === "avwap") { addDrawing({ id: 0, kind: tool, points: [point], text: "" }); return; }
+    if (tool === "hline" || tool === "avwap" || tool === "vline" || tool === "hray") { addDrawing({ id: 0, kind: tool, points: [point], text: "" }); return; }
     if (tool === "text") {
       editing = { point, x: Math.min(p.x, Math.max(PAD.l, width - 220)), y: p.y };
       inputText = "";
       return;
     }
-    if (tool === "ruler" || TWO_POINT.has(tool as Drawing["kind"])) {
-      const second = preview != null;
-      if (!preview) preview = { id: 0, kind: tool === "ruler" ? "trend" : (tool as Drawing["kind"]), points: [point, point], text: "" };
-      else preview = { ...preview, points: [preview.points[0], point] };
-      gesture = { start: p, original: null, endpoint: -1, moved: false, second };
+    if (tool === "ruler" || multi(tool)) {
+      const kind = tool === "ruler" ? "trend" : (tool as Drawing["kind"]);
+      const need = POINT_COUNT[kind] ?? 2;
+      if (!preview) {
+        preview = { id: 0, kind, points: Array.from({ length: need }, () => point), text: "" };
+        placed = 1;
+      } else {
+        placed = Math.min(placed + 1, need);
+        preview = { ...preview, points: preview.points.map((q, i) => (i < placed - 1 ? q : point)) };
+      }
+      gesture = { start: p, original: null, endpoint: -1, moved: false, second: placed >= need };
       return;
     }
   }
@@ -1238,7 +1265,7 @@
         return anchor({ x: old.x + p.x - start.x, y: old.y + p.y - start.y }, false);
       });
       if (points.every((a) => a.price > 0 && Number.isFinite(a.price))) preview = { ...original, points };
-    } else if (preview) preview = { ...preview, points: [preview.points[0], point] };
+    } else if (preview) preview = { ...preview, points: preview.points.map((q, i) => (i < placed ? q : point)) };
     hover = null;
     return true;
   }
@@ -1251,7 +1278,8 @@
         preview = null;
       } else if (tool === "pen") finishStroke();
       else if (tool === "ruler") cancelDrawing();
-      else if (preview && (gesture.moved || gesture.second)) addDrawing(preview);
+      else if (preview && (gesture.second || (gesture.moved && preview.points.length === 2))) addDrawing(preview);
+      else if (preview && gesture.moved) placed = Math.max(placed, 2);
       gesture = null;
     }
     dragX = null;
@@ -1275,9 +1303,11 @@
     const items = [...(hideDrawings ? [] : list.filter((d) => !preview || !gesture?.original || d.id !== preview.id)), ...(preview ? [preview] : [])];
     for (const d of items) {
       const a = screen(d.points[0]);
-      const two = TWO_POINT.has(d.kind);
-      const b = two ? screen(d.points[1]) : a;
-      const wide = d.kind === "ray" || d.kind === "fib" || d.kind === "position" || d.kind === "avwap";
+      const two = multi(d.kind);
+      const pts = d.points.map(screen);
+      const b = two ? pts[1] : a;
+      const c = pts[2] ?? b;
+      const wide = d.kind !== "hline" && d.kind !== "trend" && d.kind !== "rect" && d.kind !== "text" && d.kind !== "pen" && d.kind !== "arrow";
       const path = d.kind === "pen" ? d.points.map(screen) : null;
       const box = path ? pathBounds(path) : { minX: Math.min(a.x, b.x), maxX: Math.max(a.x, b.x), minY: Math.min(a.y, b.y), maxY: Math.max(a.y, b.y) };
       const bottom = PAD.t + geo.priceH, right = width - PAD.r;
@@ -1343,14 +1373,89 @@
           ctx.stroke();
           ctx.fillText(label, box.minX + 3, y - 2);
         }
+      } else if (d.kind === "vline") {
+        ctx.beginPath();
+        ctx.moveTo(Math.round(a.x) + 0.5, PAD.t);
+        ctx.lineTo(Math.round(a.x) + 0.5, bottom);
+        ctx.stroke();
+      } else if (d.kind === "hray") {
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(right, a.y);
+        ctx.stroke();
+        ctx.fillText(num(d.points[0].price), a.x + 3, a.y - 2);
+      } else if (d.kind === "prange" || d.kind === "drange") {
+        const m = rulerMeasurement(d.points[0], d.points[1], times);
+        const x0 = box.minX, x1 = box.maxX;
+        const y0 = d.kind === "drange" ? PAD.t : box.minY, y1 = d.kind === "drange" ? bottom : box.maxY;
+        const fill = ctx.fillStyle;
+        ctx.globalAlpha = 0.1;
+        ctx.fillRect(x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+        if (d.kind === "prange") {
+          ctx.moveTo(x0, a.y); ctx.lineTo(x1, a.y);
+          ctx.moveTo(x0, b.y); ctx.lineTo(x1, b.y);
+          ctx.moveTo((x0 + x1) / 2, a.y); ctx.lineTo((x0 + x1) / 2, b.y);
+        } else {
+          ctx.moveTo(a.x, y0); ctx.lineTo(a.x, y1);
+          ctx.moveTo(b.x, y0); ctx.lineTo(b.x, y1);
+          ctx.moveTo(a.x, (a.y + b.y) / 2); ctx.lineTo(b.x, (a.y + b.y) / 2);
+        }
+        ctx.stroke();
+        ctx.fillStyle = fill;
+        const sign = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}`;
+        const label = d.kind === "prange" ? `${sign(m.delta)} (${sign(m.percent)}%)` : `${m.bars} bars · ${m.elapsed}`;
+        ctx.fillText(label, x0 + 3, d.kind === "prange" ? box.minY - 2 : Math.max(PAD.t + 14, (a.y + b.y) / 2 - 3));
+      } else if (d.kind === "channel" || d.kind === "pitchfork") {
+        const lines = d.kind === "channel" ? channelLines(a, b, c) : pitchforkLines(a, b, c, PAD.l, right);
+        if (d.kind === "channel") {
+          ctx.globalAlpha = 0.07;
+          ctx.beginPath();
+          ctx.moveTo(lines[0][0].x, lines[0][0].y);
+          ctx.lineTo(lines[0][1].x, lines[0][1].y);
+          ctx.lineTo(lines[1][1].x, lines[1][1].y);
+          ctx.lineTo(lines[1][0].x, lines[1][0].y);
+          ctx.closePath();
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+        ctx.beginPath();
+        for (const [s, e] of lines) { ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); }
+        ctx.stroke();
+      } else if (d.kind === "fibext") {
+        ctx.save();
+        ctx.setLineDash([2, 3]);
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.lineTo(c.x, c.y);
+        ctx.stroke();
+        ctx.restore();
+        for (const l of fibExtLevels(d.points[0].price, d.points[1].price, d.points[2].price)) {
+          const y = Math.round(geo.y(l.price)) + 0.5;
+          ctx.beginPath();
+          ctx.moveTo(c.x, y);
+          ctx.lineTo(right, y);
+          ctx.stroke();
+          ctx.fillText(`${l.ratio} ${num(l.price)}`, c.x + 3, y - 1);
+        }
       } else {
+        if (d.kind === "arrow") {
+          const [l, r] = arrowHead(a, b);
+          ctx.beginPath();
+          ctx.moveTo(l.x, l.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.lineTo(r.x, r.y);
+          ctx.stroke();
+        }
         const end = d.kind === "ray" ? rayEnd(a, b, PAD.l, right) : b;
         ctx.beginPath();
         ctx.moveTo(d.kind === "hline" ? PAD.l : a.x, a.y);
         ctx.lineTo(d.kind === "hline" ? right : end.x, end.y);
         ctx.stroke();
       }
-      if (two && d.id === selected) for (const p of [a, b]) { ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill(); }
+      if (two && d.id === selected) for (const p of pts) { ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill(); }
       if (tool === "ruler" && d === preview) {
         const label = rulerMeasurement(d.points[0], d.points[1], times).label;
         const x = Math.max(PAD.l + 3, Math.min(b.x, right - ctx.measureText(label).width - 3));
@@ -1483,6 +1588,10 @@
       {#each tools as item}
         <button aria-label={item.label} aria-pressed={tool === item.tool} title={item.label} onclick={() => chooseTool(item.tool)}>{item.label}</button>
       {/each}
+      <select aria-label="More drawing tools" value={moreTools.some((m) => m.tool === tool) ? tool : ""} onchange={(e) => chooseTool((e.currentTarget.value || "cursor") as Tool)}>
+        <option value="">More</option>
+        {#each moreTools as item}<option value={item.tool}>{item.label}</option>{/each}
+      </select>
       <button aria-label="Undo" aria-pressed={false} title="Undo (Ctrl+Z); redo (Ctrl+Shift+Z)" disabled={!history.past.length || drawingBusy} onclick={() => { cancelDrawing(); void changeDrawings("undo"); }}>Undo</button>
       <button aria-label="Delete" aria-pressed={false} title="Delete (Delete / Backspace)" disabled={selected == null || drawingBusy || !!selectedDrawing?.locked} onclick={removeDrawing}>Delete</button>
       <button aria-label="Magnet" aria-pressed={magnet} title="Magnet: snap new points and dragged endpoints to the open, high, low or close" onclick={toggleMagnet}>Magnet</button>
@@ -1627,6 +1736,7 @@
   }
   .drawing-tools button[aria-pressed="true"] { background: var(--surface); color: var(--text); }
   .drawing-tools button:disabled { opacity: 0.4; }
+  .drawing-tools select { font-size: 10px; padding: 2px 4px; }
   .drawing-style { top: 25px; align-items: center; }
   .drawing-style .swatch { width: 14px; height: 14px; padding: 0; background: var(--swatch); }
   .drawing-style .swatch[aria-pressed="true"] { background: var(--swatch); box-shadow: 0 0 0 2px var(--text); }

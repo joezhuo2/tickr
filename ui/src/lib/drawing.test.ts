@@ -1,5 +1,5 @@
 ﻿import { describe, expect, it } from "vitest";
-import { PEN_MAX_POINTS, snapPrice, hitPolyline, hitTest, indexToTime, pathBounds, polylineDistance, rulerMeasurement, segmentDistance, simplifyPath, timeToIndex, undoReducer, type History } from "./drawing";
+import { PEN_MAX_POINTS, POINT_COUNT, arrowHead, channelLines, fibExtLevels, pitchforkLines, snapPrice, hitPolyline, hitTest, indexToTime, pathBounds, polylineDistance, rulerMeasurement, segmentDistance, simplifyPath, timeToIndex, undoReducer, type History } from "./drawing";
 import { forward, inverse, scaleLabel } from "./scale";
 import type { Drawing } from "./types";
 
@@ -148,5 +148,35 @@ describe("snapPrice", () => {
     expect(snapPrice(10.4, candle, 0.5)).toBe(10);
     expect(snapPrice(10.5, candle, 0.2)).toBe(10.5);
     expect(snapPrice(10.5, undefined, 5)).toBe(10.5);
+  });
+});
+
+describe("multi-point drawings", () => {
+  it("projects Fibonacci extensions of the first move from the third point", () => {
+    const levels = fibExtLevels(100, 110, 105);
+    expect(levels[0]).toEqual({ ratio: 0, price: 105 });
+    expect(levels[2]).toEqual({ ratio: 1, price: 115 });
+    expect(fibExtLevels(110, 100, 105)[2].price).toBe(95);
+  });
+
+  it("offsets the channel's second line to pass through the third point", () => {
+    const [base, other] = channelLines({ x: 0, y: 0 }, { x: 10, y: 10 }, { x: 5, y: 15 });
+    expect(base).toEqual([{ x: 0, y: 0 }, { x: 10, y: 10 }]);
+    expect(other).toEqual([{ x: 0, y: 10 }, { x: 10, y: 20 }]);
+    expect(channelLines({ x: 3, y: 0 }, { x: 3, y: 10 }, { x: 8, y: 4 })[1]).toEqual([{ x: 8, y: 0 }, { x: 8, y: 10 }]);
+  });
+
+  it("runs the pitchfork median through the midpoint and keeps the tines parallel", () => {
+    const [median, upper, lower] = pitchforkLines({ x: 0, y: 50 }, { x: 10, y: 40 }, { x: 10, y: 60 }, 0, 100);
+    expect(median[1]).toEqual({ x: 100, y: 50 });
+    expect(upper[1]).toEqual({ x: 100, y: 40 });
+    expect(lower[1]).toEqual({ x: 100, y: 60 });
+  });
+
+  it("puts the arrow head wings behind the tip", () => {
+    const [l, r] = arrowHead({ x: 0, y: 0 }, { x: 10, y: 0 }, 10);
+    expect(l.x).toBeLessThan(10);
+    expect(l.y).toBeCloseTo(-r.y);
+    expect(POINT_COUNT.pitchfork).toBe(3);
   });
 });
