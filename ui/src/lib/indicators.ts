@@ -62,14 +62,18 @@ export function clampPanel(height: number, total: number): number {
   return Math.round(Math.max(PANEL_MIN, Math.min(height, total * 0.85)));
 }
 
-export function paneLayout(height: number, rsi: boolean, macd: boolean) {
-  const count = Number(rsi) + Number(macd);
-  const priceH = height * (count === 2 ? 0.42 : count === 1 ? 0.6 : 0.8);
-  const volTop = height * (count === 2 ? 0.44 : count === 1 ? 0.62 : 0.84);
-  const volH = height * (count ? 0.12 : 0.16);
-  const paneH = height * (count === 2 ? 0.19 : 0.22);
-  const first = height * (count === 2 ? 0.6 : 0.78);
-  return { priceH, volTop, volH, rsiTop: first, rsiH: paneH, macdTop: first + (rsi ? paneH + height * 0.02 : 0), macdH: paneH };
+export function paneLayout(height: number, rsi: boolean, macd: boolean, extra = 0) {
+  const count = Number(rsi) + Number(macd) + extra;
+  const gap = height * 0.02;
+  const many = count > 2;
+  const priceH = height * (many ? 0.46 - 0.06 * (count - 1) : count === 2 ? 0.42 : count === 1 ? 0.6 : 0.8);
+  const volTop = many ? priceH + gap : height * (count === 2 ? 0.44 : count === 1 ? 0.62 : 0.84);
+  const volH = height * (many ? 0.1 : count ? 0.12 : 0.16);
+  const first = many ? volTop + volH + height * 0.03 : height * (count === 2 ? 0.6 : 0.78);
+  const paneH = many ? (height - first - gap * (count - 1)) / count : height * (count === 2 ? 0.19 : 0.22);
+  const top = (k: number) => first + k * (paneH + gap);
+  const used = Number(rsi) + Number(macd);
+  return { priceH, volTop, volH, rsiTop: first, rsiH: paneH, macdTop: top(Number(rsi)), macdH: paneH, extraTops: Array.from({ length: extra }, (_, k) => top(used + k)) };
 }
 
 export function legendText(label: string, values: (number | null)[], digits?: number): string {

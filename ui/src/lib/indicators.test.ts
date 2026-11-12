@@ -92,3 +92,17 @@ describe("legendText", () => {
     expect(legendText("VWAP", [null, NaN])).toBe("VWAP");
   });
 });
+
+describe("paneLayout with study panes", () => {
+  for (const [rsi, macd, extra] of [[false, false, 1], [true, false, 1], [true, true, 1], [true, true, 2], [false, false, 2]] as const) {
+    it(`stacks RSI=${rsi}, MACD=${macd} and ${extra} study panes inside the chart`, () => {
+      const p = paneLayout(400, rsi, macd, extra);
+      const tops = [...(rsi ? [p.rsiTop] : []), ...(macd ? [p.macdTop] : []), ...p.extraTops];
+      expect(p.volTop).toBeGreaterThan(p.priceH);
+      expect(tops[0]).toBeGreaterThan(p.volTop + p.volH);
+      tops.forEach((t, i) => { if (i) expect(t).toBeGreaterThan(tops[i - 1] + p.rsiH); });
+      expect(tops[tops.length - 1] + p.rsiH).toBeLessThanOrEqual(400.0001);
+      expect(p.priceH).toBeGreaterThan(100);
+    });
+  }
+});
