@@ -313,7 +313,6 @@
               {@const m = moves[symbol]}
               <span class="line">
                 <span class="px">{price(m.price, q.currency)}</span>
-                <span class="bar">|</span>
                 <span class="chg {direction(m.pct)}">{m.pct == null ? "—" : `${signed(m.pct)}%`}</span>
               </span>
             {:else if w?.error}
@@ -550,8 +549,7 @@
   .line {
     margin-top: auto;
     display: flex;
-    align-items: baseline;
-    gap: 6px;
+    flex-direction: column;
     white-space: nowrap;
     overflow: hidden;
   }
@@ -559,11 +557,8 @@
     font-size: 15px;
     font-weight: 650;
   }
-  .bar {
-    color: var(--muted);
-  }
   .chg {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
