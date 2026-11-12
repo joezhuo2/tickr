@@ -104,6 +104,10 @@ export function fibLevels(from: number, to: number): { ratio: number; price: num
   return FIB_RATIOS.map((ratio) => ({ ratio, price: to - (to - from) * ratio }));
 }
 
+export function clampReward(v: number): number {
+  return Number.isFinite(v) && v > 0 ? Math.min(20, Math.max(0.1, Math.round(v * 10) / 10)) : 2;
+}
+
 /** A long (stop below entry) or short trade with its target `reward` times the risk away. */
 export function positionLevels(entry: number, stop: number, reward = 2) {
   const risk = Math.abs(entry - stop);

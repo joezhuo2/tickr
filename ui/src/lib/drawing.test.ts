@@ -125,6 +125,11 @@ describe("box, ray, Fibonacci, position and anchored VWAP helpers", () => {
     expect(positionLevels(50, 52, 3)).toMatchObject({ long: false, risk: 2, target: 44 });
   });
 
+  it("clamps the configured reward multiple", async () => {
+    const { clampReward } = await import("./drawing");
+    expect([1.55, 0, -3, NaN, 99, 0.01].map(clampReward)).toEqual([1.6, 2, 2, 2, 20, 0.1]);
+  });
+
   it("anchors VWAP at the first candle on or after the anchor time", async () => {
     const { anchoredVwap } = await import("./drawing");
     const bar = (t: number, p: number, v: number) => ({ t, o: p, h: p, l: p, c: p, v });

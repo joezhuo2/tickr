@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.61] - 2026-11-12
+
+### Added
+- **R:R reward multiple:** Settings > Chart > Drawings sets the target of the
+  R:R drawing as a multiple of the risk (0.1 to 20, default 2). It applies to
+  every R:R drawing and is included in settings backups.
+
 ## [0.11.60] - 2026-11-12
 
 ### Added
