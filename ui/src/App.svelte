@@ -842,6 +842,19 @@
     else if (r.order) paperNotice = r.order.kind === "market" ? "Simulated market order queued for the next bar's open" : `Simulated ${r.order.kind} order placed`;
   }
 
+  const paperLines = $derived(Paper.orderLines(paperAccount, symbol));
+
+  function paperMove(id: string, price: number) {
+    if (!paperAccount) return;
+    const r = Paper.moveOrder(paperAccount, id, price);
+    paperNotice = null;
+    paperError = r.ok ? null : r.error;
+    if (r.ok) {
+      setPaperAccount(r.account);
+      paperNotice = `Simulated order moved to ${price >= 1 ? price.toFixed(2) : price.toFixed(4)}`;
+    }
+  }
+
   function paperCancel(id: number) {
     if (paperAccount) setPaperAccount(Paper.cancelOrder(paperAccount, id));
   }
@@ -1793,7 +1806,7 @@
             {:else if view === "technicals"}
               <div class="split">
                 {#if mainChart}
-                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={chartFills} />
+                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={chartFills} orderLines={paperLines} onmoveorder={paperMove} />
                 {:else if chartError}
                   <div class="msg">
                     {chartError}
@@ -1823,7 +1836,7 @@
             {:else if view === "paper"}
               <div class="split">
                 {#if mainChart}
-                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={chartFills} />
+                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={chartFills} orderLines={paperLines} onmoveorder={paperMove} />
                 {:else if chartError}
                   <div class="msg">
                     {chartError}
@@ -1856,7 +1869,7 @@
             {:else if view === "backtest"}
               <div class="split">
                 {#if mainChart}
-                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} fills={chartFills} />
+                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} fills={chartFills} orderLines={paperLines} onmoveorder={paperMove} />
                 {:else if chartError}
                   <div class="msg">
                     {chartError}

@@ -36,6 +36,8 @@
     onwindow,
     replay = false,
     fills = [],
+    orderLines = [],
+    onmoveorder,
   }: {
     chart: Chart | null;
     redrawKey?: number;
@@ -58,7 +60,11 @@
     onwindow?: (w: TimeWindow) => void;
     replay?: boolean;
     fills?: { t: number; side: "buy" | "sell"; price: number }[];
+    orderLines?: { id: string; price: number; side: "buy" | "sell"; label: string }[];
+    onmoveorder?: (id: string, price: number) => void;
   } = $props();
+
+  let orderDrag = $state<{ id: string; price: number } | null>(null);
 
   let wrap: HTMLDivElement | undefined = $state();
   let canvas: HTMLCanvasElement | undefined = $state();
@@ -542,6 +548,31 @@
     }
 
     drawDrawings(ctx, v);
+
+    for (const line of orderLines) {
+      const at = orderDrag?.id === line.id ? orderDrag.price : line.price;
+      const y = Math.round(g.y(at)) + 0.5;
+      if (y < PAD.t || y > PAD.t + g.priceH) continue;
+      const col = v(line.side === "buy" ? "--up" : "--down");
+      ctx.strokeStyle = col;
+      ctx.lineWidth = orderDrag?.id === line.id ? 2 : 1;
+      ctx.setLineDash([5, 3]);
+      ctx.beginPath();
+      ctx.moveTo(PAD.l, y);
+      ctx.lineTo(width - PAD.r, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.font = `10px ${v("--font")}`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "bottom";
+      const text = `${line.label} @ ${num(at)}`;
+      ctx.fillStyle = v("--bg");
+      ctx.fillRect(PAD.l + 4, y - 14, ctx.measureText(text).width + 6, 13);
+      ctx.fillStyle = col;
+      ctx.fillText(text, PAD.l + 7, y - 2);
+      ctx.font = `11px ${v("--font")}`;
+      axisTag(ctx, y, g.label(at), col, v("--bg"));
+    }
 
     // Crosshair.
     if (hover != null && candles[hover] && (g.scale !== "log" || candles[hover].c > 0)) {
@@ -1077,7 +1108,7 @@
 
   $effect(() => {
     // Redraw when any of these change.
-    void [stoch, ichi, trendLine, onBalance, pivotLevels, sessionKeys, redrawKey, list, preview, selected, tool, hideDrawings, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt, fillMarks];
+    void [stoch, ichi, trendLine, onBalance, pivotLevels, sessionKeys, redrawKey, list, preview, selected, tool, hideDrawings, orderLines, orderDrag, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt, fillMarks];
     draw();
   });
 
@@ -1254,6 +1285,7 @@
     gesture = null;
     dragX = null;
     axisY = null;
+    orderDrag = null;
   }
 
   export function drawTool(next: Tool) {
@@ -1392,6 +1424,8 @@
     if (tool === "cursor") {
       wrap!.setPointerCapture(e.pointerId);
       hover = null;
+      const line = onmoveorder ? orderLines.find((l) => Math.abs(geo.y(l.price) - p.y) <= 5) : undefined;
+      if (line) { orderDrag = { id: line.id, price: line.price }; selected = null; return; }
       const hit = hitDrawing(p);
       selected = hit?.drawing.id ?? null;
       if (hit && !hit.drawing.locked) gesture = { start: p, original: hit.drawing, endpoint: hit.endpoint, moved: false, second: false };
@@ -1477,6 +1511,11 @@
   }
 
   function onUp(e: PointerEvent) {
+    if (orderDrag) {
+      const line = orderLines.find((l) => l.id === orderDrag!.id);
+      if (line && Math.abs(geo.y(line.price) - geo.y(orderDrag.price)) > 1) onmoveorder?.(orderDrag.id, orderDrag.price);
+      orderDrag = null;
+    }
     if (gesture) {
       moveDrawing(e);
       if (gesture.original) {
@@ -1685,6 +1724,12 @@
     if (axisY != null) {
       manual = stretchRange(geo.lo, geo.hi, geo.scale, Math.exp((e.clientY - axisY) * 0.006));
       axisY = e.clientY;
+      hover = null;
+      return;
+    }
+    if (orderDrag) {
+      const to = anchor(pixel(e), false).price;
+      if (Number.isFinite(to) && to > 0) orderDrag = { ...orderDrag, price: to };
       hover = null;
       return;
     }

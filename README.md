@@ -217,6 +217,12 @@ taskbar to keep it visible.
   P&L, and review fills on the chart. The account used with current quotes is
   saved to `paper.json`. Replay uses a separate account for the session, and
   simulated market orders fill at the next revealed candle's open.
+  Open limit and stop orders for the symbol on screen are drawn on the chart
+  as dashed lines, green for buys and red for sells, with their stop-loss and
+  take-profit when they carry one. Drag a line up or down to change that
+  price; a move that would put a stop-loss or take-profit on the wrong side of
+  its entry is refused and the line snaps back. A limit dragged through the
+  market fills on the next price check, as it would if typed that way.
   An order can carry an optional **stop-loss** and **take-profit**: when the
   entry fills, tickr places both as exit orders, and filling one cancels the
   other (shown as OCO in Open orders). If a single candle reaches both, the
@@ -600,8 +606,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.25
-git push origin v0.11.25
+git tag v0.11.26
+git push origin v0.11.26
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

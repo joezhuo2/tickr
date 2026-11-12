@@ -6,6 +6,10 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.26] - 2026-11-11
+
+### Added\n- **Order lines:** open simulated orders and their stop-loss and take-profit\n  are drawn on the chart; drag a line to change its price.
+
 ## [0.11.25] - 2026-11-11
 
 ### Added\n- **Go to date:** jump the chart to a date within the loaded range.\n- **Session volume profile** study and a **Volume profile (range)** drawing.
