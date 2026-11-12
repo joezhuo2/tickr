@@ -1,6 +1,7 @@
 import { MAX_CHART_ALERTS, type ChartAlert } from "./chartAlerts";
 import { sanitizeCustom, type Custom } from "./display";
 import { STUDIES } from "./studies";
+import { cleanPanes, type PaneState } from "./panes";
 
 export interface LocalBackup {
   custom?: Custom;
@@ -9,11 +10,12 @@ export interface LocalBackup {
   magnet?: boolean;
   hide_drawings?: boolean;
   technicals_settings_open?: boolean;
+  panes?: PaneState;
 }
 
 type Store = Pick<Storage, "getItem" | "setItem">;
 
-const KEYS = { custom: "tickr.custom", studies: "tickr.studies", chart_alerts: "tickr.chartAlerts", magnet: "tickr.magnet", hide_drawings: "tickr.hideDrawings", technicals_settings_open: "tickr.technicalsSettingsOpen" };
+const KEYS = { custom: "tickr.custom", studies: "tickr.studies", chart_alerts: "tickr.chartAlerts", magnet: "tickr.magnet", hide_drawings: "tickr.hideDrawings", technicals_settings_open: "tickr.technicalsSettingsOpen", panes: "tickr.panes" };
 
 function read(store: Store, key: string): unknown {
   try { return JSON.parse(store.getItem(key) ?? "null"); } catch { return null; }
@@ -34,9 +36,11 @@ export function collectLocal(store: Store): LocalBackup {
   const custom = read(store, KEYS.custom);
   const studies = read(store, KEYS.studies);
   const alerts = read(store, KEYS.chart_alerts);
+  const panes = read(store, KEYS.panes);
   if (custom != null) out.custom = sanitizeCustom(custom);
   if (studies != null) out.studies = cleanStudies(studies);
   if (alerts != null) out.chart_alerts = cleanAlerts(alerts);
+  if (panes != null) out.panes = cleanPanes(panes);
   out.magnet = store.getItem(KEYS.magnet) === "1";
   out.hide_drawings = store.getItem(KEYS.hide_drawings) === "1";
   out.technicals_settings_open = store.getItem(KEYS.technicals_settings_open) === "1";
@@ -53,6 +57,7 @@ export function parseLocal(text: string): LocalBackup {
   if (typeof l.magnet === "boolean") out.magnet = l.magnet;
   if (typeof l.hide_drawings === "boolean") out.hide_drawings = l.hide_drawings;
   if (typeof l.technicals_settings_open === "boolean") out.technicals_settings_open = l.technicals_settings_open;
+  if ("panes" in l) out.panes = cleanPanes(l.panes);
   return out;
 }
 
@@ -61,6 +66,7 @@ export function applyLocal(store: Store, local: LocalBackup) {
     if (local.custom) store.setItem(KEYS.custom, JSON.stringify(local.custom));
     if (local.studies) store.setItem(KEYS.studies, JSON.stringify(local.studies));
     if (local.chart_alerts) store.setItem(KEYS.chart_alerts, JSON.stringify(local.chart_alerts));
+    if (local.panes) store.setItem(KEYS.panes, JSON.stringify(local.panes));
     if (local.magnet !== undefined) store.setItem(KEYS.magnet, local.magnet ? "1" : "0");
     if (local.hide_drawings !== undefined) store.setItem(KEYS.hide_drawings, local.hide_drawings ? "1" : "0");
     if (local.technicals_settings_open !== undefined) store.setItem(KEYS.technicals_settings_open, local.technicals_settings_open ? "1" : "0");

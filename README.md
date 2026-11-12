@@ -143,7 +143,17 @@ taskbar to keep it visible.
   are one 14-bar average true range tall, are built from closes, and are not
   evenly spaced in time.
 - **Price scales:** linear, logarithmic, or percentage change rebased to the
-  first visible candle as you pan and zoom. Press L to cycle scales.
+  first visible candle as you pan and zoom. Press L to cycle scales. The
+  **Left price scale** button at the top right adds a second scale on the left:
+  the same labels as the right, or percent change from the first visible bar.
+- **Panes:** hover a pane for its buttons at the top right. RSI, MACD,
+  Stochastic and OBV panes move up or down, **Merge** puts a pane into the one
+  above (or into the price pane) as an overlay with its own autoscaled range,
+  and **Unmerge** splits them again. A merged pane shows the first study's
+  scale on the right and the second's on the left. **Maximize** fills the chart
+  with one pane, the price pane included; the same button, Escape, or a
+  double-click on a lower pane's header restores it. Order, merges and the left
+  scale are saved and shared by every chart.
 - **Drawings:** the toolbar places levels, trendlines, text, freehand pen strokes, boxes, rays,
   Fibonacci retracements, long / short positions and anchored VWAPs, saved per symbol.
   Keys 1 to 5 pick the level, trendline, text, ruler and pen tools; `[` `]` `;` `'` `/` pick
@@ -680,8 +690,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.50
-git push origin v0.11.50
+git tag v0.11.51
+git push origin v0.11.51
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

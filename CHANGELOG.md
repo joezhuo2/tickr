@@ -6,6 +6,18 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.51] - 2026-11-12
+
+### Added
+- **Pane control:** each chart pane has buttons to move it up or down, merge
+  it into the pane above (or split it again) and maximize it; Escape or the
+  same button restores. Merged studies share a pane on their own scales. A
+  toolbar button cycles a left price scale: off, same as right, or percent
+  change from the first visible bar. The layout is saved and in Backup.
+
+### Changed
+- The Stochastic and OBV panes show axis labels.
+
 ## [0.11.50] - 2026-11-12
 
 ### Added

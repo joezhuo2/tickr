@@ -17,6 +17,7 @@ describe("backup local state", () => {
       "tickr.magnet": "1",
       "tickr.hideDrawings": "1",
       "tickr.technicalsSettingsOpen": "1",
+      "tickr.panes": JSON.stringify({ groups: [["price"], ["macd", "rsi"]], left: "percent" }),
     });
     const text = withLocal('{"app":"tickr","settings":{}}', src);
     const dst = fake();
@@ -27,6 +28,7 @@ describe("backup local state", () => {
     expect(dst.getItem("tickr.magnet")).toBe("1");
     expect(dst.getItem("tickr.hideDrawings")).toBe("1");
     expect(dst.getItem("tickr.technicalsSettingsOpen")).toBe("1");
+    expect(JSON.parse(dst.getItem("tickr.panes")!)).toEqual({ groups: [["price"], ["macd", "rsi"], ["stoch"], ["obv"]], left: "percent" });
   });
 
   it("an old backup leaves existing local state alone", () => {
@@ -38,9 +40,10 @@ describe("backup local state", () => {
   });
 
   it("drops malformed entries", () => {
-    const l = parseLocal(JSON.stringify({ local: { chart_alerts: [alert, { id: "x" }, null], studies: 5, custom: { main: "nope" } } }));
+    const l = parseLocal(JSON.stringify({ local: { chart_alerts: [alert, { id: "x" }, null], studies: 5, custom: { main: "nope" }, panes: { left: "log" } } }));
     expect(l.chart_alerts).toEqual([alert]);
     expect(Object.values(l.studies!).every((v) => v === false)).toBe(true);
     expect(l.custom!.main).toBe("");
+    expect(l.panes!.left).toBe("off");
   });
 });
