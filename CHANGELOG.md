@@ -6,6 +6,10 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.19] - 2026-11-11
+
+### Added\n- **Live legend:** indicator labels on the chart show their values at the\n  crosshair, or at the latest bar on screen when nothing is hovered.
+
 ## [0.11.18] - 2026-11-11
 
 ### Added

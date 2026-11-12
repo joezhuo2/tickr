@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alertLevels, clampPanel, overlayVisibility, paneLayout, volumeProfile, shouldAnalyze, toggleOverlay } from "./indicators";
+import { alertLevels, clampPanel, legendText, overlayVisibility, paneLayout, volumeProfile, shouldAnalyze, toggleOverlay } from "./indicators";
 import type { IndicatorConfig, Overlays } from "./types";
 
 const config = (): IndicatorConfig => ({
@@ -83,4 +83,12 @@ describe("lower pane layout", () => {
       }
     });
   }
+});
+
+describe("legendText", () => {
+  it("appends the values that exist and keeps the bare label otherwise", () => {
+    expect(legendText("SMA 20", [101.5])).toBe("SMA 20  101.50");
+    expect(legendText("BB 20", [110, null, 90], 1)).toBe("BB 20  110.0 / 90.0");
+    expect(legendText("VWAP", [null, NaN])).toBe("VWAP");
+  });
 });
