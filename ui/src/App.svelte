@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { applyCustom, loadCustom } from "./lib/display";
   import * as Scrollback from "./lib/scrollback";
   import * as ChartAlertRules from "./lib/chartAlerts";
   import { chartAlerts, setChartAlerts } from "./lib/chartAlertStore.svelte";
@@ -120,8 +121,10 @@
   let textSize = $state<TextSize>(100);
   let palette = $state<Palette>("standard");
   let displayKey = $state(0);
+  let custom = $state(loadCustom());
   $effect(() => {
     applyDisplay(document.documentElement, theme, palette);
+    applyCustom(document.documentElement, custom);
     void textSize;
     untrack(() => displayKey++);
   });
@@ -2100,7 +2103,7 @@
       onrefresh={refresh}
     />
     {#if settingsOpen}
-      <Settings bind:theme bind:textSize bind:palette bind:refreshMode extended={chartExtended} shade={shadeSessions} timeZone={chartTimeZone} onextended={saveChartExtended} onshade={saveShadeSessions} ontimezone={saveChartTimeZone} bind:hotkey bind:error={hotkeyError} {defaultHotkey} bind:keybinds bind:dots onclose={() => (settingsOpen = false)} />
+      <Settings bind:custom bind:theme bind:textSize bind:palette bind:refreshMode extended={chartExtended} shade={shadeSessions} timeZone={chartTimeZone} onextended={saveChartExtended} onshade={saveShadeSessions} ontimezone={saveChartTimeZone} bind:hotkey bind:error={hotkeyError} {defaultHotkey} bind:keybinds bind:dots onclose={() => (settingsOpen = false)} />
     {/if}
   </div>
 {/if}
