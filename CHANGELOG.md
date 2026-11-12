@@ -6,6 +6,17 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.53] - 2026-11-12
+
+### Added
+- **Future time axis:** charts keep 3 empty bars right of the last candle and
+  pan further into the future (up to half the view, 200 bars at most), with
+  time labels and the crosshair continuing there. The Ichimoku cloud is drawn
+  26 bars ahead, and drawings, fib extensions, R:R targets and notes can be
+  placed in or extend into the future. Line alerts value such lines the same
+  way on screen and in the background. Future bar times skip weekends and
+  closed hours, not holidays.
+
 ## [0.11.52] - 2026-11-12
 
 ### Added
