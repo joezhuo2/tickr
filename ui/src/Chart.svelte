@@ -7,6 +7,8 @@
   import { DRAWING_COLORS, POINT_COUNT, arrowHead, channelLines, fibExtLevels, pitchforkLines, snapPrice, anchoredVwap, fibLevels, hitBox, positionLevels, rayEnd, timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
   import { legendText, volumeProfile, paneLayout } from "./lib/indicators";
   import { untrack } from "svelte";
+  import { axisRange } from "./lib/scrollback";
+  import { clamp } from "./lib/viewport";
   import { ichimoku, obv, pivotPeriod, pivots, stochastic, supertrend } from "./lib/studies";
   import { studies } from "./lib/studyStore.svelte";
   import { displayCandles, isOhlc } from "./lib/charttypes";
@@ -38,7 +40,11 @@
     fills = [],
     orderLines = [],
     onmoveorder,
+    onolder,
+    loadingOlder = false,
   }: {
+    onolder?: () => void;
+    loadingOlder?: boolean;
     chart: Chart | null;
     redrawKey?: number;
     drawings: Record<string, Drawing[]>;
@@ -368,12 +374,13 @@
     ctx.textBaseline = "alphabetic";
     ctx.fillStyle = v("--muted");
     if (g.n > 0 && chart) {
+      const labels = axisRange(chart.range, chart.interval, candles[g.i1].t - candles[g.i0].t);
       const every = Math.max(1, Math.ceil(view.count / Math.max(1, Math.floor(g.plotW / 110))));
       const off = Math.floor(every / 2);
       for (let i = off + Math.ceil((g.i0 - off) / every) * every; i <= g.i1; i += every) {
         const x = g.x(i);
         if (x < PAD.l || x > width - PAD.r) continue;
-        ctx.fillText(axisTime(candles[i].t, displayOffset(candles[i].t, timeZone, clock, chart.interval), chart.range, chart.interval), x, height - 6);
+        ctx.fillText(axisTime(candles[i].t, displayOffset(candles[i].t, timeZone, clock, chart.interval), labels, chart.interval), x, height - 6);
       }
     }
 
@@ -1141,6 +1148,7 @@
   });
 
   let viewKey = "";
+  let viewFirst = 0;
   let viewN = 0;
   let savedView: { key: string; view: View; n: number } | null = null;
   $effect(() => {
@@ -1148,7 +1156,10 @@
     const key = replay ? `${base} replay` : base;
     const n = candles.length;
     const current = untrack(() => view);
-    if (key === viewKey) view = follow(current, viewN, n);
+    const first = candles[0]?.t ?? 0;
+    const added = key === viewKey && first < viewFirst ? candles.findIndex((c) => c.t >= viewFirst) : 0;
+    if (added > 0) view = clamp({ start: current.start + added, count: current.count }, n);
+    else if (key === viewKey) view = follow(current, viewN, n);
     else if (replay && viewKey === base) {
       savedView = { key: base, view: current, n: viewN };
       view = full(n);
@@ -1157,6 +1168,7 @@
     if (key !== viewKey) manual = null;
     if (!replay) savedView = null;
     viewKey = key;
+    viewFirst = first;
     viewN = n;
   });
 
@@ -1182,7 +1194,9 @@
     const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? width : 1;
     const dx = e.deltaX || (e.shiftKey ? e.deltaY : 0);
     const r = wrap!.getBoundingClientRect();
-    if (!e.ctrlKey && (e.shiftKey || Math.abs(dx) >= Math.abs(e.deltaY))) view = pan(view, geo.n, (dx * unit) / geo.step);
+    const panning = !e.ctrlKey && (e.shiftKey || Math.abs(dx) >= Math.abs(e.deltaY));
+    if (panning ? view.start + (dx * unit) / geo.step < 0 : e.deltaY > 0 && isFull(view, geo.n)) onolder?.();
+    if (panning) view = pan(view, geo.n, (dx * unit) / geo.step);
     else view = zoom(view, geo.n, Math.exp(e.deltaY * unit * (e.ctrlKey ? 0.01 : 0.0015)), (e.clientX - r.left - PAD.l) / geo.plotW);
     emitWindow();
     onMove(e);
@@ -1736,6 +1750,7 @@
     if (moveDrawing(e)) return;
     if (tool !== "cursor" || (e.target instanceof Element && e.target.closest(".drawing-tools, input"))) { hover = null; return; }
     if (dragX != null) {
+      if (view.start + (dragX - e.clientX) / geo.step < 0) onolder?.();
       view = pan(view, geo.n, (dragX - e.clientX) / geo.step);
       if (manual) manual = shiftRange(geo.lo, geo.hi, geo.scale, (e.clientY - dragY) / geo.priceH);
       dragX = e.clientX;
@@ -1869,6 +1884,9 @@
   {/if}
   {#if candles.length}
     <div class="axis-grip" style:top="{PAD.t}px" style:width="{PAD.r}px" style:height="{geo.priceH}px"></div>
+  {/if}
+  {#if loadingOlder}
+    <div class="older-note" role="status">Loading older candles…</div>
   {/if}
   {#if staleNote}
     <div class="stale-note" role="status">{staleNote}</div>
@@ -2023,6 +2041,17 @@
     color: var(--muted);
     font-size: 11px;
     font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+  .older-note {
+    position: absolute;
+    left: 8px;
+    top: 46px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--tooltip-bg);
+    color: var(--muted);
+    font-size: 11px;
     pointer-events: none;
   }
   .stale-note {

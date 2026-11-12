@@ -153,8 +153,19 @@ taskbar to keep it visible.
   the open, high, low or close of the candle under the cursor when within 12
   pixels, and **Hide** hides every drawing until you click it again.
 - **Candle interval:** choose Auto to keep the default resolution for each
-  range, or select a supported interval independently. The choice is saved
-  and resets to Auto when switching to a range that does not support it.
+  range, or pick any interval from 1m to 1M at any time. If the current range
+  cannot show that interval, tickr moves to the nearest range that can (5m on
+  1Y becomes 5m on 1M) and you scroll back for more. The choice is saved, and
+  switching to a range that does not support it returns to Auto.
+- **Scroll back for history:** drag or scroll past the left edge of the main
+  chart, or zoom out when everything is already on screen, to load older
+  candles at the same interval. Each step adds about as much history as is
+  already loaded and the view stays where it was. Yahoo limits intraday
+  history (about 30 days of 1m, 60 days of 5m to 30m, two years of 1h), so
+  scrolling stops there; daily and longer go back to the first listing. Older
+  candles always come from Yahoo, also when Alpaca supplies the live chart,
+  and are kept until tickr restarts. Analysis overlays cover the range's own
+  candles, not the older ones. The second chart does not scroll back.
 - **Candle countdown:** on a live intraday chart, the bottom right corner shows
   the time left until the forming candle closes.
 - **Tooltip:** hover the chart, or use ← and →, for time, open, high, low,

@@ -151,6 +151,11 @@ pub async fn get_history(shared: State<'_, Arc<Shared>>, symbol: String, interva
     Ok(chart)
 }
 
+#[tauri::command]
+pub async fn get_older(shared: State<'_, Arc<Shared>>, symbol: String, interval: String, start: i64, end: i64, extended: bool) -> Result<Chart, String> {
+    quote::fetch_older(&shared.http, &symbol, &interval, start, end, extended).await
+}
+
 fn history_for(shared: &Shared, symbol: &str, interval: &str) -> Result<Chart, String> {
     lock(&shared.history)
         .clone()
