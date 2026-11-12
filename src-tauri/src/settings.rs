@@ -183,7 +183,9 @@ pub enum ScreenOp {
 pub enum EventImportance {
     #[default]
     All,
-    Key,
+    Medium,
+    #[serde(alias = "key")]
+    High,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1028,23 +1030,25 @@ mod tests {
         let old: Settings = serde_json::from_str(r#"{"symbol":"NVDA"}"#).unwrap();
         assert_eq!(old.event_filter, EventFilter { countries: vec!["US".into()], importance: EventImportance::All });
         let partial: Settings = serde_json::from_str(r#"{"event_filter":{"importance":"key"}}"#).unwrap();
-        assert_eq!(partial.event_filter, EventFilter { countries: vec!["US".into()], importance: EventImportance::Key });
+        assert_eq!(partial.event_filter, EventFilter { countries: vec!["US".into()], importance: EventImportance::High });
+        let medium: Settings = serde_json::from_str(r#"{"event_filter":{"importance":"medium"}}"#).unwrap();
+        assert_eq!(medium.event_filter.importance, EventImportance::Medium);
         let all: Settings = serde_json::from_str(r#"{"event_filter":{"countries":[]}}"#).unwrap();
         assert!(all.event_filter.countries.is_empty());
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("settings.json");
-        let s = Settings { event_filter: EventFilter { countries: vec!["EU".into(), "GB".into()], importance: EventImportance::Key }, ..Settings::default() };
+        let s = Settings { event_filter: EventFilter { countries: vec!["EU".into(), "GB".into()], importance: EventImportance::High }, ..Settings::default() };
         s.save(&p).unwrap();
         assert_eq!(Settings::load(&p), s);
-        assert_eq!(serde_json::to_value(&s.event_filter).unwrap(), serde_json::json!({"countries":["EU","GB"],"importance":"key"}));
+        assert_eq!(serde_json::to_value(&s.event_filter).unwrap(), serde_json::json!({"countries":["EU","GB"],"importance":"high"}));
     }
 
     #[test]
     fn event_filter_cleaning_normalizes_and_rejects() {
-        let filter = |countries: &[&str]| EventFilter { countries: countries.iter().map(|c| c.to_string()).collect(), importance: EventImportance::Key };
+        let filter = |countries: &[&str]| EventFilter { countries: countries.iter().map(|c| c.to_string()).collect(), importance: EventImportance::High };
         let cleaned = filter(&[" gb ", "US", "us", "eu"]).cleaned().unwrap();
         assert_eq!(cleaned.countries, ["EU", "GB", "US"]);
-        assert_eq!(cleaned.importance, EventImportance::Key);
+        assert_eq!(cleaned.importance, EventImportance::High);
         assert!(filter(&[]).cleaned().unwrap().countries.is_empty());
         for bad in ["", "U", "USAA", "U1", "U S", "\u{e9}\u{e9}"] {
             assert!(filter(&[bad]).cleaned().is_err(), "{bad:?}");

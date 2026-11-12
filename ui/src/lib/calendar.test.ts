@@ -14,7 +14,7 @@ import {
   formatDay,
   groupByDate,
   groupByDay,
-  isKeyRelease,
+  importanceOf,
   mergeCalendar,
   localDay,
   rangeLabel,
@@ -115,56 +115,60 @@ describe("weekRange", () => {
   });
 });
 
-describe("isKeyRelease", () => {
-  it("recognizes headline releases by name", () => {
-    for (const name of [
-      "Non-Farm Payrolls",
-      "Unemployment Rate",
-      "ILO Unemployment Rate",
-      "Initial Jobless Clm *",
-      "Core CPI YY, NSA",
-      "CPI MM, SA",
-      "HICP Flash YY *",
-      "GDP Advance YY",
-      "GDP",
-      "Retail Sales MM",
-      "FOMC Decision Fed Funds Tgt Rate",
-      "BoC Rate Decision",
-      "BOE Bank Rate",
-      "Riksbank Rate",
-      "ISM Manufacturing PMI",
-      "PMI Services*",
-      "PPI Final Demand MM",
-      "Producer Prices YY",
-      "Consumer Confidence",
-      "U Mich Sentiment Prelim",
-      "JOLTS Job Openings",
-    ]) {
-      expect(isKeyRelease(name), name).toBe(true);
-    }
-  });
+describe("importanceOf", () => {
+  const cases: [string, string, number][] = [
+    ["FOMC Decision Fed Funds Tgt Rate", "US", 3],
+    ["FOMC Minutes", "US", 3],
+    ["FOMC Press Conference", "US", 3],
+    ["Non-Farm Payrolls", "US", 3],
+    ["Unemployment Rate", "US", 3],
+    ["Initial Jobless Clm *", "US", 3],
+    ["Core CPI YY, NSA", "US", 3],
+    ["CPI MM, SA", "US", 3],
+    ["Core PCE Price Index MM", "US", 3],
+    ["GDP Advance QQ", "US", 3],
+    ["GDP Final QQ", "US", 3],
+    ["Retail Sales MM", "US", 3],
+    ["ISM Manufacturing PMI", "US", 3],
+    ["ISM Services PMI", "US", 3],
+    ["PPI Final Demand MM", "US", 3],
+    ["JOLTS Job Openings", "US", 2],
+    ["ADP National Employment", "US", 2],
+    ["Durable Goods Orders", "US", 2],
+    ["Consumer Confidence", "US", 2],
+    ["U Mich Sentiment Prelim", "US", 2],
+    ["Housing Starts", "US", 2],
+    ["Building Permits", "US", 2],
+    ["Existing Home Sales", "US", 2],
+    ["New Home Sales", "US", 2],
+    ["Industrial Production MM", "US", 2],
+    ["Trade Balance", "US", 2],
+    ["S&P Global Mfg PMI Final", "US", 2],
+    ["Fed Chair Powell Speaks", "US", 2],
+    ["Average Hourly Earnings MM", "US", 2],
+    ["Empire State Manufacturing", "US", 2],
+    ["Philly Fed Manufacturing", "US", 2],
+    ["Redbook YY *", "US", 1],
+    ["Cont Jobless Clm *", "US", 1],
+    ["Cleveland Fed CPI*", "US", 1],
+    ["EndYear CPI Fcst/Cb Svy", "US", 1],
+    ["Fiscal Balance/GDP", "US", 1],
+    ["GDP QQ Capital Expend.", "US", 1],
+    ["BRC Retail Sales YY", "GB", 1],
+    ["Mystery", "US", 1],
+    ["", "US", 1],
+    ["CPI YY", "EU", 2],
+    ["BOE Bank Rate", "GB", 2],
+    ["BoC Rate Decision", "CA", 2],
+    ["ILO Unemployment Rate", "GB", 2],
+    ["Trade Balance", "JP", 1],
+    ["Redbook YY *", "JP", 1],
+    ["CPI YY", "", 3],
+    ["Trade Balance", "", 2],
+  ];
 
-  it("leaves minor releases out", () => {
-    for (const name of [
-      "Redbook YY *",
-      "EIA Wkly Crude Stk*",
-      "MBA Purchase Index",
-      "Cleveland Fed CPI*",
-      "EndYear CPI Fcst/Cb Svy",
-      "Fiscal Balance/GDP",
-      "ISTAT Public Deficit/GDP",
-      "GDP QQ Capital Expend.",
-      "GDP QQ External Demand",
-      "GDP QQ Pvt Consmp Prelim",
-      "BRC Retail Sales YY",
-      "Elec Card Retail Sale MM",
-      "Cont Jobless Clm *",
-      "Consumer Credit*",
-      "WSD-Corn Output 26/27",
-      "",
-    ]) {
-      expect(isKeyRelease(name), name).toBe(false);
-    }
+  it.each(cases)("%s (%s) is %i", (name, country, level) => {
+    expect(importanceOf({ name, country })).toBe(level);
   });
 });
 
@@ -182,12 +186,13 @@ describe("filterEvents", () => {
   });
 
   it("filters by importance", () => {
-    expect(filterEvents(list, { countries: [], importance: "key" }).map((e) => e.name)).toEqual(["CPI YY", "CPI YY", "Bank Rate"]);
+    expect(filterEvents(list, { countries: [], importance: "medium" }).map((e) => e.name)).toEqual(["CPI YY", "CPI YY", "Bank Rate"]);
+    expect(filterEvents(list, { countries: [], importance: "high" }).map((e) => e.country)).toEqual(["US"]);
   });
 
   it("combines both filters and leaves the input alone", () => {
     const before = [...list];
-    expect(filterEvents(list, { countries: ["US"], importance: "key" })).toEqual([list[0]]);
+    expect(filterEvents(list, { countries: ["US"], importance: "high" })).toEqual([list[0]]);
     expect(list).toEqual(before);
   });
 
@@ -226,12 +231,12 @@ describe("country choice", () => {
   });
 
   it("keeps the importance when toggling", () => {
-    expect(toggleCountry(f(["US"], "key"), "EU", options)).toEqual({ countries: ["EU", "US"], importance: "key" });
+    expect(toggleCountry(f(["US"], "high"), "EU", options)).toEqual({ countries: ["EU", "US"], importance: "high" });
   });
 
   it("sets countries sorted without duplicates, and importance", () => {
-    expect(setCountries(f([], "key"), ["US", "EU", "US"])).toEqual({ countries: ["EU", "US"], importance: "key" });
-    expect(setImportance(f(["US"]), "key")).toEqual({ countries: ["US"], importance: "key" });
+    expect(setCountries(f([], "high"), ["US", "EU", "US"])).toEqual({ countries: ["EU", "US"], importance: "high" });
+    expect(setImportance(f(["US"]), "high")).toEqual({ countries: ["US"], importance: "high" });
   });
 
   it("does not mutate the previous filter", () => {
@@ -243,7 +248,7 @@ describe("country choice", () => {
 
   it("compares filters", () => {
     expect(sameFilter(f(["US"]), f(["US"]))).toBe(true);
-    expect(sameFilter(f(["US"]), f(["US"], "key"))).toBe(false);
+    expect(sameFilter(f(["US"]), f(["US"], "high"))).toBe(false);
     expect(sameFilter(f(["US"]), f(["EU"]))).toBe(false);
     expect(sameFilter(f([]), f(["US"]))).toBe(false);
   });
@@ -397,7 +402,7 @@ describe("mergeCalendar", () => {
   it("applies country and key filters to macro rows only", () => {
     const us = mergeCalendar(events, entries, range, { countries: ["US"], importance: "all" }, utc);
     expect(us.map((d) => d.key)).toEqual(["2026-11-04", "2026-11-06"]);
-    const key = mergeCalendar(events, entries, range, { countries: ["US"], importance: "key" }, utc);
+    const key = mergeCalendar(events, entries, range, { countries: ["US"], importance: "high" }, utc);
     expect(key.map((d) => d.key)).toEqual(["2026-11-04"]);
     expect(key[0].items.filter((i) => i.kind === "watch")).toHaveLength(3);
   });

@@ -9,6 +9,8 @@
     filterEvents,
     formatDay,
     groupByDay,
+    IMPORTANCE_LABELS,
+    importanceOf,
     mergeCalendar,
     rangeLabel,
     setCountries,
@@ -18,7 +20,7 @@
     type EventsTab,
     type WeekRange,
   } from "./lib/calendar";
-  import type { EventAnalysis, EventFilter, EventsReport, MarketEvent, WatchDates } from "./lib/types";
+  import type { EventAnalysis, EventFilter, EventImportance, EventsReport, MarketEvent, WatchDates } from "./lib/types";
   import WatchCalendar from "./WatchCalendar.svelte";
 
   // report: undefined while loading with nothing cached.
@@ -66,6 +68,12 @@
     onfilter: (filter: EventFilter) => void;
     onopensymbol: (symbol: string) => void;
   } = $props();
+
+  const IMPORTANCE_OPTIONS: { value: EventImportance; label: string; tip: string }[] = [
+    { value: "high", label: "High", tip: "Headline releases: rates, jobs, inflation, GDP, retail sales, ISM and PPI" },
+    { value: "medium", label: "Medium+", tip: "High and medium releases, such as JOLTS, durable goods, housing, sentiment and PMIs" },
+    { value: "all", label: "All", tip: "Every release" },
+  ];
 
   let menu: HTMLDetailsElement | undefined = $state();
 
@@ -136,8 +144,13 @@
 {/snippet}
 
 {#snippet macroRow(e: MarketEvent)}
+  {@const level = importanceOf(e)}
   <button class="row" onclick={() => open(e)}>
-    <span class="title">{#if showCountry && e.country}<span class="cc">{e.country}</span>{/if}{e.name}</span>
+    <span class="title"
+      ><span class="imp" title="{IMPORTANCE_LABELS[level - 1]} importance (curated by release name, Yahoo gives no rating)"
+        >{#each [1, 2, 3] as n (n)}<i class:on={n <= level}></i>{/each}</span
+      >{#if showCountry && e.country}<span class="cc">{e.country}</span>{/if}{e.name}</span
+    >
     <span class="meta">
       {time(e.at)}{#if e.period}
         · For {e.period}{/if}
@@ -277,13 +290,9 @@
         </div>
       </details>
       <div class="seg" role="group" aria-label="Releases">
-        <button class:on={filter.importance === "all"} aria-pressed={filter.importance === "all"} onclick={() => onfilter(setImportance(filter, "all"))}>All</button>
-        <button
-          class:on={filter.importance === "key"}
-          aria-pressed={filter.importance === "key"}
-          title="Headline releases such as jobs, inflation, GDP, rates, PMIs, retail sales and confidence, picked by name. Yahoo does not rate importance."
-          onclick={() => onfilter(setImportance(filter, "key"))}>Key</button
-        >
+        {#each IMPORTANCE_OPTIONS as o (o.value)}
+          <button class:on={filter.importance === o.value} aria-pressed={filter.importance === o.value} title={o.tip} onclick={() => onfilter(setImportance(filter, o.value))}>{o.label}</button>
+        {/each}
       </div>
     </div>
   </div>
@@ -579,6 +588,30 @@
   .title {
     font-weight: 600;
     line-height: 1.3;
+  }
+  .imp {
+    display: inline-flex;
+    gap: 2px;
+    align-items: flex-end;
+    margin-right: 6px;
+    vertical-align: -1px;
+  }
+  .imp i {
+    width: 3px;
+    border-radius: 1px;
+    background: var(--border);
+  }
+  .imp i:nth-child(1) {
+    height: 6px;
+  }
+  .imp i:nth-child(2) {
+    height: 9px;
+  }
+  .imp i:nth-child(3) {
+    height: 12px;
+  }
+  .imp i.on {
+    background: var(--accent);
   }
   .meta {
     font-size: 11.5px;
