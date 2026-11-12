@@ -1448,6 +1448,7 @@
   let dockWidth = $state(Math.max(DOCK_MIN, Number(stored("tickr.dockWidth")) || 440));
   let dockDrag: { x: number; w: number } | null = null;
   const docked = $derived(dockOn && DOCKABLE.has(view));
+  const showSecond = $derived(split && view === "chart");
 
   function toggleDock() {
     dockOn = !dockOn;
@@ -1892,8 +1893,6 @@
             onchange={changePractice}
           />
         {/if}
-        {#key docked ? "dock" : view}
-          <div class="pane" in:paneIn={view === "watchlist" && !docked ? { y: 16, speed: "slow" } : {}}>
             {#snippet panel()}
             {#if view === "watchlist"}
               <Watchlist bind:this={watchlistView} {refreshMode} symbols={watchlist} {groups} current={symbol} sort={watchlistSort} view={watchlistLayout} columns={watchlistColumns} {screens} bind:tab={groupTab} onopen={openWatched} ongroups={saveGroups} onsort={saveSort} onview={saveWatchlistLayout} oncolumns={saveWatchlistColumns} onsavescreen={saveScreen} ondeletescreen={deleteScreen} />
@@ -1940,126 +1939,14 @@
                 {now} onretry={() => newsScope === "symbol" ? loadNews() : loadFeed()} />
             {/if}
             {/snippet}
-            {#if docked}
-              <div class="dock">
-                <div class="dock-chart">
-                  {#if mainChart}
-                    <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={chartFills} orderLines={paperLines} onmoveorder={paperMove} onolder={loadOlder} loadingOlder={olderBusy} />
-                  {:else if chartError}
-                    <div class="msg">
-                      {chartError}
-                      <button class="retry" onclick={() => loadChart(true)}>Retry</button>
-                    </div>
-                  {:else}
-                    <ChartSkeleton />
-                  {/if}
-                </div>
-                <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
-                <div
-                  class="dock-grip"
-                  role="separator"
-                  aria-orientation="vertical"
-                  aria-label="Resize panel"
-                  aria-valuenow={dockWidth}
-                  tabindex="0"
-                  onpointerdown={(e) => { dockDrag = { x: e.clientX, w: dockWidth }; e.currentTarget.setPointerCapture(e.pointerId); }}
-                  onpointermove={(e) => { if (dockDrag) setDockWidth(dockDrag.w + dockDrag.x - e.clientX); }}
-                  onpointerup={() => (dockDrag = null)}
-                  onpointercancel={() => (dockDrag = null)}
-                  onkeydown={(e) => {
-                    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setDockWidth(dockWidth + (e.key === "ArrowLeft" ? 24 : -24));
-                  }}
-                ></div>
-                <div class="dock-panel" style:width="{dockWidth}px">
-                  {#key view}
-                    <div class="pane" in:paneIn={{}}>{@render panel()}</div>
-                  {/key}
-                </div>
-              </div>
-            {:else if DOCKABLE.has(view)}
-              {@render panel()}
-            {:else if view === "technicals"}
-              <div class="split">
-                {#if mainChart}
-                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={chartFills} orderLines={paperLines} onmoveorder={paperMove} onolder={loadOlder} loadingOlder={olderBusy} />
-                {:else if chartError}
-                  <div class="msg">
-                    {chartError}
-                    <button class="retry" onclick={() => loadChart(true)}>Retry</button>
-                  </div>
-                {:else}
-                  <ChartSkeleton />
-                {/if}
-                <Technicals
-                  analysis={techAnalysis}
-                  loading={replay ? replayAnalyzing || (replayAnalyzeOn && !shownReplayAnalysis && !replayAnalysisError) : analyzing}
-                  error={replay ? replayAnalysisError : analysisError}
-                  bars={mainChart?.candles.length ?? 0}
-                  gmtoffset={analysisOffset}
-                  {overlays}
-                  config={indicators!}
-                  presets={indicatorPresets}
-                  onsave={saveIndicators}
-                  onsavepreset={savePreset}
-                  ondeletepreset={deletePreset}
-                  onanalyze={() => runAnalysis()}
-                  onalert={replay ? undefined : async (l) => {
-                    alerts = await invoke<PriceAlert[]>("add_alert", { symbol, kind: "price", direction: l.direction, level: l.level, recurring: false, cooldownMins: 15, regularOnly: true });
-                  }}
-                />
-              </div>
-            {:else if view === "paper"}
-              <div class="split">
-                {#if mainChart}
-                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={chartFills} orderLines={paperLines} onmoveorder={paperMove} onolder={loadOlder} loadingOlder={olderBusy} />
-                {:else if chartError}
-                  <div class="msg">
-                    {chartError}
-                    <button class="retry" onclick={() => loadChart(true)}>Retry</button>
-                  </div>
-                {:else}
-                  <ChartSkeleton />
-                {/if}
-                {#if paperAccount}
-                  <PaperView
-                    account={paperAccount}
-                    {symbol}
-                    currency={mainChart?.meta.currency ?? quote?.currency ?? "USD"}
-                    replay={!!replay}
-                    mark={paperMark}
-                    markLabel={replay ? "Last revealed close" : "Last quote"}
-                    marketBlock={paperMarketBlock}
-                    error={paperError}
-                    notice={paperNotice}
-                    when={paperWhen}
-                    onorder={paperOrder}
-                    oncancel={paperCancel}
-                    oncosts={paperCosts}
-                    onreset={paperReset}
-                  />
-                {:else}
-                  <div class="msg">{paperError ?? "Loading the simulated account…"}</div>
-                {/if}
-              </div>
-            {:else if view === "backtest"}
-              <div class="split">
-                {#if mainChart}
-                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} fills={chartFills} orderLines={paperLines} onmoveorder={paperMove} onolder={loadOlder} loadingOlder={olderBusy} />
-                {:else if chartError}
-                  <div class="msg">
-                    {chartError}
-                    <button class="retry" onclick={() => loadChart(true)}>Retry</button>
-                  </div>
-                {:else}
-                  <ChartSkeleton />
-                {/if}
-                <BacktestView report={backtestReport} bars={mainChart?.candles.length ?? 0} currency={mainChart?.meta.currency ?? "USD"} when={chartWhen} onrun={(rules) => (backtestRules = rules)} />
-              </div>
-            {:else}
-              <div class="charts" class:stacked={split && layout.orientation === "stacked"}>
+        {#if !docked && DOCKABLE.has(view)}
+          {#key view}
+            <div class="pane" in:paneIn={view === "watchlist" ? { y: 16, speed: "slow" } : {}}>{@render panel()}</div>
+          {/key}
+        {:else}
+          <div class="pane">
+            <div class="dock">
+              <div class="charts" class:docked class:stacked={showSecond && layout.orientation === "stacked"}>
                 {#if mainChart}
                   <ChartView
                     bind:this={chartView}
@@ -2078,10 +1965,10 @@
                     earnings={chartEarnings}
                     ratings={chartRatings}
                     news={chartNews}
-                    linkedTime={split && syncHover?.source === "second" ? syncHover.t : null}
-                    onhovertime={split ? (t) => hoverFrom("main", t) : undefined}
-                    linkedWindow={split && layout.sync_range && syncWindow?.source === "second" ? syncWindow.w : null}
-                    onwindow={split && layout.sync_range ? (w) => (syncWindow = { source: "main", w }) : undefined}
+                    linkedTime={showSecond && syncHover?.source === "second" ? syncHover.t : null}
+                    onhovertime={showSecond ? (t) => hoverFrom("main", t) : undefined}
+                    linkedWindow={showSecond && layout.sync_range && syncWindow?.source === "second" ? syncWindow.w : null}
+                    onwindow={showSecond && layout.sync_range ? (w) => (syncWindow = { source: "main", w }) : undefined}
                     replay={!!replay}
                     fills={chartFills}
                     orderLines={paperLines}
@@ -2097,7 +1984,7 @@
                 {:else}
                   <ChartSkeleton />
                 {/if}
-                {#if split}
+                {#if showSecond}
                   <SecondChart
                     bind:this={secondView}
                     {layout}
@@ -2123,9 +2010,83 @@
                   />
                 {/if}
               </div>
+              {#if docked}
+                <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+                <div
+                  class="dock-grip"
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label="Resize panel"
+                  aria-valuenow={dockWidth}
+                  tabindex="0"
+                  onpointerdown={(e) => { dockDrag = { x: e.clientX, w: dockWidth }; e.currentTarget.setPointerCapture(e.pointerId); }}
+                  onpointermove={(e) => { if (dockDrag) setDockWidth(dockDrag.w + dockDrag.x - e.clientX); }}
+                  onpointerup={() => (dockDrag = null)}
+                  onpointercancel={() => (dockDrag = null)}
+                  onkeydown={(e) => {
+                    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setDockWidth(dockWidth + (e.key === "ArrowLeft" ? 24 : -24));
+                  }}
+                ></div>
+                <div class="dock-panel" style:width="{dockWidth}px">
+                  {#key view}
+                    <div class="pane" in:paneIn={{}}>{@render panel()}</div>
+                  {/key}
+                </div>
+              {/if}
+            </div>
+            {#if view === "technicals"}
+              <div class="below">
+              <Technicals
+                analysis={techAnalysis}
+                loading={replay ? replayAnalyzing || (replayAnalyzeOn && !shownReplayAnalysis && !replayAnalysisError) : analyzing}
+                error={replay ? replayAnalysisError : analysisError}
+                bars={mainChart?.candles.length ?? 0}
+                gmtoffset={analysisOffset}
+                {overlays}
+                config={indicators!}
+                presets={indicatorPresets}
+                onsave={saveIndicators}
+                onsavepreset={savePreset}
+                ondeletepreset={deletePreset}
+                onanalyze={() => runAnalysis()}
+                onalert={replay ? undefined : async (l) => {
+                  alerts = await invoke<PriceAlert[]>("add_alert", { symbol, kind: "price", direction: l.direction, level: l.level, recurring: false, cooldownMins: 15, regularOnly: true });
+                }}
+              />
+              </div>
+            {:else if view === "paper"}
+              <div class="below">
+              {#if paperAccount}
+                <PaperView
+                  account={paperAccount}
+                  {symbol}
+                  currency={mainChart?.meta.currency ?? quote?.currency ?? "USD"}
+                  replay={!!replay}
+                  mark={paperMark}
+                  markLabel={replay ? "Last revealed close" : "Last quote"}
+                  marketBlock={paperMarketBlock}
+                  error={paperError}
+                  notice={paperNotice}
+                  when={paperWhen}
+                  onorder={paperOrder}
+                  oncancel={paperCancel}
+                  oncosts={paperCosts}
+                  onreset={paperReset}
+                />
+              {:else}
+                <div class="msg">{paperError ?? "Loading the simulated account…"}</div>
+              {/if}
+              </div>
+            {:else if view === "backtest"}
+              <div class="below">
+              <BacktestView report={backtestReport} bars={mainChart?.candles.length ?? 0} currency={mainChart?.meta.currency ?? "USD"} when={chartWhen} onrun={(rules) => (backtestRules = rules)} />
+              </div>
             {/if}
           </div>
-        {/key}
+        {/if}
       </section>
     </main>
     <Footer
@@ -2170,8 +2131,7 @@
     flex-direction: column;
     padding: 12px 12px 6px 14px;
   }
-  .pane,
-  .split {
+  .pane {
     flex: 1;
     min-height: 0;
     display: flex;
@@ -2193,13 +2153,11 @@
     min-height: 0;
     display: flex;
   }
-  .dock-chart {
-    flex: 1;
-    min-width: 0;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
+  .charts.docked {
     overflow: hidden;
+  }
+  .below {
+    display: contents;
   }
   .dock-grip {
     flex: none;
@@ -2238,7 +2196,7 @@
     overflow: hidden;
   }
   @media (max-width: 860px) {
-    .dock-chart,
+    .charts.docked,
     .dock-grip {
       display: none;
     }
