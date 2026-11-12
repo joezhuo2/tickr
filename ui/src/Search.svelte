@@ -128,7 +128,7 @@
     <div class="pop">
       {#if !showRecent}
         <div class="filters">
-          <div class="types" role="group" aria-label="Asset type">
+          <div class="types jelly" role="group" aria-label="Asset type">
             {#each SEARCH_TYPES as t (t.key)}
               <button
                 class="chip"

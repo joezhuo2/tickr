@@ -217,7 +217,7 @@
   </div>
 {:else}
   <div class="bar">
-    <div class="tabs" role="tablist" aria-label="Calendar">
+    <div class="tabs seg" role="tablist" aria-label="Calendar">
       <button role="tab" class:on={tab === "economic"} aria-selected={tab === "economic"} onclick={() => ontab("economic")}>Economic</button>
       <button role="tab" class:on={tab === "watchlist"} aria-selected={tab === "watchlist"} onclick={() => ontab("watchlist")}>Watchlist</button>
       <button role="tab" class:on={tab === "calendar"} aria-selected={tab === "calendar"} onclick={() => ontab("calendar")}>Calendar</button>
