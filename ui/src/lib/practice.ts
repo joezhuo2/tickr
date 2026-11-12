@@ -1,5 +1,6 @@
 import * as Paper from "./paper";
-import type { Group } from "./types";
+import type { ReplayState } from "./replay";
+import type { Candle, Chart, Drawing, Group } from "./types";
 
 export const CONTEXT = 60;
 export const AFTER = 50;
@@ -255,4 +256,72 @@ export function markers(r: Result | null, bars: readonly Bar[]): { t: number; si
   const out: { t: number; side: Paper.Side; price: number }[] = [{ t: bars[r.entry].t, side: long ? "buy" : "sell", price: r.entry_price }];
   if (r.status === "closed" && r.exit != null && r.exit_price != null) out.push({ t: bars[r.exit].t, side: long ? "sell" : "buy", price: r.exit_price });
   return out;
+}
+
+export interface SavedRun {
+  id: number;
+  saved: number;
+  symbol: string;
+  name: string;
+  exchange: string;
+  currency: string;
+  timezone: string;
+  gmtoffset: number;
+  interval: Interval;
+  range: Range;
+  start: number;
+  volatile: boolean;
+  trade: Trade;
+  return_pct: number;
+  market_pct: number | null;
+  candles: Candle[];
+  drawings: Drawing[];
+}
+
+export function savedRun(ex: Exercise, base: Chart, drawings: Drawing[], now: number): SavedRun | null {
+  if (!ex.ended || !ex.trade || !base.candles.length) return null;
+  const s = summarize(ex.trade, base.candles);
+  const m = base.meta;
+  return {
+    id: 0,
+    saved: now,
+    symbol: m.symbol || ex.symbol,
+    name: ex.name,
+    exchange: m.exchange,
+    currency: m.currency,
+    timezone: m.timezone ?? "",
+    gmtoffset: m.gmtoffset,
+    interval: ex.setup.interval,
+    range: ex.setup.range,
+    start: ex.start,
+    volatile: ex.volatile,
+    trade: ex.trade,
+    return_pct: s.result.return_pct,
+    market_pct: s.market_pct,
+    candles: base.candles,
+    drawings,
+  };
+}
+
+export function reopen(run: SavedRun): { exercise: Exercise; base: Chart; state: ReplayState } {
+  const bars = run.candles;
+  const last = bars[bars.length - 1];
+  return {
+    exercise: { setup: { ...DEFAULT_SETUP, interval: run.interval, range: run.range }, symbol: run.symbol, name: run.name, start: run.start, volatile: run.volatile, trade: run.trade, ended: true },
+    base: {
+      source: "practice",
+      meta: { symbol: run.symbol, name: run.name, exchange: run.exchange, currency: run.currency, price: last.c, prev_close: null, market_time: last.t, gmtoffset: run.gmtoffset, timezone: run.timezone || undefined, periods: null },
+      range: displayRange(run.interval),
+      interval: run.interval,
+      candles: bars,
+      dividends: [],
+      splits: [],
+      last_bar_time: last.t,
+    },
+    state: { total: bars.length, start: run.start, cursor: bars.length - 1, playing: false, speed: 1, elapsed: 0 },
+  };
+}
+
+export function sortRuns(runs: unknown): SavedRun[] {
+  return Array.isArray(runs) ? [...(runs as SavedRun[])].sort((a, b) => b.saved - a.saved || b.id - a.id) : [];
 }
