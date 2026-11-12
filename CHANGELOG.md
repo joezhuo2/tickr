@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.63] - 2026-11-12
+
+### Fixed
+- **Right panel at minimum width:** Options is split into Calls / Puts and
+  Strategy subtabs, Events controls wrap instead of hiding, and Earnings and
+  Analysts stack their two sections. Earnings shows the days until the next
+  report.
+
 ## [0.11.62] - 2026-11-12
 
 ### Added

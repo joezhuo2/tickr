@@ -19,6 +19,7 @@
     side?: "calls" | "puts";
   } = $props();
 
+  let tab = $state<"chain" | "strategy">("chain");
   let text = $state("");
   let wrap = $state<HTMLDivElement>();
   let mid = $state<HTMLElement>();
@@ -105,10 +106,16 @@
   </div>
 {:else}
   <div class="bar">
-    <select bind:value={side} aria-label="Contract type">
-      <option value="calls">Calls</option>
-      <option value="puts">Puts</option>
-    </select>
+    <div class="seg" role="tablist" aria-label="Options view">
+      <button role="tab" class:on={tab === "chain"} aria-selected={tab === "chain"} onclick={() => (tab = "chain")}>Calls / Puts</button>
+      <button role="tab" class:on={tab === "strategy"} aria-selected={tab === "strategy"} onclick={() => (tab = "strategy")}>Strategy</button>
+    </div>
+    {#if tab === "chain"}
+      <select bind:value={side} aria-label="Contract type">
+        <option value="calls">Calls</option>
+        <option value="puts">Puts</option>
+      </select>
+    {/if}
     <input
       type="text"
       list="expiries"
@@ -124,6 +131,7 @@
     {#if error}<span class="err">{error} <button class="retry" onclick={onretry}>Retry</button></span>{/if}
   </div>
   <div class="body">
+    {#if tab === "chain"}
     <div class="chain">
       {#if rows.length === 0}
         <div class="msg">No {side} for this expiry.</div>
@@ -154,9 +162,9 @@
         </div>
       {/if}
     </div>
-    <div class="side">
+    {:else}
       <Strategy {options} bind:legs bind:saved bind:mode />
-    </div>
+    {/if}
   </div>
 {/if}
 
@@ -184,35 +192,41 @@
   .body {
     flex: 1;
     min-height: 0;
+    min-width: 0;
     display: flex;
-    gap: 12px;
   }
   .chain {
-    flex: 1.2 1 0;
+    flex: 1;
     min-width: 0;
     min-height: 0;
     display: flex;
     flex-direction: column;
   }
-  .side {
-    flex: 1 1 0;
-    min-width: 340px;
-    min-height: 0;
+  .seg {
     display: flex;
-    flex-direction: column;
-    border-left: 1px solid var(--faint);
-    padding-left: 8px;
+    background: var(--surface);
+    border: 1px solid var(--faint);
+    border-radius: 7px;
+    padding: 2px;
   }
-  @media (max-width: 900px) {
-    .body {
-      flex-direction: column;
-    }
-    .side {
-      min-width: 0;
-      border-left: 0;
-      padding-left: 0;
-      border-top: 1px solid var(--faint);
-    }
+  .seg button {
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 12px;
+    padding: 2px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    color: var(--muted);
+  }
+  .seg button.on {
+    background: var(--bg);
+    color: var(--text);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  }
+  .seg button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
   }
   .add button {
     border: 1px solid var(--faint);

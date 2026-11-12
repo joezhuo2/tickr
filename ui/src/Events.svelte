@@ -380,6 +380,7 @@
 <style>
   .bar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
@@ -430,6 +431,7 @@
   .weeks,
   .filters {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 6px;
   }
