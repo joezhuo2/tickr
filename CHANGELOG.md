@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.58] - 2026-11-12
+
+### Changed
+- **Faster zoomed-out charts:** when bars are narrower than a pixel, candles,
+  volume and indicator lines are drawn once per pixel column (high to low)
+  instead of once per bar. Normal zoom looks the same.
+
 ## [0.11.57] - 2026-11-12
 
 ### Changed
