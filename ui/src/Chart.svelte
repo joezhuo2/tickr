@@ -6,6 +6,7 @@
   import type { Drawing, DrawingPoint } from "./lib/types";
   import { DRAWING_COLORS, POINT_COUNT, arrowHead, channelLines, fibExtLevels, pitchforkLines, snapPrice, anchoredVwap, fibLevels, hitBox, positionLevels, rayEnd, timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
   import { legendText, volumeProfile } from "./lib/indicators";
+  import { columnPen, columns, type Sink } from "./lib/decimate";
   import { LEFT_SCALES, PANE_NAMES, mergeUp, movePane, paneRects, unmerge, visibleGroups, type PaneId, type Slot } from "./lib/panes";
   import { panes, setPanes } from "./lib/paneStore.svelte";
   import { untrack } from "svelte";
@@ -272,7 +273,8 @@
     let vmax = 0;
     for (let i = i0; i <= i1; i++) {
       const c = candles[i];
-      prices.push(...(ohlc ? [c.l, c.h, c.o, c.c] : [c.c]));
+      if (ohlc) prices.push(c.l, c.h, c.o, c.c);
+      else prices.push(c.c);
       vmax = Math.max(vmax, c.v);
     }
     if (prevClose != null) {
@@ -356,7 +358,11 @@
       clipPlot(ctx);
       ctx.fillStyle = v("--ext-shade");
       for (let i = g.from; i <= g.to; i++) {
-        if (isExtendedSession(sessions[i])) ctx.fillRect(g.x(i) - g.step / 2, PAD.t, g.step + 0.5, bottom - PAD.t);
+        if (!isExtendedSession(sessions[i])) continue;
+        let j = i;
+        while (j < g.to && isExtendedSession(sessions[j + 1])) j++;
+        ctx.fillRect(g.x(i) - g.step / 2, PAD.t, g.step * (j - i + 1) + 0.5, bottom - PAD.t);
+        i = j;
       }
       ctx.restore();
     }
@@ -400,12 +406,27 @@
     // Volume.
     clipPlot(ctx);
     const bw = Math.max(1, g.step * 0.65);
-    for (let i = g.from; i <= g.to; i++) {
-      const c = candles[i];
-      ctx.fillStyle = c.c >= c.o ? up : down;
+    const cols = g.step * dpr < 1 ? columns(candles, g.from, g.to, g.x, dpr) : null;
+    if (cols) {
       ctx.globalAlpha = 0.28;
-      const y = g.vy(c.v);
-      ctx.fillRect(g.x(i) - bw / 2, y, bw, g.volTop + g.volH - y);
+      for (const rising of [true, false]) {
+        ctx.beginPath();
+        for (const c of cols) {
+          if (c.c >= c.o !== rising) continue;
+          const y = g.vy(c.v);
+          ctx.rect(c.x - 0.5 / dpr, y, 1 / dpr, g.volTop + g.volH - y);
+        }
+        ctx.fillStyle = rising ? up : down;
+        ctx.fill();
+      }
+    } else {
+      for (let i = g.from; i <= g.to; i++) {
+        const c = candles[i];
+        ctx.fillStyle = c.c >= c.o ? up : down;
+        ctx.globalAlpha = 0.28;
+        const y = g.vy(c.v);
+        ctx.fillRect(g.x(i) - bw / 2, y, bw, g.volTop + g.volH - y);
+      }
     }
     ctx.globalAlpha = 1;
 
@@ -439,7 +460,21 @@
       ctx.setLineDash([]);
     }
 
-    if (ohlc) {
+    if (ohlc && cols) {
+      ctx.lineWidth = 1 / dpr;
+      for (const rising of [true, false]) {
+        ctx.beginPath();
+        for (const c of cols) {
+          if (c.c >= c.o !== rising) continue;
+          const top = g.y(c.h);
+          ctx.moveTo(c.x, top);
+          ctx.lineTo(c.x, Math.max(g.y(c.l), top + 1 / dpr));
+        }
+        ctx.strokeStyle = rising ? up : down;
+        ctx.stroke();
+      }
+      ctx.lineWidth = 1;
+    } else if (ohlc) {
       for (let i = g.from; i <= g.to; i++) {
         const c = candles[i];
         const x = Math.round(g.x(i)) + 0.5;
@@ -477,7 +512,9 @@
           ctx.clip();
         }
         ctx.beginPath();
-        for (let i = g.from; i <= g.to; i++) (i === g.from ? ctx.moveTo(g.x(i), g.y(candles[i].c)) : ctx.lineTo(g.x(i), g.y(candles[i].c)));
+        const pen = columnPen(ctx, dpr);
+        for (let i = g.from; i <= g.to; i++) pen.to(g.x(i), g.y(candles[i].c));
+        pen.lift();
         ctx.strokeStyle = col;
         ctx.lineWidth = 1.6;
         ctx.lineJoin = "round";
@@ -677,23 +714,30 @@
     ctx.clip();
   }
 
+  function linePen(sink: Sink) {
+    return columnPen(sink, window.devicePixelRatio || 1);
+  }
+
+  function collect(out: [number, number][]): Sink {
+    const add = (x: number, y: number) => {
+      out.push([x, y]);
+    };
+    return { moveTo: add, lineTo: add };
+  }
+
   /** Strokes a series in two parts: dashed during warm-up, solid after. */
   function strokeLine(ctx: CanvasRenderingContext2D, line: Line, y: (v: number) => number, g: Geo) {
     for (const warm of [true, false]) {
       ctx.setLineDash(warm ? [3, 3] : []);
       ctx.beginPath();
-      let pen = false;
+      const pen = linePen(ctx);
       for (let i = g.from; i <= g.to; i++) {
         const k = align[i];
         const val = valueAt(line, i);
-        if (val == null || (y === g.y && g.scale === "log" && val <= 0) || (warm ? k > line.full_from : k < line.full_from)) {
-          pen = false;
-          continue;
-        }
-        if (pen) ctx.lineTo(g.x(i), y(val));
-        else ctx.moveTo(g.x(i), y(val));
-        pen = true;
+        if (val == null || (y === g.y && g.scale === "log" && val <= 0) || (warm ? k > line.full_from : k < line.full_from)) pen.lift();
+        else pen.to(g.x(i), y(val));
       }
+      pen.lift();
       ctx.stroke();
     }
     ctx.setLineDash([]);
@@ -767,10 +811,12 @@
       const [up, mid, lo] = a.series.bollinger;
       const pts = (line: Line) => {
         const out: [number, number][] = [];
+        const pen = linePen(collect(out));
         for (let i = g.from; i <= g.to; i++) {
           const val = valueAt(line, i);
-          if (val != null) out.push([g.x(i), g.y(val)]);
+          if (val != null) pen.to(g.x(i), g.y(val));
         }
+        pen.lift();
         return out;
       };
       const band = [...pts(up), ...pts(lo).reverse()];
@@ -811,22 +857,29 @@
       const [orHigh, orLow] = a.series.opening_range;
       ctx.fillStyle = col;
       ctx.globalAlpha = 0.08;
-      let box: [number, number, number][] = [];
+      const top: [number, number][] = [];
+      const bot: [number, number][] = [];
+      const hiPen = linePen(collect(top));
+      const loPen = linePen(collect(bot));
       for (let i = g.from; i <= g.to + 1; i++) {
         const hi = i <= g.to ? valueAt(orHigh, i) : null;
         const lo = i <= g.to ? valueAt(orLow, i) : null;
         if (hi != null && lo != null) {
-          box.push([g.x(i), g.y(hi), g.y(lo)]);
+          hiPen.to(g.x(i), g.y(hi));
+          loPen.to(g.x(i), g.y(lo));
           continue;
         }
-        if (box.length > 1) {
+        hiPen.lift();
+        loPen.lift();
+        if (top.length > 1) {
           ctx.beginPath();
-          box.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-          for (let k = box.length - 1; k >= 0; k--) ctx.lineTo(box[k][0], box[k][2]);
+          top.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+          for (let k = bot.length - 1; k >= 0; k--) ctx.lineTo(bot[k][0], bot[k][1]);
           ctx.closePath();
           ctx.fill();
         }
-        box = [];
+        top.length = 0;
+        bot.length = 0;
       }
       ctx.globalAlpha = 1;
       ctx.strokeStyle = col;
@@ -941,14 +994,13 @@
 
   function plot(ctx: CanvasRenderingContext2D, g: Geo, values: (number | null)[], y: (v: number) => number) {
     ctx.beginPath();
-    let pen = false;
+    const pen = linePen(ctx);
     for (let i = Math.max(0, g.i0 - 1); i <= Math.min(values.length - 1, g.j1 + 1); i++) {
       const val = values[i];
-      if (val == null || !Number.isFinite(val)) { pen = false; continue; }
-      if (pen) ctx.lineTo(g.x(i), y(val));
-      else ctx.moveTo(g.x(i), y(val));
-      pen = true;
+      if (val == null || !Number.isFinite(val)) pen.lift();
+      else pen.to(g.x(i), y(val));
     }
+    pen.lift();
     ctx.stroke();
   }
 
@@ -983,17 +1035,19 @@
       }
     }
     if (ichi) {
-      for (let i = Math.max(1, g.i0); i <= Math.min(ichi.spanA.length - 1, g.j1 + 1); i++) {
-        const a0 = ichi.spanA[i - 1], a1 = ichi.spanA[i], b0 = ichi.spanB[i - 1], b1 = ichi.spanB[i];
-        if (a0 == null || a1 == null || b0 == null || b1 == null) continue;
-        ctx.fillStyle = v(a1 >= b1 ? "--up" : "--down");
-        ctx.globalAlpha = 0.1;
+      ctx.globalAlpha = 0.1;
+      for (const rising of [true, false]) {
         ctx.beginPath();
-        ctx.moveTo(g.x(i - 1), g.y(a0));
-        ctx.lineTo(g.x(i), g.y(a1));
-        ctx.lineTo(g.x(i), g.y(b1));
-        ctx.lineTo(g.x(i - 1), g.y(b0));
-        ctx.closePath();
+        for (let i = Math.max(1, g.i0); i <= Math.min(ichi.spanA.length - 1, g.j1 + 1); i++) {
+          const a0 = ichi.spanA[i - 1], a1 = ichi.spanA[i], b0 = ichi.spanB[i - 1], b1 = ichi.spanB[i];
+          if (a0 == null || a1 == null || b0 == null || b1 == null || a1 >= b1 !== rising) continue;
+          ctx.moveTo(g.x(i - 1), g.y(a0));
+          ctx.lineTo(g.x(i), g.y(a1));
+          ctx.lineTo(g.x(i), g.y(b1));
+          ctx.lineTo(g.x(i - 1), g.y(b0));
+          ctx.closePath();
+        }
+        ctx.fillStyle = v(rising ? "--up" : "--down");
         ctx.fill();
       }
       ctx.globalAlpha = 1;
@@ -1103,11 +1157,15 @@
     } else if (id === "macd" && a) {
       const [line, signal, histogram] = a.series.macd;
       ctx.globalAlpha = 0.5;
-      for (let i = g.i0; i <= g.i1; i++) {
-        const value = valueAt(histogram, i);
-        if (value == null) continue;
-        ctx.fillStyle = histogram.color || v(value >= 0 ? "--up" : "--down");
-        ctx.fillRect(g.x(i) - g.step * 0.3, Math.min(y(value), y(0)), Math.max(1, g.step * 0.6), Math.abs(y(value) - y(0)));
+      for (const rising of [true, false]) {
+        ctx.beginPath();
+        for (let i = g.i0; i <= g.i1; i++) {
+          const value = valueAt(histogram, i);
+          if (value == null || value >= 0 !== rising) continue;
+          ctx.rect(g.x(i) - g.step * 0.3, Math.min(y(value), y(0)), Math.max(1, g.step * 0.6), Math.abs(y(value) - y(0)));
+        }
+        ctx.fillStyle = histogram.color || v(rising ? "--up" : "--down");
+        ctx.fill();
       }
       ctx.globalAlpha = 1;
       col = line.color || col;
