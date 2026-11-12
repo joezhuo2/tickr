@@ -318,7 +318,7 @@ export interface EventsReport {
   events: MarketEvent[];
 }
 
-export type EventImportance = "all" | "key";
+export type EventImportance = "all" | "medium" | "high";
 
 export interface EventFilter {
   countries: string[];

@@ -964,7 +964,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let shared = Shared::new(dir.path().join("settings.json"), Default::default());
         assert_eq!(init_payload(&shared).event_filter, EventFilter::default());
-        let filter = EventFilter { countries: vec!["gb".into(), "US".into()], importance: EventImportance::Key }.cleaned().unwrap();
+        let filter = EventFilter { countries: vec!["gb".into(), "US".into()], importance: EventImportance::High }.cleaned().unwrap();
         shared.update_settings(|s| s.event_filter = filter.clone());
         assert_eq!(init_payload(&shared).event_filter, filter);
         assert_eq!(Settings::load(&shared.settings_path).event_filter.countries, ["GB", "US"]);

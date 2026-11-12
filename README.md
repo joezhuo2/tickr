@@ -562,9 +562,10 @@ grouped by day, each with its local release time and, where Yahoo has them, the
 actual, expected and prior figures. It starts with the next 7 days; the arrows
 step a week back or forward (up to about a year either way) and **Today**
 returns. The country menu picks which countries to show (US by default, or all)
-and **All / Key** limits the list to headline releases (jobs, inflation, GDP,
-rates, PMIs, retail sales, confidence). Yahoo does not rate importance, so Key
-is decided by release name and is only a rough guide. Both choices are saved in
+and **High / Medium+ / All** limits the list by importance. Yahoo does not rate
+importance, so each release gets a high, medium or low rating (three bars) from a
+curated table of release names, one level lower for non-US releases. It is a
+rough guide. Both choices are saved in
 settings. The list needs no AI and is refreshed every 15 minutes or with the
 Refresh button.
 
@@ -576,7 +577,7 @@ fetched three symbols at a time; ETFs, indices and crypto have none.
 
 **Calendar** combines both: your watchlist's earnings and ex-dividend dates
 next to the macro releases, grouped by day, with the same week arrows and the
-saved country and All / Key filters applied to the macro rows.
+saved country and importance filters applied to the macro rows.
 
 Clicking an event asks the AI configured in Settings, as above, using the
 Events model or else Model, to analyze that
@@ -653,8 +654,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.43
-git push origin v0.11.43
+git tag v0.11.44
+git push origin v0.11.44
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

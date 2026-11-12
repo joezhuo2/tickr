@@ -60,31 +60,38 @@ export function rangeLabel(range: WeekRange, locale?: string): string {
   return `${first} – ${last}`;
 }
 
-const KEY_RELEASES: RegExp[] = [
-  /\bnon-?farm payrolls?\b/i,
-  /\b(unemployment|jobless) rate\b/i,
-  /^initial jobless clm/i,
-  /\b(cpi|hicp)\b/i,
-  /\bpce\b/i,
-  /^gdp\b/i,
-  /^retail sales\b/i,
-  /rate decision|\bbank rate\b|fed funds|^interest rate\b|^fomc\b|^riksbank rate/i,
-  /\bpmi\b/i,
-  /\bppi\b|producer price/i,
-  /^(consumer confidence|consumer sentiment|u mich sentiment)/i,
-  /\bjolts\b|job openings/i,
+export type Importance = 1 | 2 | 3;
+
+const RELEASES: [Importance, RegExp][] = [
+  [1, /^cleveland\b|\bfcst\b|\bsvy\b|capital|external|consmp/i],
+  [2, /\bfed chair\b|\bpowell\b/i],
+  [3, /^fomc\b|fed funds|rate decision|\bbank rate\b|^interest rate\b|^riksbank rate/i],
+  [3, /\bnon-?farm payrolls?\b/i],
+  [3, /\b(unemployment|jobless) rate\b|^initial jobless clm/i],
+  [3, /\b(cpi|hicp|pce)\b/i],
+  [3, /^gdp\b/i],
+  [3, /^retail sales\b/i],
+  [3, /\bism\b/i],
+  [3, /\bppi\b|producer price/i],
+  [2, /\bjolts\b|job openings|\badp\b|durable goods|average hourly earnings|avg hourly earn/i],
+  [2, /^(consumer confidence|consumer sentiment|u mich sentiment)|\bmichigan\b/i],
+  [2, /housing starts|building permits|home sales|industrial production|trade balance|^trade\b/i],
+  [2, /empire state|philly fed|philadelphia fed|\bpmi\b/i],
 ];
 
-const NOT_KEY = /^cleveland\b|\bfcst\b|\bsvy\b|capital|external|consmp/i;
+export const IMPORTANCE_LABELS = ["Low", "Medium", "High"] as const;
 
-export function isKeyRelease(name: string): boolean {
-  const clean = name.replace(/\*/g, "").trim();
-  return !NOT_KEY.test(clean) && KEY_RELEASES.some((p) => p.test(clean));
+export function importanceOf(e: Pick<MarketEvent, "name" | "country">): Importance {
+  const clean = e.name.replace(/\*/g, "").trim();
+  const base = RELEASES.find(([, p]) => p.test(clean))?.[0] ?? 1;
+  return e.country && e.country !== "US" && base > 1 ? ((base - 1) as Importance) : base;
 }
+
+const MIN_IMPORTANCE: Record<EventImportance, Importance> = { all: 1, medium: 2, high: 3 };
 
 export function filterEvents(events: MarketEvent[], filter: EventFilter): MarketEvent[] {
   const countries = new Set(filter.countries);
-  return events.filter((e) => (countries.size === 0 || countries.has(e.country)) && (filter.importance === "all" || isKeyRelease(e.name)));
+  return events.filter((e) => (countries.size === 0 || countries.has(e.country)) && importanceOf(e) >= MIN_IMPORTANCE[filter.importance]);
 }
 
 export function countryOptions(events: MarketEvent[], selected: string[]): string[] {
