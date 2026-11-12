@@ -17,7 +17,7 @@ export const SETTINGS: SettingEntry[] = [
   { label: "Show or hide tickr", section: "Hotkeys · General", tab: "hotkeys", group: "general" },
   { label: "Reset all keybinds", section: "Hotkeys · General", tab: "hotkeys", group: "general" },
   ...groupActions().flatMap((g) => g.actions.map((a) => ({ label: a.label, section: `Hotkeys · ${g.label}`, tab: "hotkeys" as const, group: g.id }))),
-  ...entry("chart", "Chart", ["Extended-hours candles", "Shade pre-market and after-hours", "Chart times", "Earnings", "News", "Analyst ratings"]),
+  ...entry("chart", "Chart", ["Extended-hours candles", "Shade pre-market and after-hours", "Chart times", "R:R reward multiple", "Earnings", "News", "Analyst ratings"]),
   ...entry("chart", "Chart alerts", ["Check indicator and drawing alerts in the background"]),
   ...entry("data", "Market data", ["Provider", "Clear cached history"]),
   ...entry("ai", "AI", ["News analysis", "Base URL", "Model", "News model", "Events model", "API key"]),

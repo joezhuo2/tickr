@@ -18,6 +18,7 @@ describe("backup local state", () => {
       "tickr.hideDrawings": "1",
       "tickr.technicalsSettingsOpen": "1",
       "tickr.panes": JSON.stringify({ groups: [["price"], ["macd", "rsi"]], left: "percent" }),
+      "tickr.rr": "3.5",
     });
     const text = withLocal('{"app":"tickr","settings":{}}', src);
     const dst = fake();
@@ -27,6 +28,7 @@ describe("backup local state", () => {
     expect(JSON.parse(dst.getItem("tickr.chartAlerts")!)).toEqual([alert]);
     expect(dst.getItem("tickr.magnet")).toBe("1");
     expect(dst.getItem("tickr.hideDrawings")).toBe("1");
+    expect(dst.getItem("tickr.rr")).toBe("3.5");
     expect(dst.getItem("tickr.technicalsSettingsOpen")).toBe("1");
     expect(JSON.parse(dst.getItem("tickr.panes")!)).toEqual({ groups: [["price"], ["macd", "rsi"], ["stoch"], ["obv"]], left: "percent" });
   });

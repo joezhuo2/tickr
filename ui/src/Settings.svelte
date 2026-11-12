@@ -11,6 +11,7 @@
   import { onMount, tick } from "svelte";
   import { matchSettings, type SettingEntry } from "./lib/settingsSearch";
   import { chartAlerts } from "./lib/chartAlertStore.svelte";
+  import { rr, setReward } from "./lib/rrStore.svelte";
   import type { ChartTimeZone, ConnectionsReport, ServiceStatus, AiConfig, AiTestResult, DataProvider, Dots, Keybinds, RefreshMode, Theme, TextSize, Palette } from "./lib/types";
 
   let {
@@ -634,6 +635,13 @@
       </select>
     </label>
     <p class="hint">Extended-hours candles apply to the 1D chart. The tray quote has its own extended-hours setting. Local time applies to intraday candles; daily and longer candles keep exchange dates.</p>
+
+    <h3>Drawings</h3>
+    <label class="row">
+      <span>R:R reward multiple</span>
+      <input class="field" type="number" min="0.1" max="20" step="0.1" value={rr.reward} onchange={(e) => { setReward(e.currentTarget.valueAsNumber); e.currentTarget.value = String(rr.reward); }} />
+    </label>
+    <p class="hint">Target distance of the R:R drawing as a multiple of the risk. Applies to every R:R drawing.</p>
 
     <h3>Chart dots</h3>
     {#each DOTS as d (d.id)}

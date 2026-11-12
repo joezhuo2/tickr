@@ -5,6 +5,7 @@
   import { fitScale, forward, inverse, scaleLabel, scaleTicks, shiftRange, stretchRange } from "./lib/scale";
   import type { Drawing, DrawingPoint } from "./lib/types";
   import { DRAWING_COLORS, POINT_COUNT, arrowHead, channelLines, fibExtLevels, pitchforkLines, snapPrice, anchoredVwap, fibLevels, hitBox, positionLevels, rayEnd, timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
+  import { rr } from "./lib/rrStore.svelte";
   import { legendText, volumeProfile } from "./lib/indicators";
   import { columnPen, columns, type Sink } from "./lib/decimate";
   import { LEFT_SCALES, PANE_NAMES, mergeUp, movePane, paneRects, unmerge, visibleGroups, type PaneId, type Slot } from "./lib/panes";
@@ -1230,7 +1231,7 @@
 
   $effect(() => {
     // Redraw when any of these change.
-    void [stoch, ichi, trendLine, onBalance, pivotLevels, sessionKeys, redrawKey, list, preview, selected, tool, hideDrawings, orderLines, orderDrag, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt, fillMarks];
+    void [rr.reward, stoch, ichi, trendLine, onBalance, pivotLevels, sessionKeys, redrawKey, list, preview, selected, tool, hideDrawings, orderLines, orderDrag, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt, fillMarks];
     draw();
   });
 
@@ -1536,7 +1537,7 @@
   }
 
   function positionTargetY(d: Drawing): number {
-    return geo.y(positionLevels(d.points[0].price, d.points[1].price).target);
+    return geo.y(positionLevels(d.points[0].price, d.points[1].price, rr.reward).target);
   }
 
   function positionRight(a: Pixel, b: Pixel): number {
@@ -1788,7 +1789,7 @@
           ctx.fillText(`${l.ratio} ${num(l.price)}`, box.minX + 3, y - 1);
         }
       } else if (d.kind === "position") {
-        const pos = positionLevels(d.points[0].price, d.points[1].price);
+        const pos = positionLevels(d.points[0].price, d.points[1].price, rr.reward);
         const targetY = positionTargetY(d);
         const x1 = positionRight(a, b);
         ctx.globalAlpha = 0.14;
