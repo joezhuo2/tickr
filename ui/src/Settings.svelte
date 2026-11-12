@@ -4,7 +4,8 @@
   import { accelerator, display } from "./lib/hotkey";
   import { actionFor, bindKey, groupActions, keyLabel, rebind, type Action, type Category } from "./lib/keybinds";
   import { backdrop, dialog, expand, paneIn } from "./lib/motion";
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
+  import { matchSettings, type SettingEntry } from "./lib/settingsSearch";
   import type { ChartTimeZone, ConnectionsReport, ServiceStatus, AiConfig, AiTestResult, DataProvider, Dots, Keybinds, RefreshMode, Theme, TextSize, Palette } from "./lib/types";
 
   let {
@@ -315,6 +316,44 @@
   let keyGroup = $state<Category>(KEY_GROUPS[0].id);
   let keysOpen = $state(true);
 
+  let find = $state("");
+  let findOpen = $state(false);
+  let findActive = $state(0);
+  let content: HTMLDivElement | undefined = $state();
+  const found = $derived(matchSettings(find));
+
+  async function goTo(entry: SettingEntry) {
+    findOpen = false;
+    find = "";
+    tab = entry.tab;
+    if (entry.group) {
+      keyGroup = entry.group;
+      keysOpen = true;
+    }
+    await tick();
+    const rows = [...(content?.querySelectorAll<HTMLElement>(".row, button.link") ?? [])];
+    const text = (el: Element | null | undefined) => el?.textContent?.trim() ?? "";
+    const row = rows.find((r) => text(r.firstElementChild ?? r) === entry.label) ?? rows.find((r) => text(r).includes(entry.label));
+    if (!row) return;
+    row.scrollIntoView({ block: "center" });
+    row.classList.remove("flash-setting");
+    void row.offsetWidth;
+    row.classList.add("flash-setting");
+    setTimeout(() => row.classList.remove("flash-setting"), 1600);
+  }
+
+  function findKey(e: KeyboardEvent) {
+    if (e.key === "Escape") {
+      if (!findOpen && !find) return;
+      findOpen = false;
+      find = "";
+    } else if (e.key === "ArrowDown") findActive = Math.min(found.length - 1, findActive + 1);
+    else if (e.key === "ArrowUp") findActive = Math.max(0, findActive - 1);
+    else if (e.key === "Enter" && found[findActive]) void goTo(found[findActive]);
+    else return;
+    e.preventDefault();
+  }
+
   function openHotkeys() {
     keysOpen = tab === "hotkeys" ? !keysOpen : true;
     tab = "hotkeys";
@@ -330,6 +369,34 @@
   <div class="panel" role="dialog" tabindex="-1" aria-modal="true" aria-label="Settings" onclick={(e) => e.stopPropagation()} transition:dialog>
     <header>
       <h2>Settings</h2>
+      <div class="find" onfocusout={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) findOpen = false; }}>
+        <input
+          type="search"
+          placeholder="Search settings…"
+          aria-label="Search settings"
+          role="combobox"
+          aria-expanded={findOpen && found.length > 0}
+          aria-controls="settings-found"
+          spellcheck="false"
+          autocomplete="off"
+          bind:value={find}
+          oninput={() => { findOpen = true; findActive = 0; }}
+          onfocus={() => { findOpen = true; findActive = 0; }}
+          onkeydown={findKey}
+        />
+        {#if findOpen && found.length}
+          <ul id="settings-found" class="found" role="listbox" aria-label="Matching settings" transition:expand>
+            {#each found as entry, i (`${entry.tab} ${entry.group ?? ""} ${entry.label}`)}
+              <li role="option" aria-selected={i === findActive}>
+                <button tabindex="-1" onmouseenter={() => (findActive = i)} onclick={() => goTo(entry)}>
+                  <span>{entry.label}</span>
+                  <span class="where">{entry.section}</span>
+                </button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
       <button class="close" aria-label="Close" onclick={onclose}>×</button>
     </header>
 
@@ -350,7 +417,7 @@
           {/if}
         {/each}
       </div>
-      <div class="content" role="tabpanel">
+      <div class="content" role="tabpanel" bind:this={content}>
       {#key `${tab} ${tab === "hotkeys" ? keyGroup : ""}`}
       <div class="section" in:paneIn={{ y: 8 }}>
     {#if tab === "display"}
@@ -672,6 +739,78 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 12px;
+  }
+  .find {
+    position: relative;
+    flex: 1;
+    max-width: 260px;
+    margin-right: auto;
+  }
+  .find input {
+    width: 100%;
+    font: inherit;
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 7px;
+    border: 1px solid var(--faint);
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+  }
+  .find input:focus {
+    border-color: var(--accent);
+  }
+  .found {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    width: 320px;
+    max-width: calc(100vw - 64px);
+    margin: 0;
+    padding: 4px;
+    list-style: none;
+    background: var(--tooltip-bg);
+    border: 1px solid var(--faint);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    z-index: 3;
+  }
+  .found button {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 5px 8px;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    color: var(--text);
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+  }
+  .found li[aria-selected="true"] button {
+    background: var(--surface);
+  }
+  .where {
+    color: var(--muted);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .content :global(.flash-setting) {
+    border-radius: 6px;
+    animation: flash-setting 1.5s var(--ease-out);
+  }
+  @keyframes flash-setting {
+    0%, 45% {
+      background: color-mix(in srgb, var(--accent) 30%, transparent);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent);
+    }
+    100% {
+      background: transparent;
+      box-shadow: 0 0 0 4px transparent;
+    }
   }
   h2 {
     margin: 0;
