@@ -450,7 +450,10 @@ polls can be missed.
 ### Settings and keybinds
 
 The gear at the bottom left opens Settings. A menu on the left switches between
-Display, Hotkeys, Chart, Market data, AI, Backup and Connections. Hotkeys holds
+Display, Hotkeys, Chart, Market data, AI, Backup and Connections. The window
+keeps one size: a section longer than it scrolls inside, sections slide in as
+you switch, and the Hotkeys categories fold open and shut (click Hotkeys again
+to fold them). Hotkeys holds
 the global hotkey (click the field and press a new combination; **Reset**
 restores the default) and the in-window keybinds; Chart holds the session
 shading and chart dot toggles. Esc or a click outside closes it.
