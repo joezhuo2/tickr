@@ -155,7 +155,7 @@
   {#if error}<p class="error" role="alert">{error}</p>{/if}
   <p class="hint">Armed symbols are checked about every 15 seconds while tickr is running, even with the window closed. The first price after arming or restarting establishes a baseline; trailing alerts check a stop reached while tickr was closed. Allow tickr notifications in your system settings.</p>
   {#if alerts.length}
-    <div class="filters" role="group" aria-label="Filter alerts">
+    <div class="filters jelly" role="group" aria-label="Filter alerts">
       {#each ALERT_FILTERS as f (f.key)}
         <button type="button" class:on={filter === f.key} aria-pressed={filter === f.key} onclick={() => (filter = f.key)}>
           {f.label} <span class="count">{counts[f.key]}</span>

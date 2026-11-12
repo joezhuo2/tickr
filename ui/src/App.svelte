@@ -1622,7 +1622,7 @@
           </div>
         </div>
         <div class="range-controls">
-          <div class="ranges" role="tablist">
+          <div class="ranges jelly" role="tablist">
             {#each RANGES as r (r.id)}
               {@const on = !practice && (view === "chart" || view === "technicals" || view === "paper" || view === "backtest") && range === r.id}
               <button role="tab" aria-selected={on} class:on disabled={!!practice} onclick={() => setRange(r.id)}>

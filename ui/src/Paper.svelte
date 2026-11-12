@@ -190,7 +190,7 @@
     </section>
 
     <form class="ticket" onsubmit={submit} aria-label="Simulated order ticket">
-      <div class="seg" role="group" aria-label="Side">
+      <div class="side jelly" role="group" aria-label="Side">
         <button type="button" class:on={side === "buy"} class:buy={side === "buy"} aria-pressed={side === "buy"} onclick={() => (side = "buy")}>Buy</button>
         <button type="button" class:on={side === "sell"} class:sell={side === "sell"} aria-pressed={side === "sell"} onclick={() => (side = "sell")}>Sell</button>
       </div>
@@ -383,16 +383,16 @@
   .ghost {
     background: none;
   }
-  .seg {
+  .side {
     display: flex;
     gap: 2px;
   }
-  .seg button.buy {
+  .side button.buy {
     background: var(--up);
     border-color: var(--up);
     color: white;
   }
-  .seg button.sell {
+  .side button.sell {
     background: var(--down);
     border-color: var(--down);
     color: white;
