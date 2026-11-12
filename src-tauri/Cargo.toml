@@ -38,11 +38,12 @@ futures-util = "0.3"
 tempfile = "3"
 
 [profile.release]
-opt-level = "s"
+# Speed-optimised and unstripped: the stripped size-optimised build was
+# flagged by Microsoft Defender's ML model (Trojan:Win32/Bearfoos.A!ml).
+opt-level = 3
 lto = true
 codegen-units = 1
 panic = "abort"
-strip = true
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_System_Registry"] }
