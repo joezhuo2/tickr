@@ -449,9 +449,18 @@ type a condition in the Strategy syntax, such as
 `crosses_above(rsi(14), 70)` or `crosses_below(sma(20), sma(50))`, or choose a
 trendline or ray drawn on the symbol and whether the close should cross above
 or below it. Each alert belongs to the symbol and candle interval on screen
-when it was added. These alerts are checked each time the chart refreshes,
-only while that symbol and interval are on the main chart with the window
-open; they do not run in the background the way price alerts do. They fire
+when it was added. These alerts are checked each time the chart refreshes
+while that symbol and interval are on the main chart. Turn on **Check
+indicator and drawing alerts in the background** (Settings, Chart, off by
+default) to check every symbol and interval that has an armed alert for as
+long as tickr runs, even while the window is hidden in the tray or shows
+another symbol. Each symbol and interval is downloaded about once per bar,
+at most every 15 minutes and at least a minute apart (1m every minute, 5m
+every 5 minutes, 15m and longer every 15 minutes), using regular-session
+candles. With it on, minimizing or closing the window hides it instead of
+unloading it, and the window loads hidden at startup when tickr starts in
+the tray, so expect the memory of an open window. Each alert in the list
+says whether it is checked in the background or only on screen. They fire
 once with a desktop notification, then show **Triggered** until you **Rearm**
 them. A line alert keeps the line as it was when the alert was added, so
 moving the drawing later does not move the alert. They are saved on this

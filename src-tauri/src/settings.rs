@@ -598,6 +598,7 @@ pub struct Settings {
     pub always_on_top: bool,
     pub unload_on_minimize: bool,
     pub start_hidden: bool,
+    pub background_chart_alerts: bool,
     /// macOS: price and change next to the menu bar icon.
     pub show_tray_title: bool,
     /// Launch at login as last chosen; None until first recorded.
@@ -658,6 +659,7 @@ impl Default for Settings {
             always_on_top: false,
             unload_on_minimize: true,
             start_hidden: false,
+            background_chart_alerts: false,
             show_tray_title: true,
             autostart: None,
             watchlist: Vec::new(),
@@ -863,6 +865,7 @@ mod tests {
         assert!(s.drawings.is_empty());
         assert!(s.indicator_presets.is_empty());
         assert!(s.unload_on_minimize);
+        assert!(!s.background_chart_alerts);
         assert!(s.groups.is_empty());
         assert!(s.screens.is_empty());
         assert!(s.auto_update);

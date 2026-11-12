@@ -120,6 +120,7 @@ pub fn run() {
             commands::set_palette,
             commands::set_chart_mode,
             commands::set_refresh_mode,
+            commands::set_background_chart_alerts,
             commands::set_chart_scale,
             commands::set_hotkey,
             commands::export_settings,
@@ -183,11 +184,14 @@ pub fn run() {
             autostart::sync(&handle, &shared);
             tray::build(&handle)?;
             poller::spawn(handle.clone(), shared.clone());
+            poller::spawn_chart_alert_tick(handle.clone(), shared.clone());
             stream::spawn(handle.clone(), shared.clone());
             updater::spawn(handle.clone(), shared.clone());
 
             if !autostarted && !lock(&shared.settings).start_hidden {
                 window::open(&handle);
+            } else if lock(&shared.settings).background_chart_alerts {
+                window::preload(&handle);
             }
             Ok(())
         })

@@ -2,7 +2,7 @@
   import { applyCustom, loadCustom } from "./lib/display";
   import * as Scrollback from "./lib/scrollback";
   import * as ChartAlertRules from "./lib/chartAlerts";
-  import { chartAlerts, claimChartAlerts } from "./lib/chartAlertStore.svelte";
+  import { chartAlerts, fireChartAlerts, startBackgroundChartAlerts } from "./lib/chartAlertStore.svelte";
   import { CHART_MODES, nextMode } from "./lib/charttypes";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
@@ -325,6 +325,7 @@
     drawings = init.drawings ?? {};
     mode = init.chart_mode;
     refreshMode = init.refresh_mode ?? "balanced";
+    chartAlerts.background = init.background_chart_alerts ?? false;
     scale = init.chart_scale;
     chartExtended = init.chart_extended_hours ?? true;
     shadeSessions = init.chart_shade_sessions ?? true;
@@ -375,6 +376,7 @@
     theme = init.theme;
     textSize = init.text_size;
     palette = init.palette;
+    chartAlerts.background = init.background_chart_alerts ?? false;
     watchlist = keep(watchlist, init.watchlist ?? []);
     groups = keep(groups, init.groups ?? []);
     screens = keep(screens, init.screens ?? []);
@@ -944,12 +946,7 @@
   $effect(() => {
     const c = chart;
     if (!c || replay) return;
-    untrack(() => {
-      const fired = ChartAlertRules.due(chartAlerts.list, c.meta.symbol, c.interval, c.candles, clockFor(c.meta));
-      if (!fired.length) return;
-      const claimed = claimChartAlerts(new Set(fired.map((a) => a.id)), Math.floor(Date.now() / 1000));
-      for (const a of claimed) invoke("send_notification", { title: `tickr · ${a.symbol} chart alert`, body: `${a.label} (${a.interval})` }).catch(console.warn);
-    });
+    untrack(() => fireChartAlerts((list) => ChartAlertRules.due(list, c.meta.symbol, c.interval, c.candles, clockFor(c.meta))));
   });
 
   const paperLines = $derived(Paper.orderLines(paperAccount, symbol));
@@ -1746,12 +1743,14 @@
     const unStream = listen<StreamStatus>("stream-status", (e) => (dataProvider.stream = e.payload));
     invoke<DataProvider>("get_data_provider").then((c) => (dataProvider = c)).catch(console.warn);
     const unAlerts = listen<PriceAlert[]>("alerts", (e) => (alerts = e.payload));
+    const stopChartAlerts = startBackgroundChartAlerts();
     const onFocus = () => invoke<Init>("get_init").then(syncShared).catch(console.warn);
     window.addEventListener("focus", onFocus);
     const poll = persist ? undefined : setInterval(() => {
       if (refreshMode !== "low_power" || !document.hidden) void pollOwn();
     }, 15_000);
     return () => {
+      stopChartAlerts();
       window.removeEventListener("focus", onFocus);
       clearInterval(poll);
       un.then((f) => f());

@@ -10,6 +10,7 @@
   import { backdrop, dialog, expand, paneIn } from "./lib/motion";
   import { onMount, tick } from "svelte";
   import { matchSettings, type SettingEntry } from "./lib/settingsSearch";
+  import { chartAlerts } from "./lib/chartAlertStore.svelte";
   import type { ChartTimeZone, ConnectionsReport, ServiceStatus, AiConfig, AiTestResult, DataProvider, Dots, Keybinds, RefreshMode, Theme, TextSize, Palette } from "./lib/types";
 
   let {
@@ -618,6 +619,13 @@
         <input type="checkbox" checked={dots[d.id]} onchange={() => toggleDot(d.id)} />
       </label>
     {/each}
+
+    <h3>Chart alerts</h3>
+    <label class="row">
+      <span>Check indicator and drawing alerts in the background</span>
+      <input type="checkbox" checked={chartAlerts.background} onchange={(e) => { chartAlerts.background = e.currentTarget.checked; invoke("set_background_chart_alerts", { enabled: chartAlerts.background }).catch(console.warn); }} />
+    </label>
+    <p class="hint">Downloads candles for each symbol and interval with an armed alert about once per bar (at most every 15 minutes) while tickr runs, and keeps the window loaded in memory when it is minimized or closed to the tray.</p>
 
     {/if}
     {#if tab === "data"}
