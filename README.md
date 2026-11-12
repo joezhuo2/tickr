@@ -123,7 +123,8 @@ taskbar to keep it visible.
 - **Recent symbols and history:** focus the empty search box to see the last
   10 symbols you viewed. The Back and Forward buttons (or Alt+Left and
   Alt+Right) step through this session's symbols, and B jumps to the previous
-  one, so pressing it again toggles between two.
+  one, so pressing it again toggles between two. The list
+  under the search box slides open on focus and shut when you leave it.
 - **Chart types:** Line, Area, Baseline, Candles, Hollow candles, Bars (OHLC),
   Heikin Ashi and Renko, from the menu next to the price scale or by pressing C
   to cycle. Baseline colors the line green above and red below the previous
@@ -640,8 +641,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.30
-git push origin v0.11.30
+git tag v0.11.31
+git push origin v0.11.31
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

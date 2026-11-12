@@ -6,6 +6,10 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.31] - 2026-11-11
+
+### Changed\n- The list under the search box slides open on focus and shut on blur.
+
 ## [0.11.30] - 2026-11-11
 
 ### Changed\n- Settings keeps one size and scrolls inside; sections slide in and the Hotkeys\n  categories fold open and shut.
