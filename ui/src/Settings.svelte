@@ -179,6 +179,20 @@
     }
   }
 
+  let historyStatus = $state("");
+  let historyError = $state(false);
+
+  async function clearHistory() {
+    try {
+      await invoke("clear_bar_cache");
+      historyStatus = "Cleared";
+      historyError = false;
+    } catch (e) {
+      historyStatus = String(e);
+      historyError = true;
+    }
+  }
+
   let backupStatus = $state("");
   let backupError = $state(false);
   let pendingImport = $state<string | null>(null);
@@ -648,8 +662,12 @@
       <button class="link" disabled={marketBusy || !market.has_keys} onclick={() => marketAction("test")}>Test connection</button>
       <button class="link" disabled={marketBusy || !market.has_keys} onclick={() => marketAction("clear")}>Clear keys</button>
     </div>
-    <p class="hint">Free Alpaca keys give real-time IEX trades for US stocks. Watchlist and alerts still use Yahoo.</p>
+    <p class="hint">Free Alpaca keys give real-time IEX trades for US stocks in the chart, watchlist and alerts, and deeper intraday history when you scroll the chart back. Yahoo quotes can be delayed.</p>
     {#if marketStatus}<p class="hint" class:error={!marketStatus.ok}>{marketStatus.text}</p>{/if}
+    <div class="row">
+      <button class="link" onclick={clearHistory}>Clear cached history</button>
+    </div>
+    <p class="hint" class:error={historyError} role="status">{historyStatus || "Intraday candles you load are kept on this computer, so scrolling back reaches past Yahoo's limit over time."}</p>
 
     {/if}
     {#if tab === "ai"}

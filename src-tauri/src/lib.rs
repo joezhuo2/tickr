@@ -5,6 +5,7 @@ pub mod provider;
 pub mod stream;
 pub mod ai;
 pub mod analysis;
+pub mod barcache;
 pub mod alerts;
 pub mod analyst;
 pub mod autostart;
@@ -115,6 +116,7 @@ pub fn run() {
             commands::set_drawings,
             commands::send_notification,
             commands::get_older,
+            commands::clear_bar_cache,
             commands::set_theme,
             commands::set_text_size,
             commands::set_palette,

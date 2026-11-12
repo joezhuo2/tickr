@@ -19,6 +19,7 @@ use crate::sp500::HeatQuote;
 use crate::options::Options;
 use crate::stats::Section;
 use crate::news::Article;
+use crate::barcache;
 use crate::quote::{self, Candle, Chart, Quote, SearchHit};
 use crate::ivrank::{self, IvRank};
 use crate::screener::{self, ScreenRow};
@@ -138,6 +139,10 @@ pub fn get_init(shared: State<'_, Arc<Shared>>) -> Init {
 pub async fn get_chart(shared: State<'_, Arc<Shared>>, symbol: String, range: String, interval: String, extended: bool, secondary: Option<bool>) -> Result<Chart, String> {
     let revision = shared.revision();
     let chart = crate::provider::Provider::current(&shared).fetch_chart(&shared.http, &symbol, &range, &interval, extended).await?;
+    if secondary != Some(true) && barcache::cacheable(&chart.interval) {
+        let _bars = lock(&shared.bar_cache);
+        barcache::record(&barcache::dir(&shared.settings_path), &barcache::key(&chart.source, &chart.meta.symbol, &chart.interval, chart.extended), &chart.candles);
+    }
     let _settings = lock(&shared.settings);
     if shared.revision() != revision { return Err("Market data settings changed; try again".into()); }
     if secondary != Some(true) { *lock(&shared.last_chart) = Some(chart.clone()); }
@@ -158,7 +163,30 @@ pub async fn get_history(shared: State<'_, Arc<Shared>>, symbol: String, interva
 pub async fn get_older(shared: State<'_, Arc<Shared>>, symbol: String, interval: String, start: i64, end: i64, extended: bool) -> Result<Vec<Candle>, String> {
     let symbol = symbol.trim().to_uppercase();
     let provider = crate::provider::Provider::current(&shared);
-    provider.fetch_older(&shared.http, &symbol, &interval, start, end, extended).await.map(|(_, candles)| candles)
+    let result = provider.fetch_older(&shared.http, &symbol, &interval, start, end, extended).await;
+    if !barcache::cacheable(&interval) { return result.map(|(_, candles)| candles); }
+    let prepost = extended && interval.ends_with('m');
+    let dir = barcache::dir(&shared.settings_path);
+    let _bars = lock(&shared.bar_cache);
+    match result {
+        Ok((source, candles)) if !candles.is_empty() => {
+            barcache::record(&dir, &barcache::key(source, &symbol, &interval, prepost), &candles);
+            Ok(candles)
+        }
+        other => {
+            let cached = barcache::older_slice(&barcache::load(&dir, &barcache::key(provider.bar_source(&symbol), &symbol, &interval, prepost)), start, end);
+            if cached.is_empty() { other.map(|(_, candles)| candles) } else { Ok(cached) }
+        }
+    }
+}
+
+#[tauri::command]
+pub fn clear_bar_cache(shared: State<'_, Arc<Shared>>) -> Result<(), String> {
+    let _bars = lock(&shared.bar_cache);
+    match std::fs::remove_dir_all(barcache::dir(&shared.settings_path)) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(format!("Could not clear cached history: {e}")),
+        _ => Ok(()),
+    }
 }
 
 fn history_for(shared: &Shared, symbol: &str, interval: &str) -> Result<Chart, String> {

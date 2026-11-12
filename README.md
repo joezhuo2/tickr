@@ -190,11 +190,13 @@ taskbar to keep it visible.
   chart, or zoom out when everything is already on screen, to load older
   candles at the same interval. Each step adds about as much history as is
   already loaded and the view stays where it was. Yahoo limits intraday
-  history (about 30 days of 1m, 60 days of 5m to 30m, two years of 1h), so
-  scrolling stops there; daily and longer go back to the first listing. Older
-  candles always come from Yahoo, also when Alpaca supplies the live chart,
-  and are kept until tickr restarts. Analysis overlays cover the range's own
-  candles, not the older ones. The second chart does not scroll back.
+  history (about 30 days of 1m, 60 days of 5m to 30m, two years of 1h); with
+  Alpaca keys, US stocks scroll back through Alpaca's years of history at the
+  same interval. Intraday candles you load are also saved on this computer, so
+  scrolling back reaches past Yahoo's limit over time (see [Files](#files)).
+  Scrolling stops at 20,000 candles; daily and longer go back to the first
+  listing. Analysis overlays cover the range's own candles, not the older
+  ones. The second chart does not scroll back.
 - **Candle countdown:** on a live intraday chart, the bottom right corner shows
   the time left until the forming candle closes.
 - **Tooltip:** hover the chart, or use ← and →, for time, open, high, low,
@@ -650,10 +652,16 @@ requires. Analysis and sentiment run on your machine. Not investment advice.
 | --- | --- | --- |
 | Settings | `%APPDATA%\tickr\settings.json` | `~/Library/Application Support/tickr/` |
 | AI credentials | `%APPDATA%\tickr\.env.local` | `~/Library/Application Support/tickr/` |
+| Intraday candle history | `%APPDATA%\tickr\bars\` | `~/Library/Application Support/tickr/bars/` |
 | Logo, AI tone and event analysis cache | `%LOCALAPPDATA%\tickr\` | `~/Library/Caches/tickr/` |
 | Logs | `%LOCALAPPDATA%\dev.tickr.desktop\logs\tickr.log` | `~/Library/Logs/dev.tickr.desktop/` |
 
 Logs rotate at 1 MB and keep two old files. Attach `tickr.log` to bug reports.
+
+The candle history keeps the newest 20,000 candles per symbol, interval and
+source, for at most 40 series; the least recently updated series is dropped
+first. A stock split restarts that symbol's history. Settings > Market data >
+Clear cached history deletes it.
 
 Uninstalling on Windows removes the launch-at-login entry. Check "Delete the
 application data" in the uninstaller to also remove settings, the logo cache,
@@ -822,9 +830,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports should include
 
 Yahoo is the default; no provider configuration is required. To use Alpaca, open Settings > Market data, choose Alpaca, select a feed, enter your key ID and secret, then Save and Test connection. Blank key fields keep saved credentials. Clear keys removes them and switches back to Yahoo.
 
-Free Alpaca keys provide real-time IEX trades for US stocks. IEX covers one exchange; the paid SIP feed provides consolidated US market data and requires the appropriate subscription. Only symbols of one to five uppercase letters use Alpaca. Indices, crypto, foreign listings and symbols such as BRK-B continue to use Yahoo. Yahoo also supplies company metadata, sessions, corporate actions and quote volume. Alpaca supplies selected-stock prices and chart candles, with automatic Yahoo fallback on failure. The footer shows the actual quote source and stream status.
+Free Alpaca keys provide real-time IEX trades for US stocks. IEX covers one exchange; the paid SIP feed provides consolidated US market data and requires the appropriate subscription. Only symbols of one to five uppercase letters use Alpaca. Indices, crypto, foreign listings and symbols such as BRK-B continue to use Yahoo. Yahoo also supplies company metadata, sessions, corporate actions and quote volume. Alpaca supplies prices for the selected stock, the watchlist and alerts, chart candles, and older intraday candles when you scroll the chart back (split-adjusted, from your selected feed), with automatic Yahoo fallback on failure. The footer shows the actual quote source and stream status.
 
-Watchlist quotes and alerts still use Yahoo because free Alpaca keys allow 200 requests per minute. The stream subscribes only to the selected stock, using one connection (the free plan allows one connection and 30 symbols). Polling continues as a backstop. Authentication, connection-limit and subscription errors pause stream retries until the symbol or provider configuration changes.
+Watchlist and alert prices take one Alpaca snapshot request per refresh for all their stocks, since free Alpaca keys allow 200 requests per minute. The stream subscribes only to the selected stock, using one connection (the free plan allows one connection and 30 symbols). Polling continues as a backstop. Authentication, connection-limit and subscription errors pause stream retries until the symbol or provider configuration changes.
 
 Keys are stored in `.env.local` in tickr's OS configuration directory, alongside the AI configuration, and are never returned to the page. `settings.json` stores only the provider and feed. Changing market data settings reloads the chart.
 
