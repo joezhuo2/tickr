@@ -6,6 +6,15 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.49] - 2026-11-12
+
+### Added
+- **Chart notes:** pin a note to a bar with the Note tool in the drawing
+  toolbar or `` ` `` (rebindable). Hover the marker to read it, click to edit
+  the text and color or delete it. Notes stay on their candle across intervals
+  and are listed per symbol in the Alerts panel, where a click scrolls the
+  chart to the note. They are saved with drawings and included in Backup.
+
 ## [0.11.48] - 2026-11-12
 
 ### Fixed
