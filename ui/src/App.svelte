@@ -1389,6 +1389,32 @@
     else if (syncHover?.source === source) syncHover = null;
   }
 
+  const DOCKABLE = new Set(["watchlist", "alerts", "analysts", "earnings", "stats", "financials", "market", "events", "options", "news"]);
+  const DOCK_MIN = 280;
+
+  function stored(key: string): string | null {
+    try { return localStorage.getItem(key); } catch { return null; }
+  }
+
+  function store(key: string, value: string) {
+    try { localStorage.setItem(key, value); } catch { /* storage unavailable */ }
+  }
+
+  let dockOn = $state(stored("tickr.dock") !== "0");
+  let dockWidth = $state(Math.max(DOCK_MIN, Number(stored("tickr.dockWidth")) || 440));
+  let dockDrag: { x: number; w: number } | null = null;
+  const docked = $derived(dockOn && DOCKABLE.has(view));
+
+  function toggleDock() {
+    dockOn = !dockOn;
+    store("tickr.dock", dockOn ? "1" : "0");
+  }
+
+  function setDockWidth(w: number) {
+    dockWidth = Math.round(Math.max(DOCK_MIN, Math.min(w, window.innerWidth * 0.7)));
+    store("tickr.dockWidth", String(dockWidth));
+  }
+
   function setMode(m: ChartMode) {
     if (view !== "technicals" && view !== "paper" && view !== "backtest") view = "chart";
     mode = m;
@@ -1639,6 +1665,9 @@
             <div class="seg">
               <button class:on={view === "news"} aria-pressed={view === "news"} disabled={!!replay} onclick={toggleNews}>News</button>
             </div>
+            <div class="seg">
+              <button class:on={dockOn} aria-pressed={dockOn} title="Keep the chart beside the watchlist and panels" onclick={toggleDock}>Dock</button>
+            </div>
             <div class="seg" role="group" aria-label="Chart type">
               <select aria-label="Chart type" value={mode} onchange={(event) => setMode(event.currentTarget.value as ChartMode)}>
                 {#each CHART_MODES as m}<option value={m.id}>{m.label}</option>{/each}
@@ -1773,8 +1802,9 @@
             onchange={changePractice}
           />
         {/if}
-        {#key view}
-          <div class="pane" in:paneIn={view === "watchlist" ? { y: 16, speed: "slow" } : {}}>
+        {#key docked ? "dock" : view}
+          <div class="pane" in:paneIn={view === "watchlist" && !docked ? { y: 16, speed: "slow" } : {}}>
+            {#snippet panel()}
             {#if view === "watchlist"}
               <Watchlist bind:this={watchlistView} {refreshMode} symbols={watchlist} {groups} current={symbol} sort={watchlistSort} view={watchlistLayout} columns={watchlistColumns} {screens} bind:tab={groupTab} onopen={openWatched} ongroups={saveGroups} onsort={saveSort} onview={saveWatchlistLayout} oncolumns={saveWatchlistColumns} onsavescreen={saveScreen} ondeletescreen={deleteScreen} />
             {:else if view === "alerts"}
@@ -1818,6 +1848,49 @@
               <News {symbol} {groups} bind:scope={newsScope} articles={news} {feed}
                 emptyScope={feedSymbols.length === 0} error={newsScope === "symbol" ? newsError : feedError}
                 {now} onretry={() => newsScope === "symbol" ? loadNews() : loadFeed()} />
+            {/if}
+            {/snippet}
+            {#if docked}
+              <div class="dock">
+                <div class="dock-chart">
+                  {#if mainChart}
+                    <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={chartFills} orderLines={paperLines} onmoveorder={paperMove} />
+                  {:else if chartError}
+                    <div class="msg">
+                      {chartError}
+                      <button class="retry" onclick={() => loadChart(true)}>Retry</button>
+                    </div>
+                  {:else}
+                    <ChartSkeleton />
+                  {/if}
+                </div>
+                <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+                <div
+                  class="dock-grip"
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label="Resize panel"
+                  aria-valuenow={dockWidth}
+                  tabindex="0"
+                  onpointerdown={(e) => { dockDrag = { x: e.clientX, w: dockWidth }; e.currentTarget.setPointerCapture(e.pointerId); }}
+                  onpointermove={(e) => { if (dockDrag) setDockWidth(dockDrag.w + dockDrag.x - e.clientX); }}
+                  onpointerup={() => (dockDrag = null)}
+                  onpointercancel={() => (dockDrag = null)}
+                  onkeydown={(e) => {
+                    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setDockWidth(dockWidth + (e.key === "ArrowLeft" ? 24 : -24));
+                  }}
+                ></div>
+                <div class="dock-panel" style:width="{dockWidth}px">
+                  {#key view}
+                    <div class="pane" in:paneIn={{}}>{@render panel()}</div>
+                  {/key}
+                </div>
+              </div>
+            {:else if DOCKABLE.has(view)}
+              {@render panel()}
             {:else if view === "technicals"}
               <div class="split">
                 {#if mainChart}
@@ -2019,6 +2092,53 @@
   }
   .charts.stacked {
     flex-direction: column;
+  }
+  .dock {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+  }
+  .dock-chart {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .dock-grip {
+    flex: none;
+    width: 7px;
+    margin: 0 2px;
+    border-left: 1px solid var(--faint);
+    cursor: col-resize;
+    touch-action: none;
+  }
+  .dock-grip:hover,
+  .dock-grip:focus-visible {
+    border-left-color: var(--accent);
+    outline: none;
+  }
+  .dock-panel {
+    flex: none;
+    max-width: 70%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  @media (max-width: 860px) {
+    .dock-chart,
+    .dock-grip {
+      display: none;
+    }
+    .dock-panel {
+      flex: 1;
+      width: auto !important;
+      max-width: none;
+    }
   }
   .toolbar {
     display: flex;

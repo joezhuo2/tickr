@@ -256,8 +256,15 @@ taskbar to keep it visible.
 
 ### Views
 
-Each tab or button below swaps the chart out; click it again, or a range, to
-go back.
+The Watchlist, Alerts, Analysts, Earnings, Stats, Financials, Market, Events,
+Options and News open in a column to the right of the chart, so the chart
+stays on screen. Drag the border between them (or focus it and press ← or →)
+to resize the column; the width is remembered. Turn **Dock** off in the
+toolbar to give those views the full width instead, which is also what
+happens when the window is narrower than 860 pixels. Click a tab again, or a
+range, to close its panel. Zoom on the chart resets when a panel opens or
+closes. Technicals, Paper trading and Strategy keep their own layout with the
+chart on top.
 Views fade in, the watchlist slides up, Settings scales open and switching
 line / candles fades the chart. With the OS reduced-motion setting on, all of
 it is instant.
@@ -619,8 +626,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.27
-git push origin v0.11.27
+git tag v0.11.28
+git push origin v0.11.28
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

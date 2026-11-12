@@ -6,6 +6,10 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.28] - 2026-11-11
+
+### Added\n- **Docked panels:** the watchlist and research panels open in a resizable\n  column beside the chart. The Dock button in the toolbar turns this off.
+
 ## [0.11.27] - 2026-11-11
 
 ### Added\n- **Indicator and drawing alerts:** alert on a Strategy condition such as an\n  RSI or moving-average cross, or on a close through a trendline. Checked\n  while that symbol and interval are on the main chart.
