@@ -47,3 +47,12 @@ export function mix(a: string, b: string, amount: number): string {
   const [x, y] = [hexToRgb(a), hexToRgb(b)];
   return rgbToHex(x[0] + (y[0] - x[0]) * amount, x[1] + (y[1] - x[1]) * amount, x[2] + (y[2] - x[2]) * amount);
 }
+
+/** A computed CSS color ("#abc", "#aabbcc", "rgb(…)" or "rgba(…)") as #rrggbb, dropping alpha; "" otherwise. */
+export function cssToHex(value: string): string {
+  const v = value.trim().toLowerCase();
+  if (isHex(v)) return v;
+  if (/^#[0-9a-f]{3}$/.test(v)) return `#${[...v.slice(1)].map((c) => c + c).join("")}`;
+  const m = v.match(/^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/);
+  return m ? rgbToHex(+m[1], +m[2], +m[3]) : "";
+}

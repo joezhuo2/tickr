@@ -13,9 +13,45 @@ export interface Custom {
   sub: string;
   font: string;
   mono: string;
+  colors: Record<string, string>;
 }
 
-export const NO_CUSTOM: Custom = { main: "", sub: "", font: "", mono: "" };
+export const NO_CUSTOM: Custom = { main: "", sub: "", font: "", mono: "", colors: {} };
+
+export const TOKENS: { name: string; label: string; group: string }[] = [
+  { name: "bg", label: "Background", group: "Interface" },
+  { name: "surface", label: "Panels", group: "Interface" },
+  { name: "text", label: "Text", group: "Interface" },
+  { name: "muted", label: "Muted text", group: "Interface" },
+  { name: "faint", label: "Borders", group: "Interface" },
+  { name: "accent", label: "Accent", group: "Interface" },
+  { name: "tooltip-bg", label: "Tooltip background", group: "Interface" },
+  { name: "warn-bg", label: "Warning background", group: "Interface" },
+  { name: "warn-text", label: "Warning text", group: "Interface" },
+  { name: "up", label: "Gain", group: "Market" },
+  { name: "down", label: "Loss", group: "Market" },
+  { name: "flat", label: "Unchanged", group: "Market" },
+  { name: "grid", label: "Chart grid", group: "Chart" },
+  { name: "crosshair", label: "Crosshair", group: "Chart" },
+  { name: "ext-shade", label: "Extended-hours shade", group: "Chart" },
+  { name: "ma-1", label: "Moving average 1", group: "Chart" },
+  { name: "ma-2", label: "Moving average 2", group: "Chart" },
+  { name: "ma-3", label: "Moving average 3", group: "Chart" },
+  { name: "ma-4", label: "Moving average 4", group: "Chart" },
+  { name: "ma-5", label: "Moving average 5", group: "Chart" },
+  { name: "bb", label: "Bollinger bands", group: "Chart" },
+  { name: "bb-fill", label: "Bollinger fill", group: "Chart" },
+  { name: "vwap", label: "VWAP", group: "Chart" },
+  { name: "rsi", label: "RSI", group: "Chart" },
+  { name: "fib", label: "Fibonacci", group: "Chart" },
+  { name: "or", label: "Opening range", group: "Chart" },
+  { name: "levels", label: "Key levels", group: "Chart" },
+  { name: "vol-ma", label: "Volume average", group: "Chart" },
+  { name: "rating", label: "Analyst rating markers", group: "Chart" },
+  { name: "news", label: "News markers", group: "Chart" },
+  { name: "dividend", label: "Dividend markers", group: "Chart" },
+  { name: "split", label: "Split markers", group: "Chart" },
+];
 
 export const FONTS: { id: string; label: string; stack: string }[] = [
   { id: "sans", label: "Sans (Segoe UI, Helvetica)", stack: '"Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif' },
@@ -36,13 +72,15 @@ export const MAIN_PRESETS = ["#4c8dff", "#0a66d8", "#7c4dff", "#bf5af2", "#ff375
 export const SUB_PRESETS = ["#111113", "#0b1220", "#161a1d", "#1e1b2e", "#ffffff", "#f5f1e8", "#eef3f8", "#f4f4f5"];
 
 const KEY = "tickr.custom";
-const VARS = ["--accent", "--bg", "--surface", "--faint", "--text", "--muted", "--grid", "--crosshair", "--ext-shade", "--tooltip-bg", "--font", "--font-mono"];
+const VARS = [...TOKENS.map((t) => `--${t.name}`), "--font", "--font-mono"];
 
 export function sanitizeCustom(value: unknown): Custom {
   const v = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
   const hex = (x: unknown) => (typeof x === "string" && isHex(x) ? x.toLowerCase() : "");
   const pick = (x: unknown, list: { id: string }[]) => (typeof x === "string" && list.some((f) => f.id === x) ? x : "");
-  return { main: hex(v.main), sub: hex(v.sub), font: pick(v.font, FONTS), mono: pick(v.mono, MONO_FONTS) };
+  const given = (v.colors && typeof v.colors === "object" ? v.colors : {}) as Record<string, unknown>;
+  const colors = Object.fromEntries(TOKENS.filter((t) => hex(given[t.name])).map((t) => [t.name, hex(given[t.name])]));
+  return { main: hex(v.main), sub: hex(v.sub), font: pick(v.font, FONTS), mono: pick(v.mono, MONO_FONTS), colors };
 }
 
 export function loadCustom(): Custom {
@@ -75,6 +113,7 @@ export function customVars(c: Custom): { vars: Record<string, string>; scheme: "
     vars["--ext-shade"] = `rgba(${veil}, 0.035)`;
     vars["--tooltip-bg"] = mix(c.sub, ink, 0.04);
   }
+  for (const [name, hex] of Object.entries(c.colors)) vars[`--${name}`] = hex;
   const font = FONTS.find((f) => f.id === c.font);
   const mono = MONO_FONTS.find((f) => f.id === c.mono);
   if (font) vars["--font"] = font.stack;
