@@ -1459,6 +1459,22 @@
     store("tickr.dockWidth", String(dockWidth));
   }
 
+  const LEFT_MIN = 180;
+  const LEFT_MAX = 420;
+  let leftOn = $state(stored("tickr.left") !== "0");
+  let leftWidth = $state(Math.min(LEFT_MAX, Math.max(LEFT_MIN, Number(stored("tickr.leftWidth")) || 230)));
+  let leftDrag: { x: number; w: number } | null = null;
+
+  function toggleLeft() {
+    leftOn = !leftOn;
+    store("tickr.left", leftOn ? "1" : "0");
+  }
+
+  function setLeftWidth(w: number) {
+    leftWidth = Math.round(Math.max(LEFT_MIN, Math.min(w, LEFT_MAX, window.innerWidth * 0.5)));
+    store("tickr.leftWidth", String(leftWidth));
+  }
+
   function setMode(m: ChartMode) {
     if (view !== "technicals" && view !== "paper" && view !== "backtest") view = "chart";
     mode = m;
@@ -1510,6 +1526,9 @@
         break;
       case "settings":
         if (!e.repeat) settingsOpen = true;
+        break;
+      case "side_panel":
+        if (!e.repeat) toggleLeft();
         break;
       case "toggle_watchlist":
         if (!e.repeat) view = view === "watchlist" ? "chart" : "watchlist";
@@ -1672,7 +1691,9 @@
 {#if ready}
   <div class="app">
     <main>
+      {#if leftOn}
       <Left
+        width={leftWidth}
         symbol={practice?.symbol ?? symbol}
         {quote}
         logo={practice ? null : logo}
@@ -1687,9 +1708,32 @@
         }}
         replay={replayHeader}
       />
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+      <div
+        class="left-grip"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize stock overview"
+        aria-valuenow={leftWidth}
+        tabindex="0"
+        onpointerdown={(e) => { leftDrag = { x: e.clientX, w: leftWidth }; e.currentTarget.setPointerCapture(e.pointerId); }}
+        onpointermove={(e) => { if (leftDrag) setLeftWidth(leftDrag.w + e.clientX - leftDrag.x); }}
+        onpointerup={() => (leftDrag = null)}
+        onpointercancel={() => (leftDrag = null)}
+        onkeydown={(e) => {
+          if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+          e.preventDefault();
+          e.stopPropagation();
+          setLeftWidth(leftWidth + (e.key === "ArrowRight" ? 24 : -24));
+        }}
+      ></div>
+      {/if}
       <section>
         <div class="toolbar">
           <div class="nav">
+            <button title="{leftOn ? "Hide" : "Show"} stock overview ({keyLabel(keybinds.side_panel)})" aria-label="Stock overview" aria-pressed={leftOn} onclick={toggleLeft}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2" /><path d="M10 5v14" /></svg>
+            </button>
             <button title="Back (Alt+←)" aria-label="Back (Alt+←)" disabled={!history.back.length} onclick={() => navigate(goBack)}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
             </button>
@@ -2164,6 +2208,20 @@
     border-left: 1px solid var(--faint);
     cursor: col-resize;
     touch-action: none;
+  }
+  .left-grip {
+    flex: none;
+    width: 7px;
+    margin: 0 -3px 0 -4px;
+    position: relative;
+    z-index: 1;
+    cursor: col-resize;
+    touch-action: none;
+  }
+  .left-grip:hover,
+  .left-grip:focus-visible {
+    background: linear-gradient(90deg, transparent 3px, var(--accent) 3px 4px, transparent 4px);
+    outline: none;
   }
   .dock-grip:hover,
   .dock-grip:focus-visible {

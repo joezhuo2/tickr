@@ -265,6 +265,7 @@ export interface Keybinds {
   search: string;
   settings: string;
   toggle_watchlist: string;
+  side_panel: string;
   alerts: string;
   market: string;
   news: string;

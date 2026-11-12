@@ -28,6 +28,7 @@ const DEFAULTS: Keybinds = {
   search: "s",
   settings: ",",
   toggle_watchlist: "w",
+  side_panel: "\\",
   alerts: "p",
   market: "m",
   news: "n",
