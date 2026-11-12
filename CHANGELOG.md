@@ -6,6 +6,17 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.55] - 2026-11-12
+
+### Added
+- **Reset all keybinds:** Settings, Hotkeys, General has a "Reset to defaults"
+  button that restores every keybind and the show/hide hotkey.
+
+### Fixed
+- The Display tab's "Reset to defaults" button follows the theme instead of
+  showing as a native button. Disabled reset links are dimmed and show a focus
+  ring.
+
 ## [0.11.54] - 2026-11-12
 
 ### Added

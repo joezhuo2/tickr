@@ -64,6 +64,58 @@ export const ACTIONS: { id: Action; label: string; category: Category }[] = [
   { id: "settings", label: "Toggle Settings", category: "general" },
 ];
 
+export const DEFAULT_KEYBINDS: Keybinds = {
+  chart_mode: "c",
+  chart_scale: "l",
+  chart_interval: "i",
+  draw_level: "1",
+  draw_trend: "2",
+  draw_text: "3",
+  draw_ruler: "4",
+  draw_pen: "5",
+  draw_rect: "[",
+  draw_ray: "]",
+  draw_fib: ";",
+  draw_position: "'",
+  draw_avwap: "/",
+  draw_note: "`",
+  chart_split: "j",
+  new_window: "=",
+  chart_replay: "y",
+  practice: "q",
+  refresh: "r",
+  range: "v",
+  technicals: "t",
+  analysts: "a",
+  earnings: "e",
+  watchlist: "x",
+  search: "s",
+  settings: ",",
+  toggle_watchlist: "w",
+  side_panel: "\\",
+  alerts: "p",
+  market: "m",
+  news: "n",
+  analyze: "z",
+  options: "o",
+  paper: "h",
+  backtest: ".",
+  options_side: "u",
+  options_expiry: "d",
+  add_watchlist: "f",
+  events: "k",
+  next_group: "g",
+  previous_symbol: "b",
+  toggle_opening_range: "6",
+  toggle_levels: "7",
+  toggle_volume_ma: "8",
+  toggle_volume_profile: "9",
+};
+
+export function keybindsCustomized(binds: Keybinds): boolean {
+  return ACTIONS.some((a) => binds[a.id] !== DEFAULT_KEYBINDS[a.id]);
+}
+
 export function groupActions(): { id: Category; label: string; actions: typeof ACTIONS }[] {
   return CATEGORIES.map((c) => ({ ...c, actions: ACTIONS.filter((a) => a.category === c.id) })).filter((g) => g.actions.length);
 }

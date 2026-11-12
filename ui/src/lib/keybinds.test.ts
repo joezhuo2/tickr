@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ACTIONS, CATEGORIES, actionFor, groupActions, bindKey, keyLabel, nextGroupTab, practiceAllows, rebind, replayAllows } from "./keybinds";
+import { ACTIONS, DEFAULT_KEYBINDS, keybindsCustomized, CATEGORIES, actionFor, groupActions, bindKey, keyLabel, nextGroupTab, practiceAllows, rebind, replayAllows } from "./keybinds";
 import type { Keybinds } from "./types";
 
 const DEFAULTS: Keybinds = {
@@ -50,7 +50,15 @@ const DEFAULTS: Keybinds = {
   toggle_volume_profile: "9",
 };
 
-const down = (key: string, mods: Partial<Record<"ctrlKey" | "altKey" | "metaKey", boolean>> = {}) => ({
+describe("keybindsCustomized", () => {
+  it("is false for the defaults and true after a rebind", () => {
+    expect(keybindsCustomized(DEFAULT_KEYBINDS)).toBe(false);
+    expect(keybindsCustomized(rebind(DEFAULT_KEYBINDS, "chart_mode", "F5"))).toBe(true);
+    expect(DEFAULT_KEYBINDS).toEqual(DEFAULTS);
+  });
+});
+
+const down =(key: string, mods: Partial<Record<"ctrlKey" | "altKey" | "metaKey", boolean>> = {}) => ({
   key,
   ctrlKey: false,
   altKey: false,
