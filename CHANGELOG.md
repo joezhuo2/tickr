@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.40] - 2026-11-11
+
+### Added
+- **Colors:** Settings > Display lists every theme color (interface,
+  gain/loss, chart grid, crosshair and every overlay and marker), each with
+  the color picker and its own Reset. **Reset to defaults** at the top of
+  Display clears them all.
+
 ## [0.11.39] - 2026-11-11
 
 ### Changed
