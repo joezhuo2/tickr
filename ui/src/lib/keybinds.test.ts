@@ -137,9 +137,9 @@ describe("chart_replay", () => {
     expect(bindKey(down(" "))).toBeNull();
     expect(bindKey(down("Escape"))).toBeNull();
   });
-  it("blocks panels, drawing and the second chart during replay", () => {
-    for (const id of ["chart_replay", "chart_mode", "chart_scale", "technicals", "paper", "analyze", "settings"] as const) expect(replayAllows(id)).toBe(true);
-    for (const id of ["news", "earnings", "analysts", "options", "market", "events", "alerts", "toggle_watchlist", "chart_split", "draw_level", "draw_pen"] as const) expect(replayAllows(id)).toBe(false);
+  it("blocks panels and the second chart during replay but allows drawing", () => {
+    for (const id of ["chart_replay", "chart_mode", "chart_scale", "technicals", "paper", "analyze", "settings", "draw_level", "draw_pen", "draw_note", "draw_avwap"] as const) expect(replayAllows(id)).toBe(true);
+    for (const id of ["news", "earnings", "analysts", "options", "market", "events", "alerts", "toggle_watchlist", "chart_split"] as const) expect(replayAllows(id)).toBe(false);
   });
 });
 
@@ -155,9 +155,9 @@ describe("practice", () => {
   it("can be reached from bar replay", () => {
     expect(replayAllows("practice")).toBe(true);
   });
-  it("allows only view-only actions during practice", () => {
-    for (const id of ["practice", "chart_mode", "chart_scale", "technicals", "analyze", "settings"] as const) expect(practiceAllows(id)).toBe(true);
-    for (const id of ["chart_replay", "chart_interval", "range", "refresh", "paper", "search", "previous_symbol", "watchlist", "add_watchlist", "news", "earnings", "analysts", "alerts", "options", "market", "events", "toggle_watchlist", "next_group", "chart_split", "draw_level", "draw_pen"] as const) expect(practiceAllows(id)).toBe(false);
+  it("allows only view-only and drawing actions during practice", () => {
+    for (const id of ["practice", "chart_mode", "chart_scale", "technicals", "analyze", "settings", "draw_level", "draw_pen", "draw_note", "draw_avwap"] as const) expect(practiceAllows(id)).toBe(true);
+    for (const id of ["chart_replay", "chart_interval", "range", "refresh", "paper", "search", "previous_symbol", "watchlist", "add_watchlist", "news", "earnings", "analysts", "alerts", "options", "market", "events", "toggle_watchlist", "next_group", "chart_split"] as const) expect(practiceAllows(id)).toBe(false);
   });
 });
 

@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { direction, price, signed } from "./lib/format";
-  import { INTERVALS, INTERVAL_LABELS, RANGES, isInterval, rangesFor, scopes, validSetup, type Decision, type Exercise, type Result, type Setup, type Summary } from "./lib/practice";
+  import { direction, newsDate, price, signed } from "./lib/format";
+  import { localOffset } from "./lib/freshness";
+  import { INTERVALS, INTERVAL_LABELS, RANGES, isInterval, rangesFor, scopes, validSetup, type Decision, type Exercise, type Result, type SavedRun, type Setup, type Summary } from "./lib/practice";
   import type { Group } from "./lib/types";
 
   let {
@@ -24,6 +25,12 @@
     onend,
     onnext,
     onchange,
+    runs,
+    saved,
+    saving,
+    onsave,
+    onopen,
+    ondelete,
   }: {
     setup: Setup;
     groups: Group[];
@@ -45,7 +52,15 @@
     onend: () => void;
     onnext: () => void;
     onchange: () => void;
+    runs: SavedRun[];
+    saved: boolean;
+    saving: boolean;
+    onsave: () => void;
+    onopen: (run: SavedRun) => void;
+    ondelete: (id: number) => void;
   } = $props();
+
+  let confirming = $state<number | null>(null);
 
   const LABELS: Record<Decision, string> = { long: "Long", short: "Short", skip: "Skip" };
   const rangeLabel = (id: string) => RANGES.find((r) => r.id === id)?.label ?? id;
@@ -99,6 +114,30 @@
       <button type="button" onclick={oncancel}>Cancel</button>
       {#if error}<span class="error" role="alert">{error}</span>{:else if count === 0}<span class="muted">Star symbols or pick a group with symbols</span>{/if}
     </form>
+    {#if runs.length}
+      <div class="card runs" role="region" aria-label="Saved runs">
+        <span class="tag sim">Saved runs</span>
+        {#each runs as run (run.id)}
+          <div class="head">
+            <span class="muted">{newsDate(run.saved, localOffset(run.saved))}</span>
+            <strong>{run.symbol}</strong>
+            <span class="muted">{INTERVAL_LABELS[run.interval]}</span>
+            <span>{LABELS[run.trade.decision]}</span>
+            <span class={direction(run.return_pct)}>{pct(run.return_pct)}</span>
+            {#if confirming === run.id}
+              <span class="confirm" role="alert">
+                Delete this saved run and its drawings?
+                <button type="button" class="danger" onclick={() => { confirming = null; ondelete(run.id); }}>Confirm delete</button>
+                <button type="button" onclick={() => (confirming = null)}>Cancel</button>
+              </span>
+            {:else}
+              <button type="button" disabled={busy} onclick={() => onopen(run)}>Open</button>
+              <button type="button" class="danger" onclick={() => (confirming = run.id)}>Delete…</button>
+            {/if}
+          </div>
+        {/each}
+      </div>
+    {/if}
   {:else if !exercise.ended}
     <div class="row">
       <span class="tag sim">Simulated</span>
@@ -156,6 +195,7 @@
       <div class="actions">
         <button class="primary" disabled={busy} onclick={onnext}>{busy ? "Finding a setup…" : "Next setup"}</button>
         <button disabled={busy} onclick={onchange}>Change setup</button>
+        <button disabled={saved || saving} title={saved ? "Drawing changes are saved with the run" : "Save this run and its drawings"} onclick={onsave}>{saved ? "Saved" : saving ? "Saving…" : "Save run"}</button>
         {#if error}<span class="error" role="alert">{error}</span>{/if}
       </div>
     </div>
@@ -241,6 +281,21 @@
   }
   .muted {
     color: var(--muted);
+  }
+  .runs {
+    margin-top: 4px;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  .danger {
+    color: var(--down);
+    border-color: var(--down);
+  }
+  .confirm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
   }
   .error {
     color: var(--down);

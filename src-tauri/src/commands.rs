@@ -26,6 +26,7 @@ use crate::screener::{self, ScreenRow};
 use crate::settings::{EventFilter, ChartLayout, ChartTimeZone, Theme, Palette, validate_text_size, RefreshMode, ChartMode, ChartScale, Dots, Group, WatchlistSort, WatchlistView, WatchlistColumns, SavedScreen, ScreenRule, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
 use crate::state::{lock, now_secs, QuoteState, Shared};
 use crate::paper::{Costs as PaperCosts, PaperAccount};
+use crate::practice::{PracticeRun, PracticeRuns};
 
 #[derive(Serialize)]
 pub struct Init {
@@ -971,6 +972,29 @@ pub fn save_paper(shared: State<'_, Arc<Shared>>, account: PaperAccount) -> Resu
 pub fn reset_paper(shared: State<'_, Arc<Shared>>, starting_cash: f64, costs: Option<PaperCosts>) -> Result<PaperAccount, String> {
     let costs = costs.unwrap_or(lock(&shared.paper).costs);
     store_paper(&shared, PaperAccount::new(starting_cash, costs))
+}
+
+fn store_practice(shared: &Shared, edit: impl FnOnce(&PracticeRuns) -> Result<PracticeRuns, String>) -> Result<Vec<PracticeRun>, String> {
+    let mut current = lock(&shared.practice);
+    let next = edit(&current)?;
+    next.save(&shared.practice_path).map_err(|e| format!("Could not save practice runs: {e}"))?;
+    *current = next;
+    Ok(current.runs.clone())
+}
+
+#[tauri::command]
+pub fn practice_runs(shared: State<'_, Arc<Shared>>) -> Vec<PracticeRun> {
+    lock(&shared.practice).runs.clone()
+}
+
+#[tauri::command]
+pub fn save_practice_run(shared: State<'_, Arc<Shared>>, run: PracticeRun) -> Result<Vec<PracticeRun>, String> {
+    store_practice(&shared, |runs| runs.upsert(run))
+}
+
+#[tauri::command]
+pub fn delete_practice_run(shared: State<'_, Arc<Shared>>, id: u64) -> Result<Vec<PracticeRun>, String> {
+    store_practice(&shared, |runs| Ok(PracticeRuns { runs: runs.runs.iter().filter(|r| r.id != id).cloned().collect() }))
 }
 
 #[cfg(test)]

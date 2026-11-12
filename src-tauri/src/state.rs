@@ -56,6 +56,8 @@ pub struct Shared {
     pub logo: Mutex<Option<(String, Option<Vec<u8>>)>>,
     pub paper: Mutex<crate::paper::PaperAccount>,
     pub paper_path: PathBuf,
+    pub practice: Mutex<crate::practice::PracticeRuns>,
+    pub practice_path: PathBuf,
     /// Last known window geometry while it was not minimized.
     pub geometry: Mutex<Option<Geometry>>,
     /// Last chart the window fetched; survives window unloads.
@@ -78,9 +80,12 @@ impl Shared {
     pub fn new(settings_path: PathBuf, settings: Settings) -> Self {
         let geometry = settings.geometry;
         let paper_path = crate::paper::paper_path(&settings_path);
+        let practice_path = crate::practice::practice_path(&settings_path);
         Self {
             paper: Mutex::new(crate::paper::PaperAccount::load(&paper_path)),
             paper_path,
+            practice: Mutex::new(crate::practice::PracticeRuns::load(&practice_path)),
+            practice_path,
             provider: Mutex::new(crate::provider::Provider::load(&settings)),
             provider_revision: std::sync::atomic::AtomicU64::new(0),
             stream_status: Mutex::new(crate::stream::Status::Off),

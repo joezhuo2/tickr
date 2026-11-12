@@ -142,13 +142,15 @@ export function rebind(binds: Keybinds, id: Action, key: string): Keybinds {
   return next;
 }
 
-const REPLAY_ACTIONS = new Set<Action>(["chart_mode", "chart_scale", "chart_interval", "chart_replay", "practice", "range", "refresh", "technicals", "paper", "analyze", "toggle_opening_range", "toggle_levels", "toggle_volume_ma", "toggle_volume_profile", "search", "previous_symbol", "watchlist", "add_watchlist", "settings", "side_panel"]);
+const DRAW_ACTIONS = ACTIONS.filter((a) => a.category === "draw").map((a) => a.id);
+
+const REPLAY_ACTIONS = new Set<Action>([...DRAW_ACTIONS, "chart_mode", "chart_scale", "chart_interval", "chart_replay", "practice", "range", "refresh", "technicals", "paper", "analyze", "toggle_opening_range", "toggle_levels", "toggle_volume_ma", "toggle_volume_profile", "search", "previous_symbol", "watchlist", "add_watchlist", "settings", "side_panel"]);
 
 export function replayAllows(action: Action): boolean {
   return REPLAY_ACTIONS.has(action);
 }
 
-const PRACTICE_ACTIONS = new Set<Action>(["chart_mode", "chart_scale", "practice", "technicals", "analyze", "settings", "side_panel"]);
+const PRACTICE_ACTIONS = new Set<Action>(["chart_mode", "chart_scale", "practice", "technicals", "analyze", "settings", "side_panel", ...DRAW_ACTIONS]);
 
 export function practiceAllows(action: Action): boolean {
   return PRACTICE_ACTIONS.has(action);

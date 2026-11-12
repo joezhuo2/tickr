@@ -123,6 +123,13 @@
       return false;
     } finally { drawingBusy = false; }
   }
+  let tempDrawings = $state<Record<string, import("./lib/types").Drawing[]>>({});
+  async function saveTempDrawings(symbol: string, next: import("./lib/types").Drawing[]) {
+    tempDrawings[symbol] = next;
+    const run = practiceRuns.find((r) => r.id === practiceRunId);
+    if (run) writePracticeRuns("save_practice_run", { run: { ...run, drawings: next } }, "Could not save the run's drawings");
+    return true;
+  }
 
   let theme = $state<Theme>("system");
   let textSize = $state<TextSize>(100);
@@ -369,6 +376,7 @@
     loadStats();
     loadNews();
     loadPaper();
+    invoke("practice_runs").then((runs) => (practiceRuns = Practice.sortRuns(runs)), console.warn);
   }
 
   function keep<T>(now: T, next: T): T {
@@ -689,6 +697,10 @@
   let practiceBusy = $state(false);
   let practiceError = $state<string | null>(null);
   let practiceSeq = 0;
+  let practiceRuns = $state.raw<Practice.SavedRun[]>([]);
+  let practiceRunId = $state<number | null>(null);
+  let practiceSaving = $state(false);
+  let practiceWrite: Promise<unknown> = Promise.resolve();
   const practiceCount = $derived(Practice.scopeSymbols(practiceSetup.scope, watchlist, groups).length);
   const practiceResult = $derived(practice?.trade && replay ? Practice.evaluate(practice.trade, replayBars, replay.cursor) : null);
   const practiceSummary = $derived(practice?.ended && practice.trade ? Practice.summarize(practice.trade, replayBars) : null);
@@ -710,6 +722,8 @@
     replayAnalyzeOn = shouldAnalyze(!!activeAnalysis, indicators?.keep_analysis ?? false);
     syncHover = null;
     syncWindow = null;
+    tempDrawings = {};
+    practiceRunId = null;
     replay = next;
     if (paperSession) openPaperBook();
   }
@@ -795,13 +809,63 @@
       return;
     }
     const base: Chart = { ...c, range: Practice.displayRange(setup.interval), meta: { ...c.meta, prev_close: null }, candles: w.bars, last_bar_time: w.bars[w.bars.length - 1].t };
+    showExercise({ setup, symbol: c.meta.symbol || pick, name: c.meta.name, start: w.start, volatile: start.volatile, trade: null, ended: false }, base, next);
+  }
+
+  function showExercise(exercise: Practice.Exercise, base: Chart, next: Replay.ReplayState) {
     exitReplay();
     practiceSeq++;
     practiceOpen = false;
     practiceBusy = false;
     practiceError = null;
-    practice = { setup, symbol: c.meta.symbol || pick, name: c.meta.name, start: w.start, volatile: start.volatile, trade: null, ended: false };
+    practice = exercise;
     beginReplay(base, next, false);
+  }
+
+  function openPracticeRun(run: Practice.SavedRun) {
+    const r = Practice.reopen(run);
+    showExercise(r.exercise, r.base, r.state);
+    tempDrawings = { [run.symbol.toUpperCase()]: run.drawings };
+    practiceRunId = run.id;
+  }
+
+  function writePracticeRuns(command: string, args: Record<string, unknown>, failure: string): Promise<boolean> {
+    const write = practiceWrite.then(() => invoke(command, args)).then(
+      (runs) => {
+        practiceRuns = Practice.sortRuns(runs);
+        return true;
+      },
+      (e) => {
+        practiceError = `${failure}: ${e}`;
+        return false;
+      },
+    );
+    practiceWrite = write;
+    return write;
+  }
+
+  async function savePracticeRun() {
+    if (!practice?.ended || !replayBase || practiceRunId != null || practiceSaving) return;
+    const key = replayBase.meta.symbol.toUpperCase();
+    const drawn = tempDrawings[key] ?? [];
+    const run = Practice.savedRun(practice, replayBase, drawn, Math.floor(Date.now() / 1000));
+    if (!run) return;
+    const session = replaySession;
+    const before = new Set(practiceRuns.map((r) => r.id));
+    practiceSaving = true;
+    practiceError = null;
+    const ok = await writePracticeRuns("save_practice_run", { run }, "Could not save the run");
+    practiceSaving = false;
+    const id = practiceRuns.find((r) => !before.has(r.id))?.id;
+    if (!ok || session !== replaySession || id == null) return;
+    practiceRunId = id;
+    const now = tempDrawings[key] ?? [];
+    if (now !== drawn) void saveTempDrawings(key, now);
+  }
+
+  function deletePracticeRun(id: number) {
+    practiceError = null;
+    void writePracticeRuns("delete_practice_run", { id }, "Could not delete the run");
   }
 
   function practiceDecide(decision: Practice.Decision) {
@@ -835,6 +899,8 @@
     paperError = null;
     paperNotice = null;
     replay = null;
+    tempDrawings = {};
+    practiceRunId = null;
     replayBars = [];
     replayBase = null;
     replayAnalysis = null;
@@ -1982,6 +2048,12 @@
             onend={endPractice}
             onnext={startPractice}
             onchange={changePractice}
+            runs={practiceRuns}
+            saved={practiceRunId != null}
+            saving={practiceSaving}
+            onsave={savePracticeRun}
+            onopen={openPracticeRun}
+            ondelete={deletePracticeRun}
           />
         {/if}
             {#snippet panel()}
@@ -2047,9 +2119,9 @@
                     {scale}
                     {shadeSessions}
                     timeZone={chartTimeZone}
-                    {drawings}
+                    drawings={replay ? tempDrawings : drawings}
                     {drawingBusy}
-                    {saveDrawings}
+                    saveDrawings={replay ? saveTempDrawings : saveDrawings}
                     analysis={techAnalysis}
                     {overlays}
                     earnings={chartEarnings}

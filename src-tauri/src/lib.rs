@@ -25,6 +25,7 @@ pub mod options;
 pub mod news;
 pub mod paper;
 pub mod poller;
+pub mod practice;
 pub mod quote;
 pub mod screener;
 pub mod sentiment;
@@ -168,6 +169,9 @@ pub fn run() {
             commands::get_paper,
             commands::save_paper,
             commands::reset_paper,
+            commands::practice_runs,
+            commands::save_practice_run,
+            commands::delete_practice_run,
         ])
         .on_window_event(window::on_event)
         .setup(move |app| {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Chart, Drawing } from "./types";
 import {
   AFTER,
   CONTEXT,
@@ -20,12 +21,17 @@ import {
   pickStart,
   randomInt,
   rangesFor,
+  reopen,
+  savedRun,
+  sortRuns,
   scopeSymbols,
   scopes,
   seeded,
   summarize,
   validSetup,
   type Bar,
+  type Exercise,
+  type SavedRun,
 } from "./practice";
 
 const DAY = 86_400;
@@ -281,5 +287,56 @@ describe("trades", () => {
   it("measures the market move over the exercise", () => {
     expect(marketMove(up, 0, 4)).toBeCloseTo(10);
     expect(marketMove(up, 4, 4)).toBeNull();
+  });
+});
+
+describe("saved runs", () => {
+  const candles = bars(8, (i) => 100 + i).map((b) => ({ ...b, v: 1000 }));
+  const base: Chart = {
+    source: "yahoo",
+    meta: { symbol: "AAPL", name: "Apple", exchange: "NMS", currency: "USD", price: 107, prev_close: null, gmtoffset: -14400, timezone: "America/New_York", periods: null },
+    range: "1y",
+    interval: "1d",
+    candles,
+    dividends: [],
+    splits: [],
+  };
+  const drawings: Drawing[] = [{ id: 0, kind: "hline", points: [{ t: candles[3].t, price: 104 }], text: "" }];
+  const ended: Exercise = { setup: { scope: "group:Tech", interval: "1d", range: "2y" }, symbol: "AAPL", name: "Apple", start: 3, volatile: true, trade: finish(decide("long", 3), 7), ended: true };
+
+  it("saves only an ended exercise with a trade", () => {
+    expect(savedRun({ ...ended, ended: false }, base, [], 1)).toBeNull();
+    expect(savedRun({ ...ended, trade: null }, base, [], 1)).toBeNull();
+  });
+  it("stores the window, decision, result and drawings", () => {
+    const run = savedRun(ended, base, drawings, 1_700_000_000)!;
+    expect(run).toMatchObject({ id: 0, saved: 1_700_000_000, symbol: "AAPL", interval: "1d", range: "2y", start: 3, volatile: true, timezone: "America/New_York", gmtoffset: -14400 });
+    expect(run.candles).toBe(candles);
+    expect(run.drawings).toBe(drawings);
+    expect(run.trade).toEqual({ decision: "long", decided: 3, exit: 7, cancelled: false });
+    expect(run.return_pct).toBeCloseTo(summarize(ended.trade!, candles).result.return_pct);
+    expect(run.market_pct).toBeCloseTo((107 / 103 - 1) * 100);
+  });
+  it("reopens a saved run as the finished exercise", () => {
+    const run: SavedRun = { ...savedRun(ended, base, drawings, 1)!, id: 4 };
+    const r = reopen(run);
+    expect(r.exercise).toEqual({ setup: { scope: "watchlist", interval: "1d", range: "2y" }, symbol: "AAPL", name: "Apple", start: 3, volatile: true, trade: ended.trade, ended: true });
+    expect(r.state).toEqual({ total: 8, start: 3, cursor: 7, playing: false, speed: 1, elapsed: 0 });
+    expect(r.base.candles).toBe(candles);
+    expect(r.base.meta).toMatchObject({ symbol: "AAPL", currency: "USD", price: 107, prev_close: null, timezone: "America/New_York" });
+    expect(r.base.last_bar_time).toBe(candles[7].t);
+    expect(summarize(r.exercise.trade!, r.base.candles)).toEqual(summarize(ended.trade!, candles));
+  });
+  it("lists runs newest first and treats a missing list as empty", () => {
+    const run = savedRun(ended, base, [], 1)!;
+    const list = [
+      { ...run, id: 1, saved: 10 },
+      { ...run, id: 3, saved: 30 },
+      { ...run, id: 2, saved: 30 },
+    ];
+    expect(sortRuns(list).map((r) => r.id)).toEqual([3, 2, 1]);
+    expect(list.map((r) => r.id)).toEqual([1, 3, 2]);
+    expect(sortRuns(null)).toEqual([]);
+    expect(sortRuns(undefined)).toEqual([]);
   });
 });
