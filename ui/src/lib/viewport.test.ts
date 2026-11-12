@@ -1,20 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { center, firstAtOrAfter, clamp, follow, full, isFull, MIN_BARS, pan, reveal, visible, zoom } from "./viewport";
+import { center, firstAtOrAfter, clamp, follow, full, isFull, MAX_FUTURE, MIN_BARS, pan, reveal, RIGHT_MARGIN, visible, zoom } from "./viewport";
 
 describe("clamp", () => {
-  it("keeps the view inside the data", () => {
+  it("keeps the view inside the data plus up to half a screen of future", () => {
     expect(clamp({ start: -5, count: 20 }, 100)).toEqual({ start: 0, count: 20 });
-    expect(clamp({ start: 95, count: 20 }, 100)).toEqual({ start: 80, count: 20 });
+    expect(clamp({ start: 95, count: 20 }, 100)).toEqual({ start: 90, count: 20 });
   });
 
-  it("limits the bar count to MIN_BARS and n", () => {
+  it("caps the future space at MAX_FUTURE bars", () => {
+    expect(clamp({ start: 5000, count: 1000 }, 2000)).toEqual({ start: 1000 + MAX_FUTURE, count: 1000 });
+  });
+
+  it("limits the bar count to MIN_BARS and n plus the right margin", () => {
     expect(clamp({ start: 0, count: 2 }, 100).count).toBe(MIN_BARS);
-    expect(clamp({ start: 0, count: 500 }, 100)).toEqual({ start: 0, count: 100 });
+    expect(clamp({ start: 0, count: 500 }, 100)).toEqual({ start: 0, count: 100 + RIGHT_MARGIN });
   });
 
   it("shows everything when there are fewer bars than MIN_BARS", () => {
-    expect(clamp({ start: 3, count: 1 }, 4)).toEqual({ start: 0, count: 4 });
+    expect(clamp({ start: 3, count: 1 }, 4)).toEqual({ start: 2, count: 4 });
     expect(clamp({ start: 0, count: 0 }, 0)).toEqual({ start: 0, count: 0 });
+    expect(full(0)).toEqual({ start: 0, count: 0 });
   });
 });
 
@@ -31,11 +36,16 @@ describe("zoom", () => {
 
   it("stops at MIN_BARS and the full view", () => {
     expect(zoom({ start: 40, count: 20 }, 100, 0.01, 0.5)).toEqual({ start: 45, count: MIN_BARS });
-    expect(zoom({ start: 40, count: 20 }, 100, 100, 0.5)).toEqual({ start: 0, count: 100 });
+    expect(zoom({ start: 40, count: 20 }, 100, 100, 0.5)).toEqual(full(100));
   });
 
   it("clamps when zooming out near an edge", () => {
-    expect(zoom({ start: 90, count: 10 }, 100, 2, 0)).toEqual({ start: 80, count: 20 });
+    expect(zoom({ start: 95, count: 10 }, 100, 2, 0)).toEqual({ start: 90, count: 20 });
+  });
+
+  it("keeps the right margin when zooming in at the right edge of the full view", () => {
+    const v = zoom(full(100), 100, 0.5, 1);
+    expect(v.start + v.count).toBe(100 + RIGHT_MARGIN);
   });
 
   it("clamps the anchor", () => {
@@ -50,11 +60,12 @@ describe("pan", () => {
 
   it("stops at both ends", () => {
     expect(pan({ start: 10, count: 20 }, 100, -50)).toEqual({ start: 0, count: 20 });
-    expect(pan({ start: 10, count: 20 }, 100, 500)).toEqual({ start: 80, count: 20 });
+    expect(pan({ start: 10, count: 20 }, 100, 500)).toEqual({ start: 90, count: 20 });
   });
 
-  it("does nothing on a full view", () => {
-    expect(pan(full(50), 50, 10)).toEqual(full(50));
+  it("pans a full view only into the future", () => {
+    expect(pan(full(50), 50, -10)).toEqual(full(50));
+    expect(pan(full(50), 50, 10)).toEqual({ start: 10, count: 50 + RIGHT_MARGIN });
   });
 });
 
@@ -85,7 +96,7 @@ describe("follow", () => {
   });
 
   it("clamps when the data shrinks", () => {
-    expect(follow({ start: 30, count: 20 }, 100, 40)).toEqual({ start: 20, count: 20 });
+    expect(follow({ start: 30, count: 20 }, 100, 30)).toEqual({ start: 20, count: 20 });
   });
 });
 
@@ -110,9 +121,8 @@ describe("isFull", () => {
 describe("go to date", () => {
   it("centers a bar, zooming in first when the whole range is shown", () => {
     expect(center(full(500), 500, 250)).toEqual({ start: 210.5, count: 80 });
-    expect(center({ start: 0, count: 20 }, 500, 499)).toEqual({ start: 480, count: 20 });
-    expect(center(full(30), 30, 3)).toEqual({ start: 0, count: 30 });
-  });
+    expect(center({ start: 0, count: 20 }, 500, 499)).toEqual({ start: 489.5, count: 20 });
+    expect(center(full(30), 30, 3)).toEqual({ start: 0, count: 30 });  });
 
   it("finds the first bar at or after a time, or the last bar", () => {
     expect(firstAtOrAfter([10, 20, 30], 15)).toBe(1);

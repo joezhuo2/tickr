@@ -145,6 +145,62 @@ export function isExtendedSession(session: Session): boolean {
   return session !== "regular";
 }
 
+export function futureTimes(times: readonly number[], interval: string, clock: Clock, count: number): number[] {
+  const n = times.length;
+  const unit = /^(\d+)(mo|wk|m|d)$/.exec(interval);
+  if (!n || !unit || !(count > 0)) return [];
+  const size = Number(unit[1]);
+  const offsets = new Map<number, number>();
+  const off = (t: number) => {
+    const hour = Math.floor(t / 3600);
+    let o = offsets.get(hour);
+    if (o === undefined) offsets.set(hour, (o = exchangeOffset(hour * 3600, clock)));
+    return o;
+  };
+  const last = times[n - 1];
+  let open = DAY;
+  let close = 0;
+  const weekdays = new Set<number>();
+  for (let i = n - 1; i >= 0 && times[i] > last - 14 * DAY; i--) {
+    const w = times[i] + off(times[i]);
+    const tod = mod(w, DAY);
+    open = Math.min(open, tod);
+    close = Math.max(close, tod);
+    weekdays.add(mod(Math.floor(w / DAY) + 4, 7));
+  }
+  // shortcut: only weekends with no recent bars are skipped, not holidays or early closes; upgrade with an exchange holiday calendar
+  const skip = (day: number) => {
+    const dow = mod(day + 4, 7);
+    return (dow === 0 || dow === 6) && !weekdays.has(dow);
+  };
+  const lastOffset = off(last);
+  let w = last + lastOffset;
+  const out: number[] = [];
+  while (out.length < count) {
+    if (unit[2] === "m") {
+      w += size * 60;
+      let day = Math.floor(w / DAY);
+      let tod = w - day * DAY;
+      if (tod > close) { day++; tod = open; }
+      else if (tod < open) tod = open;
+      while (skip(day)) { day++; tod = open; }
+      w = day * DAY + tod;
+    } else if (unit[2] === "d") {
+      let day = Math.floor(w / DAY);
+      const tod = w - day * DAY;
+      for (let k = 0; k < size; k++) do day++; while (skip(day));
+      w = day * DAY + tod;
+    } else if (unit[2] === "wk") w += size * 7 * DAY;
+    else {
+      const d = new Date(w * 1000);
+      d.setUTCMonth(d.getUTCMonth() + size);
+      w = d.getTime() / 1000;
+    }
+    out.push(w - off(w - lastOffset));
+  }
+  return out;
+}
+
 /** Time left in the candle that started at `lastBar`, as m:ss; null when that candle is not forming now. */
 export function candleCountdown(interval: string, lastBar: number | undefined, now: number): string | null {
   if (!isIntraday(interval) || lastBar == null) return null;

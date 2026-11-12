@@ -55,12 +55,12 @@ export function ichimoku(candles: readonly Candle[], fast = 9, base = 26, slow =
   const tenkan = mid(fast);
   const kijun = mid(base);
   const slowMid = mid(slow);
-  const ahead = (i: number, f: (k: number) => number | null) => (i >= base ? f(i - base) : null);
+  const ahead = (f: (k: number) => number | null) => Array.from({ length: candles.length + base }, (_, i) => (i >= base ? f(i - base) : null));
   return {
     tenkan,
     kijun,
-    spanA: candles.map((_, i) => ahead(i, (k) => (tenkan[k] != null && kijun[k] != null ? (tenkan[k]! + kijun[k]!) / 2 : null))),
-    spanB: candles.map((_, i) => ahead(i, (k) => slowMid[k])),
+    spanA: ahead((k) => (tenkan[k] != null && kijun[k] != null ? (tenkan[k]! + kijun[k]!) / 2 : null)),
+    spanB: ahead((k) => slowMid[k]),
     chikou: candles.map((_, i) => candles[i + base]?.c ?? null),
   };
 }

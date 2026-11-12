@@ -24,6 +24,9 @@ describe("studies", () => {
     expect(i.spanB[6]).toBe((c[3].h + c[0].l) / 2);
     expect(i.chikou[0]).toBe(c[3].c);
     expect(i.chikou[11]).toBeNull();
+    expect(i.spanA).toHaveLength(15);
+    expect(i.spanA[14]).toBe((i.tenkan[11]! + i.kijun[11]!) / 2);
+    expect(i.spanB[14]).toBe((c[11].h + c[8].l) / 2);
   });
 
   it("keeps Supertrend below a rising market and flips above a falling one", () => {

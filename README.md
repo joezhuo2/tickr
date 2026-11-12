@@ -161,6 +161,9 @@ taskbar to keep it visible.
   the stop and shows the stop distance and the 2R target; an anchored VWAP starts at the candle
   you click.
   Drag to move them or adjust trend endpoints, and Delete removes the selection.
+  Drawings, notes, targets and Fibonacci extensions can be placed in the empty
+  space right of the latest candle; a future point keeps its date and time, so it
+  stays put as new bars arrive and when you switch intervals.
   Ctrl+Z undoes, Ctrl+Shift+Z redoes, and Escape returns to Cursor. The ruler
   measures price, percent, bars and elapsed time without saving.
   The **More** menu adds a parallel channel, vertical line, horizontal ray,
@@ -209,6 +212,10 @@ taskbar to keep it visible.
   drag or scroll sideways to pan, and double-click to see the whole range
   again. With the chart focused, + and - zoom and 0 resets. The price axis
   fits the visible bars, and a zoomed view follows new bars at the right edge.
+  The chart keeps 3 empty bars right of the latest candle, and you can drag
+  further into the future, up to half the visible bars (at most 200). The time
+  axis and crosshair continue there with future bar times, skipping weekends
+  and closed hours like the real bars (holidays are not skipped).
 - **Go to date:** the calendar button at the top right of the chart opens a
   date box (date and time on intraday charts). Picking a date centers the
   first candle at or after it and puts the crosshair there. It moves within
@@ -377,8 +384,8 @@ it is instant.
   both charts without running Analyze, follow replay, do not feed the score,
   and use fixed settings. Pivots come from the previous day on intraday charts,
   the previous month on daily charts and the previous year on longer ones. The
-  Ichimoku cloud stops at the latest bar, since the chart has no room to the
-  right of it. Which studies are on is remembered on this computer and is in
+  Ichimoku cloud is projected 26 bars past the latest bar into the empty space
+  on the right, and the lagging line sits 26 bars back. Which studies are on is remembered on this computer and is in
   Backup, but not in indicator presets.
 
 - **Analysts:** the rating (Strong buy to Sell), average 12-month target and

@@ -67,5 +67,5 @@ export function triggered(alerts: readonly ChartAlert[], symbol: string, interva
   const s = symbol.toUpperCase();
   const closedSince = since != null && candles.length > 0 && candles[candles.length - 1].t > since;
   const closed = candles.slice(0, -1);
-  return alerts.filter((a) => a.enabled && a.symbol === s && a.interval === interval && (holds(a, candles, clock) || (closedSince && holds(a, closed, clock))));
+  return alerts.filter((a) => a.enabled && a.symbol === s && a.interval === interval && (holds(a, candles, clock, interval) || (closedSince && holds(a, closed, clock, interval))));
 }

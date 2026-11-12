@@ -6,6 +6,7 @@ import {
   classifySession,
   displayOffset,
   exchangeOffset,
+  futureTimes,
   isExtendedSession,
   isIntraday,
   offsetAt,
@@ -16,6 +17,7 @@ import {
   type Session,
   type TradingPeriods,
 } from "./session";
+import { indexToTime, timeToIndex } from "./drawing";
 
 const utc = (iso: string) => Date.parse(iso) / 1000;
 const period = (start: string, end: string) => ({ start: utc(start), end: utc(end) });
@@ -312,6 +314,45 @@ describe("display time zone", () => {
     expect(offsetLabel(-14400)).toBe("UTC-04:00");
     expect(offsetLabel(19800)).toBe("UTC+05:30");
     expect(offsetLabel(-12600)).toBe("UTC-03:30");
+  });
+});
+
+describe("futureTimes", () => {
+  const at = (...isos: string[]) => isos.map(utc);
+  const bars = (from: string, count: number, step: number) => Array.from({ length: count }, (_, i) => utc(from) + i * step);
+
+  it("continues weekday daily bars past the weekend", () => {
+    const week = bars("2026-06-01T13:30:00Z", 5, 86_400);
+    expect(futureTimes(week, "1d", NY, 3)).toEqual(at("2026-06-08T13:30:00Z", "2026-06-09T13:30:00Z", "2026-06-10T13:30:00Z"));
+  });
+
+  it("keeps the exchange open time across a daylight saving change", () => {
+    expect(futureTimes(bars("2026-03-02T14:30:00Z", 5, 86_400), "1d", NY, 1)).toEqual(at("2026-03-09T13:30:00Z"));
+  });
+
+  it("steps intraday bars through the session close to the next open", () => {
+    const times = [...bars("2026-06-04T13:30:00Z", 78, 300), ...bars("2026-06-05T13:30:00Z", 77, 300)];
+    const future = futureTimes(times, "5m", NY, 3);
+    expect(future).toEqual(at("2026-06-05T19:55:00Z", "2026-06-08T13:30:00Z", "2026-06-08T13:35:00Z"));
+    const slots = [...times, ...future];
+    expect(timeToIndex(slots, future[1])).toBe(times.length + 1);
+    expect(indexToTime(slots, times.length + 1.5)).toBe(future[1] + 150);
+  });
+
+  it("steps weekly and monthly bars by the calendar", () => {
+    expect(futureTimes(bars("2026-06-01T04:00:00Z", 3, 7 * 86_400), "1wk", NY, 2)).toEqual(at("2026-06-22T04:00:00Z", "2026-06-29T04:00:00Z"));
+    expect(futureTimes(at("2026-01-01T05:00:00Z", "2026-02-01T05:00:00Z"), "1mo", NY, 2)).toEqual(at("2026-03-01T05:00:00Z", "2026-04-01T04:00:00Z"));
+  });
+
+  it("keeps weekends and nights for markets that trade them", () => {
+    const hourly = bars("2026-05-30T00:00:00Z", 8 * 24, 3600);
+    expect(futureTimes(hourly, "60m", { gmtoffset: 0 }, 2)).toEqual(at("2026-06-07T00:00:00Z", "2026-06-07T01:00:00Z"));
+  });
+
+  it("returns nothing it cannot extrapolate", () => {
+    expect(futureTimes([], "1d", NY, 3)).toEqual([]);
+    expect(futureTimes([1000], "auto", NY, 3)).toEqual([]);
+    expect(futureTimes([1000], "1d", NY, 0)).toEqual([]);
   });
 });
 
