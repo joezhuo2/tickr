@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import type { SearchHit } from "./lib/types";
+  import { expand } from "./lib/motion";
   import { SEARCH_TYPES, exchangesOf, hitLabel, searchView, type SearchType } from "./lib/search";
 
   let { onpick, recent, current }: { onpick: (symbol: string) => Promise<string | null>; recent: string[]; current: string } = $props();
@@ -125,7 +126,7 @@
   />
   {#if error}<div class="error">{error}</div>{/if}
   {#if open && listed}
-    <div class="pop">
+    <div class="pop" transition:expand>
       {#if !showRecent}
         <div class="filters">
           <div class="types jelly" role="group" aria-label="Asset type">

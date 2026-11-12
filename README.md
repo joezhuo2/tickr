@@ -123,7 +123,8 @@ taskbar to keep it visible.
 - **Recent symbols and history:** focus the empty search box to see the last
   10 symbols you viewed. The Back and Forward buttons (or Alt+Left and
   Alt+Right) step through this session's symbols, and B jumps to the previous
-  one, so pressing it again toggles between two.
+  one, so pressing it again toggles between two. The list
+  under the search box slides open on focus and shut when you leave it.
 - **Chart types:** Line, Area, Baseline, Candles, Hollow candles, Bars (OHLC),
   Heikin Ashi and Renko, from the menu next to the price scale or by pressing C
   to cycle. Baseline colors the line green above and red below the previous
