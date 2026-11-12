@@ -1,7 +1,10 @@
 <script lang="ts">
-  import { direction, num, signed } from "./lib/format";
+  import { invoke } from "@tauri-apps/api/core";
+  import { direction, num, signed, volume } from "./lib/format";
+  import { heatColor, tileDetail } from "./lib/heatmap";
   import { HOTLISTS, hotlist, type HotlistId } from "./lib/hotlists";
-  import type { Market, Mover } from "./lib/types";
+  import { layoutMarket, SECTOR_HEAD, sectorNames } from "./lib/marketmap";
+  import type { HeatQuote, Market, Mover } from "./lib/types";
 
   let {
     market,
@@ -27,6 +30,35 @@
 
   let list = $state<HotlistId>("gainers");
   const hot = $derived(market ? hotlist(market, list) : []);
+
+  let mode = $state<"overview" | "heatmap">("overview");
+  let rows = $state.raw<HeatQuote[] | undefined>(undefined);
+  let mapError = $state<string | null>(null);
+  let sector = $state<string | null>(null);
+  let mapW = $state(0);
+  let mapH = $state(0);
+  const names = $derived(rows ? sectorNames(rows) : []);
+  const blocks = $derived(rows ? layoutMarket(rows, sector, mapW, mapH) : []);
+  const bySymbol = $derived(new Map((rows ?? []).map((r) => [r.symbol, r])));
+
+  async function loadMap() {
+    try {
+      rows = await invoke<HeatQuote[]>("get_heatmap");
+      mapError = null;
+    } catch (e) {
+      mapError = String(e);
+    }
+  }
+
+  $effect(() => {
+    if (mode === "heatmap" && market) void loadMap();
+  });
+
+  function tip(symbol: string): string {
+    const r = bySymbol.get(symbol);
+    if (!r) return symbol;
+    return `${r.name} (${r.symbol}): ${num(r.price)} (${signed(r.change_pct)}%), market cap $${volume(r.market_cap)}`;
+  }
 </script>
 
 {#snippet row(m: Mover, showSymbol: boolean, px?: string | null, hotPct?: number | null)}
@@ -53,6 +85,52 @@
         {/each}
       </section>
     {/each}
+  </div>
+{:else}
+  <div class="seg top" role="group" aria-label="Market view">
+    <button class:on={mode === "overview"} aria-pressed={mode === "overview"} onclick={() => (mode = "overview")}>Overview</button>
+    <button class:on={mode === "heatmap"} aria-pressed={mode === "heatmap"} onclick={() => (mode = "heatmap")}>Heatmap</button>
+  </div>
+{#if mode === "heatmap"}
+  <div class="mapwrap">
+    <div class="seg" role="group" aria-label="Sector">
+      <button class:on={sector === null} aria-pressed={sector === null} onclick={() => (sector = null)}>All</button>
+      {#each names as n (n)}
+        <button class:on={sector === n} aria-pressed={sector === n} onclick={() => (sector = n)}>{n}</button>
+      {/each}
+    </div>
+    {#if rows === undefined && mapError}
+      <div class="msg">
+        Could not load the heatmap: {mapError}
+        <button class="retry" onclick={loadMap}>Retry</button>
+      </div>
+    {:else if rows === undefined}
+      <div class="sk mapsk" aria-busy="true" aria-label="Loading heatmap"></div>
+    {:else}
+      <div class="map" bind:clientWidth={mapW} bind:clientHeight={mapH}>
+        {#each blocks as b (b.name)}
+          <div class="block" style="left: {b.x}px; top: {b.y}px; width: {b.w}px; height: {b.h}px">
+            <span class="blabel">{b.name}</span>
+            <div class="inner" style="top: {SECTOR_HEAD}px">
+              {#each b.tiles as t (t.id)}
+                {@const d = tileDetail(t.w, t.h)}
+                {@const pct = bySymbol.get(t.id)?.change_pct}
+                <button
+                  class="tile"
+                  style="left: {t.x}px; top: {t.y}px; width: {t.w}px; height: {t.h}px; background: {heatColor(pct)}"
+                  title={tip(t.id)}
+                  aria-label={tip(t.id)}
+                  onclick={() => onopen(t.id)}
+                >
+                  {#if d !== "none"}<span class="tsym" class:big={d === "full"}>{t.id}</span>{/if}
+                  {#if d === "full"}<span class="tchg">{pct == null ? "—" : `${signed(pct)}%`}</span>{/if}
+                </button>
+              {/each}
+            </div>
+          </div>
+        {/each}
+      </div>
+    {/if}
   </div>
 {:else}
   <div class="grid">
@@ -82,8 +160,95 @@
     </section>
   </div>
 {/if}
+{/if}
 
 <style>
+  .top {
+    margin: 10px 0 0 4px;
+  }
+  .mapwrap {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 10px 8px 4px;
+  }
+  .mapsk {
+    flex: 1;
+    min-height: 0;
+  }
+  .map {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+    border-radius: 6px;
+  }
+  .block {
+    position: absolute;
+    overflow: hidden;
+  }
+  .blabel {
+    display: block;
+    height: 18px;
+    padding: 0 3px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 18px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .inner {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+  }
+  .tile {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    padding: 2px;
+    border: 1px solid var(--bg);
+    border-radius: 4px;
+    color: var(--text);
+    cursor: pointer;
+    overflow: hidden;
+    font-variant-numeric: tabular-nums;
+    transition: filter var(--motion-fast) var(--ease-out);
+  }
+  .tile:hover,
+  .tile:focus-visible {
+    filter: brightness(1.08) saturate(1.1);
+    z-index: 1;
+  }
+  .tsym {
+    max-width: 100%;
+    font-weight: 750;
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tsym.big {
+    font-size: 14px;
+  }
+  .tchg {
+    max-width: 100%;
+    font-size: 12px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .grid {
     flex: 1;
     min-height: 0;
