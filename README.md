@@ -557,8 +557,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.18
-git push origin v0.11.18
+git tag v0.11.19
+git push origin v0.11.19
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
