@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.62] - 2026-11-12
+
+### Added
+- **Financials chart animation:** switching between Annual and Quarterly grows
+  the bars from the baseline, wipes the margin lines in and fades the table.
+  Reduced-motion settings turn it off.
+
 ## [0.11.61] - 2026-11-12
 
 ### Added
