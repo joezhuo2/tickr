@@ -6,6 +6,11 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.37] - 2026-11-11
+
+### Changed
+- The stock overview slides open and closed when you show or hide it.
+
 ## [0.11.36] - 2026-11-11
 
 ### Fixed
