@@ -1,7 +1,7 @@
 use std::path::Path;
 use serde_json::Value;
 use crate::provider::Feed;
-use crate::quote::{Candle, Chart, Extended, Meta, Quote, Session};
+use crate::quote::{Candle, Chart, Extended, Periods, Quote, Session};
 
 const KEY_ID: &str = "TICKR_ALPACA_KEY_ID";
 const SECRET: &str = "TICKR_ALPACA_SECRET";
@@ -38,6 +38,10 @@ async fn get(client: &reqwest::Client, keys: &AlpacaCreds, path: &str, query: &[
 
 pub async fn snapshot(client: &reqwest::Client, keys: &AlpacaCreds, feed: Feed, symbol: &str) -> Result<Value, String> {
     get(client, keys, &format!("/v2/stocks/{symbol}/snapshot"), &[("feed", feed.name())]).await
+}
+
+pub async fn snapshots(client: &reqwest::Client, keys: &AlpacaCreds, feed: Feed, symbols: &[String]) -> Result<Value, String> {
+    get(client, keys, "/v2/stocks/snapshots", &[("feed", feed.name()), ("symbols", &symbols.join(","))]).await
 }
 
 fn number(v: &Value) -> Option<f64> { v.as_f64().filter(|n| n.is_finite()) }
@@ -122,13 +126,25 @@ pub fn parse_bars(v: &Value) -> Result<Vec<Candle>, String> {
     }).collect()
 }
 
-pub fn regular_bar(t: i64, meta: &Meta) -> bool {
-    if let Some(p) = meta.periods {
-        if (t + meta.gmtoffset).div_euclid(86400) == (p.regular.start + meta.gmtoffset).div_euclid(86400) {
+pub fn new_york_offset(t: i64) -> i64 {
+    let y = 1970 + t.div_euclid(86400) * 400 / 146097;
+    let first_sunday = |month: i64| {
+        let day = days_before_year(y) - days_before_year(1970) + (1..month).map(|k| month_days(y, k)).sum::<i64>();
+        day + (7 - (day + 4).rem_euclid(7)) % 7
+    };
+    let start = (first_sunday(3) + 7) * 86400 + 7 * 3600;
+    let end = first_sunday(11) * 86400 + 6 * 3600;
+    if (start..end).contains(&t) { -14400 } else { -18000 }
+}
+
+pub fn regular_bar(t: i64, periods: Option<Periods>) -> bool {
+    let offset = new_york_offset(t);
+    if let Some(p) = periods {
+        if (t + offset).div_euclid(86400) == (p.regular.start + offset).div_euclid(86400) {
             return t >= p.regular.start && t < p.regular.end;
         }
     }
-    let seconds = (t + meta.gmtoffset).rem_euclid(86400);
+    let seconds = (t + offset).rem_euclid(86400);
     (34200..57600).contains(&seconds)
 }
 
@@ -137,24 +153,40 @@ pub fn next_page(v: &Value, page: usize) -> Option<&str> {
     v["next_page_token"].as_str().filter(|s| !s.is_empty())
 }
 
-pub async fn bars(client: &reqwest::Client, keys: &AlpacaCreds, feed: Feed, chart: &Chart) -> Result<Vec<Candle>, String> {
-    let start = format_time(chart.candles.first().ok_or("No Yahoo candles")?.t);
-    let timeframe = match chart.interval.as_str() {
+fn timeframe(interval: &str) -> Result<&'static str, String> {
+    Ok(match interval {
         "1m" => "1Min", "5m" => "5Min", "15m" => "15Min", "30m" => "30Min", "60m" => "1Hour", "1d" => "1Day", "1wk" => "1Week", "1mo" => "1Month", _ => return Err("Unknown interval".into()),
-    };
-    let prepost = chart.extended;
-    let intraday = chart.interval.ends_with('m');
+    })
+}
+
+async fn fetch_bars(client: &reqwest::Client, keys: &AlpacaCreds, feed: Feed, symbol: &str, timeframe: &str, window: &[(&str, &str)], keep: impl Fn(i64) -> bool) -> Result<Vec<Candle>, String> {
     let mut token = String::new();
     let mut candles = Vec::new();
     for page in 0..10 {
-        let mut query = vec![("timeframe", timeframe), ("start", &start), ("adjustment", "split"), ("limit", "10000"), ("feed", feed.name())];
+        let mut query = vec![("timeframe", timeframe), ("adjustment", "split"), ("limit", "10000"), ("feed", feed.name())];
+        query.extend_from_slice(window);
         if !token.is_empty() { query.push(("page_token", &token)); }
-        let v = get(client, keys, &format!("/v2/stocks/{}/bars", chart.meta.symbol), &query).await?;
-        candles.extend(parse_bars(&v)?.into_iter().filter(|b| !intraday || prepost || regular_bar(b.t, &chart.meta)));
+        let v = get(client, keys, &format!("/v2/stocks/{symbol}/bars"), &query).await?;
+        candles.extend(parse_bars(&v)?.into_iter().filter(|b| keep(b.t)));
         match next_page(&v, page) { Some(next) if next != token => token = next.to_string(), _ => break }
     }
     candles.sort_by_key(|b| b.t);
     candles.dedup_by_key(|b| b.t);
+    Ok(candles)
+}
+
+pub async fn bars(client: &reqwest::Client, keys: &AlpacaCreds, feed: Feed, chart: &Chart) -> Result<Vec<Candle>, String> {
+    let start = format_time(chart.candles.first().ok_or("No Yahoo candles")?.t);
+    let (prepost, periods, intraday) = (chart.extended, chart.meta.periods, chart.interval.ends_with('m'));
+    fetch_bars(client, keys, feed, &chart.meta.symbol, timeframe(&chart.interval)?, &[("start", start.as_str())], move |t| !intraday || prepost || regular_bar(t, periods)).await
+}
+
+pub async fn older_bars(client: &reqwest::Client, keys: &AlpacaCreds, feed: Feed, symbol: &str, interval: &str, prepost: bool, (start, end): (i64, i64)) -> Result<Vec<Candle>, String> {
+    if start <= 0 || end <= start { return Err("bad date range".into()); }
+    let (from, to) = (format_time(start), format_time(end - 1));
+    let intraday = interval.ends_with('m');
+    let mut candles = fetch_bars(client, keys, feed, symbol, timeframe(interval)?, &[("start", from.as_str()), ("end", to.as_str())], move |t| !intraday || prepost || regular_bar(t, None)).await?;
+    candles.retain(|c| c.t >= start && c.t < end);
     Ok(candles)
 }
 
@@ -251,17 +283,26 @@ mod tests {
     fn session_filter() {
         let c = chart();
         let p = c.meta.periods.unwrap();
-        assert!(!regular_bar(p.regular.start-1, &c.meta));
-        assert!(regular_bar(p.regular.start, &c.meta));
-        assert!(regular_bar(p.regular.end-1, &c.meta));
-        assert!(!regular_bar(p.regular.end, &c.meta));
-        let mut meta = c.meta;
-        meta.gmtoffset = -18000;
-        for (time, keep) in [("2020-01-02T14:29:59Z",false),("2020-01-02T14:30:00Z",true),("2020-01-02T20:59:59Z",true),("2020-01-02T21:00:00Z",false)] {
-            assert_eq!(regular_bar(parse_time(time).unwrap(), &meta),keep);
+        assert!(!regular_bar(p.regular.start-1, c.meta.periods));
+        assert!(regular_bar(p.regular.start, c.meta.periods));
+        assert!(regular_bar(p.regular.end-1, c.meta.periods));
+        assert!(!regular_bar(p.regular.end, c.meta.periods));
+        for (time, keep) in [("2020-01-02T14:29:59Z",false),("2020-01-02T14:30:00Z",true),("2020-01-02T20:59:59Z",true),("2020-01-02T21:00:00Z",false),
+            ("2026-07-01T13:29:59Z",false),("2026-07-01T13:30:00Z",true),("2026-07-01T19:59:59Z",true),("2026-07-01T20:00:00Z",false)] {
+            assert_eq!(regular_bar(parse_time(time).unwrap(), c.meta.periods),keep, "{time}");
+            assert_eq!(regular_bar(parse_time(time).unwrap(), None),keep, "{time}");
         }
-        meta.periods.as_mut().unwrap().regular.end = p.regular.start + 3600;
-        assert!(!regular_bar(p.regular.start+3600,&meta));
+        let mut early = p;
+        early.regular.end = p.regular.start + 3600;
+        assert!(!regular_bar(p.regular.start+3600,Some(early)));
+    }
+
+    #[test]
+    fn new_york_daylight_saving() {
+        for (time, offset) in [("2026-03-08T06:59:59Z",-18000),("2026-03-08T07:00:00Z",-14400),("2026-11-01T05:59:59Z",-14400),("2026-11-01T06:00:00Z",-18000),
+            ("2024-03-10T07:00:00Z",-14400),("2024-11-03T06:00:00Z",-18000),("2025-12-31T23:59:59Z",-18000),("2026-01-01T00:00:00Z",-18000),("2016-06-15T12:00:00Z",-14400)] {
+            assert_eq!(new_york_offset(parse_time(time).unwrap()), offset, "{time}");
+        }
     }
 
     #[test]

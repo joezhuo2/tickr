@@ -400,6 +400,7 @@ pub async fn poll(app: &AppHandle, shared: &Shared, selected: &str, fresh: Optio
         }
     }
     let others: Vec<_> = symbols.into_iter().filter(|s| s != selected).collect();
+    let mut quotes = Vec::new();
     for batch in others.chunks(4) {
         let tasks: Vec<_> = batch
             .iter()
@@ -414,11 +415,15 @@ pub async fn poll(app: &AppHandle, shared: &Shared, selected: &str, fresh: Optio
             .collect();
         for task in tasks {
             match task.await {
-                Ok((symbol, Ok(q))) => observe(app, shared, &symbol, &q),
+                Ok((symbol, Ok(q))) => quotes.push((symbol, q)),
                 Ok((symbol, Err(e))) => log::warn!("alert quote {symbol}: {e}"),
                 Err(e) => log::warn!("alert quote task: {e}"),
             }
         }
+    }
+    crate::provider::Provider::current(shared).overlay_quotes(&shared.http, quotes.iter_mut().map(|(_, q)| q).collect()).await;
+    for (symbol, q) in &quotes {
+        observe(app, shared, symbol, q);
     }
 }
 

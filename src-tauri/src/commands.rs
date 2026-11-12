@@ -19,7 +19,7 @@ use crate::sp500::HeatQuote;
 use crate::options::Options;
 use crate::stats::Section;
 use crate::news::Article;
-use crate::quote::{self, Chart, Quote, SearchHit};
+use crate::quote::{self, Candle, Chart, Quote, SearchHit};
 use crate::ivrank::{self, IvRank};
 use crate::screener::{self, ScreenRow};
 use crate::settings::{EventFilter, ChartLayout, ChartTimeZone, Theme, Palette, validate_text_size, RefreshMode, ChartMode, ChartScale, Dots, Group, WatchlistSort, WatchlistView, WatchlistColumns, SavedScreen, ScreenRule, Keybinds, IndicatorConfig, IndicatorPreset, Settings, validate_indicators, DEFAULT_HOTKEY};
@@ -155,8 +155,10 @@ pub async fn get_history(shared: State<'_, Arc<Shared>>, symbol: String, interva
 }
 
 #[tauri::command]
-pub async fn get_older(shared: State<'_, Arc<Shared>>, symbol: String, interval: String, start: i64, end: i64, extended: bool) -> Result<Chart, String> {
-    quote::fetch_older(&shared.http, &symbol, &interval, start, end, extended).await
+pub async fn get_older(shared: State<'_, Arc<Shared>>, symbol: String, interval: String, start: i64, end: i64, extended: bool) -> Result<Vec<Candle>, String> {
+    let symbol = symbol.trim().to_uppercase();
+    let provider = crate::provider::Provider::current(&shared);
+    provider.fetch_older(&shared.http, &symbol, &interval, start, end, extended).await.map(|(_, candles)| candles)
 }
 
 fn history_for(shared: &Shared, symbol: &str, interval: &str) -> Result<Chart, String> {
@@ -778,6 +780,8 @@ pub async fn get_watch_quotes(shared: State<'_, Arc<Shared>>, symbols: Vec<Strin
     for t in tasks {
         out.push(t.await.map_err(|e| e.to_string())?);
     }
+    let provider = crate::provider::Provider::current(&shared);
+    provider.overlay_quotes(&shared.http, out.iter_mut().filter_map(|w| w.quote.as_mut()).collect()).await;
     Ok(out)
 }
 

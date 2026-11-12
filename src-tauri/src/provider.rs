@@ -45,6 +45,36 @@ impl Provider {
         }
         Ok(quote)
     }
+    pub async fn overlay_quotes(&self, client: &reqwest::Client, mut quotes: Vec<&mut Quote>) {
+        let Self::Alpaca(keys, feed) = self else { return };
+        quotes.retain(|q| eligible(&q.symbol));
+        if quotes.is_empty() { return; }
+        let symbols: Vec<String> = quotes.iter().map(|q| q.symbol.clone()).collect();
+        match alpaca::snapshots(client, keys, *feed, &symbols).await {
+            Ok(v) => {
+                for q in quotes {
+                    let snapshot = &v[q.symbol.as_str()];
+                    if let Err(e) = alpaca::overlay(q, snapshot, *feed) { log::warn!("Alpaca quote {}: {e}; using Yahoo", q.symbol); }
+                }
+            },
+            Err(e) => log::warn!("Alpaca quotes: {e}; using Yahoo"),
+        }
+    }
+    pub fn bar_source(&self, symbol: &str) -> &'static str {
+        match self { Self::Alpaca(_, feed) if eligible(symbol) => feed.source(), _ => "yahoo" }
+    }
+    pub async fn fetch_older(&self, client: &reqwest::Client, symbol: &str, interval: &str, start: i64, end: i64, extended: bool) -> Result<(&'static str, Vec<Candle>), String> {
+        if let Self::Alpaca(keys, feed) = self {
+            if eligible(symbol) {
+                match alpaca::older_bars(client, keys, *feed, symbol, interval, extended && interval.ends_with('m'), (start, end)).await {
+                    Ok(candles) if !candles.is_empty() => return Ok((feed.source(), candles)),
+                    Ok(_) => log::warn!("Alpaca returned no older bars; using Yahoo"),
+                    Err(e) => log::warn!("Alpaca older bars: {e}; using Yahoo"),
+                }
+            }
+        }
+        Ok(("yahoo", quote::fetch_older(client, symbol, interval, start, end, extended).await?.candles))
+    }
     pub async fn fetch_chart(&self, client: &reqwest::Client, symbol: &str, range: &str, interval: &str, extended: bool) -> Result<Chart, String> {
         let mut chart = quote::fetch_chart(client, symbol, range, interval, extended).await?;
         self.overlay_bars(client, symbol, &mut chart).await;
