@@ -6,6 +6,10 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.22] - 2026-11-11
+
+### Added\n- **Drawing style:** select a drawing to set its color, width and dash, or lock\n  it against moves and deletion.\n- **Magnet:** snaps drawing points to the open, high, low or close.\n- **Hide drawings:** hides every drawing until toggled back.
+
 ## [0.11.21] - 2026-11-11
 
 ### Added\n- **Chart types:** Area, Baseline, Hollow candles, Bars, Heikin Ashi and Renko\n  join Line and Candles in a Chart type menu.\n\n### Changed\n- `C` cycles through every chart type.
