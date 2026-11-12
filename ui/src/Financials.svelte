@@ -62,6 +62,7 @@
     {#if rows.length === 0}
       <div class="none">No {frequency} data for {symbol}</div>
     {:else}
+      {#key frequency}
       <div class="charts">
         <figure>
           <figcaption>
@@ -70,7 +71,7 @@
           <svg viewBox="0 0 {W} {H}" preserveAspectRatio="none" role="img" aria-label="Revenue, net income and free cash flow by period">
             <line class="base" x1="0" x2={W} y1={bars.baseline} y2={bars.baseline} />
             {#each bars.bars as b (`${b.series}-${b.index}`)}
-              <rect x={b.x} y={b.y} width={b.width} height={b.height} fill={COLORS[flows[b.series].key]}>
+              <rect class:neg={b.value < 0} style="animation-delay: {b.index * 20}ms" x={b.x} y={b.y} width={b.width} height={b.height} fill={COLORS[flows[b.series].key]}>
                 <title>{flows[b.series].label} {labels[b.index]}: {money(b.value)}</title>
               </rect>
             {/each}
@@ -84,7 +85,7 @@
             <figcaption>
               {#each margins as s (s.key)}<span class="key"><i style="background: {COLORS[s.key]}"></i>{s.label}</span>{/each}
             </figcaption>
-            <svg viewBox="0 0 {W} {H}" preserveAspectRatio="none" role="img" aria-label="Margins by period">
+            <svg class="wipe" viewBox="0 0 {W} {H}" preserveAspectRatio="none" role="img" aria-label="Margins by period">
               <line class="base" x1="0" x2={W} y1={lines.baseline} y2={lines.baseline} />
               {#each margins as s, i (s.key)}
                 <path d={lines.paths[i]} stroke={COLORS[s.key]}>
@@ -118,6 +119,7 @@
           </tbody>
         </table>
       </div>
+      {/key}
     {/if}
   </div>
 {/if}
@@ -206,6 +208,47 @@
     stroke-linecap: round;
     stroke-linejoin: round;
     vector-effect: non-scaling-stroke;
+  }
+  rect {
+    transform-box: fill-box;
+    transform-origin: bottom;
+    animation: grow var(--motion-slow) var(--ease-out) backwards;
+  }
+  rect.neg {
+    transform-origin: top;
+  }
+  .wipe {
+    animation: wipe 400ms var(--ease-out);
+  }
+  .axis,
+  .scroll {
+    animation: fade var(--motion-slow) var(--ease-out);
+  }
+  @keyframes grow {
+    from {
+      transform: scaleY(0);
+    }
+  }
+  @keyframes wipe {
+    from {
+      clip-path: inset(-4px 100% -4px -4px);
+    }
+    to {
+      clip-path: inset(-4px);
+    }
+  }
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    rect,
+    .wipe,
+    .axis,
+    .scroll {
+      animation: none;
+    }
   }
   .axis {
     display: grid;
