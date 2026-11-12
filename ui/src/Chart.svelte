@@ -4,7 +4,7 @@
   import type { Analysis, Article, Chart, ChartMode, ChartScale, ChartTimeZone, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
   import { fitScale, forward, inverse, scaleLabel, scaleTicks, shiftRange, stretchRange } from "./lib/scale";
   import type { Drawing, DrawingPoint } from "./lib/types";
-  import { TWO_POINT, anchoredVwap, fibLevels, hitBox, positionLevels, rayEnd, timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
+  import { DRAWING_COLORS, TWO_POINT, snapPrice, anchoredVwap, fibLevels, hitBox, positionLevels, rayEnd, timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
   import { legendText, volumeProfile, paneLayout } from "./lib/indicators";
   import { untrack } from "svelte";
   import { displayCandles, isOhlc } from "./lib/charttypes";
@@ -872,7 +872,7 @@
 
   $effect(() => {
     // Redraw when any of these change.
-    void [redrawKey, list, preview, selected, tool, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt, fillMarks];
+    void [redrawKey, list, preview, selected, tool, hideDrawings, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt, fillMarks];
     draw();
   });
 
@@ -986,6 +986,17 @@
   ];
   let tool = $state<Tool>("cursor");
   let selected = $state<number | null>(null);
+  let hideDrawings = $state(false);
+  let magnet = $state(readMagnet());
+
+  function readMagnet() {
+    try { return localStorage.getItem("tickr.magnet") === "1"; } catch { return false; }
+  }
+
+  function toggleMagnet() {
+    magnet = !magnet;
+    try { localStorage.setItem("tickr.magnet", magnet ? "1" : "0"); } catch { /* storage unavailable */ }
+  }
   let history = $state<History>({ past: [], present: [], future: [] });
   let preview = $state<Drawing | null>(null);
   let editing = $state<{ point: DrawingPoint; x: number; y: number } | null>(null);
@@ -993,6 +1004,7 @@
   let gesture: { start: Pixel; original: Drawing | null; endpoint: number; moved: boolean; second: boolean } | null = null;
   const drawingSymbol = $derived(chart?.meta.symbol.toUpperCase() ?? "");
   const list = $derived(replay ? [] : (drawings[drawingSymbol] ?? []));
+  const selectedDrawing = $derived(selected == null ? null : (list.find((d) => d.id === selected) ?? null));
   const times = $derived(candles.map((c) => c.t));
   const linkedIndex = $derived(linkedTime == null ? -1 : barAt(times, linkedTime));
   $effect(() => {
@@ -1047,8 +1059,13 @@
     if (await saveDrawings(symbol, next.present) && drawingSymbol === symbol) history = next;
   }
 
+  function restyle(patch: Partial<Drawing>) {
+    if (selected == null) return;
+    void changeDrawings(list.map((d) => (d.id === selected ? { ...d, ...patch } : d)));
+  }
+
   function removeDrawing() {
-    if (selected == null || drawingBusy) return;
+    if (selected == null || drawingBusy || selectedDrawing?.locked) return;
     void changeDrawings(list.filter((d) => d.id !== selected));
     selected = null;
   }
@@ -1067,10 +1084,13 @@
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   }
 
-  function anchor(p: Pixel): DrawingPoint {
+  function anchor(p: Pixel, snap = magnet): DrawingPoint {
+    const at = view.start + (p.x - PAD.l) / geo.step - 0.5;
+    const priceAt = (y: number) => inverse(1 - (y - PAD.t) / geo.priceH, geo.lo, geo.hi, geo.scale);
+    const price = priceAt(p.y);
     return {
-      t: Math.round(indexToTime(times, view.start + (p.x - PAD.l) / geo.step - 0.5)),
-      price: inverse(1 - (p.y - PAD.t) / geo.priceH, geo.lo, geo.hi, geo.scale),
+      t: Math.round(indexToTime(times, at)),
+      price: snap ? snapPrice(price, candles[Math.round(at)], Math.abs(priceAt(p.y - 12) - price)) : price,
     };
   }
 
@@ -1099,6 +1119,7 @@
   }
 
   function hitDrawing(p: Pixel) {
+    if (hideDrawings) return null;
     const ctx = canvas?.getContext("2d");
     if (ctx) ctx.font = `11px ${getComputedStyle(canvas!).getPropertyValue("--font")}`;
     for (const d of [...list].reverse()) {
@@ -1146,8 +1167,8 @@
       hover = null;
       const hit = hitDrawing(p);
       selected = hit?.drawing.id ?? null;
-      if (hit) gesture = { start: p, original: hit.drawing, endpoint: hit.endpoint, moved: false, second: false };
-      else { dragX = e.clientX; dragY = e.clientY; }
+      if (hit && !hit.drawing.locked) gesture = { start: p, original: hit.drawing, endpoint: hit.endpoint, moved: false, second: false };
+      else if (!hit) { dragX = e.clientX; dragY = e.clientY; }
       return;
     }
     const point = anchor(p);
@@ -1214,7 +1235,7 @@
       const points = original.points.map((a, i) => {
         if (endpoint >= 0) return i === endpoint ? point : a;
         const old = screen(a);
-        return anchor({ x: old.x + p.x - start.x, y: old.y + p.y - start.y });
+        return anchor({ x: old.x + p.x - start.x, y: old.y + p.y - start.y }, false);
       });
       if (points.every((a) => a.price > 0 && Number.isFinite(a.price))) preview = { ...original, points };
     } else if (preview) preview = { ...preview, points: [preview.points[0], point] };
@@ -1251,7 +1272,7 @@
 
   function drawDrawings(ctx: CanvasRenderingContext2D, v: (name: string) => string) {
     ctx.font = `11px ${v("--font")}`;
-    const items = [...list.filter((d) => !preview || !gesture?.original || d.id !== preview.id), ...(preview ? [preview] : [])];
+    const items = [...(hideDrawings ? [] : list.filter((d) => !preview || !gesture?.original || d.id !== preview.id)), ...(preview ? [preview] : [])];
     for (const d of items) {
       const a = screen(d.points[0]);
       const two = TWO_POINT.has(d.kind);
@@ -1266,9 +1287,10 @@
       ctx.beginPath();
       ctx.rect(PAD.l, PAD.t, geo.plotW, geo.priceH);
       ctx.clip();
-      ctx.strokeStyle = v(d.id === selected ? "--text" : "--muted");
-      ctx.fillStyle = v("--text");
-      ctx.lineWidth = d.id === selected ? 2 : 1;
+      ctx.strokeStyle = d.color || v(d.id === selected ? "--text" : "--muted");
+      ctx.fillStyle = d.color || v("--text");
+      ctx.lineWidth = (d.width || 1) + (d.id === selected ? 1 : 0);
+      if (d.dashed) ctx.setLineDash([6, 4]);
       ctx.textAlign = "left";
       ctx.textBaseline = "bottom";
       if (d.kind === "text") {
@@ -1284,7 +1306,7 @@
         ctx.stroke();
       } else if (d.kind === "avwap") {
         const line = avwapPath(d);
-        ctx.strokeStyle = v("--vwap");
+        ctx.strokeStyle = d.color || v("--vwap");
         ctx.beginPath();
         line.forEach((p, k) => (k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
         ctx.stroke();
@@ -1339,7 +1361,7 @@
         ctx.fillText(label, x, y);
       }
       ctx.restore();
-      if (d.kind === "hline") axisTag(ctx, a.y, geo.label(d.points[0].price), v("--muted"), v("--bg"));
+      if (d.kind === "hline") axisTag(ctx, a.y, geo.label(d.points[0].price), d.color || v("--muted"), v("--bg"));
     }
   }
 
@@ -1462,8 +1484,23 @@
         <button aria-label={item.label} aria-pressed={tool === item.tool} title={item.label} onclick={() => chooseTool(item.tool)}>{item.label}</button>
       {/each}
       <button aria-label="Undo" aria-pressed={false} title="Undo (Ctrl+Z); redo (Ctrl+Shift+Z)" disabled={!history.past.length || drawingBusy} onclick={() => { cancelDrawing(); void changeDrawings("undo"); }}>Undo</button>
-      <button aria-label="Delete" aria-pressed={false} title="Delete (Delete / Backspace)" disabled={selected == null || drawingBusy} onclick={removeDrawing}>Delete</button>
+      <button aria-label="Delete" aria-pressed={false} title="Delete (Delete / Backspace)" disabled={selected == null || drawingBusy || !!selectedDrawing?.locked} onclick={removeDrawing}>Delete</button>
+      <button aria-label="Magnet" aria-pressed={magnet} title="Magnet: snap new points and dragged endpoints to the open, high, low or close" onclick={toggleMagnet}>Magnet</button>
+      <button aria-label="Hide drawings" aria-pressed={hideDrawings} title="Hide all drawings" onclick={() => { hideDrawings = !hideDrawings; selected = null; }}>Hide</button>
     </div>
+    {#if selectedDrawing}
+      {@const d = selectedDrawing}
+      <div class="drawing-tools drawing-style" role="toolbar" aria-label="Drawing style">
+        {#each DRAWING_COLORS as color}
+          <button class="swatch" aria-label={color ? `Color ${color}` : "Default color"} aria-pressed={(d.color ?? "") === color} disabled={drawingBusy} style:--swatch={color || "var(--muted)"} onclick={() => restyle({ color })}></button>
+        {/each}
+        {#each [1, 2, 3] as w}
+          <button aria-label={`Width ${w}`} aria-pressed={(d.width || 1) === w} disabled={drawingBusy} onclick={() => restyle({ width: w })}>{w}px</button>
+        {/each}
+        <button aria-label="Dashed" aria-pressed={!!d.dashed} disabled={drawingBusy} onclick={() => restyle({ dashed: !d.dashed })}>Dash</button>
+        <button aria-label="Lock" aria-pressed={!!d.locked} title="Locked drawings cannot be moved or deleted" disabled={drawingBusy} onclick={() => restyle({ locked: !d.locked })}>Lock</button>
+      </div>
+    {/if}
   {/if}
   {#if candles.length}
     <div class="axis-grip" style:top="{PAD.t}px" style:width="{PAD.r}px" style:height="{geo.priceH}px"></div>
@@ -1590,6 +1627,9 @@
   }
   .drawing-tools button[aria-pressed="true"] { background: var(--surface); color: var(--text); }
   .drawing-tools button:disabled { opacity: 0.4; }
+  .drawing-style { top: 25px; align-items: center; }
+  .drawing-style .swatch { width: 14px; height: 14px; padding: 0; background: var(--swatch); }
+  .drawing-style .swatch[aria-pressed="true"] { background: var(--swatch); box-shadow: 0 0 0 2px var(--text); }
   .drawing-input { position: absolute; width: 200px; z-index: 2; }
   .countdown {
     position: absolute;
