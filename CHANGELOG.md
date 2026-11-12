@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.43] - 2026-11-12
+
+### Added
+- **Market hotlists:** the Market view lists up to 25 names for gainers,
+  losers, most active, gap up, gap down, 52-week highs and 52-week lows,
+  replacing the top-5 gainers and losers. The gap and 52-week lists rank
+  within Yahoo's top gainers, losers and most-active names.
+
 ## [0.11.42] - 2026-11-12
 
 ### Changed

@@ -378,7 +378,7 @@ it is instant.
   your browser.
 - **Market:** the S&P 500, Nasdaq, Dow, Russell 2000 and VIX; the 10-year
   yield, crude oil, gold, the dollar index and Bitcoin; the 11 S&P sector ETFs
-  by day change; and the day's top 5 gainers and losers. Click a row to chart
+  by day change; and hotlists of up to 25 names (gainers, losers, most active, gap up, gap down, 52-week highs and lows; the gap and 52-week lists rank within Yahoo's top gainers, losers and most-active names). Click a row to chart
   it.
 - **Options:** the option chain for the current symbol, calls or puts one
   side at a time, for any expiry (type a YYYY-MM-DD date or pick from the
@@ -653,8 +653,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.42
-git push origin v0.11.42
+git tag v0.11.43
+git push origin v0.11.43
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
