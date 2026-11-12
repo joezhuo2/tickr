@@ -6,6 +6,10 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.29] - 2026-11-11
+
+### Added\n- **Scroll back:** pan past the left edge of the chart to load older candles.\n\n### Changed\n- Every candle interval can be picked at any time; tickr moves to the nearest\n  range that supports it.
+
 ## [0.11.28] - 2026-11-11
 
 ### Added\n- **Docked panels:** the watchlist and research panels open in a resizable\n  column beside the chart. The Dock button in the toolbar turns this off.

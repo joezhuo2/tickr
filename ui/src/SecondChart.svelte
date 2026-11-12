@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ALL_INTERVALS, rangeFor } from "./lib/scrollback";
   import { invoke } from "@tauri-apps/api/core";
   import { untrack } from "svelte";
   import ChartView from "./Chart.svelte";
@@ -132,7 +133,8 @@
   }
 
   function chooseInterval(i: string) {
-    onlayout({ range, interval: validInterval(range, i) });
+    const r = rangeFor(range, i);
+    onlayout({ range: r, interval: validInterval(r, i) });
   }
 </script>
 
@@ -150,7 +152,7 @@
     </select>
     <select aria-label="Second chart interval" value={interval} onchange={(e) => chooseInterval(e.currentTarget.value)}>
       <option value="auto">Auto</option>
-      {#each intervalsFor(range) as i (i)}
+      {#each ALL_INTERVALS as i (i)}
         <option value={i}>{INTERVAL_LABELS[i] ?? i}</option>
       {/each}
     </select>

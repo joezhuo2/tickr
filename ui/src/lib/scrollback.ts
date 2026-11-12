@@ -1,0 +1,44 @@
+import { RANGES, intervalsFor, type Candle } from "./types";
+
+export const ALL_INTERVALS = ["1m", "5m", "15m", "30m", "60m", "1d", "1wk", "1mo"];
+export const MAX_CANDLES = 20_000;
+
+const DAY = 86_400;
+const STEP_LIMIT: Record<string, number> = { "1m": 7 * DAY, "5m": 55 * DAY, "15m": 55 * DAY, "30m": 55 * DAY, "60m": 700 * DAY };
+const NOMINAL_DAYS: Record<string, number> = { "1d": 1, "5d": 5, "1mo": 31, "6mo": 183, ytd: 366, "1y": 366, "5y": 1830 };
+
+export function rangeFor(range: string, interval: string): string {
+  if (interval === "auto" || intervalsFor(range).includes(interval)) return range;
+  const at = RANGES.findIndex((r) => r.id === range);
+  let best = range;
+  let gap = Infinity;
+  RANGES.forEach((r, i) => {
+    if (intervalsFor(r.id).includes(interval) && Math.abs(i - at) < gap) {
+      best = r.id;
+      gap = Math.abs(i - at);
+    }
+  });
+  return best;
+}
+
+export function olderWindow(interval: string, first: number, last: number): { start: number; end: number } | null {
+  if (!(first > 1)) return null;
+  const span = Math.min(Math.max(last - first, 5 * DAY), STEP_LIMIT[interval] ?? 20 * 365 * DAY);
+  return { start: Math.max(1, Math.floor(first - span)), end: first };
+}
+
+export function mergeOlder(older: readonly Candle[], candles: Candle[]): Candle[] {
+  const first = candles[0]?.t;
+  if (first == null) return candles;
+  const add = older.filter((c) => c.t < first);
+  return add.length ? [...add, ...candles] : candles;
+}
+
+export function axisRange(range: string, interval: string, seconds: number): string {
+  const days = seconds / DAY;
+  if (days <= (NOMINAL_DAYS[range] ?? Infinity) * 1.5) return range;
+  if (days <= 1.5) return "1d";
+  if (days <= 8) return "5d";
+  if (/\dm$/.test(interval)) return "1y";
+  return days <= 400 ? "1mo" : "max";
+}

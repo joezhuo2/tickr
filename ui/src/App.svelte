@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as Scrollback from "./lib/scrollback";
   import * as ChartAlertRules from "./lib/chartAlerts";
   import { chartAlerts, setChartAlerts } from "./lib/chartAlertStore.svelte";
   import { CHART_MODES, nextMode } from "./lib/charttypes";
@@ -387,6 +388,41 @@
   );
   const delayText = $derived(quote ? delayLabel(quote.delay_secs) : null);
 
+  let olderBusy = $state(false);
+  const olderDone = new Set<string>();
+  const olderKept = new Map<string, Candle[]>();
+
+  function withOlder(key: string, c: Chart): Chart {
+    const candles = Scrollback.mergeOlder(olderKept.get(key) ?? [], c.candles);
+    return candles === c.candles ? c : { ...c, candles };
+  }
+
+  async function loadOlder() {
+    const c = chart;
+    const key = cacheKey();
+    if (!c || replay || olderBusy || olderDone.has(key) || !c.candles.length) return;
+    const first = c.candles[0].t;
+    const w = c.candles.length < Scrollback.MAX_CANDLES ? Scrollback.olderWindow(c.interval, first, c.candles[c.candles.length - 1].t) : null;
+    if (!w) return;
+    olderBusy = true;
+    try {
+      const older = await invoke<Chart>("get_older", { symbol: c.meta.symbol, interval: c.interval, start: w.start, end: w.end, extended: c.extended ?? false });
+      const add = older.candles.filter((k) => k.t < first);
+      if (!add.length) olderDone.add(key);
+      else {
+        olderKept.set(key, [...add, ...(olderKept.get(key) ?? [])]);
+        if (chart === c && cacheKey() === key) {
+          chart = withOlder(key, c);
+          cache.set(key, { chart, at: cache.get(key)?.at ?? Date.now() });
+        }
+      }
+    } catch {
+      olderDone.add(key);
+    } finally {
+      olderBusy = false;
+    }
+  }
+
   /** Shows the cached chart (or a skeleton) at once, then fetches if stale. */
   async function loadChart(force = false, manual = false) {
     if (replay) return;
@@ -404,8 +440,9 @@
     try {
       const c = await invoke<Chart>("get_chart", { symbol, range, interval, extended: chartExtended });
       if (mine !== chartSeq) return;
-      cache.set(key, { chart: c, at: Date.now() });
-      chart = c;
+      const merged = withOlder(key, c);
+      cache.set(key, { chart: merged, at: Date.now() });
+      chart = merged;
       chartAt = Date.now();
       loading = false;
       if (shouldAnalyze(!!analysis, indicators?.keep_analysis ?? false)) void runAnalysis(true);
@@ -1186,10 +1223,14 @@
   function changeInterval(next: string) {
     if (next === interval) return;
     exitReplay();
+    const r = Scrollback.rangeFor(range, next);
+    const moved = r !== range;
+    range = r;
     interval = validInterval(range, next);
     const saved = interval;
     clearAnalysis();
     chartSettingsWrite = chartSettingsWrite
+      .then(() => (moved ? invoke<void>("set_range", { range: r }) : undefined))
       .then(() => invoke<void>("set_interval", { interval: saved }))
       .catch(console.warn);
     loadChart(true);
@@ -1600,6 +1641,8 @@
       dataProvider = e.payload;
       exitReplay();
       cache.clear();
+      olderKept.clear();
+      olderDone.clear();
       clearAnalysis();
       void loadChart(true);
       secondView?.clearCache();
@@ -1725,7 +1768,7 @@
           </div>
           <select aria-label="Candle interval" value={interval} disabled={!!practice} onchange={(event) => changeInterval(event.currentTarget.value)}>
             <option value="auto">Auto</option>
-            {#each intervalsFor(range) as i (i)}
+            {#each Scrollback.ALL_INTERVALS as i (i)}
               <option value={i}>{INTERVAL_LABELS[i] ?? i}</option>
             {/each}
           </select>
@@ -1854,7 +1897,7 @@
               <div class="dock">
                 <div class="dock-chart">
                   {#if mainChart}
-                    <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={chartFills} orderLines={paperLines} onmoveorder={paperMove} />
+                    <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={chartFills} orderLines={paperLines} onmoveorder={paperMove} onolder={loadOlder} loadingOlder={olderBusy} />
                   {:else if chartError}
                     <div class="msg">
                       {chartError}
@@ -1894,7 +1937,7 @@
             {:else if view === "technicals"}
               <div class="split">
                 {#if mainChart}
-                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={chartFills} orderLines={paperLines} onmoveorder={paperMove} />
+                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={chartFills} orderLines={paperLines} onmoveorder={paperMove} onolder={loadOlder} loadingOlder={olderBusy} />
                 {:else if chartError}
                   <div class="msg">
                     {chartError}
@@ -1924,7 +1967,7 @@
             {:else if view === "paper"}
               <div class="split">
                 {#if mainChart}
-                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={chartFills} orderLines={paperLines} onmoveorder={paperMove} />
+                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={replay ? null : chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} replay={!!replay} fills={chartFills} orderLines={paperLines} onmoveorder={paperMove} onolder={loadOlder} loadingOlder={olderBusy} />
                 {:else if chartError}
                   <div class="msg">
                     {chartError}
@@ -1957,7 +2000,7 @@
             {:else if view === "backtest"}
               <div class="split">
                 {#if mainChart}
-                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} fills={chartFills} orderLines={paperLines} onmoveorder={paperMove} />
+                  <ChartView bind:this={chartView} redrawKey={displayKey} chart={mainChart} staleNote={chartStale} {mode} {scale} {shadeSessions} timeZone={chartTimeZone} {drawings} {drawingBusy} {saveDrawings} analysis={techAnalysis} {overlays} earnings={chartEarnings} ratings={chartRatings} news={chartNews} fills={chartFills} orderLines={paperLines} onmoveorder={paperMove} onolder={loadOlder} loadingOlder={olderBusy} />
                 {:else if chartError}
                   <div class="msg">
                     {chartError}
@@ -1994,6 +2037,10 @@
                     onwindow={split && layout.sync_range ? (w) => (syncWindow = { source: "main", w }) : undefined}
                     replay={!!replay}
                     fills={chartFills}
+                    orderLines={paperLines}
+                    onmoveorder={paperMove}
+                    onolder={loadOlder}
+                    loadingOlder={olderBusy}
                   />
                 {:else if chartError}
                   <div class="msg">

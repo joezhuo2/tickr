@@ -439,6 +439,30 @@ pub async fn fetch_period(client: &reqwest::Client, symbol: &str, interval: &str
     parse_period(&body, interval, start, end)
 }
 
+pub const OLDER_INTERVALS: [&str; 8] = ["1m", "5m", "15m", "30m", "60m", "1d", "1wk", "1mo"];
+
+pub async fn fetch_older(client: &reqwest::Client, symbol: &str, interval: &str, start: i64, end: i64, extended: bool) -> Result<Chart, String> {
+    let interval = *OLDER_INTERVALS.iter().find(|&&i| i == interval).ok_or("unsupported interval")?;
+    if start <= 0 || end <= start {
+        return Err("bad date range".into());
+    }
+    let url = format!("{CHART_URL}/{}", symbol.trim().to_uppercase());
+    let (from, to) = (start.to_string(), end.to_string());
+    let prepost = extended && interval.ends_with('m');
+    let query = [
+        ("period1", from.as_str()),
+        ("period2", to.as_str()),
+        ("interval", interval),
+        ("includePrePost", if prepost { "true" } else { "false" }),
+        ("events", "div,split"),
+    ];
+    let body = get(client, &url, &query).await?;
+    let mut chart = parse_chart(&body, PERIOD_RANGE, interval)?;
+    trim_period(&mut chart, start, end);
+    chart.extended = prepost;
+    Ok(chart)
+}
+
 /// 1-minute 1d chart, for the freshest price and extended-hours value.
 pub async fn fetch_quote(client: &reqwest::Client, symbol: &str, now: i64) -> Result<Quote, String> {
     let url = format!("{CHART_URL}/{}", symbol.trim().to_uppercase());
