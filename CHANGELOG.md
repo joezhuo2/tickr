@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.57] - 2026-11-12
+
+### Changed
+- **Faster zoomed-in charts:** with many bars loaded, each redraw now walks
+  only the bars on screen instead of every loaded bar, so panning, zooming and
+  moving the crosshair stay smooth with indicators on.
+
 ## [0.11.56] - 2026-11-12
 
 ### Fixed
