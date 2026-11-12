@@ -63,6 +63,7 @@ pub struct Shared {
     pub ai_cache: Mutex<Option<crate::ai::SentimentCache>>,
     pub last_chart: Mutex<Option<Chart>>,
     pub history: Mutex<Option<Chart>>,
+    pub bar_cache: Mutex<()>,
     /// Why the saved hotkey is not registered, if it is not.
     pub hotkey_error: Mutex<Option<String>>,
     /// Set when the last "Launch at login" toggle failed.
@@ -101,6 +102,7 @@ impl Shared {
             ai_cache: Mutex::new(None),
             last_chart: Mutex::new(None),
             history: Mutex::new(None),
+            bar_cache: Mutex::new(()),
             hotkey_error: Mutex::new(None),
             autostart_error: Mutex::new(None),
             update_status: Mutex::new(Default::default()),
