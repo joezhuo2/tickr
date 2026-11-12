@@ -110,7 +110,7 @@ taskbar to keep it visible.
 ### Chart
 
 - **Symbol and range:** search to change the symbol, pick a range from 1D to
-  Max and switch between line and candles. Search filters by asset type and
+  Max and choose a chart type. Search filters by asset type and
   exchange, and exact ticker matches come first. Press Enter on a typed ticker
   to open it directly. 1D, 5D and 1M charts reload about once a minute.
 - **Sessions and time zone:** extended-hours candles can be shown or hidden on
@@ -124,6 +124,13 @@ taskbar to keep it visible.
   10 symbols you viewed. The Back and Forward buttons (or Alt+Left and
   Alt+Right) step through this session's symbols, and B jumps to the previous
   one, so pressing it again toggles between two.
+- **Chart types:** Line, Area, Baseline, Candles, Hollow candles, Bars (OHLC),
+  Heikin Ashi and Renko, from the menu next to the price scale or by pressing C
+  to cycle. Baseline colors the line green above and red below the previous
+  close on 1D, or the first bar on screen otherwise. Heikin Ashi and Renko show
+  smoothed prices, so the tooltip values are not traded prices. Renko bricks
+  are one 14-bar average true range tall, are built from closes, and are not
+  evenly spaced in time.
 - **Price scales:** linear, logarithmic, or percentage change rebased to the
   first visible candle as you pan and zoom. Press L to cycle scales.
 - **Drawings:** the toolbar places levels, trendlines, text, freehand pen strokes, boxes, rays,
@@ -386,7 +393,7 @@ typing in a text field.
 
 | Category | Key | Action |
 | --- | --- | --- |
-| Chart | `C` | Switch line / candles |
+| Chart | `C` | Cycle chart type |
 | | `L` | Cycle price scale (Lin, Log, %) |
 | | `I` | Cycle candle length (Auto, then the lengths the range allows) |
 | | `1` | Draw level (press again for Cursor) |
@@ -562,8 +569,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.20
-git push origin v0.11.20
+git tag v0.11.21
+git push origin v0.11.21
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

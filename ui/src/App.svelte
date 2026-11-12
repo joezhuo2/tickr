@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART_MODES, nextMode } from "./lib/charttypes";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount, tick, untrack } from "svelte";
@@ -1422,7 +1423,7 @@
         }
         break;
       case "chart_mode":
-        setMode(mode === "line" ? "candles" : "line");
+        setMode(nextMode(mode));
         break;
       case "chart_scale":
         setScale(scale === "linear" ? "log" : scale === "log" ? "percent" : "linear");
@@ -1611,8 +1612,9 @@
               <button class:on={view === "news"} aria-pressed={view === "news"} disabled={!!replay} onclick={toggleNews}>News</button>
             </div>
             <div class="seg" role="group" aria-label="Chart type">
-              <button class:on={view !== "news" && view !== "market" && view !== "events" && view !== "options" && mode === "line"} onclick={() => setMode("line")}>Line</button>
-              <button class:on={view !== "news" && view !== "market" && view !== "events" && view !== "options" && mode === "candles"} onclick={() => setMode("candles")}>Candles</button>
+              <select aria-label="Chart type" value={mode} onchange={(event) => setMode(event.currentTarget.value as ChartMode)}>
+                {#each CHART_MODES as m}<option value={m.id}>{m.label}</option>{/each}
+              </select>
             </div>
             <div class="seg" role="group" aria-label="Price scale">
               {#each ["linear", "log", "percent"] as s}

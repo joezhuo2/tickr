@@ -16,7 +16,13 @@ pub const DEFAULT_HOTKEY: &str = "Ctrl+Alt+K";
 pub enum ChartMode {
     #[default]
     Line,
+    Area,
+    Baseline,
     Candles,
+    Hollow,
+    Bars,
+    Heikin,
+    Renko,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
