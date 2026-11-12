@@ -6,6 +6,20 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.18] - 2026-11-11
+
+### Added
+- **Hotkey sections:** Hotkeys in Settings expands into General, Chart, Draw,
+  Indicators, Panels, Options and Watchlist, each on its own page.
+- **Themed dropdowns:** every dropdown opens a themed menu with a gliding
+  highlight in place of the system popup.
+- **Themed tooltips:** the first waits a moment, then its neighbours open at once.
+
+### Changed
+- Segmented controls slide a thumb between options, chip rows nudge apart around
+  the chosen chip, and checkboxes fill and draw their tick.
+- Drawing tool hotkeys are listed under Draw, not Chart.
+
 ## [0.11.17] - 2026-11-11
 
 ### Added
