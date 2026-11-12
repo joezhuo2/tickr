@@ -6,6 +6,12 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.38] - 2026-11-11
+
+### Changed
+- **Financials** moved into the **Stats** tab, below the statistics, and the
+  separate Financials tab is gone.
+
 ## [0.11.37] - 2026-11-11
 
 ### Changed
