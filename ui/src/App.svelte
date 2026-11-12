@@ -406,7 +406,7 @@
     if (!w) return;
     olderBusy = true;
     try {
-      const older = await invoke<Chart>("get_older", { symbol: c.meta.symbol, interval: c.interval, start: w.start, end: w.end, extended: c.extended });
+      const older = await invoke<Chart>("get_older", { symbol: c.meta.symbol, interval: c.interval, start: w.start, end: w.end, extended: c.extended ?? false });
       const add = older.candles.filter((k) => k.t < first);
       if (!add.length) olderDone.add(key);
       else {
