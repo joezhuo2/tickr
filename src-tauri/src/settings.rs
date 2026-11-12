@@ -285,6 +285,10 @@ pub struct Drawing {
     pub dashed: bool,
     #[serde(default)]
     pub locked: bool,
+    #[serde(default)]
+    pub created: i64,
+    #[serde(default)]
+    pub edited: i64,
 }
 
 const PEN_MAX_POINTS: usize = 500;
@@ -297,7 +301,7 @@ pub fn validate_drawings(map: &HashMap<String, Vec<Drawing>>) -> Result<(), Stri
         let mut ids = HashSet::new();
         for d in drawings {
             let valid = match d.kind.as_str() {
-                "hline" | "text" | "avwap" | "vline" | "hray" => d.points.len() == 1,
+                "hline" | "text" | "avwap" | "vline" | "hray" | "note" => d.points.len() == 1,
                 "trend" | "rect" | "ray" | "fib" | "position" | "arrow" | "prange" | "drange" | "vprofile" => d.points.len() == 2,
                 "channel" | "fibext" | "pitchfork" => d.points.len() == 3,
                 "pen" => (2..=PEN_MAX_POINTS).contains(&d.points.len()),
@@ -305,7 +309,8 @@ pub fn validate_drawings(map: &HashMap<String, Vec<Drawing>>) -> Result<(), Stri
             };
             if !valid { return Err("Invalid drawing points.".into()); }
             if d.points.iter().any(|p| !p.price.is_finite() || p.price <= 0.0) { return Err("Invalid drawing price.".into()); }
-            if d.text.chars().count() > 200 || (if d.kind == "text" { d.text.trim().is_empty() } else { !d.text.is_empty() }) { return Err("Invalid drawing text.".into()); }
+            let max_text = if d.kind == "note" { 2000 } else { 200 };
+            if d.text.chars().count() > max_text || (if d.kind == "text" || d.kind == "note" { d.text.trim().is_empty() } else { !d.text.is_empty() }) { return Err("Invalid drawing text.".into()); }
             if !ids.insert(d.id) { return Err("Duplicate drawing ID.".into()); }
             let hex = d.color.len() == 7 && d.color.starts_with('#') && d.color[1..].bytes().all(|b| b.is_ascii_hexdigit());
             if !(d.color.is_empty() || hex) || d.width > 4 { return Err("Invalid drawing style.".into()); }
@@ -340,6 +345,7 @@ pub struct Keybinds {
     pub draw_fib: String,
     pub draw_position: String,
     pub draw_avwap: String,
+    pub draw_note: String,
     pub chart_split: String,
     pub new_window: String,
     pub chart_replay: String,
@@ -389,6 +395,7 @@ impl Default for Keybinds {
             draw_fib: ";".into(),
             draw_position: "'".into(),
             draw_avwap: "/".into(),
+            draw_note: "`".into(),
             chart_split: "j".into(),
             new_window: "=".into(),
             chart_replay: "y".into(),
@@ -891,7 +898,7 @@ mod tests {
         assert_eq!(s.keybinds.draw_text, "3");
         assert_eq!(s.keybinds.draw_ruler, "4");
         assert_eq!(s.keybinds.draw_pen, "5");
-        assert_eq!([&s.keybinds.draw_rect, &s.keybinds.draw_ray, &s.keybinds.draw_fib, &s.keybinds.draw_position, &s.keybinds.draw_avwap], ["[", "]", ";", "'", "/"]);
+        assert_eq!([&s.keybinds.draw_rect, &s.keybinds.draw_ray, &s.keybinds.draw_fib, &s.keybinds.draw_position, &s.keybinds.draw_avwap, &s.keybinds.draw_note], ["[", "]", ";", "'", "/", "`"]);
         assert_eq!(s.keybinds.chart_split, "j");
         assert_eq!(s.keybinds.new_window, "=");
         assert_eq!(s.keybinds.chart_replay, "y");

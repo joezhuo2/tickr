@@ -3,9 +3,10 @@
   import { invoke } from "@tauri-apps/api/core";
   import { ALERT_FILTERS, addedAlert, alertCounts, alertStatus, emptyMessage, levelError, toggleLabel, triggerInfo, visibleAlerts, type AlertFilter } from "./lib/alerts";
   import { alertSummary } from "./lib/format";
+  import { noteTitle, notesOf } from "./lib/notes";
   import type { AlertKind, PriceAlert, Quote } from "./lib/types";
 
-  let { symbol, quote, alerts, onchange, onopen, interval = "", drawings = [] }: {
+  let { symbol, quote, alerts, onchange, onopen, interval = "", drawings = [], onnote }: {
     interval?: string;
     drawings?: import("./lib/types").Drawing[];
     symbol: string;
@@ -13,6 +14,7 @@
     alerts: PriceAlert[];
     onchange: (alerts: PriceAlert[]) => void;
     onopen: (symbol: string) => void;
+    onnote?: (id: number) => void;
   } = $props();
 
   let direction = $state<"above" | "below">("above");
@@ -221,10 +223,25 @@
     </ul>
   {/if}
   <ChartAlerts {symbol} {interval} {drawings} />
+  {#if notesOf(drawings).length}
+    <section aria-label="Notes">
+      <h3>Notes on {symbol}</h3>
+      <ul class="notes">
+        {#each notesOf(drawings) as n (n.id)}
+          <li><button type="button" title="Show on the chart" onclick={() => onnote?.(n.id)}><span class="dot" style:background={n.color || "var(--accent)"}></span>{noteTitle(n.text)}<span class="when">{n.edited ? new Date(n.edited).toLocaleDateString() : ""}</span></button></li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
 </div>
 
 <style>
   .alerts { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 14px 10px 8px 4px; }
+  h3 { margin: 16px 0 8px; font-size: 13px; }
+  .notes { margin: 0; padding: 0; list-style: none; }
+  .notes button { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; }
+  .notes .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; }
+  .notes .when { margin-left: auto; color: var(--muted); font-size: 11px; }
   h2 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
   p { margin: 0; color: var(--muted); }
   form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0 10px; }

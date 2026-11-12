@@ -16,6 +16,7 @@ const DEFAULTS: Keybinds = {
   draw_fib: ";",
   draw_position: "'",
   draw_avwap: "/",
+  draw_note: "`",
   chart_split: "j",
   new_window: "=",
   chart_replay: "y",
@@ -187,7 +188,7 @@ describe("groupActions", () => {
     expect(CATEGORIES.map((c) => c.id)).toEqual(["general", "chart", "draw", "indicators", "panels", "options", "watchlist"]);
     const draw = groupActions().find((g) => g.id === "draw")!;
     expect(draw.actions.map((a) => a.id)).toEqual(ACTIONS.filter((a) => a.id.startsWith("draw_")).map((a) => a.id));
-    expect(draw.actions).toHaveLength(10);
+    expect(draw.actions).toHaveLength(11);
   });
   it("puts the options actions in their own group", () => {
     const options = groupActions().find((g) => g.id === "options")!;
