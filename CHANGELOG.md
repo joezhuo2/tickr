@@ -6,6 +6,16 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.54] - 2026-11-12
+
+### Added
+- **Custom intervals:** the interval picker adds 2m, 3m, 10m, 45m, 2h, 3h, 4h,
+  2D and 3D, plus a Custom field for any length such as `45m`, `4h`, `2D` or
+  `3W`. They are built from native bars: intraday buckets start at the session
+  open (the last one of a day can be short), day buckets count trading days
+  from the start of the year. Lengths you use are remembered. Scroll-back,
+  drawings, the future axis, analysis and background alerts work on them.
+
 ## [0.11.53] - 2026-11-12
 
 ### Added
