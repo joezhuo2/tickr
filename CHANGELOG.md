@@ -6,6 +6,17 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.35] - 2026-11-11
+
+### Added
+- **Stock overview:** drag the right edge of the left panel to resize it, and
+  hide or show it with the new toolbar button or `\` (rebindable).
+
+### Fixed
+- **Windows:** the release binary is no longer stripped and size-optimised.
+  Microsoft Defender flagged the v0.11.34 build as
+  `Trojan:Win32/Bearfoos.A!ml` and removed it.
+
 ## [0.11.34] - 2026-11-11
 
 ### Changed\n- Text boxes share the look of the symbol search box, and dropdowns the look\n  of the calendar country menu.
