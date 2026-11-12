@@ -114,7 +114,7 @@ impl ChartLayout {
         if !self.range.is_empty() && crate::quote::interval_for(&self.range).is_none() {
             return Err(format!("unknown range {}", self.range));
         }
-        if self.interval != "auto" && !crate::quote::intervals_for(&self.range).contains(&self.interval.as_str()) {
+        if self.interval != "auto" && !crate::quote::interval_supported(&self.range, &self.interval) {
             return Err(format!("unknown interval {}", self.interval));
         }
         Ok(Self { symbol, ..self })
@@ -621,6 +621,7 @@ pub struct Settings {
     pub alerts: Vec<crate::alerts::PriceAlert>,
     /// Most recently viewed symbols, newest first.
     pub recent_symbols: Vec<String>,
+    pub recent_intervals: Vec<String>,
 }
 
 pub const MAX_RECENT_SYMBOLS: usize = 10;
@@ -629,6 +630,12 @@ pub fn push_recent(recent: &mut Vec<String>, symbol: &str) {
     recent.retain(|s| s != symbol);
     recent.insert(0, symbol.to_string());
     recent.truncate(MAX_RECENT_SYMBOLS);
+}
+
+pub fn remember_interval(recent: &mut Vec<String>, interval: &str) {
+    if interval != "auto" && !crate::quote::OLDER_INTERVALS.contains(&interval) {
+        push_recent(recent, interval);
+    }
 }
 
 impl Default for Settings {
@@ -675,6 +682,7 @@ impl Default for Settings {
             ai_news: true,
             alerts: Vec::new(),
             recent_symbols: Vec::new(),
+            recent_intervals: Vec::new(),
         }
     }
 }
@@ -872,6 +880,17 @@ mod tests {
         assert!(s.alerts.is_empty());
         assert!(s.ai_news);
         assert!(s.recent_symbols.is_empty());
+        assert!(s.recent_intervals.is_empty());
+    }
+
+    #[test]
+    fn remembers_custom_intervals_only() {
+        let mut recent = Vec::new();
+        for interval in ["auto", "5m", "60m", "1d", "1mo", "45m", "4h", "45m"] { remember_interval(&mut recent, interval); }
+        assert_eq!(recent, ["45m", "4h"]);
+        let old: Settings = serde_json::from_str(r#"{"interval":"15m","range":"5d"}"#).unwrap();
+        assert_eq!(old.interval, "15m");
+        assert!(old.recent_intervals.is_empty());
     }
 
     #[test]
@@ -1036,6 +1055,11 @@ mod tests {
         assert!(layout("AAPL", "2y", "auto").cleaned().is_err());
         assert!(layout("AAPL", "1y", "5m").cleaned().is_err());
         assert!(layout("AAPL", "", "1d").cleaned().is_err());
+        assert!(layout("AAPL", "5d", "45m").cleaned().is_ok());
+        assert!(layout("AAPL", "1y", "4h").cleaned().is_ok());
+        assert!(layout("AAPL", "1y", "2d").cleaned().is_ok());
+        assert!(layout("AAPL", "1mo", "2d").cleaned().is_err());
+        assert!(layout("AAPL", "5d", "7x").cleaned().is_err());
     }
 
     #[test]

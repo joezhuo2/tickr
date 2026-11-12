@@ -185,10 +185,23 @@ taskbar to keep it visible.
   Magnet, Hide, the study toggles and the Technicals panel (height and whether
   Indicator settings is open) are all restored when you relaunch tickr.
 - **Candle interval:** choose Auto to keep the default resolution for each
-  range, or pick any interval from 1m to 1M at any time. If the current range
-  cannot show that interval, tickr moves to the nearest range that can (5m on
-  1Y becomes 5m on 1M) and you scroll back for more. The choice is saved, and
-  switching to a range that does not support it returns to Auto.
+  range, or pick any interval from 1m to 1M at any time. Besides Yahoo's
+  intervals the list has 2m, 3m, 10m, 45m, 2h, 3h, 4h, 2D and 3D, and
+  Custom… takes any length you type: minutes (`7m`, 1 to 1440), hours (`4h`,
+  1 to 24), days (`2D`, 1 to 30), weeks (`3W`, 1 to 8) or months (`2mo`, 1 to
+  12). These are built from the largest native interval that divides them (45m
+  from 15m, 2h and 4h from 30m, or 60m on 6M to 1Y, 2m and 7m from 1m, 2D from
+  1D) with the same rules for Yahoo and Alpaca, so the base interval's
+  history limits apply: 1m-based lengths only reach back about 30 days.
+  Intraday bars start at each day's session open (the pre-market open with
+  extended hours on), so a 4h chart has 09:30 and 13:30 bars and the last bar
+  of the day can be shorter. N-day bars count trading days from each year's
+  first session and need YTD, 1Y, 5Y or Max; N-week bars count weeks from
+  Monday 5 January 1970; N-month bars count from January. Lengths you type are
+  remembered in the list. If the current range cannot show that interval,
+  tickr moves to the nearest range that can (5m on 1Y becomes 5m on 1M) and
+  you scroll back for more. The choice is saved, and switching to a range that
+  does not support it returns to Auto.
 - **Scroll back for history:** drag or scroll past the left edge of the main
   chart, or zoom out when everything is already on screen, to load older
   candles at the same interval. Each step adds about as much history as is
@@ -475,8 +488,8 @@ default) to check every symbol and interval that has an armed alert for as
 long as tickr runs, even while the window is hidden in the tray or shows
 another symbol. Each symbol and interval is downloaded about once per bar,
 at most every 15 minutes and at least a minute apart (1m every minute, 5m
-every 5 minutes, 15m and longer every 15 minutes), using regular-session
-candles. With it on, minimizing or closing the window hides it instead of
+every 5 minutes, 15m and longer every 15 minutes; a custom interval follows
+the interval it is built from), using regular-session candles. With it on, minimizing or closing the window hides it instead of
 unloading it, and the window loads hidden at startup when tickr starts in
 the tray, so expect the memory of an open window. Each alert in the list
 says whether it is checked in the background or only on screen. They fire
@@ -520,7 +533,7 @@ typing in a text field.
 | --- | --- | --- |
 | Chart | `C` | Cycle chart type |
 | | `L` | Cycle price scale (Lin, Log, %) |
-| | `I` | Cycle candle length (Auto, then the lengths the range allows) |
+| | `I` | Cycle candle length (Auto, then the lengths the range allows, including presets and remembered custom lengths) |
 | | `1` | Draw level (press again for Cursor) |
 | | `2` | Draw trendline |
 | | `3` | Draw text |
@@ -666,7 +679,7 @@ requires. Analysis and sentiment run on your machine. Not investment advice.
 Logs rotate at 1 MB and keep two old files. Attach `tickr.log` to bug reports.
 
 The candle history keeps the newest 20,000 candles per symbol, interval and
-source, for at most 40 series; the least recently updated series is dropped
+source (custom intervals store the native candles they are built from), for at most 40 series; the least recently updated series is dropped
 first. A stock split restarts that symbol's history. Settings > Market data >
 Clear cached history deletes it.
 
@@ -705,8 +718,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.53
-git push origin v0.11.53
+git tag v0.11.54
+git push origin v0.11.54
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

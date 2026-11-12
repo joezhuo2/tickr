@@ -1,4 +1,5 @@
-import type { Candle } from "./types";
+import { isIntraday } from "./session";
+import { intervalSpec, type Candle } from "./types";
 
 export type Series = (number | null)[];
 
@@ -122,8 +123,8 @@ export function pivots(candles: readonly Candle[], period: (t: number) => number
 }
 
 export function pivotPeriod(interval: string, gmtoffset: number): (t: number) => number {
-  if (/\dm$|h$/.test(interval)) return (t) => Math.floor((t + gmtoffset) / 86400);
+  if (isIntraday(interval)) return (t) => Math.floor((t + gmtoffset) / 86400);
   const date = (t: number) => new Date((t + gmtoffset) * 1000);
-  if (interval === "1d") return (t) => date(t).getUTCFullYear() * 12 + date(t).getUTCMonth();
+  if (intervalSpec(interval)?.unit === "d") return (t) => date(t).getUTCFullYear() * 12 + date(t).getUTCMonth();
   return (t) => date(t).getUTCFullYear();
 }

@@ -1,4 +1,4 @@
-import type { Chart, Quote, Session } from "./types";
+import { intervalSpec, type Chart, type Quote, type Session } from "./types";
 
 export type FreshnessState = "fresh" | "stale" | "closed" | "unknown";
 export type StatusKind = "live" | "delayed" | "recent" | "stale" | "closed" | "unknown" | "offline" | "loading";
@@ -36,7 +36,6 @@ export const CHART_GRACE_SECS = 120;
 const DAY = 86400;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const UNITS: Record<string, number> = { m: 60, h: 3600, d: DAY, wk: 7 * DAY, mo: 30 * DAY };
 
 export function knownDelay(delay: number | null | undefined): number | null {
   return typeof delay === "number" && Number.isFinite(delay) && delay >= 0 ? delay : null;
@@ -71,8 +70,7 @@ export function localOffset(t: number): number {
 }
 
 export function intervalSeconds(interval: string): number | null {
-  const m = /^(\d+)(m|h|d|wk|mo)$/.exec(interval);
-  return m ? Number(m[1]) * UNITS[m[2]] : null;
+  return intervalSpec(interval)?.seconds ?? null;
 }
 
 function validTime(t: number | null | undefined): t is number {

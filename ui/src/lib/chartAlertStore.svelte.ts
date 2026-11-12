@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { aggregateChart } from "./aggregate";
 import { claim, type ChartAlert } from "./chartAlerts";
 import { CONCURRENCY, dueGroups, groups, triggered, type Group } from "./chartAlertSchedule";
 import { clockFor } from "./strategy";
@@ -49,10 +50,10 @@ let busy = false;
 async function check(g: Group, now: number) {
   checked.set(g.key, now);
   // shortcut: background checks use regular-session candles, add extended hours if users ask for pre/post crosses
-  const c = await invoke<Chart>("get_chart", { symbol: g.symbol, range: g.range, interval: g.interval, extended: false, secondary: true });
+  const c = await invoke<Chart>("get_chart", { symbol: g.symbol, range: g.range, interval: g.base, extended: false, secondary: true });
   const since = seen.get(g.key) ?? null;
   seen.set(g.key, now);
-  if (c.interval === g.interval) fireChartAlerts((list) => triggered(list, g.symbol, g.interval, c.candles, clockFor(c.meta), since));
+  if (c.interval === g.base) fireChartAlerts((list) => triggered(list, g.symbol, g.interval, aggregateChart(c, g.interval).candles, clockFor(c.meta), since));
 }
 
 async function tick() {
