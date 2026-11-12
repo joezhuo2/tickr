@@ -276,7 +276,7 @@ The stock overview on the left can be resized: drag its right edge (or focus
 it and press ← or →); the width is remembered. Hide or show it with the
 button left of the back arrow, or `\`.
 
-The Watchlist, Alerts, Analysts, Earnings, Stats, Market, Events,
+The Watchlist, Analysts, Earnings, Stats, Market, Events,
 Options and News open in a column to the right of the chart, so the chart
 stays on screen. Drag the border between them (or focus it and press ← or →)
 to resize the column; the width is remembered. Turn **Dock** off in the
@@ -414,8 +414,9 @@ is on.
 
 ### Price alerts
 
-Open **Alerts**, to the left of Technicals, to add an alert for the selected
-symbol. Pick a kind: **Price** (at or above or below a level, in the trading
+Click the bell next to the star in the stock overview (or press `P`) to open
+**Alerts** over the window, like Settings; Escape or a click outside closes
+it. Use it to add an alert for the selected symbol. Pick a kind: **Price** (at or above or below a level, in the trading
 currency), **Day move %** (up or down X% from yesterday's close), **Move since
 armed %** (up or down X% from the price when armed), **Trailing %** or
 **Trailing amount** (falls by that much from the high since arming, or rises
@@ -502,7 +503,7 @@ typing in a text field.
 | | `Z` | Analyze / re-analyze |
 | | `A` | Open Analysts |
 | | `E` | Open Earnings |
-| | `P` | Open Alerts |
+| | `P` | Toggle Alerts |
 | | `M` | Open Market |
 | | `K` | Open Events |
 | | `N` | Open News |
@@ -652,8 +653,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.38
-git push origin v0.11.38
+git tag v0.11.39
+git push origin v0.11.39
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

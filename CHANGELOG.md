@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.39] - 2026-11-11
+
+### Changed
+- **Alerts** open from a bell next to the watchlist star, as an overlay with
+  the same animation as Settings, instead of a tab on the right. `P` toggles
+  it, and Escape or a click outside closes it. The bell shows how many alerts
+  the symbol has.
+
 ## [0.11.38] - 2026-11-11
 
 ### Changed

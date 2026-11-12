@@ -15,9 +15,15 @@
     onstar,
     replay = null,
     width = 230,
+    alertsOn = false,
+    alertCount = 0,
+    onalerts,
   }: {
     symbol: string;
     width?: number;
+    alertsOn?: boolean;
+    alertCount?: number;
+    onalerts?: () => void;
     quote: Quote | null;
     logo: string | null | undefined;
     analyst: Consensus | null | undefined;
@@ -62,6 +68,18 @@
       onclick={onstar}
     >
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" /></svg>
+    </button>
+    <button
+      class="star bell"
+      class:on={alertsOn}
+      aria-pressed={alertsOn}
+      aria-label="Alerts"
+      title={alertCount ? `Alerts (${alertCount} on ${symbol})` : "Alerts"}
+      disabled={!onalerts}
+      onclick={onalerts}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0" /></svg>
+      {#if alertCount}<span class="count">{alertCount}</span>{/if}
     </button>
   </div>
   {#if replay?.name != null}
@@ -212,6 +230,35 @@
   }
   .star.on svg {
     fill: currentColor;
+  }
+  .bell {
+    position: relative;
+    margin-left: -4px;
+  }
+  .bell.on {
+    color: var(--accent);
+  }
+  .bell.on svg {
+    fill: none;
+  }
+  .bell:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .count {
+    position: absolute;
+    top: 0;
+    right: 0;
+    min-width: 12px;
+    height: 12px;
+    padding: 0 3px;
+    border-radius: 6px;
+    background: var(--accent);
+    color: var(--bg);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 12px;
+    text-align: center;
   }
   h1 {
     margin: 0;

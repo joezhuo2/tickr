@@ -83,7 +83,7 @@
   import type { Theme, TextSize, Palette } from "./lib/types";
   import { refreshOutcome, type RefreshView } from "./lib/refresh";
   import { chartNote, chartSegment, chartTime, classifyChart, classifyQuote, delayLabel, localOffset, quoteNote, quoteSegment, quoteStatus, quoteTime, sourceName } from "./lib/freshness";
-  import { paneIn, sideIn } from "./lib/motion";
+  import { backdrop, dialog, paneIn, sideIn } from "./lib/motion";
   import { displayOffset, isIntraday } from "./lib/session";
   import { emptyHistory, goBack, goForward, previous, pushRecent, visit, type History, type Move } from "./lib/history";
   import { DEFAULT_EVENT_FILTER, localDay, weekRange, type EventsTab } from "./lib/calendar";
@@ -147,6 +147,7 @@
   let keybinds = $state<Keybinds>() as Keybinds;
   let dots = $state<Dots>() as Dots;
   let settingsOpen = $state(false);
+  let alertsOpen = $state(false);
   let search: Search | undefined = $state();
   let qs = $state<QuoteState>({ quote: null, error: null, updated_at: 0 });
   let chart = $state<Chart | null>(null);
@@ -1385,7 +1386,6 @@
       case "market": panelDone = loadMarket(true); break;
       case "options": panelDone = loadOptions(options?.expiry ?? undefined, true); break;
       case "watchlist": panelDone = watchlistView?.refresh() ?? Promise.resolve(); break;
-      case "alerts": panelDone = Promise.resolve(); break;
       default: panelDone = chartDone;
     }
     const panelError = (await Promise.all([panelDone, quoteDone, chartDone]))[0];
@@ -1432,7 +1432,7 @@
     else if (syncHover?.source === source) syncHover = null;
   }
 
-  const DOCKABLE = new Set(["watchlist", "alerts", "analysts", "earnings", "stats", "market", "events", "options", "news"]);
+  const DOCKABLE = new Set(["watchlist", "analysts", "earnings", "stats", "market", "events", "options", "news"]);
   const DOCK_MIN = 280;
 
   function stored(key: string): string | null {
@@ -1483,6 +1483,11 @@
 
   async function onKey(e: KeyboardEvent) {
     if (!ready || settingsOpen || e.defaultPrevented) return;
+    if (alertsOpen && e.key === "Escape") {
+      e.preventDefault();
+      alertsOpen = false;
+      return;
+    }
     if (e.target instanceof Element && e.target.closest("input, textarea, select, [contenteditable]")) return;
     if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
       e.preventDefault();
@@ -1581,8 +1586,10 @@
       case "technicals":
       case "analysts":
       case "earnings":
-      case "alerts":
         view = view === action ? "chart" : action;
+        break;
+      case "alerts":
+        if (!e.repeat) alertsOpen = !alertsOpen;
         break;
       case "paper":
         if (!e.repeat) view = view === "paper" ? "chart" : "paper";
@@ -1707,6 +1714,9 @@
         onstar={() => {
           if (!practice) toggleStar();
         }}
+        alertsOn={alertsOpen}
+        alertCount={alerts.filter((a) => a.symbol === (practice?.symbol ?? symbol)).length}
+        onalerts={replay || practice ? undefined : () => (alertsOpen = !alertsOpen)}
         replay={replayHeader}
       />
       <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
@@ -1781,9 +1791,6 @@
               </button>
             {/each}
             <span class="sep"></span>
-            <button role="tab" aria-selected={view === "alerts"} class:on={view === "alerts"} disabled={!!replay} onclick={() => (view = view === "alerts" ? "chart" : "alerts")}>
-              Alerts
-            </button>
             <button
               role="tab"
               aria-selected={view === "technicals"}
@@ -1894,8 +1901,6 @@
             {#snippet panel()}
             {#if view === "watchlist"}
               <Watchlist bind:this={watchlistView} {refreshMode} symbols={watchlist} {groups} current={symbol} sort={watchlistSort} view={watchlistLayout} columns={watchlistColumns} {screens} bind:tab={groupTab} onopen={openWatched} ongroups={saveGroups} onsort={saveSort} onview={saveWatchlistLayout} oncolumns={saveWatchlistColumns} onsavescreen={saveScreen} ondeletescreen={deleteScreen} />
-            {:else if view === "alerts"}
-              <Alerts {symbol} {quote} {alerts} onchange={(next) => (alerts = next)} onopen={openWatched} interval={chart?.interval ?? ""} drawings={drawings[symbol.toUpperCase()] ?? []} />
             {:else if view === "analysts"}
               <Analysts {symbol} {quote} {analyst} />
             {:else if view === "earnings"}
@@ -2106,6 +2111,19 @@
       {refreshStatus}
       onrefresh={refresh}
     />
+    {#if alertsOpen}
+      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+      <div class="backdrop" onclick={() => (alertsOpen = false)} transition:backdrop>
+        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+        <div class="alerts-panel" role="dialog" tabindex="-1" aria-modal="true" aria-label="Alerts" onclick={(e) => e.stopPropagation()} transition:dialog>
+          <header>
+            <h2>Alerts</h2>
+            <button class="close" aria-label="Close" onclick={() => (alertsOpen = false)}>×</button>
+          </header>
+          <Alerts {symbol} {quote} {alerts} onchange={(next) => (alerts = next)} onopen={(s) => { alertsOpen = false; openWatched(s); }} interval={chart?.interval ?? ""} drawings={drawings[symbol.toUpperCase()] ?? []} />
+        </div>
+      </div>
+    {/if}
     {#if settingsOpen}
       <Settings bind:custom bind:theme bind:textSize bind:palette bind:refreshMode extended={chartExtended} shade={shadeSessions} timeZone={chartTimeZone} onextended={saveChartExtended} onshade={saveShadeSessions} ontimezone={saveChartTimeZone} bind:hotkey bind:error={hotkeyError} {defaultHotkey} bind:keybinds bind:dots onclose={() => (settingsOpen = false)} />
     {/if}
@@ -2165,6 +2183,45 @@
     border-left: 1px solid var(--faint);
     cursor: col-resize;
     touch-action: none;
+  }
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: grid;
+    place-items: center;
+    background: rgba(0, 0, 0, 0.35);
+  }
+  .alerts-panel {
+    width: min(600px, calc(100% - 32px));
+    height: min(480px, calc(100% - 32px));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 14px 16px 16px;
+    border-radius: 10px;
+    background: var(--bg);
+    box-shadow: var(--shadow);
+  }
+  .alerts-panel header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .alerts-panel h2 {
+    margin: 0;
+    font-size: 15px;
+  }
+  .alerts-panel .close {
+    border: 0;
+    background: none;
+    font-size: 18px;
+    line-height: 1;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .alerts-panel .close:hover {
+    color: var(--text);
   }
   .stats-scroll {
     flex: 1;
