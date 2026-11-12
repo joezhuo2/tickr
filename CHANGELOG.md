@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.36] - 2026-11-11
+
+### Fixed
+- Opening, switching or closing a tab on the right (and Technicals, Paper
+  or Strategy below the chart) no longer rebuilds the chart and the rest of
+  the screen.
+
 ## [0.11.35] - 2026-11-11
 
 ### Added
