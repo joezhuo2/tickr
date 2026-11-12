@@ -1,14 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { center, firstAtOrAfter, clamp, follow, full, isFull, MAX_FUTURE, MIN_BARS, pan, reveal, RIGHT_MARGIN, visible, zoom } from "./viewport";
+import { center, firstAtOrAfter, clamp, follow, full, isFull, MAX_FUTURE, MIN_BARS, MIN_SHOWN, pan, reveal, RIGHT_MARGIN, visible, zoom } from "./viewport";
 
 describe("clamp", () => {
-  it("keeps the view inside the data plus up to half a screen of future", () => {
+  it("stops at the first bar", () => {
     expect(clamp({ start: -5, count: 20 }, 100)).toEqual({ start: 0, count: 20 });
-    expect(clamp({ start: 95, count: 20 }, 100)).toEqual({ start: 90, count: 20 });
+  });
+
+  it("scrolls into the future until only MIN_SHOWN bars remain", () => {
+    expect(clamp({ start: 95, count: 20 }, 100)).toEqual({ start: 95, count: 20 });
+    expect(clamp({ start: 150, count: 20 }, 100)).toEqual({ start: 100 - MIN_SHOWN, count: 20 });
+    expect(clamp({ start: 150, count: MIN_BARS }, 100)).toEqual({ start: 100 - MIN_SHOWN, count: MIN_BARS });
   });
 
   it("caps the future space at MAX_FUTURE bars", () => {
     expect(clamp({ start: 5000, count: 1000 }, 2000)).toEqual({ start: 1000 + MAX_FUTURE, count: 1000 });
+    expect(clamp({ start: 5000, count: 300 }, 2000)).toEqual({ start: 1900, count: 300 });
   });
 
   it("limits the bar count to MIN_BARS and n plus the right margin", () => {
@@ -17,7 +23,8 @@ describe("clamp", () => {
   });
 
   it("shows everything when there are fewer bars than MIN_BARS", () => {
-    expect(clamp({ start: 3, count: 1 }, 4)).toEqual({ start: 2, count: 4 });
+    expect(clamp({ start: 3, count: 1 }, 4)).toEqual({ start: 4 - MIN_SHOWN, count: 4 });
+    expect(clamp({ start: 3, count: 1 }, 2)).toEqual({ start: 0, count: 2 });
     expect(clamp({ start: 0, count: 0 }, 0)).toEqual({ start: 0, count: 0 });
     expect(full(0)).toEqual({ start: 0, count: 0 });
   });
@@ -39,8 +46,15 @@ describe("zoom", () => {
     expect(zoom({ start: 40, count: 20 }, 100, 100, 0.5)).toEqual(full(100));
   });
 
-  it("clamps when zooming out near an edge", () => {
-    expect(zoom({ start: 95, count: 10 }, 100, 2, 0)).toEqual({ start: 90, count: 20 });
+  it("keeps the anchor in place over the future space", () => {
+    expect(zoom({ start: 95, count: 10 }, 100, 2, 0)).toEqual({ start: 95, count: 20 });
+    const v = zoom({ start: 80, count: 40 }, 100, 0.5, 0.75);
+    expect(v).toEqual({ start: 95, count: 20 });
+    expect(v.start + 0.75 * v.count).toBe(110);
+  });
+
+  it("clamps when zooming in would leave fewer than MIN_SHOWN bars", () => {
+    expect(zoom({ start: 90, count: 40 }, 100, 0.25, 1)).toEqual({ start: 100 - MIN_SHOWN, count: MIN_BARS });
   });
 
   it("keeps the right margin when zooming in at the right edge of the full view", () => {
@@ -60,7 +74,14 @@ describe("pan", () => {
 
   it("stops at both ends", () => {
     expect(pan({ start: 10, count: 20 }, 100, -50)).toEqual({ start: 0, count: 20 });
-    expect(pan({ start: 10, count: 20 }, 100, 500)).toEqual({ start: 90, count: 20 });
+    expect(pan({ start: 10, count: 20 }, 100, 500)).toEqual({ start: 100 - MIN_SHOWN, count: 20 });
+  });
+
+  it("pans into the future and back", () => {
+    const out = pan({ start: 80, count: 20 }, 100, 15);
+    expect(out).toEqual({ start: 95, count: 20 });
+    expect(visible(out, 100)).toEqual([95, 99]);
+    expect(pan(out, 100, -15)).toEqual({ start: 80, count: 20 });
   });
 
   it("pans a full view only into the future", () => {
@@ -91,12 +112,16 @@ describe("follow", () => {
     expect(follow({ start: 80, count: 20 }, 100, 102)).toEqual({ start: 82, count: 20 });
   });
 
+  it("follows new bars while scrolled into the future", () => {
+    expect(follow({ start: 95, count: 20 }, 100, 101)).toEqual({ start: 96, count: 20 });
+  });
+
   it("stays put when scrolled back", () => {
     expect(follow({ start: 30, count: 20 }, 100, 102)).toEqual({ start: 30, count: 20 });
   });
 
   it("clamps when the data shrinks", () => {
-    expect(follow({ start: 30, count: 20 }, 100, 30)).toEqual({ start: 20, count: 20 });
+    expect(follow({ start: 30, count: 20 }, 100, 30)).toEqual({ start: 30 - MIN_SHOWN, count: 20 });
   });
 });
 
