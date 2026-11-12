@@ -43,7 +43,7 @@ export const ACTIONS: { id: Action; label: string; category: Category }[] = [
   { id: "analyze", label: "Analyze / re-analyze", category: "panels" },
   { id: "analysts", label: "Open Analysts", category: "panels" },
   { id: "earnings", label: "Open Earnings", category: "panels" },
-  { id: "alerts", label: "Open Alerts", category: "panels" },
+  { id: "alerts", label: "Toggle Alerts", category: "panels" },
   { id: "market", label: "Open Market", category: "panels" },
   { id: "events", label: "Open Events", category: "panels" },
   { id: "news", label: "Open News", category: "panels" },
