@@ -6,6 +6,25 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.52] - 2026-11-12
+
+### Added
+- **Real-time watchlist and alerts with Alpaca:** with Alpaca keys set, the
+  watchlist and price alerts use Alpaca prices in one batched request, like
+  the chart already did. Other symbols and any Alpaca error fall back to
+  Yahoo.
+- **Deeper intraday history:** scrolling a chart left pages older bars in from
+  Alpaca, past Yahoo's 30 and 60 day caps (1m stays limited by the chart's
+  20,000 candle cap).
+- **Local history cache:** intraday bars you load are kept on disk (20,000
+  bars per series, 40 series) and fill in when you scroll back past what the
+  source still serves. Settings > Market data has **Clear cached history**.
+
+### Fixed
+- Regular-hours filtering of Alpaca bars uses the New York offset of each
+  bar's date, so history across a daylight-saving change is cut at 9:30 to
+  16:00.
+
 ## [0.11.51] - 2026-11-12
 
 ### Added
