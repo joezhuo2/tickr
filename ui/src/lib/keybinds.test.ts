@@ -17,6 +17,7 @@ const DEFAULTS: Keybinds = {
   draw_position: "'",
   draw_avwap: "/",
   chart_split: "j",
+  new_window: "=",
   chart_replay: "y",
   practice: "q",
   refresh: "r",

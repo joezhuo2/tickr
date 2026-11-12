@@ -107,6 +107,7 @@ pub fn run() {
             commands::delete_indicator_preset,
             commands::search,
             commands::set_symbol,
+            commands::open_chart_window,
             commands::refresh_quote,
             commands::set_range,
             commands::set_interval,

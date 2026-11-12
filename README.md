@@ -124,6 +124,12 @@ taskbar to keep it visible.
   side or stacked, with its own symbol and range. Crosshair time is linked
   across both charts. Turn on **Sync** to pan and zoom both panes together.
   tickr saves the layout across launches.
+- **Chart windows:** the window button next to the layout control (= by
+  default) opens the current symbol in a new window. Each window keeps its own
+  symbol, range, candle length, chart type and view, and you can open as many
+  as you like. Closing one just closes it; the main window keeps its saved
+  size, position, symbol and layout. Chart windows refresh their quote every
+  15 seconds; the Alpaca stream feeds only the main window's symbol.
 - **Recent symbols and history:** focus the empty search box to see the last
   10 symbols you viewed. The Back and Forward buttons (or Alt+Left and
   Alt+Right) step through this session's symbols, and B jumps to the previous
@@ -490,6 +496,7 @@ typing in a text field.
 | | `'` | Draw long / short position |
 | | `/` | Anchored VWAP |
 | | `J` | Toggle second chart |
+| | `=` | Open in new window |
 | | `Y` | Toggle bar replay |
 | | `H` | Open Paper trading |
 | | `Q` | Start random practice |

@@ -31,6 +31,7 @@ export const ACTIONS: { id: Action; label: string; category: Category }[] = [
   { id: "draw_position", label: "Draw long / short position", category: "draw" },
   { id: "draw_avwap", label: "Anchored VWAP", category: "draw" },
   { id: "chart_split", label: "Toggle second chart", category: "chart" },
+  { id: "new_window", label: "Open in new window", category: "chart" },
   { id: "chart_replay", label: "Toggle bar replay", category: "chart" },
   { id: "practice", label: "Practice on a random setup", category: "chart" },
   { id: "range", label: "Cycle date range", category: "chart" },

@@ -60,6 +60,12 @@ export function due(alerts: readonly ChartAlert[], symbol: string, interval: str
   return alerts.filter((a) => a.enabled && a.symbol === s && a.interval === interval && holds(a, candles, clock));
 }
 
+export function claim(stored: readonly ChartAlert[], ids: ReadonlySet<number>, now: number): { list: ChartAlert[]; claimed: ChartAlert[] } {
+  const claimed = stored.filter((a) => a.enabled && ids.has(a.id));
+  const won = new Set(claimed.map((a) => a.id));
+  return { list: stored.map((a) => (won.has(a.id) ? { ...a, enabled: false, fired_at: now } : a)), claimed };
+}
+
 export function addError(alerts: readonly ChartAlert[], expr: string | null): string | null {
   if (alerts.length >= MAX_CHART_ALERTS) return `At most ${MAX_CHART_ALERTS} chart alerts are allowed`;
   if (expr == null) return null;

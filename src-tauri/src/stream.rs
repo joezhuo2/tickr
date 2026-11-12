@@ -50,7 +50,7 @@ pub fn set_status(app: &AppHandle, shared: &Shared, status: Status) {
     let mut current = lock(&shared.stream_status);
     if *current != status {
         *current = status.clone();
-        let _ = app.emit_to(crate::window::LABEL, "stream-status", status);
+        let _ = app.emit("stream-status", status);
     }
 }
 
