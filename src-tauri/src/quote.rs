@@ -49,10 +49,10 @@ fn custom_bases(interval: &str) -> &'static [&'static str] {
         _ => return &[],
     };
     match unit {
-        "m" if n <= 1440 && n % 60 == 0 => &["30m", "60m"],
-        "m" if n <= 1440 && n % 30 == 0 => &["30m", "15m", "5m", "1m"],
-        "m" if n <= 1440 && n % 15 == 0 => &["15m", "5m", "1m"],
-        "m" if n <= 1440 && n % 5 == 0 => &["5m", "1m"],
+        "m" if n <= 1440 && n.is_multiple_of(60) => &["30m", "60m"],
+        "m" if n <= 1440 && n.is_multiple_of(30) => &["30m", "15m", "5m", "1m"],
+        "m" if n <= 1440 && n.is_multiple_of(15) => &["15m", "5m", "1m"],
+        "m" if n <= 1440 && n.is_multiple_of(5) => &["5m", "1m"],
         "m" if n <= 1440 => &["1m"],
         "h" if n <= 24 => &["30m", "60m"],
         "d" if n <= 30 => &["1d"],
