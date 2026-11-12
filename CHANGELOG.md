@@ -6,6 +6,10 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.33] - 2026-11-11
+
+### Added\n- **Theme colors:** a main (accent) and sub (background) color in Settings >\n  Display, chosen in a themed color picker.\n- **Fonts:** pick the text font and the number font.
+
 ## [0.11.32] - 2026-11-11
 
 ### Added\n- **Settings search:** a search box beside the Settings title suggests\n  settings by name, opens the chosen one and flashes it.

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ColorPicker from "./ColorPicker.svelte";
+  import { FONTS, MAIN_PRESETS, MONO_FONTS, NO_CUSTOM, SUB_PRESETS, saveCustom, type Custom } from "./lib/display";
   import { invoke } from "@tauri-apps/api/core";
   import { ago } from "./lib/format";
   import { accelerator, display } from "./lib/hotkey";
@@ -9,6 +11,7 @@
   import type { ChartTimeZone, ConnectionsReport, ServiceStatus, AiConfig, AiTestResult, DataProvider, Dots, Keybinds, RefreshMode, Theme, TextSize, Palette } from "./lib/types";
 
   let {
+    custom = $bindable(),
     theme = $bindable(),
     textSize = $bindable(),
     palette = $bindable(),
@@ -26,6 +29,7 @@
     ontimezone,
     onclose,
   }: {
+    custom: Custom;
     theme: Theme;
     textSize: TextSize;
     palette: Palette;
@@ -44,6 +48,18 @@
     ontimezone: (zone: ChartTimeZone) => void;
     onclose: () => void;
   } = $props();
+
+  let picking = $state<"main" | "sub" | null>(null);
+
+  function setCustom(change: Partial<Custom>) {
+    custom = { ...custom, ...change };
+    saveCustom(custom);
+  }
+
+  function shown(kind: "main" | "sub") {
+    void custom;
+    return custom[kind] || getComputedStyle(document.documentElement).getPropertyValue(kind === "main" ? "--accent" : "--bg").trim();
+  }
 
   let displayError = $state<string | null>(null);
   let displayBusy = $state(false);
@@ -400,6 +416,17 @@
       <button class="close" aria-label="Close" onclick={onclose}>×</button>
     </header>
 
+    {#if picking}
+      {@const kind = picking}
+      <ColorPicker
+        label={kind === "main" ? "Main color" : "Sub color"}
+        value={shown(kind)}
+        presets={kind === "main" ? MAIN_PRESETS : SUB_PRESETS}
+        onchange={(hex) => setCustom({ [kind]: hex })}
+        onreset={() => { setCustom({ [kind]: "" }); picking = null; }}
+        onclose={() => (picking = null)}
+      />
+    {/if}
     <div class="body">
       <div class="nav" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
         {#each TABS as t (t.id)}
@@ -428,6 +455,38 @@
         <option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option>
       </select>
     </label>
+    <div class="row">
+      <span>Main color</span>
+      <span class="keys">
+        {#if custom.main}<button class="link" onclick={() => setCustom({ main: "" })}>Reset</button>{/if}
+        <button class="color" aria-label="Choose the main color" onclick={() => (picking = "main")}><span style:background={shown("main")}></span>{custom.main || "Theme default"}</button>
+      </span>
+    </div>
+    <div class="row">
+      <span>Sub color</span>
+      <span class="keys">
+        {#if custom.sub}<button class="link" onclick={() => setCustom({ sub: "" })}>Reset</button>{/if}
+        <button class="color" aria-label="Choose the sub color" onclick={() => (picking = "sub")}><span style:background={shown("sub")}></span>{custom.sub || "Theme default"}</button>
+      </span>
+    </div>
+    <p class="hint">Main is the accent on buttons, links and highlights. Sub is the background; text, panels and borders are derived from it, and a sub color decides light or dark on its own, overriding Theme.</p>
+    <label class="row">
+      <span>Font</span>
+      <select class="field" value={custom.font} onchange={(e) => setCustom({ font: e.currentTarget.value })}>
+        <option value="">System default</option>
+        {#each FONTS as f (f.id)}<option value={f.id}>{f.label}</option>{/each}
+      </select>
+    </label>
+    <label class="row">
+      <span>Number font</span>
+      <select class="field" value={custom.mono} onchange={(e) => setCustom({ mono: e.currentTarget.value })}>
+        <option value="">System monospace</option>
+        {#each MONO_FONTS as f (f.id)}<option value={f.id}>{f.label}</option>{/each}
+      </select>
+    </label>
+    {#if custom.main || custom.sub || custom.font || custom.mono}
+      <div class="row"><span></span><button class="link" onclick={() => setCustom(NO_CUSTOM)}>Reset colors and fonts</button></div>
+    {/if}
     <label class="row">
       <span>Text size</span>
       <select class="field" value={textSize} disabled={displayBusy} onchange={(e) => { const next = Number(e.currentTarget.value) as TextSize; saveDisplay("set_text_size", { percent: next }, () => textSize = next); }}>
@@ -634,6 +693,7 @@
     background: rgba(0, 0, 0, 0.35);
   }
   .panel {
+    position: relative;
     width: min(600px, calc(100% - 32px));
     height: min(480px, calc(100% - 32px));
     display: flex;
@@ -856,6 +916,26 @@
     background: var(--surface);
     cursor: pointer;
     min-width: 90px;
+  }
+  .color {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 220px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    border: 1px solid var(--faint);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .color span {
+    width: 26px;
+    height: 14px;
+    border-radius: 4px;
+    border: 1px solid var(--faint);
   }
   .key.recording {
     border-color: var(--accent);
