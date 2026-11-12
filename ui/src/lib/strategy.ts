@@ -10,17 +10,18 @@ export interface SessionClock {
   gmtoffset: number;
   open: number;
   close: number;
+  timezone?: string | null;
 }
 
 export const DEFAULT_CLOCK: SessionClock = { gmtoffset: 0, open: 34_200, close: 57_600 };
 
-export function clockFor(meta: { gmtoffset: number; periods?: { regular: { start: number; end: number } } | null }): SessionClock {
+export function clockFor(meta: { gmtoffset: number; timezone?: string | null; periods?: { regular: { start: number; end: number } } | null }): SessionClock {
   const tod = (t: number) => (((t + meta.gmtoffset) % 86_400) + 86_400) % 86_400;
   const regular = meta.periods?.regular;
-  if (!regular) return { gmtoffset: meta.gmtoffset, open: 0, close: 86_400 };
+  if (!regular) return { gmtoffset: meta.gmtoffset, timezone: meta.timezone, open: 0, close: 86_400 };
   const open = tod(regular.start);
   const close = tod(regular.end);
-  return { gmtoffset: meta.gmtoffset, open, close: close > open ? close : 86_400 };
+  return { gmtoffset: meta.gmtoffset, timezone: meta.timezone, open, close: close > open ? close : 86_400 };
 }
 
 export type Expr =

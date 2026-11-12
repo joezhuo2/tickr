@@ -21,6 +21,16 @@ describe("chart alerts", () => {
     expect(lineBroken({ ...flat, direction: "below" }, closes(11))).toBe(false);
   });
 
+  it("measures a line to a future anchor in trading bars, skipping the weekend", () => {
+    const mon = Date.UTC(2026, 5, 1, 13, 30) / 1000;
+    const week = [10, 11, 12, 12.9, 14.5].map((c, i) => ({ t: mon + i * 86_400, o: c, h: c, l: c, c, v: 1 }));
+    const line = { a: { t: mon, price: 10 }, b: { t: mon + 9 * 86_400, price: 17 }, direction: "above" as const };
+    const clock = { gmtoffset: -14_400, open: 34_200, close: 57_600 };
+    expect(lineBroken(line, week, "1d", clock)).toBe(true);
+    expect(lineBroken(line, week)).toBe(false);
+    expect(due([alert({ interval: "1d", line })], "aapl", "1d", week, clock)).toHaveLength(1);
+  });
+
   it("evaluates an expression on the latest bar", () => {
     const cross = "crosses_above(close, sma(2))";
     expect(holds(alert({ expr: cross }), closes(10, 10, 10, 12))).toBe(true);

@@ -4,9 +4,11 @@ export interface View {
 }
 
 export const MIN_BARS = 10;
+export const RIGHT_MARGIN = 3;
+export const MAX_FUTURE = 200;
 
 export function full(n: number): View {
-  return { start: 0, count: n };
+  return { start: 0, count: n && n + RIGHT_MARGIN };
 }
 
 export function isFull(v: View, n: number): boolean {
@@ -14,12 +16,12 @@ export function isFull(v: View, n: number): boolean {
 }
 
 function fitCount(count: number, n: number): number {
-  return Math.min(n, Math.max(Math.min(MIN_BARS, n), count));
+  return Math.min(n && n + RIGHT_MARGIN, Math.max(Math.min(MIN_BARS, n), count));
 }
 
 export function clamp(v: View, n: number): View {
   const count = fitCount(v.count, n);
-  return { start: Math.min(n - count, Math.max(0, v.start)), count };
+  return { start: Math.max(0, Math.min(n + Math.min(MAX_FUTURE, count / 2) - count, v.start)), count };
 }
 
 export function zoom(v: View, n: number, factor: number, anchor: number): View {

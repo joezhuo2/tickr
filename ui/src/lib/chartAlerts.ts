@@ -1,5 +1,7 @@
 import { timeToIndex } from "./drawing";
+import { futureTimes, type Clock } from "./session";
 import { check, evaluate, parse, type SessionClock } from "./strategy";
+import { MAX_FUTURE } from "./viewport";
 import type { Candle, DrawingPoint } from "./types";
 
 export interface LineSpec {
@@ -37,10 +39,11 @@ export function lineValue(line: Pick<LineSpec, "a" | "b">, times: number[], i: n
   return line.a.price + ((line.b.price - line.a.price) * (i - ia)) / (ib - ia);
 }
 
-export function lineBroken(line: LineSpec, candles: readonly Candle[]): boolean {
+export function lineBroken(line: LineSpec, candles: readonly Candle[], interval = "", clock: Clock = { gmtoffset: 0 }): boolean {
   const n = candles.length;
   if (n < 2) return false;
-  const times = candles.map((c) => c.t);
+  const past = candles.map((c) => c.t);
+  const times = [...past, ...futureTimes(past, interval, clock, MAX_FUTURE)];
   const prev = lineValue(line, times, n - 2);
   const now = lineValue(line, times, n - 1);
   if (prev == null || now == null) return false;
@@ -48,8 +51,8 @@ export function lineBroken(line: LineSpec, candles: readonly Candle[]): boolean 
   return line.direction === "above" ? before <= prev && after > now : before >= prev && after < now;
 }
 
-export function holds(alert: Pick<ChartAlert, "expr" | "line">, candles: readonly Candle[], clock?: SessionClock): boolean {
-  if (alert.line) return lineBroken(alert.line, candles);
+export function holds(alert: Pick<ChartAlert, "expr" | "line">, candles: readonly Candle[], clock?: SessionClock, interval = ""): boolean {
+  if (alert.line) return lineBroken(alert.line, candles, interval, clock);
   if (!alert.expr || candles.length < 2 || check(alert.expr)) return false;
   const hits = evaluate(parse(alert.expr), candles, clock);
   return hits[hits.length - 1] === true;
@@ -57,7 +60,7 @@ export function holds(alert: Pick<ChartAlert, "expr" | "line">, candles: readonl
 
 export function due(alerts: readonly ChartAlert[], symbol: string, interval: string, candles: readonly Candle[], clock?: SessionClock): ChartAlert[] {
   const s = symbol.toUpperCase();
-  return alerts.filter((a) => a.enabled && a.symbol === s && a.interval === interval && holds(a, candles, clock));
+  return alerts.filter((a) => a.enabled && a.symbol === s && a.interval === interval && holds(a, candles, clock, interval));
 }
 
 export function claim(stored: readonly ChartAlert[], ids: ReadonlySet<number>, now: number): { list: ChartAlert[]; claimed: ChartAlert[] } {

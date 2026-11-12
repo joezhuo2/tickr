@@ -1,6 +1,6 @@
 ﻿<script lang="ts">
   import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, num, price, quarterLabel, volume } from "./lib/format";
-  import { candleCountdown, classifyBars, displayOffset, isExtendedSession, isIntraday, zoneLabel, type Clock } from "./lib/session";
+  import { candleCountdown, classifyBars, displayOffset, futureTimes, isExtendedSession, isIntraday, zoneLabel, type Clock } from "./lib/session";
   import type { Analysis, Article, Chart, ChartMode, ChartScale, ChartTimeZone, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
   import { fitScale, forward, inverse, scaleLabel, scaleTicks, shiftRange, stretchRange } from "./lib/scale";
   import type { Drawing, DrawingPoint } from "./lib/types";
@@ -18,7 +18,7 @@
   import ColorPicker from "./ColorPicker.svelte";
   import { MAIN_PRESETS } from "./lib/display";
   import { NOTE_MAX, noteBar, noteTitle, snapNoteTime } from "./lib/notes";
-  import { center, firstAtOrAfter, follow, full, isFull, pan, reveal, visible, zoom, type View } from "./lib/viewport";
+  import { center, firstAtOrAfter, follow, full, isFull, MAX_FUTURE, pan, reveal, visible, zoom, type View } from "./lib/viewport";
   import { barAt, viewWindow, windowView, type TimeWindow } from "./lib/chartsync";
 
   let {
@@ -302,6 +302,7 @@
       n,
       i0,
       i1,
+      j1: Math.max(i1, Math.ceil(start + view.count) - 1),
       step,
       lo,
       hi,
@@ -383,10 +384,10 @@
       const labels = axisRange(chart.range, chart.interval, candles[g.i1].t - candles[g.i0].t);
       const every = Math.max(1, Math.ceil(view.count / Math.max(1, Math.floor(g.plotW / 110))));
       const off = Math.floor(every / 2);
-      for (let i = off + Math.ceil((g.i0 - off) / every) * every; i <= g.i1; i += every) {
+      for (let i = off + Math.ceil((g.i0 - off) / every) * every; i <= g.j1; i += every) {
         const x = g.x(i);
-        if (x < PAD.l || x > width - PAD.r) continue;
-        ctx.fillText(axisTime(candles[i].t, displayOffset(candles[i].t, timeZone, clock, chart.interval), labels, chart.interval), x, height - 6);
+        if (x < PAD.l || x > width - PAD.r || axisTimes[i] == null) continue;
+        ctx.fillText(axisTime(axisTimes[i], displayOffset(axisTimes[i], timeZone, clock, chart.interval), labels, chart.interval), x, height - 6);
       }
     }
 
@@ -628,6 +629,25 @@
         ctx.textAlign = "right";
         ctx.fillText(leftLabel(c.c, g), PAD.l - 6, y);
       }
+    } else if (hover != null && hover >= g.n && chart && axisTimes[hover] != null) {
+      const x = Math.round(g.x(hover)) + 0.5;
+      ctx.strokeStyle = v("--crosshair");
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x, PAD.t);
+      ctx.lineTo(x, bottom);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const label = fullTime(axisTimes[hover], displayOffset(axisTimes[hover], timeZone, clock, chart.interval), chart.interval);
+      const w = ctx.measureText(label).width + 10;
+      const left = Math.max(PAD.l, Math.min(width - PAD.r - w, x - w / 2));
+      ctx.fillStyle = v("--text");
+      ctx.fillRect(left, bottom + 2, w, PAD.b - 4);
+      ctx.fillStyle = v("--bg");
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, left + w / 2, bottom + PAD.b / 2);
     } else if (hover == null && linkedIndex >= g.i0 && linkedIndex <= g.i1) {
       const x = Math.round(g.x(linkedIndex)) + 0.5;
       ctx.strokeStyle = v("--crosshair");
@@ -911,7 +931,7 @@
   function plot(ctx: CanvasRenderingContext2D, g: Geo, values: (number | null)[], y: (v: number) => number) {
     ctx.beginPath();
     let pen = false;
-    for (let i = Math.max(0, g.i0 - 1); i <= Math.min(g.n - 1, g.i1 + 1); i++) {
+    for (let i = Math.max(0, g.i0 - 1); i <= Math.min(values.length - 1, g.j1 + 1); i++) {
       const val = values[i];
       if (val == null || !Number.isFinite(val)) { pen = false; continue; }
       if (pen) ctx.lineTo(g.x(i), y(val));
@@ -952,7 +972,7 @@
       }
     }
     if (ichi) {
-      for (let i = Math.max(1, g.i0); i <= g.i1; i++) {
+      for (let i = Math.max(1, g.i0); i <= Math.min(ichi.spanA.length - 1, g.j1 + 1); i++) {
         const a0 = ichi.spanA[i - 1], a1 = ichi.spanA[i], b0 = ichi.spanB[i - 1], b1 = ichi.spanB[i];
         if (a0 == null || a1 == null || b0 == null || b1 == null) continue;
         ctx.fillStyle = v(a1 >= b1 ? "--up" : "--down");
@@ -1328,7 +1348,7 @@
 
   export function showNote(id: number) {
     const d = list.find((x) => x.id === id);
-    const i = d ? noteBar(times, d.points[0].t) : null;
+    const i = d ? noteBar(axisTimes, d.points[0].t) : null;
     if (i == null) return;
     if (geo.hidePrice) maxPane = null;
     view = reveal(view, geo.n, i);
@@ -1339,8 +1359,9 @@
   const list = $derived(replay ? [] : (drawings[drawingSymbol] ?? []));
   const selectedDrawing = $derived(selected == null ? null : (list.find((d) => d.id === selected) ?? null));
   const times = $derived(candles.map((c) => c.t));
+  const axisTimes = $derived([...times, ...futureTimes(times, chart?.interval ?? "", clock, MAX_FUTURE)]);
   const noteMarks = $derived(hideDrawings || replay ? [] : list.flatMap((d) => {
-    const i = d.kind === "note" ? noteBar(times, d.points[0].t) : null;
+    const i = d.kind === "note" ? noteBar(axisTimes, d.points[0].t) : null;
     if (i == null) return [];
     const at = { x: geo.x(i), y: geo.y(d.points[0].price) };
     return inPlot(at) ? [{ d, ...at }] : [];
@@ -1432,13 +1453,13 @@
     const priceAt = (y: number) => inverse(1 - (y - PAD.t) / geo.priceH, geo.lo, geo.hi, geo.scale);
     const price = priceAt(p.y);
     return {
-      t: Math.round(indexToTime(times, at)),
+      t: Math.round(indexToTime(axisTimes, at)),
       price: snap ? snapPrice(price, candles[Math.round(at)], Math.abs(priceAt(p.y - 12) - price)) : price,
     };
   }
 
   function screen(p: DrawingPoint): Pixel {
-    return { x: geo.x(timeToIndex(times, p.t)), y: geo.y(p.price) };
+    return { x: geo.x(timeToIndex(axisTimes, p.t)), y: geo.y(p.price) };
   }
 
   function avwapPath(d: Drawing): Pixel[] {
@@ -1536,7 +1557,7 @@
     if (tool === "hline" || tool === "avwap" || tool === "vline" || tool === "hray") { addDrawing({ id: 0, kind: tool, points: [point], text: "" }); return; }
     if (tool === "note") {
       tool = "cursor";
-      noteEdit = { id: null, point: { ...point, t: snapNoteTime(times, point.t) }, text: "", color: "", x: p.x, y: p.y };
+      noteEdit = { id: null, point: { ...point, t: snapNoteTime(axisTimes, point.t) }, text: "", color: "", x: p.x, y: p.y };
       return;
     }
     if (tool === "text") {
@@ -1732,7 +1753,7 @@
         drawProfile(ctx, geo, i0, i1, v);
         ctx.strokeRect(box.minX, box.minY, Math.max(1, box.maxX - box.minX), Math.max(1, box.maxY - box.minY));
       } else if (d.kind === "prange" || d.kind === "drange") {
-        const m = rulerMeasurement(d.points[0], d.points[1], times);
+        const m = rulerMeasurement(d.points[0], d.points[1], axisTimes);
         const x0 = box.minX, x1 = box.maxX;
         const y0 = d.kind === "drange" ? PAD.t : box.minY, y1 = d.kind === "drange" ? bottom : box.maxY;
         const fill = ctx.fillStyle;
@@ -1804,7 +1825,7 @@
       }
       if (two && d.id === selected) for (const p of pts) { ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill(); }
       if (tool === "ruler" && d === preview) {
-        const label = rulerMeasurement(d.points[0], d.points[1], times).label;
+        const label = rulerMeasurement(d.points[0], d.points[1], axisTimes).label;
         const x = Math.max(PAD.l + 3, Math.min(b.x, right - ctx.measureText(label).width - 3));
         const y = Math.max(PAD.t + 16, Math.min(b.y - 6, bottom));
         ctx.fillStyle = v("--bg");
@@ -1848,7 +1869,7 @@
       hover = null;
       return;
     }
-    hover = Math.max(geo.i0, Math.min(geo.i1, Math.floor(view.start + (x - PAD.l) / geo.step)));
+    hover = Math.max(geo.i0, Math.min(geo.j1, Math.floor(view.start + (x - PAD.l) / geo.step)));
   }
 
   function onKey(e: KeyboardEvent) {

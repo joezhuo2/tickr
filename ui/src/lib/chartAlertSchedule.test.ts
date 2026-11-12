@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CAP, DELAY, cadence, dueGroups, groups, inBackground, nextCheck, stagger, triggered } from "./chartAlertSchedule";
 import { claim, type ChartAlert } from "./chartAlerts";
+import { clockFor } from "./strategy";
 import type { Candle } from "./types";
 
 const closes = (...values: number[]): Candle[] => values.map((c, i) => ({ t: i * 60, o: c, h: c, l: c, c, v: 1 }));
@@ -52,6 +53,14 @@ describe("background chart alert schedule", () => {
     expect(triggered(list, "AAPL", "5m", closedCross, undefined, 200).map((a) => a.id)).toEqual([1]);
     expect(triggered(list, "AAPL", "5m", closedCross, undefined, 240)).toEqual([]);
     expect(triggered(list, "AAPL", "1d", closes(10, 10, 10, 12), undefined, null)).toEqual([]);
+  });
+
+  it("values a line to a future anchor in trading bars, like the chart", () => {
+    const mon = Date.UTC(2026, 5, 1, 13, 30) / 1000;
+    const week = [10, 11, 12, 12.9, 14.5].map((c, i) => ({ t: mon + i * 86_400, o: c, h: c, l: c, c, v: 1 }));
+    const line = { a: { t: mon, price: 10 }, b: { t: mon + 9 * 86_400, price: 17 }, direction: "above" as const };
+    const clock = clockFor({ gmtoffset: -14_400, timezone: "America/New_York", periods: null });
+    expect(triggered([alert({ interval: "1d", line })], "AAPL", "1d", week, clock, null)).toHaveLength(1);
   });
 
   it("fires each alert once even when two checkers see the same bar", () => {
