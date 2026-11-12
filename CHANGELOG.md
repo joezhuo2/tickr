@@ -6,6 +6,19 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.60] - 2026-11-12
+
+### Added
+- **Drawing in Replay and Practice:** the drawing toolbar and draw keybinds
+  work in both modes. These drawings are temporary: they never touch your
+  saved drawings, and they clear when replay exits or a new practice exercise
+  starts. Your saved drawings stay hidden there as before.
+- **Saved practice runs:** a finished exercise has a "Save run" button. Saved
+  runs (candles, trade, result and drawings) are listed in the Practice setup
+  panel, newest first, with Open and Delete. An opened run shows the full
+  chart, and drawing edits are saved back to it. Up to 200 runs are kept in
+  `practice.json` next to the settings file.
+
 ## [0.11.59] - 2026-11-12
 
 ### Added
