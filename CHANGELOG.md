@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.59] - 2026-11-12
+
+### Added
+- **Scroll into blank space:** the chart pans right until three bars remain,
+  up to 200 future bars, so there is room to draw ahead of price. The right
+  arrow key steps the crosshair into that space.
+
 ## [0.11.58] - 2026-11-12
 
 ### Changed
