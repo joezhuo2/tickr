@@ -6,6 +6,7 @@
 
   const offset = -new Date().getTimezoneOffset() * 60;
   const day = (t: number) => fullTime(t, offset, "1d");
+  const until = (t: number) => Math.ceil((t - Date.now() / 1000) / 86400);
   const currency = $derived(earnings?.currency ?? "USD");
 </script>
 
@@ -32,7 +33,10 @@
       <h2>Next report</h2>
       {#if u}
         <div class="big">{day(u.date)}</div>
-        <div class="sub">{u.estimated ? "Estimated date" : "Confirmed"}</div>
+        <div class="sub">
+          {u.estimated ? "Estimated date" : "Confirmed"}{#if until(u.date) >= 0}
+            · {until(u.date) === 0 ? "today" : `in ${until(u.date)} day${until(u.date) === 1 ? "" : "s"}`}{/if}
+        </div>
         <dl>
           <dt>EPS estimate</dt>
           <dd>{price(u.eps_estimate, currency)}</dd>
@@ -52,7 +56,7 @@
     <div class="col">
       <h2>Past reports</h2>
       {#if earnings.history.length}
-        <table>
+        <div class="scroll"><table>
           <thead>
             <tr><th>Quarter</th><th>Reported</th><th>Estimate</th><th>Actual</th><th>Surprise</th><th>Revenue</th></tr>
           </thead>
@@ -68,7 +72,7 @@
               </tr>
             {/each}
           </tbody>
-        </table>
+        </table></div>
       {:else}
         <div class="sub">No past reports</div>
       {/if}
@@ -81,8 +85,9 @@
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: 1fr 2fr;
-    gap: 28px;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 22px;
     padding: 14px 10px 8px 4px;
     overflow: auto;
     overscroll-behavior: contain;
@@ -122,6 +127,9 @@
     margin: 0;
     text-align: right;
     font-variant-numeric: tabular-nums;
+  }
+  .scroll {
+    overflow-x: auto;
   }
   table {
     border-collapse: collapse;
