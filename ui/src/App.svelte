@@ -123,6 +123,11 @@
       return false;
     } finally { drawingBusy = false; }
   }
+  let tempDrawings = $state<Record<string, import("./lib/types").Drawing[]>>({});
+  async function saveTempDrawings(symbol: string, next: import("./lib/types").Drawing[]) {
+    tempDrawings[symbol] = next;
+    return true;
+  }
 
   let theme = $state<Theme>("system");
   let textSize = $state<TextSize>(100);
@@ -710,6 +715,7 @@
     replayAnalyzeOn = shouldAnalyze(!!activeAnalysis, indicators?.keep_analysis ?? false);
     syncHover = null;
     syncWindow = null;
+    tempDrawings = {};
     replay = next;
     if (paperSession) openPaperBook();
   }
@@ -835,6 +841,7 @@
     paperError = null;
     paperNotice = null;
     replay = null;
+    tempDrawings = {};
     replayBars = [];
     replayBase = null;
     replayAnalysis = null;
@@ -2047,9 +2054,9 @@
                     {scale}
                     {shadeSessions}
                     timeZone={chartTimeZone}
-                    {drawings}
+                    drawings={replay ? tempDrawings : drawings}
                     {drawingBusy}
-                    {saveDrawings}
+                    saveDrawings={replay ? saveTempDrawings : saveDrawings}
                     analysis={techAnalysis}
                     {overlays}
                     earnings={chartEarnings}

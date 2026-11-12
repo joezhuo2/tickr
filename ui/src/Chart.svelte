@@ -1425,11 +1425,11 @@
   }
   let gesture: { start: Pixel; original: Drawing | null; endpoint: number; moved: boolean; second: boolean } | null = null;
   const drawingSymbol = $derived(chart?.meta.symbol.toUpperCase() ?? "");
-  const list = $derived(replay ? [] : (drawings[drawingSymbol] ?? []));
+  const list = $derived(drawings[drawingSymbol] ?? []);
   const selectedDrawing = $derived(selected == null ? null : (list.find((d) => d.id === selected) ?? null));
   const times = $derived(candles.map((c) => c.t));
   const axisTimes = $derived([...times, ...futureTimes(times, chart?.interval ?? "", clock, MAX_FUTURE)]);
-  const noteMarks = $derived(hideDrawings || replay ? [] : list.flatMap((d) => {
+  const noteMarks = $derived(hideDrawings ? [] : list.flatMap((d) => {
     const i = d.kind === "note" ? noteBar(axisTimes, d.points[0].t) : null;
     if (i == null) return [];
     const at = { x: geo.x(i), y: geo.y(d.points[0].price) };
@@ -1449,6 +1449,7 @@
     });
   });
   $effect(() => {
+    void drawings;
     void drawingSymbol;
     untrack(() => {
       history = { past: [], present: list, future: [] };
@@ -1471,12 +1472,11 @@
   }
 
   export function drawTool(next: Tool) {
-    if (!chart || replay) return;
+    if (!chart) return;
     chooseTool(tool === next ? "cursor" : next);
   }
 
   function chooseTool(next: Tool) {
-    if (replay) return;
     cancelDrawing();
     tool = next;
     selected = null;
@@ -1485,7 +1485,7 @@
   }
 
   async function changeDrawings(action: Drawing[] | "undo" | "redo") {
-    if (drawingBusy || replay) return;
+    if (drawingBusy) return;
     const symbol = drawingSymbol;
     const next = undoReducer({ ...history, present: list }, action);
     if (next.present === list) return;
@@ -1944,8 +1944,7 @@
   function onKey(e: KeyboardEvent) {
     if ((e.target as Element).closest("input, textarea, select, [contenteditable]")) return;
     if (!chart) return;
-    if (replay && ["ArrowLeft", "ArrowRight", "Escape", " ", "Delete", "Backspace"].includes(e.key)) return;
-    if (replay && e.ctrlKey && e.key.toLowerCase() === "z") return;
+    if (replay && (["ArrowLeft", "ArrowRight", " "].includes(e.key) || (e.key === "Escape" && tool === "cursor" && selected == null))) return;
     let handled = true;
     if (e.ctrlKey && e.key.toLowerCase() === "z") { cancelDrawing(); void changeDrawings(e.shiftKey ? "redo" : "undo"); }
     else if ((e.key === "Delete" || e.key === "Backspace") && selected != null) removeDrawing();
@@ -2033,7 +2032,7 @@
   onkeydown={onKey}
 >
   <canvas bind:this={canvas} style:width="{width}px" style:height="{height}px"></canvas>
-  {#if chart && !replay}
+  {#if chart}
     <div class="drawing-bar">
     <div class="drawing-tools" role="toolbar" aria-label="Drawing tools">
       {#each tools as item}
