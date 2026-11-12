@@ -1,10 +1,13 @@
 <script lang="ts">
+  import ChartAlerts from "./ChartAlerts.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { ALERT_FILTERS, addedAlert, alertCounts, alertStatus, emptyMessage, levelError, toggleLabel, triggerInfo, visibleAlerts, type AlertFilter } from "./lib/alerts";
   import { alertSummary } from "./lib/format";
   import type { AlertKind, PriceAlert, Quote } from "./lib/types";
 
-  let { symbol, quote, alerts, onchange, onopen }: {
+  let { symbol, quote, alerts, onchange, onopen, interval = "", drawings = [] }: {
+    interval?: string;
+    drawings?: import("./lib/types").Drawing[];
     symbol: string;
     quote: Quote | null;
     alerts: PriceAlert[];
@@ -217,6 +220,7 @@
       {/each}
     </ul>
   {/if}
+  <ChartAlerts {symbol} {interval} {drawings} />
 </div>
 
 <style>
