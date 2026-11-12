@@ -111,6 +111,7 @@ pub fn run() {
             commands::set_range,
             commands::set_interval,
             commands::set_drawings,
+            commands::send_notification,
             commands::set_theme,
             commands::set_text_size,
             commands::set_palette,

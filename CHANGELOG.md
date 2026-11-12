@@ -6,6 +6,10 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.27] - 2026-11-11
+
+### Added\n- **Indicator and drawing alerts:** alert on a Strategy condition such as an\n  RSI or moving-average cross, or on a close through a trendline. Checked\n  while that symbol and interval are on the main chart.
+
 ## [0.11.26] - 2026-11-11
 
 ### Added\n- **Order lines:** open simulated orders and their stop-loss and take-profit\n  are drawn on the chart; drag a line to change its price.

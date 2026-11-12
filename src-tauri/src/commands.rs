@@ -443,6 +443,18 @@ pub fn clear_ai_key() -> Result<(), String> {
     crate::ai::save_config(&path, &config).map_err(|e| format!("Could not clear the AI key: {e}"))
 }
 
+#[tauri::command]
+pub fn send_notification(app: AppHandle, title: String, body: String) -> Result<(), String> {
+    notification_permission(&app)?;
+    let clip = |s: String, n: usize| s.chars().take(n).collect::<String>();
+    app.notification()
+        .builder()
+        .title(clip(title, 80))
+        .body(clip(body, 240))
+        .show()
+        .map_err(|e| e.to_string())
+}
+
 fn notification_permission(app: &AppHandle) -> Result<(), String> {
     let permission = app.notification().request_permission().map_err(|e| e.to_string())?;
     if permission != tauri::plugin::PermissionState::Granted {

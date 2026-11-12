@@ -402,6 +402,19 @@ price and time. By default an alert fires once and then shows
 crossing to fire again. **Regular session only** ignores extended-hours
 prices and checks nothing outside the regular session.
 
+**Indicator and drawing alerts** sit under the price alerts. Pick a preset or
+type a condition in the Strategy syntax, such as
+`crosses_above(rsi(14), 70)` or `crosses_below(sma(20), sma(50))`, or choose a
+trendline or ray drawn on the symbol and whether the close should cross above
+or below it. Each alert belongs to the symbol and candle interval on screen
+when it was added. These alerts are checked each time the chart refreshes,
+only while that symbol and interval are on the main chart with the window
+open; they do not run in the background the way price alerts do. They fire
+once with a desktop notification, then show **Triggered** until you **Rearm**
+them. A line alert keeps the line as it was when the alert was added, so
+moving the drawing later does not move the alert. They are saved on this
+computer and are not part of Backup.
+
 With an Alpaca stream connected, alerts on the symbol on screen are also
 checked on each streamed trade, about four times a second.
 Armed symbols are checked about every 15 seconds while tickr is running,
@@ -606,8 +619,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.26
-git push origin v0.11.26
+git tag v0.11.27
+git push origin v0.11.27
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

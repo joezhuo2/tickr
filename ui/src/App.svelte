@@ -1,4 +1,6 @@
 <script lang="ts">
+  import * as ChartAlertRules from "./lib/chartAlerts";
+  import { chartAlerts, setChartAlerts } from "./lib/chartAlertStore.svelte";
   import { CHART_MODES, nextMode } from "./lib/charttypes";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
@@ -841,6 +843,19 @@
     if (r.fill) paperNotice = `Simulated ${r.fill.side} ${r.fill.qty} ${r.fill.symbol} filled at ${r.fill.price.toFixed(2)}`;
     else if (r.order) paperNotice = r.order.kind === "market" ? "Simulated market order queued for the next bar's open" : `Simulated ${r.order.kind} order placed`;
   }
+
+  $effect(() => {
+    const c = chart;
+    if (!c || replay) return;
+    untrack(() => {
+      const fired = ChartAlertRules.due(chartAlerts.list, c.meta.symbol, c.interval, c.candles, clockFor(c.meta));
+      if (!fired.length) return;
+      const ids = new Set(fired.map((a) => a.id));
+      const now = Math.floor(Date.now() / 1000);
+      setChartAlerts(chartAlerts.list.map((a) => (ids.has(a.id) ? { ...a, enabled: false, fired_at: now } : a)));
+      for (const a of fired) invoke("send_notification", { title: `tickr · ${a.symbol} chart alert`, body: `${a.label} (${a.interval})` }).catch(console.warn);
+    });
+  });
 
   const paperLines = $derived(Paper.orderLines(paperAccount, symbol));
 
@@ -1763,7 +1778,7 @@
             {#if view === "watchlist"}
               <Watchlist bind:this={watchlistView} {refreshMode} symbols={watchlist} {groups} current={symbol} sort={watchlistSort} view={watchlistLayout} columns={watchlistColumns} {screens} bind:tab={groupTab} onopen={openWatched} ongroups={saveGroups} onsort={saveSort} onview={saveWatchlistLayout} oncolumns={saveWatchlistColumns} onsavescreen={saveScreen} ondeletescreen={deleteScreen} />
             {:else if view === "alerts"}
-              <Alerts {symbol} {quote} {alerts} onchange={(next) => (alerts = next)} onopen={openWatched} />
+              <Alerts {symbol} {quote} {alerts} onchange={(next) => (alerts = next)} onopen={openWatched} interval={chart?.interval ?? ""} drawings={drawings[symbol.toUpperCase()] ?? []} />
             {:else if view === "analysts"}
               <Analysts {symbol} {quote} {analyst} />
             {:else if view === "earnings"}
