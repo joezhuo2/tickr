@@ -15,6 +15,7 @@ use crate::earnings::Earnings;
 use crate::financials::Financials;
 use crate::grades::RatingChange;
 use crate::market::Market;
+use crate::sp500::HeatQuote;
 use crate::options::Options;
 use crate::stats::Section;
 use crate::news::Article;
@@ -579,6 +580,11 @@ pub async fn get_financials(shared: State<'_, Arc<Shared>>, symbol: String, forc
 #[tauri::command]
 pub async fn get_market(shared: State<'_, Arc<Shared>>) -> Result<Market, String> {
     crate::market::fetch(&shared.analysts).await.inspect_err(|e| log::warn!("market: {e}"))
+}
+
+#[tauri::command]
+pub async fn get_heatmap(shared: State<'_, Arc<Shared>>) -> Result<Vec<HeatQuote>, String> {
+    crate::sp500::fetch(&shared.analysts).await.inspect_err(|e| log::warn!("heatmap: {e}"))
 }
 
 #[tauri::command]

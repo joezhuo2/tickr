@@ -28,6 +28,7 @@ pub mod quote;
 pub mod screener;
 pub mod sentiment;
 pub mod settings;
+pub mod sp500;
 pub mod stats;
 pub mod state;
 pub mod tray;
@@ -142,6 +143,7 @@ pub fn run() {
             commands::get_stats,
             commands::get_financials,
             commands::get_market,
+            commands::get_heatmap,
             commands::get_options,
             commands::set_watchlist,
             commands::set_groups,

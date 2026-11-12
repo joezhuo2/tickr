@@ -438,6 +438,15 @@ export interface Mover {
   low_52w: number | null;
 }
 
+export interface HeatQuote {
+  symbol: string;
+  name: string;
+  sector: string;
+  price: number;
+  change_pct: number;
+  market_cap: number;
+}
+
 export interface Market {
   indices: Mover[];
   macros: Mover[];

@@ -1,0 +1,512 @@
+#Information Technology
+AAPL|Apple
+MSFT|Microsoft
+NVDA|NVIDIA
+AVGO|Broadcom
+ORCL|Oracle
+CRM|Salesforce
+AMD|Advanced Micro Devices
+CSCO|Cisco Systems
+ADBE|Adobe
+ACN|Accenture
+IBM|IBM
+NOW|ServiceNow
+INTU|Intuit
+QCOM|Qualcomm
+TXN|Texas Instruments
+AMAT|Applied Materials
+PLTR|Palantir
+MU|Micron Technology
+ANET|Arista Networks
+LRCX|Lam Research
+ADI|Analog Devices
+KLAC|KLA
+PANW|Palo Alto Networks
+CRWD|CrowdStrike
+SNPS|Synopsys
+CDNS|Cadence Design Systems
+APH|Amphenol
+MSI|Motorola Solutions
+ADSK|Autodesk
+FTNT|Fortinet
+ROP|Roper Technologies
+NXPI|NXP Semiconductors
+MCHP|Microchip Technology
+WDAY|Workday
+TEL|TE Connectivity
+FICO|Fair Isaac
+GLW|Corning
+DELL|Dell Technologies
+HPQ|HP Inc.
+HPE|Hewlett Packard Enterprise
+ON|ON Semiconductor
+CTSH|Cognizant
+IT|Gartner
+KEYS|Keysight
+TYL|Tyler Technologies
+NTAP|NetApp
+STX|Seagate
+WDC|Western Digital
+SMCI|Super Micro Computer
+FSLR|First Solar
+GDDY|GoDaddy
+PTC|PTC
+TDY|Teledyne
+TER|Teradyne
+VRSN|VeriSign
+GEN|Gen Digital
+JBL|Jabil
+FFIV|F5
+AKAM|Akamai
+ZBRA|Zebra Technologies
+SWKS|Skyworks
+TRMB|Trimble
+EPAM|EPAM Systems
+MPWR|Monolithic Power Systems
+PAYC|Paycom
+INTC|Intel
+DDOG|Datadog
+TTD|The Trade Desk
+APP|AppLovin
+IBKR|Interactive Brokers
+#Financials
+BRK-B|Berkshire Hathaway
+JPM|JPMorgan Chase
+V|Visa
+MA|Mastercard
+BAC|Bank of America
+WFC|Wells Fargo
+GS|Goldman Sachs
+MS|Morgan Stanley
+AXP|American Express
+SPGI|S&P Global
+BLK|BlackRock
+C|Citigroup
+PGR|Progressive
+SCHW|Charles Schwab
+CB|Chubb
+MMC|Marsh McLennan
+FI|Fiserv
+BX|Blackstone
+KKR|KKR
+CME|CME Group
+ICE|Intercontinental Exchange
+AON|Aon
+USB|U.S. Bancorp
+PNC|PNC Financial
+MCO|Moody's
+TFC|Truist Financial
+COF|Capital One
+AJG|Arthur J. Gallagher
+AIG|American International Group
+TRV|Travelers
+MET|MetLife
+AFL|Aflac
+ALL|Allstate
+PYPL|PayPal
+BK|Bank of New York Mellon
+MSCI|MSCI
+PRU|Prudential Financial
+AMP|Ameriprise Financial
+HIG|Hartford Financial
+FIS|Fidelity National Information Services
+NDAQ|Nasdaq
+STT|State Street
+FITB|Fifth Third Bancorp
+MTB|M&T Bank
+RJF|Raymond James
+HBAN|Huntington Bancshares
+SYF|Synchrony Financial
+CPAY|Corpay
+WRB|W. R. Berkley
+CINF|Cincinnati Financial
+NTRS|Northern Trust
+RF|Regions Financial
+TROW|T. Rowe Price
+BRO|Brown & Brown
+CFG|Citizens Financial
+L|Loews
+KEY|KeyCorp
+GPN|Global Payments
+FDS|FactSet
+PFG|Principal Financial
+EG|Everest Group
+ACGL|Arch Capital
+CBOE|Cboe Global Markets
+JKHY|Jack Henry
+AIZ|Assurant
+GL|Globe Life
+ERIE|Erie Indemnity
+IVZ|Invesco
+BEN|Franklin Resources
+MKTX|MarketAxess
+APO|Apollo Global Management
+COIN|Coinbase
+HOOD|Robinhood
+XYZ|Block
+#Health Care
+LLY|Eli Lilly
+UNH|UnitedHealth
+JNJ|Johnson & Johnson
+ABBV|AbbVie
+MRK|Merck
+TMO|Thermo Fisher Scientific
+ABT|Abbott Laboratories
+ISRG|Intuitive Surgical
+AMGN|Amgen
+DHR|Danaher
+PFE|Pfizer
+BSX|Boston Scientific
+GILD|Gilead Sciences
+SYK|Stryker
+VRTX|Vertex Pharmaceuticals
+MDT|Medtronic
+BMY|Bristol-Myers Squibb
+ELV|Elevance Health
+REGN|Regeneron
+CI|Cigna
+ZTS|Zoetis
+BDX|Becton Dickinson
+MCK|McKesson
+HCA|HCA Healthcare
+CVS|CVS Health
+EW|Edwards Lifesciences
+IDXX|IDEXX Laboratories
+A|Agilent
+IQV|IQVIA
+RMD|ResMed
+GEHC|GE HealthCare
+BIIB|Biogen
+MTD|Mettler-Toledo
+COR|Cencora
+HUM|Humana
+CNC|Centene
+DXCM|DexCom
+WAT|Waters
+ZBH|Zimmer Biomet
+LH|Labcorp
+STE|Steris
+BAX|Baxter
+PODD|Insulet
+ALGN|Align Technology
+MOH|Molina Healthcare
+HOLX|Hologic
+CAH|Cardinal Health
+COO|Cooper Companies
+WST|West Pharmaceutical
+INCY|Incyte
+TECH|Bio-Techne
+DGX|Quest Diagnostics
+VTRS|Viatris
+RVTY|Revvity
+UHS|Universal Health Services
+CRL|Charles River Laboratories
+MRNA|Moderna
+DVA|DaVita
+SOLV|Solventum
+HSIC|Henry Schein
+TFX|Teleflex
+BIO|Bio-Rad
+#Consumer Discretionary
+AMZN|Amazon
+TSLA|Tesla
+HD|Home Depot
+MCD|McDonald's
+BKNG|Booking Holdings
+LOW|Lowe's
+TJX|TJX Companies
+NKE|Nike
+SBUX|Starbucks
+ORLY|O'Reilly Automotive
+CMG|Chipotle
+MAR|Marriott
+AZO|AutoZone
+ABNB|Airbnb
+HLT|Hilton
+GM|General Motors
+DHI|D.R. Horton
+RCL|Royal Caribbean
+F|Ford
+ROST|Ross Stores
+LEN|Lennar
+YUM|Yum! Brands
+EBAY|eBay
+LULU|Lululemon
+NVR|NVR
+TSCO|Tractor Supply
+PHM|PulteGroup
+GRMN|Garmin
+CCL|Carnival
+DECK|Deckers Outdoor
+EXPE|Expedia
+ULTA|Ulta Beauty
+BBY|Best Buy
+APTV|Aptiv
+DRI|Darden Restaurants
+LVS|Las Vegas Sands
+GPC|Genuine Parts
+POOL|Pool Corp
+TPR|Tapestry
+KMX|CarMax
+NCLH|Norwegian Cruise Line
+WYNN|Wynn Resorts
+MGM|MGM Resorts
+HAS|Hasbro
+LKQ|LKQ
+RL|Ralph Lauren
+CZR|Caesars Entertainment
+BWA|BorgWarner
+MHK|Mohawk Industries
+DPZ|Domino's Pizza
+ETSY|Etsy
+#Communication Services
+GOOGL|Alphabet A
+GOOG|Alphabet C
+META|Meta Platforms
+NFLX|Netflix
+TMUS|T-Mobile US
+DIS|Disney
+VZ|Verizon
+T|AT&T
+CMCSA|Comcast
+EA|Electronic Arts
+TTWO|Take-Two Interactive
+WBD|Warner Bros. Discovery
+CHTR|Charter Communications
+OMC|Omnicom
+LYV|Live Nation
+IPG|Interpublic Group
+TKO|TKO Group
+FOXA|Fox Corp A
+FOX|Fox Corp B
+NWSA|News Corp A
+NWS|News Corp B
+#Industrials
+GE|GE Aerospace
+CAT|Caterpillar
+RTX|RTX
+UNP|Union Pacific
+HON|Honeywell
+BA|Boeing
+UBER|Uber
+ETN|Eaton
+LMT|Lockheed Martin
+DE|Deere
+ADP|Automatic Data Processing
+UPS|United Parcel Service
+GEV|GE Vernova
+WM|Waste Management
+TT|Trane Technologies
+PH|Parker-Hannifin
+NOC|Northrop Grumman
+GD|General Dynamics
+CTAS|Cintas
+EMR|Emerson Electric
+TDG|TransDigm
+ITW|Illinois Tool Works
+MMM|3M
+CSX|CSX
+FDX|FedEx
+CARR|Carrier Global
+NSC|Norfolk Southern
+PCAR|PACCAR
+JCI|Johnson Controls
+URI|United Rentals
+GWW|W. W. Grainger
+CPRT|Copart
+RSG|Republic Services
+CMI|Cummins
+PAYX|Paychex
+LHX|L3Harris
+FAST|Fastenal
+OTIS|Otis Worldwide
+PWR|Quanta Services
+AME|Ametek
+VRSK|Verisk
+ODFL|Old Dominion Freight Line
+HWM|Howmet Aerospace
+IR|Ingersoll Rand
+EFX|Equifax
+DAL|Delta Air Lines
+XYL|Xylem
+WAB|Wabtec
+ROK|Rockwell Automation
+AXON|Axon Enterprise
+DOV|Dover
+UAL|United Airlines
+BR|Broadridge
+VLTO|Veralto
+LDOS|Leidos
+FTV|Fortive
+BLDR|Builders FirstSource
+HUBB|Hubbell
+EXPD|Expeditors
+SNA|Snap-on
+J|Jacobs Solutions
+CHRW|C.H. Robinson
+LUV|Southwest Airlines
+MAS|Masco
+SWK|Stanley Black & Decker
+TXT|Textron
+PNR|Pentair
+IEX|IDEX
+JBHT|J.B. Hunt
+NDSN|Nordson
+ALLE|Allegion
+GNRC|Generac
+AOS|A. O. Smith
+HII|Huntington Ingalls
+DAY|Dayforce
+ROL|Rollins
+AAL|American Airlines
+#Consumer Staples
+WMT|Walmart
+COST|Costco
+PG|Procter & Gamble
+KO|Coca-Cola
+PEP|PepsiCo
+PM|Philip Morris International
+MDLZ|Mondelez
+CL|Colgate-Palmolive
+MO|Altria
+TGT|Target
+KMB|Kimberly-Clark
+KDP|Keurig Dr Pepper
+KVUE|Kenvue
+STZ|Constellation Brands
+SYY|Sysco
+GIS|General Mills
+KR|Kroger
+MNST|Monster Beverage
+HSY|Hershey
+KHC|Kraft Heinz
+ADM|Archer-Daniels-Midland
+EL|Estee Lauder
+DG|Dollar General
+DLTR|Dollar Tree
+CHD|Church & Dwight
+MKC|McCormick
+TSN|Tyson Foods
+CLX|Clorox
+CAG|Conagra Brands
+SJM|J.M. Smucker
+LW|Lamb Weston
+HRL|Hormel Foods
+CPB|Campbell's
+TAP|Molson Coors
+BF-B|Brown-Forman
+#Energy
+XOM|Exxon Mobil
+CVX|Chevron
+COP|ConocoPhillips
+WMB|Williams Companies
+EOG|EOG Resources
+SLB|Schlumberger
+OKE|ONEOK
+PSX|Phillips 66
+MPC|Marathon Petroleum
+KMI|Kinder Morgan
+VLO|Valero Energy
+OXY|Occidental Petroleum
+FANG|Diamondback Energy
+BKR|Baker Hughes
+TRGP|Targa Resources
+DVN|Devon Energy
+HAL|Halliburton
+CTRA|Coterra Energy
+EQT|EQT
+TPL|Texas Pacific Land
+EXE|Expand Energy
+APA|APA
+#Utilities
+NEE|NextEra Energy
+SO|Southern Company
+DUK|Duke Energy
+CEG|Constellation Energy
+AEP|American Electric Power
+SRE|Sempra
+D|Dominion Energy
+VST|Vistra
+PCG|PG&E
+EXC|Exelon
+XEL|Xcel Energy
+PEG|Public Service Enterprise Group
+ED|Consolidated Edison
+EIX|Edison International
+WEC|WEC Energy
+AWK|American Water Works
+DTE|DTE Energy
+ETR|Entergy
+PPL|PPL
+FE|FirstEnergy
+ES|Eversource
+AEE|Ameren
+CNP|CenterPoint Energy
+ATO|Atmos Energy
+CMS|CMS Energy
+NRG|NRG Energy
+LNT|Alliant Energy
+NI|NiSource
+EVRG|Evergy
+PNW|Pinnacle West
+AES|AES
+#Real Estate
+PLD|Prologis
+AMT|American Tower
+EQIX|Equinix
+WELL|Welltower
+SPG|Simon Property Group
+DLR|Digital Realty
+PSA|Public Storage
+O|Realty Income
+CCI|Crown Castle
+CBRE|CBRE Group
+VICI|VICI Properties
+EXR|Extra Space Storage
+CSGP|CoStar
+AVB|AvalonBay
+IRM|Iron Mountain
+VTR|Ventas
+EQR|Equity Residential
+SBAC|SBA Communications
+WY|Weyerhaeuser
+INVH|Invitation Homes
+ESS|Essex Property Trust
+MAA|Mid-America Apartment
+KIM|Kimco Realty
+ARE|Alexandria Real Estate
+DOC|Healthpeak
+UDR|UDR
+HST|Host Hotels
+CPT|Camden Property Trust
+REG|Regency Centers
+BXP|BXP
+FRT|Federal Realty
+#Materials
+LIN|Linde
+SHW|Sherwin-Williams
+APD|Air Products
+ECL|Ecolab
+FCX|Freeport-McMoRan
+NEM|Newmont
+CTVA|Corteva
+MLM|Martin Marietta
+VMC|Vulcan Materials
+DOW|Dow
+NUE|Nucor
+DD|DuPont
+PPG|PPG Industries
+STLD|Steel Dynamics
+IFF|International Flavors & Fragrances
+LYB|LyondellBasell
+PKG|Packaging Corp of America
+BALL|Ball
+AMCR|Amcor
+SW|Smurfit Westrock
+IP|International Paper
+CF|CF Industries
+AVY|Avery Dennison
+MOS|Mosaic
+ALB|Albemarle
+EMN|Eastman Chemical
+CE|Celanese

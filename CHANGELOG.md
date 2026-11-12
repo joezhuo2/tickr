@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.47] - 2026-11-12
+
+### Added
+- **Market heatmap:** the Market view has a Heatmap mode covering the S&P 500,
+  grouped by sector, with tiles sized by market cap and colored by day change.
+  Filter to one sector, hover for details and click a tile to chart it. The
+  constituent list ships with the app.
+
 ## [0.11.46] - 2026-11-12
 
 ### Added

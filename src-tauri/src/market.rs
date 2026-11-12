@@ -3,7 +3,7 @@ use serde_json::Value;
 
 use crate::analyst::Analysts;
 
-const QUOTE_URL: &str = "https://query1.finance.yahoo.com/v7/finance/quote";
+pub const QUOTE_URL: &str = "https://query1.finance.yahoo.com/v7/finance/quote";
 const SCREENER_URL: &str = "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved";
 const MOVERS: &str = "100";
 
