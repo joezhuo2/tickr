@@ -5,7 +5,9 @@
   import { fitScale, forward, inverse, scaleLabel, scaleTicks, shiftRange, stretchRange } from "./lib/scale";
   import type { Drawing, DrawingPoint } from "./lib/types";
   import { DRAWING_COLORS, POINT_COUNT, arrowHead, channelLines, fibExtLevels, pitchforkLines, snapPrice, anchoredVwap, fibLevels, hitBox, positionLevels, rayEnd, timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
-  import { legendText, volumeProfile, paneLayout } from "./lib/indicators";
+  import { legendText, volumeProfile } from "./lib/indicators";
+  import { LEFT_SCALES, PANE_NAMES, mergeUp, movePane, paneRects, unmerge, visibleGroups, type PaneId, type Slot } from "./lib/panes";
+  import { panes, setPanes } from "./lib/paneStore.svelte";
   import { untrack } from "svelte";
   import { axisRange } from "./lib/scrollback";
   import { clamp } from "./lib/viewport";
@@ -87,7 +89,7 @@
   let axisY: number | null = null;
   let manual = $state<{ lo: number; hi: number } | null>(null);
 
-  const PAD = { l: 6, r: 62, t: 38, b: 22 };
+  const PAD = $derived.by(() => ({ l: leftAxis ? 62 : 6, r: 62, t: 38, b: 22 }));
 
   let nowSec = $state(Date.now() / 1000);
   const countdown = $derived(chart && !replay ? candleCountdown(chart.interval, chart.candles[chart.candles.length - 1]?.t, nowSec) : null);
@@ -159,6 +161,10 @@
   }
   const rsiOn = $derived(!!show?.rsi);
   const macdOn = $derived(!!show?.macd);
+  const paneOn = (id: PaneId) => (id === "rsi" ? rsiOn : id === "macd" ? macdOn : id === "stoch" ? !!stoch : !!onBalance);
+  const shownPanes = $derived(visibleGroups(panes.groups, paneOn));
+  const leftAxis = $derived(panes.left !== "off" || shownPanes.some((g) => g.length > 1));
+  let maxPane = $state<Slot | null>(null);
   /** Series index for each candle on screen (-1 for candles newer than the analysis). */
   const align = $derived(
     analysis ? alignTimes(
@@ -253,13 +259,9 @@
     const n = candles.length;
     const plotW = Math.max(1, width - PAD.l - PAD.r);
     const plotH = Math.max(1, height - PAD.t - PAD.b);
-    const panes = paneLayout(plotH, rsiOn, macdOn, Number(!!stoch) + Number(!!onBalance));
-    const stochTop = PAD.t + (panes.extraTops[0] ?? 0);
-    const obvTop = PAD.t + (panes.extraTops[stoch ? 1 : 0] ?? 0);
-    const { priceH, volH, rsiH, macdH } = panes;
-    const volTop = PAD.t + panes.volTop;
-    const rsiTop = PAD.t + panes.rsiTop;
-    const macdTop = PAD.t + panes.macdTop;
+    const lay = paneRects(plotH, shownPanes, maxPane);
+    const { priceH, volH } = lay;
+    const volTop = PAD.t + lay.volTop;
     const [i0, i1] = visible(view, n);
     const prices: number[] = [];
     const fitValues: number[] = [];
@@ -311,16 +313,12 @@
       priceH,
       volTop,
       volH,
-      rsiTop,
-      rsiH,
-      macdTop,
-      macdH,
-      stochTop,
-      obvTop,
+      hidePrice: lay.hidePrice,
+      overlays: lay.overlays,
+      slots: lay.slots.map((r) => ({ ...r, top: PAD.t + r.top })),
       x: (i: number) => PAD.l + step * (i - start + 0.5),
       y: (v: number) => PAD.t + (1 - forward(v, lo, hi, activeScale)) * priceH,
       vy: (v: number) => volTop + volH - (vmax > 0 ? (v / vmax) * volH : 0),
-      ry: (v: number) => rsiTop + (1 - v / 100) * rsiH,
     };
   });
 
@@ -370,6 +368,11 @@
       ctx.stroke();
       ctx.fillStyle = v("--muted");
       ctx.fillText(g.label(t), width - PAD.r + 8, y);
+      if (panes.left !== "off") {
+        ctx.textAlign = "right";
+        ctx.fillText(leftLabel(t, g), PAD.l - 6, y);
+        ctx.textAlign = "left";
+      }
     }
 
     // Time axis: about one label per 110 px.
@@ -584,6 +587,8 @@
       axisTag(ctx, y, g.label(at), col, v("--bg"));
     }
 
+    drawPanes(ctx, g, v);
+
     // Crosshair.
     if (hover != null && candles[hover] && (g.scale !== "log" || candles[hover].c > 0)) {
       const c = candles[hover];
@@ -595,10 +600,13 @@
       ctx.beginPath();
       ctx.moveTo(x, PAD.t);
       ctx.lineTo(x, bottom);
-      ctx.moveTo(PAD.l, y);
-      ctx.lineTo(width - PAD.r, y);
+      if (!g.hidePrice) {
+        ctx.moveTo(PAD.l, y);
+        ctx.lineTo(width - PAD.r, y);
+      }
       ctx.stroke();
       ctx.setLineDash([]);
+      if (g.hidePrice) return;
       if (!ohlc) {
         ctx.fillStyle = trendUp ? up : down;
         ctx.beginPath();
@@ -613,6 +621,13 @@
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
       ctx.fillText(label, width - PAD.r + 8, y);
+      if (panes.left !== "off") {
+        ctx.fillStyle = v("--text");
+        ctx.fillRect(2, y - 9, PAD.l - 4, 18);
+        ctx.fillStyle = v("--bg");
+        ctx.textAlign = "right";
+        ctx.fillText(leftLabel(c.c, g), PAD.l - 6, y);
+      }
     } else if (hover == null && linkedIndex >= g.i0 && linkedIndex <= g.i1) {
       const x = Math.round(g.x(linkedIndex)) + 0.5;
       ctx.strokeStyle = v("--crosshair");
@@ -890,84 +905,6 @@
       const y = Math.round(g.y(t.price)) + 0.5;
       if (y >= PAD.t && y <= priceBottom) axisTag(ctx, y, g.label(t.price), v(t.color), v("--bg"));
     }
-
-    // RSI pane: 30/50/70 guides and the line.
-    if (s.rsi) {
-      const top = g.rsiTop;
-      ctx.strokeStyle = v("--grid");
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(PAD.l, Math.round(top) + 0.5);
-      ctx.lineTo(right, Math.round(top) + 0.5);
-      ctx.stroke();
-      ctx.font = `10px ${v("--font")}`;
-      ctx.textBaseline = "middle";
-      ctx.textAlign = "left";
-      for (const lvl of [30, 50, 70]) {
-        const y = Math.round(g.ry(lvl)) + 0.5;
-        ctx.strokeStyle = lvl === 50 ? v("--grid") : v("--muted");
-        ctx.setLineDash(lvl === 50 ? [] : [2, 3]);
-        ctx.beginPath();
-        ctx.moveTo(PAD.l, y);
-        ctx.lineTo(right, y);
-        ctx.stroke();
-        ctx.fillStyle = v("--muted");
-        ctx.fillText(String(lvl), right + 8, y);
-      }
-      ctx.setLineDash([]);
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(PAD.l, top, g.plotW, g.rsiH);
-      ctx.clip();
-      ctx.strokeStyle = (a.series.rsi.color || v("--rsi"));
-      ctx.lineWidth = 1.3;
-      strokeLine(ctx, a.series.rsi, g.ry, g);
-      ctx.restore();
-      ctx.fillStyle = (a.series.rsi.color || v("--rsi"));
-      ctx.textBaseline = "top";
-      ctx.fillText(legendText(a.series.rsi.label, [valueAt(a.series.rsi, at)], 1), PAD.l + 4, top + 2);
-    }
-    if (s.macd) {
-      const [line, signal, histogram] = a.series.macd;
-      let extent = 1e-9;
-      for (const l of a.series.macd) {
-        for (let i = g.i0; i <= g.i1; i++) extent = Math.max(extent, Math.abs(valueAt(l, i) ?? 0));
-      }
-      const y = (value: number) => g.macdTop + g.macdH * (0.5 - value / (extent * 2.4));
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(PAD.l, g.macdTop, g.plotW, g.macdH);
-      ctx.clip();
-      ctx.strokeStyle = v("--grid");
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(PAD.l, g.macdTop);
-      ctx.lineTo(right, g.macdTop);
-      ctx.moveTo(PAD.l, y(0));
-      ctx.lineTo(right, y(0));
-      ctx.stroke();
-      for (let i = g.i0; i <= g.i1; i++) {
-        const value = valueAt(histogram, i);
-        if (value == null) continue;
-        ctx.fillStyle = histogram.color || v(value >= 0 ? "--up" : "--down");
-        ctx.globalAlpha = 0.5;
-        ctx.fillRect(g.x(i) - g.step * 0.3, Math.min(y(value), y(0)), Math.max(1, g.step * 0.6), Math.abs(y(value) - y(0)));
-      }
-      ctx.globalAlpha = 1;
-      ctx.lineWidth = 1.3;
-      ctx.strokeStyle = line.color || v("--rsi");
-      strokeLine(ctx, line, y, g);
-      ctx.strokeStyle = signal.color || v("--ma-2");
-      strokeLine(ctx, signal, y, g);
-      ctx.fillStyle = line.color || v("--rsi");
-      ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      ctx.fillText(legendText(line.label, a.series.macd.map((l) => valueAt(l, at)), 2), PAD.l + 4, g.macdTop + 2);
-      ctx.restore();
-      ctx.fillStyle = v("--muted");
-      ctx.textBaseline = "middle";
-      ctx.fillText("0", right + 8, y(0));
-    }
     ctx.font = `11px ${v("--font")}`;
   }
 
@@ -1069,52 +1006,138 @@
       legend("Pivots", v("--muted"));
     }
     ctx.restore();
+    if (lx > PAD.l + 4) legendY += 12;
+    ctx.font = `11px ${v("--font")}`;
+  }
 
-    const pane = (top: number, label: string, col: string) => {
+  function leftLabel(t: number, g: Geo) {
+    return panes.left === "percent" ? scaleLabel(t, "percent", g.base) : g.label(t);
+  }
+
+  function paneScale(id: PaneId, g: Geo, top: number, h: number): { y: (val: number) => number; ticks: [number, string][] } {
+    if (id === "macd") {
+      let extent = 1e-9;
+      for (const l of analysis?.series.macd ?? []) {
+        for (let i = g.i0; i <= g.i1; i++) extent = Math.max(extent, Math.abs(valueAt(l, i) ?? 0));
+      }
+      return { y: (val) => top + h * (0.5 - val / (extent * 2.4)), ticks: [[0, "0"]] };
+    }
+    if (id === "obv" && onBalance) {
+      let lo = Infinity, hi = -Infinity;
+      for (let i = g.i0; i <= g.i1; i++) { lo = Math.min(lo, onBalance[i]); hi = Math.max(hi, onBalance[i]); }
+      const span = hi - lo || 1;
+      return { y: (val) => top + h * (0.92 - ((val - lo) / span) * 0.84), ticks: [[hi, volume(hi)], [lo, volume(lo)]] };
+    }
+    return { y: (val) => top + (1 - val / 100) * h, ticks: (id === "rsi" ? [30, 50, 70] : [20, 80]).map((t) => [t, String(t)]) };
+  }
+
+  function drawPane(ctx: CanvasRenderingContext2D, g: Geo, v: (name: string) => string, id: PaneId, top: number, h: number, ly: number, axis: "right" | "left" | null) {
+    const a = analysis;
+    const at = hover != null && candles[hover] ? hover : g.i1;
+    const right = width - PAD.r;
+    const { y, ticks } = paneScale(id, g, top, h);
+    ctx.font = `10px ${v("--font")}`;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([]);
+    if (axis) {
+      ctx.fillStyle = v("--muted");
+      ctx.textBaseline = "middle";
+      ctx.textAlign = axis === "right" ? "left" : "right";
+      for (const [t, label] of ticks) ctx.fillText(label, axis === "right" ? right + 8 : PAD.l - 6, y(t));
+    }
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(PAD.l, top, g.plotW, h);
+    ctx.clip();
+    if (axis === "right" && id !== "obv") {
+      for (const [t] of ticks) {
+        const solid = id === "macd" || t === 50;
+        ctx.strokeStyle = v(solid ? "--grid" : "--muted");
+        ctx.setLineDash(solid ? [] : [2, 3]);
+        ctx.beginPath();
+        ctx.moveTo(PAD.l, Math.round(y(t)) + 0.5);
+        ctx.lineTo(right, Math.round(y(t)) + 0.5);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }
+    ctx.lineWidth = 1.3;
+    let legend = "";
+    let col = v("--rsi");
+    if (id === "rsi" && a) {
+      col = a.series.rsi.color || col;
+      ctx.strokeStyle = col;
+      strokeLine(ctx, a.series.rsi, y, g);
+      legend = legendText(a.series.rsi.label, [valueAt(a.series.rsi, at)], 1);
+    } else if (id === "macd" && a) {
+      const [line, signal, histogram] = a.series.macd;
+      ctx.globalAlpha = 0.5;
+      for (let i = g.i0; i <= g.i1; i++) {
+        const value = valueAt(histogram, i);
+        if (value == null) continue;
+        ctx.fillStyle = histogram.color || v(value >= 0 ? "--up" : "--down");
+        ctx.fillRect(g.x(i) - g.step * 0.3, Math.min(y(value), y(0)), Math.max(1, g.step * 0.6), Math.abs(y(value) - y(0)));
+      }
+      ctx.globalAlpha = 1;
+      col = line.color || col;
+      ctx.strokeStyle = col;
+      strokeLine(ctx, line, y, g);
+      ctx.strokeStyle = signal.color || v("--ma-2");
+      strokeLine(ctx, signal, y, g);
+      legend = legendText(line.label, a.series.macd.map((l) => valueAt(l, at)), 2);
+    } else if (id === "stoch" && stoch) {
+      ctx.strokeStyle = col;
+      plot(ctx, g, stoch.k, y);
+      ctx.strokeStyle = v("--ma-2");
+      plot(ctx, g, stoch.d, y);
+      legend = legendText("Stoch 14 3 3", [stoch.k[at], stoch.d[at]], 1);
+    } else if (id === "obv" && onBalance) {
+      col = v("--accent");
+      ctx.strokeStyle = col;
+      plot(ctx, g, onBalance, y);
+      legend = `OBV  ${volume(onBalance[at] ?? 0)}`;
+    }
+    ctx.restore();
+    ctx.fillStyle = col;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText(legend, PAD.l + 4, ly);
+  }
+
+  function drawPanes(ctx: CanvasRenderingContext2D, g: Geo, v: (name: string) => string) {
+    if (g.hidePrice) ctx.clearRect(0, PAD.t, width, height - PAD.t - PAD.b);
+    else g.overlays.forEach((id, k) => drawPane(ctx, g, v, id, PAD.t, g.priceH, legendY + 12 * k, k === 0 && panes.left === "off" ? "left" : null));
+    for (const slot of g.slots) {
       ctx.strokeStyle = v("--grid");
       ctx.lineWidth = 1;
       ctx.setLineDash([]);
       ctx.beginPath();
-      ctx.moveTo(PAD.l, Math.round(top) + 0.5);
-      ctx.lineTo(right, Math.round(top) + 0.5);
+      ctx.moveTo(PAD.l, Math.round(slot.top) + 0.5);
+      ctx.lineTo(width - PAD.r, Math.round(slot.top) + 0.5);
       ctx.stroke();
-      ctx.font = `10px ${v("--font")}`;
-      ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      ctx.fillStyle = col;
-      ctx.fillText(label, PAD.l + 4, top + 2);
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(PAD.l, top, g.plotW, g.rsiH);
-      ctx.clip();
-      ctx.lineWidth = 1.3;
-    };
-    if (stoch) {
-      const y = (val: number) => g.stochTop + (1 - val / 100) * g.rsiH;
-      pane(g.stochTop, legendText("Stoch 14 3 3", [stoch.k[at], stoch.d[at]], 1), v("--rsi"));
-      ctx.strokeStyle = v("--muted");
-      ctx.setLineDash([2, 3]);
-      ctx.beginPath();
-      for (const level of [20, 80]) { ctx.moveTo(PAD.l, y(level)); ctx.lineTo(right, y(level)); }
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.strokeStyle = v("--rsi");
-      plot(ctx, g, stoch.k, y);
-      ctx.strokeStyle = v("--ma-2");
-      plot(ctx, g, stoch.d, y);
-      ctx.restore();
-    }
-    if (onBalance) {
-      let lo = Infinity, hi = -Infinity;
-      for (let i = g.i0; i <= g.i1; i++) { lo = Math.min(lo, onBalance[i]); hi = Math.max(hi, onBalance[i]); }
-      const span = hi - lo || 1;
-      pane(g.obvTop, `OBV  ${volume(onBalance[at] ?? 0)}`, v("--accent"));
-      ctx.strokeStyle = v("--accent");
-      plot(ctx, g, onBalance, (val) => g.obvTop + g.rsiH * (0.92 - ((val - lo) / span) * 0.84));
-      ctx.restore();
+      slot.ids.forEach((id, k) => drawPane(ctx, g, v, id, slot.top, slot.h, slot.top + 2 + 12 * k, k === 0 ? "right" : k === 1 ? "left" : null));
     }
     ctx.font = `11px ${v("--font")}`;
   }
+
+  function paneHead(p: Pixel) {
+    return geo.slots.find((s) => p.x >= PAD.l && p.x <= width - PAD.r && p.y >= s.top && p.y <= s.top + 14);
+  }
+
+  function layoutPanes(next: typeof panes) {
+    if (next !== panes) setPanes(next);
+  }
+
+  function cycleLeft() {
+    layoutPanes({ ...panes, left: LEFT_SCALES[(LEFT_SCALES.indexOf(panes.left) + 1) % LEFT_SCALES.length] });
+  }
+
+  const LEFT_LABELS = { off: "Off", same: "Same as right", percent: "Percent from the first visible bar" };
+
+  const paneTools = $derived([
+    ...(geo.hidePrice ? [] : [{ ids: ["price", ...geo.overlays] as Slot[], top: PAD.t }]),
+    ...geo.slots.map((s) => ({ ids: s.ids as Slot[], top: s.top })),
+  ]);
 
   $effect(() => {
     // Redraw when any of these change.
@@ -1307,6 +1330,7 @@
     const d = list.find((x) => x.id === id);
     const i = d ? noteBar(times, d.points[0].t) : null;
     if (i == null) return;
+    if (geo.hidePrice) maxPane = null;
     view = reveal(view, geo.n, i);
     emitWindow();
   }
@@ -1430,11 +1454,11 @@
   }
 
   function onAxis(p: Pixel) {
-    return p.x > width - PAD.r && p.y >= PAD.t && p.y <= PAD.t + geo.priceH;
+    return !geo.hidePrice && p.x > width - PAD.r && p.y >= PAD.t && p.y <= PAD.t + geo.priceH;
   }
 
   function inPlot(p: Pixel) {
-    return p.x >= PAD.l && p.x <= width - PAD.r && p.y >= PAD.t && p.y <= PAD.t + geo.priceH;
+    return !geo.hidePrice && p.x >= PAD.l && p.x <= width - PAD.r && p.y >= PAD.t && p.y <= PAD.t + geo.priceH;
   }
 
   function hitDrawing(p: Pixel) {
@@ -1478,7 +1502,7 @@
   }
 
   function onDown(e: PointerEvent) {
-    if (e.button !== 0 || geo.n === 0 || (e.target as Element).closest(".exports, .drawing-tools, .note-marker, .note-pop, input")) return;
+    if (e.button !== 0 || geo.n === 0 || (e.target as Element).closest(".exports, .drawing-tools, .note-marker, .note-pop, .pane-tools, input")) return;
     wrap!.focus();
     const p = pixel(e);
     if (!inPlot(p)) {
@@ -1807,7 +1831,7 @@
       return;
     }
     if (moveDrawing(e)) return;
-    if (tool !== "cursor" || (e.target instanceof Element && e.target.closest(".drawing-tools, input"))) { hover = null; return; }
+    if (tool !== "cursor" || (e.target instanceof Element && e.target.closest(".drawing-tools, .pane-tools, input"))) { hover = null; return; }
     if (dragX != null) {
       if (view.start + (dragX - e.clientX) / geo.step < 0) onolder?.();
       view = pan(view, geo.n, (dragX - e.clientX) / geo.step);
@@ -1836,6 +1860,7 @@
     if (e.ctrlKey && e.key.toLowerCase() === "z") { cancelDrawing(); void changeDrawings(e.shiftKey ? "redo" : "undo"); }
     else if ((e.key === "Delete" || e.key === "Backspace") && selected != null) removeDrawing();
     else if (e.key === "Escape" && (tool !== "cursor" || selected != null)) { cancelDrawing(); selected = null; hover = null; }
+    else if (e.key === "Escape" && maxPane) maxPane = null;
     else handled = false;
     if (handled) { e.preventDefault(); e.stopPropagation(); return; }
 
@@ -1906,8 +1931,10 @@
   onpointercancel={cancelDrawing}
   onpointerleave={() => (hover = null)}
   ondblclick={(e) => {
-    if ((e.target as Element).closest(".exports, .drawing-tools, input")) return;
-    if (onAxis(pixel(e))) manual = null;
+    if ((e.target as Element).closest(".exports, .drawing-tools, .pane-tools, input")) return;
+    const head = paneHead(pixel(e));
+    if (head) maxPane = maxPane && head.ids.includes(maxPane as PaneId) ? null : head.ids[0];
+    else if (onAxis(pixel(e))) manual = null;
     else if (tool === "cursor" && selected == null) resetView();
   }}
   onkeydown={onKey}
@@ -1943,8 +1970,42 @@
     {/if}
     </div>
   {/if}
-  {#if candles.length}
+  {#if candles.length && !geo.hidePrice}
     <div class="axis-grip" style:top="{PAD.t}px" style:width="{PAD.r}px" style:height="{geo.priceH}px"></div>
+  {/if}
+  {#if candles.length}
+    {#each paneTools as p, k (p.ids.join())}
+      {@const id = p.ids[0]}
+      {@const name = p.ids.map((s) => PANE_NAMES[s]).join(" + ")}
+      {@const maxed = maxPane != null && p.ids.includes(maxPane)}
+      <div class="pane-tools" class:maxed role="toolbar" aria-label="{name} pane" style:top="{p.top + 2}px" style:right="{PAD.r + 4}px">
+        {#if id !== "price" && !geo.hidePrice}
+          <button title="Move {name} up" aria-label="Move {name} pane up" disabled={k <= 1} onclick={() => layoutPanes(movePane(panes, id, -1, paneOn))}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6" /></svg>
+          </button>
+          <button title="Move {name} down" aria-label="Move {name} pane down" disabled={k === paneTools.length - 1} onclick={() => layoutPanes(movePane(panes, id, 1, paneOn))}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+          </button>
+          {#if p.ids.length === 1}
+            <button title="Merge {name} into the {k === 1 ? 'price pane' : 'pane above'} on its own scale" aria-label="Merge {name} pane into the {k === 1 ? 'price pane' : 'pane above'}" onclick={() => layoutPanes(mergeUp(panes, id, paneOn))}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16M12 20V9M8 13l4-4 4 4" /></svg>
+            </button>
+          {/if}
+        {/if}
+        {#if p.ids.length > 1}
+          <button title="Unmerge {name}" aria-label="Unmerge {name}" onclick={() => layoutPanes(unmerge(panes, id))}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M12 3v5M9 6l3 3 3-3M12 21v-5M9 18l3-3 3 3" /></svg>
+          </button>
+        {/if}
+        <button title={maxed ? "Restore panes (Escape)" : `Maximize ${name} (double-click a lower pane's header)`} aria-label={maxed ? "Restore panes" : `Maximize ${name} pane`} aria-pressed={maxed} onclick={() => (maxPane = maxed ? null : id)}>
+          {#if maxed}
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" /></svg>
+          {:else}
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
+          {/if}
+        </button>
+      </div>
+    {/each}
   {/if}
   {#if loadingOlder}
     <div class="older-note" role="status">Loading older candles…</div>
@@ -1958,7 +2019,7 @@
   {#each noteMarks as m (m.d.id)}
     <button class="note-marker" aria-label={`Note: ${noteTitle(m.d.text)}`} title={m.d.text.slice(0, 300)} style:left="{m.x}px" style:top="{m.y}px" style:--note={m.d.color || "var(--accent)"} onclick={() => openNote(m.d, m.x, m.y)}></button>
   {/each}
-  {#if noteEdit}
+  {#if noteEdit && !geo.hidePrice}
     <div class="note-pop" role="dialog" aria-label="Note" style:left="{Math.max(4, Math.min(noteEdit.x + 10, width - 244))}px" style:top="{Math.max(4, Math.min(noteEdit.y + 10, height - 170))}px">
       <!-- svelte-ignore a11y_autofocus -->
       <textarea aria-label="Note text" rows="5" maxlength={NOTE_MAX} autofocus bind:value={noteEdit.text} onkeydown={(e) => { if (e.key === "Escape") { e.stopPropagation(); noteEdit = null; } }}></textarea>
@@ -1993,6 +2054,9 @@
       </button>
       <button title="Go to date" aria-label="Go to date" aria-pressed={gotoOpen} onclick={() => (gotoOpen = !gotoOpen)}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
+      </button>
+      <button title="Left price scale: {LEFT_LABELS[panes.left]} (click to change)" aria-label="Left price scale: {LEFT_LABELS[panes.left]}" aria-pressed={panes.left !== "off"} onclick={cycleLeft}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v18M9 7h4M9 12h7M9 17h4" /></svg>
       </button>
       {#if manual}
         <button title="Auto price scale (double-click the price axis)" aria-label="Auto price scale" onclick={() => (manual = null)}>
@@ -2217,6 +2281,48 @@
     background: none;
     color: var(--muted);
     cursor: pointer;
+  }
+  .pane-tools {
+    position: absolute;
+    display: flex;
+    gap: 1px;
+    z-index: 1;
+    cursor: default;
+    opacity: 0;
+    transition: opacity var(--motion-fast) var(--ease-out);
+  }
+  .chart:hover .pane-tools,
+  .pane-tools:focus-within,
+  .pane-tools.maxed {
+    opacity: 1;
+  }
+  .pane-tools button {
+    width: 18px;
+    height: 18px;
+    padding: 2px;
+    border: 0;
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .pane-tools button:hover:not(:disabled) {
+    background: var(--surface);
+    color: var(--text);
+  }
+  .pane-tools button:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+  .pane-tools svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   .exports button.done,
   .exports button.done:hover {
