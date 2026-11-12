@@ -6,6 +6,10 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.24] - 2026-11-11
+
+### Added\n- **Studies:** Stochastic, Ichimoku, Supertrend, OBV and pivot points, toggled\n  from the Technicals tab and drawn without running Analyze.
+
 ## [0.11.23] - 2026-11-11
 
 ### Added\n- **More drawing tools:** parallel channel, vertical line, horizontal ray,\n  arrow, price range, date range, Fibonacci extension and pitchfork, in the\n  More menu of the drawing toolbar.

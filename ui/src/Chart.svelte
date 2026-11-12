@@ -7,6 +7,8 @@
   import { DRAWING_COLORS, POINT_COUNT, arrowHead, channelLines, fibExtLevels, pitchforkLines, snapPrice, anchoredVwap, fibLevels, hitBox, positionLevels, rayEnd, timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
   import { legendText, volumeProfile, paneLayout } from "./lib/indicators";
   import { untrack } from "svelte";
+  import { ichimoku, obv, pivotPeriod, pivots, stochastic, supertrend } from "./lib/studies";
+  import { studies } from "./lib/studyStore.svelte";
   import { displayCandles, isOhlc } from "./lib/charttypes";
   import { fadeIn } from "./lib/motion";
   import { follow, full, isFull, pan, reveal, visible, zoom, type View } from "./lib/viewport";
@@ -90,6 +92,12 @@
 
   // Analysis overlays: only when there is an analysis and a toggle set.
   const show = $derived(analysis && overlays ? overlays : null);
+  const stoch = $derived(studies.stoch ? stochastic(candles) : null);
+  const ichi = $derived(studies.ichimoku ? ichimoku(candles) : null);
+  const trendLine = $derived(studies.supertrend ? supertrend(candles) : null);
+  const onBalance = $derived(studies.obv ? obv(candles) : null);
+  const pivotLevels = $derived(studies.pivots && chart ? pivots(candles, pivotPeriod(chart.interval, chart.meta.gmtoffset ?? 0)) : null);
+  let legendY = 0;
   const rsiOn = $derived(!!show?.rsi);
   const macdOn = $derived(!!show?.macd);
   /** Series index for each candle on screen (-1 for candles newer than the analysis). */
@@ -186,7 +194,9 @@
     const n = candles.length;
     const plotW = Math.max(1, width - PAD.l - PAD.r);
     const plotH = Math.max(1, height - PAD.t - PAD.b);
-    const panes = paneLayout(plotH, rsiOn, macdOn);
+    const panes = paneLayout(plotH, rsiOn, macdOn, Number(!!stoch) + Number(!!onBalance));
+    const stochTop = PAD.t + (panes.extraTops[0] ?? 0);
+    const obvTop = PAD.t + (panes.extraTops[stoch ? 1 : 0] ?? 0);
     const { priceH, volH, rsiH, macdH } = panes;
     const volTop = PAD.t + panes.volTop;
     const rsiTop = PAD.t + panes.rsiTop;
@@ -246,6 +256,8 @@
       rsiH,
       macdTop,
       macdH,
+      stochTop,
+      obvTop,
       x: (i: number) => PAD.l + step * (i - start + 0.5),
       y: (v: number) => PAD.t + (1 - forward(v, lo, hi, activeScale)) * priceH,
       vy: (v: number) => volTop + volH - (vmax > 0 ? (v / vmax) * volH : 0),
@@ -428,7 +440,9 @@
 
     if (g.scale === "log") ctx.restore();
 
+    legendY = PAD.t + 2;
     if (show && analysis) drawOverlays(ctx, g, v);
+    drawStudies(ctx, g, v);
 
     clipPlot(ctx);
     const stacked = new Map<number, number>();
@@ -695,6 +709,8 @@
       legend(a.series.opening_range[0].label, col, [orHigh, orLow]);
     }
 
+    legendY = lx > PAD.l + 4 ? ly + 12 : ly;
+
     const profile = s.volume_profile ? volumeProfile(candles, g.i0, g.i1) : null;
     if (profile) {
       const peak = Math.max(...profile.volumes);
@@ -870,9 +886,144 @@
     ctx.font = `11px ${v("--font")}`;
   }
 
+  function plot(ctx: CanvasRenderingContext2D, g: Geo, values: (number | null)[], y: (v: number) => number) {
+    ctx.beginPath();
+    let pen = false;
+    for (let i = Math.max(0, g.i0 - 1); i <= Math.min(g.n - 1, g.i1 + 1); i++) {
+      const val = values[i];
+      if (val == null || !Number.isFinite(val)) { pen = false; continue; }
+      if (pen) ctx.lineTo(g.x(i), y(val));
+      else ctx.moveTo(g.x(i), y(val));
+      pen = true;
+    }
+    ctx.stroke();
+  }
+
+  function drawStudies(ctx: CanvasRenderingContext2D, g: Geo, v: (name: string) => string) {
+    if (g.n === 0 || !(stoch || ichi || trendLine || onBalance || pivotLevels)) return;
+    const at = hover != null && candles[hover] ? hover : g.i1;
+    const right = width - PAD.r;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(PAD.l, PAD.t, g.plotW, g.priceH);
+    ctx.clip();
+    ctx.font = `10px ${v("--font")}`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.lineWidth = 1.2;
+    let lx = PAD.l + 4;
+    const legend = (text: string, col: string) => {
+      const w = ctx.measureText(text).width;
+      if (lx + w > right && lx > PAD.l + 4) { lx = PAD.l + 4; legendY += 12; }
+      ctx.fillStyle = col;
+      ctx.fillText(text, lx, legendY);
+      lx += w + 10;
+    };
+    if (ichi) {
+      for (let i = Math.max(1, g.i0); i <= g.i1; i++) {
+        const a0 = ichi.spanA[i - 1], a1 = ichi.spanA[i], b0 = ichi.spanB[i - 1], b1 = ichi.spanB[i];
+        if (a0 == null || a1 == null || b0 == null || b1 == null) continue;
+        ctx.fillStyle = v(a1 >= b1 ? "--up" : "--down");
+        ctx.globalAlpha = 0.1;
+        ctx.beginPath();
+        ctx.moveTo(g.x(i - 1), g.y(a0));
+        ctx.lineTo(g.x(i), g.y(a1));
+        ctx.lineTo(g.x(i), g.y(b1));
+        ctx.lineTo(g.x(i - 1), g.y(b0));
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      for (const [line, col] of [[ichi.tenkan, "--ma-1"], [ichi.kijun, "--ma-2"], [ichi.spanA, "--up"], [ichi.spanB, "--down"], [ichi.chikou, "--muted"]] as const) {
+        ctx.strokeStyle = v(col);
+        plot(ctx, g, line, g.y);
+      }
+      legend(legendText("Ichimoku 9 26 52", [ichi.tenkan[at], ichi.kijun[at], ichi.spanA[at], ichi.spanB[at]]), v("--ma-1"));
+    }
+    if (trendLine) {
+      for (const rising of [true, false]) {
+        ctx.strokeStyle = v(rising ? "--up" : "--down");
+        plot(ctx, g, trendLine.value.map((val, i) => (trendLine.up[i] === rising ? val : null)), g.y);
+      }
+      legend(legendText("Supertrend 10 3", [trendLine.value[at]]), v(trendLine.up[at] ? "--up" : "--down"));
+    }
+    if (pivotLevels) {
+      const names = ["p", "r1", "r2", "s1", "s2"] as const;
+      ctx.lineWidth = 1;
+      for (const name of names) {
+        ctx.strokeStyle = v(name === "p" ? "--muted" : name[0] === "r" ? "--down" : "--up");
+        ctx.beginPath();
+        for (let i = g.i0; i <= g.i1; i++) {
+          const level = pivotLevels[i];
+          if (!level) continue;
+          const y = Math.round(g.y(level[name])) + 0.5;
+          ctx.moveTo(g.x(i) - g.step / 2, y);
+          ctx.lineTo(g.x(i) + g.step / 2, y);
+        }
+        ctx.stroke();
+        const last = pivotLevels[g.i1];
+        if (last) {
+          ctx.fillStyle = ctx.strokeStyle;
+          ctx.textAlign = "right";
+          ctx.textBaseline = "bottom";
+          ctx.fillText(`${name.toUpperCase()} ${num(last[name])}`, right - 4, g.y(last[name]) - 2);
+          ctx.textAlign = "left";
+          ctx.textBaseline = "top";
+        }
+      }
+      legend("Pivots", v("--muted"));
+    }
+    ctx.restore();
+
+    const pane = (top: number, label: string, col: string) => {
+      ctx.strokeStyle = v("--grid");
+      ctx.lineWidth = 1;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(PAD.l, Math.round(top) + 0.5);
+      ctx.lineTo(right, Math.round(top) + 0.5);
+      ctx.stroke();
+      ctx.font = `10px ${v("--font")}`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = col;
+      ctx.fillText(label, PAD.l + 4, top + 2);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(PAD.l, top, g.plotW, g.rsiH);
+      ctx.clip();
+      ctx.lineWidth = 1.3;
+    };
+    if (stoch) {
+      const y = (val: number) => g.stochTop + (1 - val / 100) * g.rsiH;
+      pane(g.stochTop, legendText("Stoch 14 3 3", [stoch.k[at], stoch.d[at]], 1), v("--rsi"));
+      ctx.strokeStyle = v("--muted");
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      for (const level of [20, 80]) { ctx.moveTo(PAD.l, y(level)); ctx.lineTo(right, y(level)); }
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = v("--rsi");
+      plot(ctx, g, stoch.k, y);
+      ctx.strokeStyle = v("--ma-2");
+      plot(ctx, g, stoch.d, y);
+      ctx.restore();
+    }
+    if (onBalance) {
+      let lo = Infinity, hi = -Infinity;
+      for (let i = g.i0; i <= g.i1; i++) { lo = Math.min(lo, onBalance[i]); hi = Math.max(hi, onBalance[i]); }
+      const span = hi - lo || 1;
+      pane(g.obvTop, `OBV  ${volume(onBalance[at] ?? 0)}`, v("--accent"));
+      ctx.strokeStyle = v("--accent");
+      plot(ctx, g, onBalance, (val) => g.obvTop + g.rsiH * (0.92 - ((val - lo) / span) * 0.84));
+      ctx.restore();
+    }
+    ctx.font = `11px ${v("--font")}`;
+  }
+
   $effect(() => {
     // Redraw when any of these change.
-    void [redrawKey, list, preview, selected, tool, hideDrawings, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt, fillMarks];
+    void [stoch, ichi, trendLine, onBalance, pivotLevels, redrawKey, list, preview, selected, tool, hideDrawings, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt, fillMarks];
     draw();
   });
 

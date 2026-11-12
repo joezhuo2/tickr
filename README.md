@@ -301,6 +301,16 @@ it is instant.
   hours shown on the chart. On a 1D chart the prior day comes from one extra
   daily-candle request per analysis.
 
+  **Studies** at the bottom of the Technicals tab add Stochastic (14, 3, 3) and
+  OBV in their own panes, and Ichimoku (9, 26, 52), Supertrend (10, 3) and
+  classic pivot points (P, R1, R2, S1, S2) over the price. They are drawn on
+  both charts without running Analyze, follow replay, do not feed the score,
+  and use fixed settings. Pivots come from the previous day on intraday charts,
+  the previous month on daily charts and the previous year on longer ones. The
+  Ichimoku cloud stops at the latest bar, since the chart has no room to the
+  right of it. Which studies are on is remembered on this computer but is not
+  part of Backup or indicator presets.
+
 - **Analysts:** the rating (Strong buy to Sell), average 12-month target and
   its upside also sit under the price on the left. The tab adds the target
   range against the current price and the count of each rating. Cached for 12
@@ -579,8 +589,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.23
-git push origin v0.11.23
+git tag v0.11.24
+git push origin v0.11.24
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

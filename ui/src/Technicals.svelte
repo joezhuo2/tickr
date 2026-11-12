@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { STUDIES } from "./lib/studies";
+  import { studies, toggleStudy } from "./lib/studyStore.svelte";
   import { biasLabel, biasTone, direction, fullTime, num, price, signed, upside } from "./lib/format";
   import type { Analysis, Direction, Overlays, Target, IndicatorConfig, IndicatorPreset } from "./lib/types";
 
@@ -266,6 +268,12 @@
       <span class="muted">Deterministic, computed on this device. Not investment advice.</span>
     </div>
   {/if}
+  <fieldset class="studies">
+    <legend>Studies (drawn without Analyze)</legend>
+    {#each STUDIES as s (s.id)}
+      <label><input type="checkbox" checked={studies[s.id]} onchange={(e) => toggleStudy(s.id, e.currentTarget.checked)} /> {s.label}</label>
+    {/each}
+  </fieldset>
   <details class="indicator-settings">
     <summary>Indicator settings</summary>
     <fieldset disabled={saving}>
@@ -331,6 +339,8 @@
 </div>
 
 <style>
+  .studies { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 0; padding: 6px 10px; border: 1px solid var(--faint); border-radius: 6px; font-size: 12px; }
+  .studies legend { padding: 0 4px; color: var(--muted); font-size: 11px; }
   .indicator-settings { margin-top: 6px; }
   .indicator-settings fieldset { display: block; }
   .indicator-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0; }
