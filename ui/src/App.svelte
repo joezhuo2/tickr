@@ -484,6 +484,7 @@
           const merged = withOlder(key, cache.get(key)?.chart ?? base);
           cache.set(key, { chart: merged, at: cache.get(key)?.at ?? Date.now() });
           chart = aggregateChart(merged, interval);
+          if (shouldAnalyze(!!analysis, indicators?.keep_analysis ?? false)) void runAnalysis(true);
         }
       }
     } catch {
@@ -1117,7 +1118,7 @@
 
   function analyzeArgs(shown: Chart | null) {
     const custom = isCustom(interval) && shown?.interval === interval;
-    return { symbol, range, interval: baseFor(interval, range) ?? interval, extended: chartExtended, candles: custom ? shown.candles : undefined };
+    return { symbol, range, interval: baseFor(interval, range) ?? interval, extended: chartExtended, candles: custom || olderKept.has(cacheKey()) ? shown?.candles : undefined };
   }
 
   /** Runs the local technical analysis on the chart on screen. */
