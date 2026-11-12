@@ -5,7 +5,7 @@ use crate::analyst::Analysts;
 
 const QUOTE_URL: &str = "https://query1.finance.yahoo.com/v7/finance/quote";
 const SCREENER_URL: &str = "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved";
-const MOVERS: &str = "5";
+const MOVERS: &str = "100";
 
 const INDICES: &[(&str, &str)] =
     &[("^GSPC", "S&P 500"), ("^IXIC", "Nasdaq"), ("^DJI", "Dow"), ("^RUT", "Russell 2000"), ("^VIX", "VIX")];
@@ -36,6 +36,11 @@ pub struct Mover {
     pub name: String,
     pub price: Option<f64>,
     pub change_pct: Option<f64>,
+    pub volume: Option<f64>,
+    pub open: Option<f64>,
+    pub prev_close: Option<f64>,
+    pub high_52w: Option<f64>,
+    pub low_52w: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -45,6 +50,7 @@ pub struct Market {
     pub sectors: Vec<Mover>,
     pub gainers: Vec<Mover>,
     pub losers: Vec<Mover>,
+    pub actives: Vec<Mover>,
 }
 
 fn num(v: &Value) -> Option<f64> {
@@ -59,6 +65,11 @@ fn mover(q: &Value, name: Option<&str>) -> Option<Mover> {
         name: name.to_string(),
         price: num(&q["regularMarketPrice"]),
         change_pct: num(&q["regularMarketChangePercent"]),
+        volume: num(&q["regularMarketVolume"]),
+        open: num(&q["regularMarketOpen"]),
+        prev_close: num(&q["regularMarketPreviousClose"]),
+        high_52w: num(&q["fiftyTwoWeekHigh"]),
+        low_52w: num(&q["fiftyTwoWeekLow"]),
     })
 }
 
@@ -86,10 +97,12 @@ pub async fn fetch(analysts: &Analysts) -> Result<Market, String> {
     let q = [("symbols", symbols.as_str())];
     let up = [("scrIds", "day_gainers"), ("count", MOVERS)];
     let down = [("scrIds", "day_losers"), ("count", MOVERS)];
-    let (quotes, gainers, losers) = tokio::try_join!(
+    let active = [("scrIds", "most_actives"), ("count", MOVERS)];
+    let (quotes, gainers, losers, actives) = tokio::try_join!(
         analysts.request(QUOTE_URL, &q),
         analysts.request(SCREENER_URL, &up),
         analysts.request(SCREENER_URL, &down),
+        analysts.request(SCREENER_URL, &active),
     )?;
     let mut sectors = parse_quotes(&quotes, SECTORS)?;
     sectors.sort_by(|a, b| b.change_pct.unwrap_or(f64::MIN).total_cmp(&a.change_pct.unwrap_or(f64::MIN)));
@@ -99,6 +112,7 @@ pub async fn fetch(analysts: &Analysts) -> Result<Market, String> {
         sectors,
         gainers: parse_screener(&gainers)?,
         losers: parse_screener(&losers)?,
+        actives: parse_screener(&actives)?,
     })
 }
 
@@ -133,7 +147,7 @@ mod tests {
         assert_eq!(m.indices.len(), INDICES.len(), "{m:?}");
         assert_eq!(m.sectors.len(), SECTORS.len());
         assert!(m.sectors.windows(2).all(|w| w[0].change_pct >= w[1].change_pct));
-        assert_eq!((m.gainers.len(), m.losers.len()), (5, 5));
+        assert!(!m.gainers.is_empty() && !m.losers.is_empty() && !m.actives.is_empty());
     }
 
     #[test]

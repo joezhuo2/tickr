@@ -1,5 +1,6 @@
 <script lang="ts">
   import { direction, num, signed } from "./lib/format";
+  import { HOTLISTS, hotlist, type HotlistId } from "./lib/hotlists";
   import type { Market, Mover } from "./lib/types";
 
   let {
@@ -20,18 +21,20 @@
           { title: "Indices", rows: market.indices, symbols: false },
           { title: "Rates, commodities, FX & crypto", rows: market.macros, symbols: false },
           { title: "Sectors", rows: market.sectors, symbols: true },
-          { title: "Top gainers", rows: market.gainers, symbols: true },
-          { title: "Top losers", rows: market.losers, symbols: true },
         ]
       : [],
   );
+
+  let list = $state<HotlistId>("gainers");
+  const hot = $derived(market ? hotlist(market, list) : []);
 </script>
 
-{#snippet row(m: Mover, showSymbol: boolean)}
+{#snippet row(m: Mover, showSymbol: boolean, px?: string | null, hotPct?: number | null)}
+  {@const pct = hotPct === undefined ? m.change_pct : hotPct}
   <button class="row" title={`${m.name} (${m.symbol})`} onclick={() => onopen(m.symbol)}>
     <span class="name">{#if showSymbol}<b>{m.symbol}</b> {/if}{m.name}</span>
-    <span class="px">{m.price == null ? "—" : num(m.price)}</span>
-    <span class="pct {direction(m.change_pct)}">{m.change_pct == null ? "—" : `${signed(m.change_pct)}%`}</span>
+    <span class="px">{px ?? (m.price == null ? "—" : num(m.price))}</span>
+    <span class="pct {direction(pct)}">{pct == null ? "—" : `${signed(pct)}%`}</span>
   </button>
 {/snippet}
 
@@ -63,6 +66,20 @@
         </section>
       {/if}
     {/each}
+    <section class="hot">
+      <div class="seg" role="group" aria-label="Hotlist">
+        {#each HOTLISTS as h (h.id)}
+          <button class:on={list === h.id} aria-pressed={list === h.id} onclick={() => (list = h.id)}>{h.label}</button>
+        {/each}
+      </div>
+      <div class="scroll">
+        {#each hot as r (r.mover.symbol)}
+          {@render row(r.mover, true, r.px, r.pct)}
+        {:else}
+          <div class="empty">Nothing matches right now.</div>
+        {/each}
+      </div>
+    </section>
   </div>
 {/if}
 
@@ -82,6 +99,42 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+  }
+  .hot {
+    grid-column: 1 / -1;
+    gap: 8px;
+  }
+  .scroll {
+    max-height: 420px;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .empty {
+    padding: 8px 0;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .seg {
+    display: flex;
+    flex-wrap: wrap;
+    align-self: flex-start;
+    background: var(--surface);
+    border: 1px solid var(--faint);
+    border-radius: 7px;
+    padding: 2px;
+  }
+  .seg button {
+    border: 0;
+    background: none;
+    padding: 3px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    color: var(--muted);
+  }
+  .seg button.on {
+    background: var(--bg);
+    color: var(--text);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
   }
   h2 {
     margin: 0 0 4px;

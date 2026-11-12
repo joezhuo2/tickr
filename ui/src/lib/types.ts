@@ -430,6 +430,11 @@ export interface Mover {
   name: string;
   price: number | null;
   change_pct: number | null;
+  volume: number | null;
+  open: number | null;
+  prev_close: number | null;
+  high_52w: number | null;
+  low_52w: number | null;
 }
 
 export interface Market {
@@ -438,6 +443,7 @@ export interface Market {
   sectors: Mover[];
   gainers: Mover[];
   losers: Mover[];
+  actives: Mover[];
 }
 
 export interface OptionContract {
