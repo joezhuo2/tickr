@@ -181,6 +181,12 @@ describe("groupActions", () => {
     const panels = groupActions().find((g) => g.id === "panels")!;
     expect(panels.actions.map((a) => a.id)).toEqual(["technicals", "analyze", "analysts", "earnings", "alerts", "market", "events", "news", "options", "paper", "backtest"]);
   });
+  it("orders the groups with General first and gives drawing tools their own group", () => {
+    expect(CATEGORIES.map((c) => c.id)).toEqual(["general", "chart", "draw", "indicators", "panels", "options", "watchlist"]);
+    const draw = groupActions().find((g) => g.id === "draw")!;
+    expect(draw.actions.map((a) => a.id)).toEqual(ACTIONS.filter((a) => a.id.startsWith("draw_")).map((a) => a.id));
+    expect(draw.actions).toHaveLength(10);
+  });
   it("puts the options actions in their own group", () => {
     const options = groupActions().find((g) => g.id === "options")!;
     expect(options.actions.map((a) => a.id)).toEqual(["options_side", "options_expiry"]);

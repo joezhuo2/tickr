@@ -2,7 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { ago } from "./lib/format";
   import { accelerator, display } from "./lib/hotkey";
-  import { actionFor, bindKey, groupActions, keyLabel, rebind, type Action } from "./lib/keybinds";
+  import { actionFor, bindKey, groupActions, keyLabel, rebind, type Action, type Category } from "./lib/keybinds";
   import { backdrop, dialog } from "./lib/motion";
   import { onMount } from "svelte";
   import type { ChartTimeZone, ConnectionsReport, ServiceStatus, AiConfig, AiTestResult, DataProvider, Dots, Keybinds, RefreshMode, Theme, TextSize, Palette } from "./lib/types";
@@ -311,6 +311,9 @@
     { id: "connections", label: "Connections" },
   ] as const;
   let tab = $state<(typeof TABS)[number]["id"]>("display");
+  const KEY_GROUPS = groupActions();
+  let keyGroup = $state<Category>(KEY_GROUPS[0].id);
+  const keys = $derived(KEY_GROUPS.find((g) => g.id === keyGroup) ?? KEY_GROUPS[0]);
 </script>
 
 <svelte:window onkeydown={onKey} />
@@ -327,7 +330,16 @@
     <div class="body">
       <div class="nav" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
         {#each TABS as t (t.id)}
-          <button role="tab" aria-selected={tab === t.id} class:on={tab === t.id} onclick={() => (tab = t.id)}>{t.label}</button>
+          {#if t.id === "hotkeys"}
+            <button aria-expanded={tab === "hotkeys"} class:open={tab === "hotkeys"} onclick={() => (tab = "hotkeys")}>{t.label}<span class="caret" aria-hidden="true">{tab === "hotkeys" ? "▾" : "▸"}</span></button>
+            {#if tab === "hotkeys"}
+              {#each KEY_GROUPS as g (g.id)}
+                <button role="tab" class="sub" aria-selected={keyGroup === g.id} class:on={keyGroup === g.id} onclick={() => (keyGroup = g.id)}>{g.label}</button>
+              {/each}
+            {/if}
+          {:else}
+            <button role="tab" aria-selected={tab === t.id} class:on={tab === t.id} onclick={() => (tab = t.id)}>{t.label}</button>
+          {/if}
         {/each}
       </div>
       <div class="content" role="tabpanel">
@@ -364,7 +376,8 @@
 
     {/if}
     {#if tab === "hotkeys"}
-    <h3>Global hotkey</h3>
+    <h3>{keys.label} hotkeys</h3>
+    {#if keys.id === "general"}
     <div class="row">
       <span>Show or hide tickr</span>
       <span class="keys">
@@ -382,24 +395,20 @@
       </span>
     </div>
     {#if error}<p class="error">{error}</p>{/if}
-
-    <h3>Keybinds</h3>
-    {#each groupActions() as g (g.id)}
-      <h4>{g.label}</h4>
-      {#each g.actions as a (a.id)}
-        <div class="row">
-          <span>{a.label}</span>
-          <button
-            class="key"
-            class:recording={recording === a.id}
-            title="Backspace to unbind"
-            onclick={() => (recording = recording === a.id ? null : a.id)}
-            onblur={() => (recording = null)}
-          >
-            {recording === a.id ? "Press a key…" : keyLabel(keybinds[a.id])}
-          </button>
-        </div>
-      {/each}
+    {/if}
+    {#each keys.actions as a (a.id)}
+      <div class="row">
+        <span>{a.label}</span>
+        <button
+          class="key"
+          class:recording={recording === a.id}
+          title="Backspace to unbind"
+          onclick={() => (recording = recording === a.id ? null : a.id)}
+          onblur={() => (recording = null)}
+        >
+          {recording === a.id ? "Press a key…" : keyLabel(keybinds[a.id])}
+        </button>
+      </div>
     {/each}
 
     {/if}
@@ -587,6 +596,19 @@
     color: var(--text);
     font-weight: 600;
   }
+  .nav button.open {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .nav button.sub {
+    margin-left: 10px;
+    font-size: 11px;
+  }
+  .caret {
+    float: right;
+    font-size: 9px;
+    line-height: 16px;
+  }
   .nav button:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 1px;
@@ -627,12 +649,6 @@
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--muted);
-  }
-  h4 {
-    margin: 10px 0 2px;
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text);
   }
   .close {
     border: 0;
