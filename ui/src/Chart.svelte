@@ -112,6 +112,10 @@
   const stoch = $derived(studies.stoch ? stochastic(candles) : null);
   const ichi = $derived(studies.ichimoku ? ichimoku(candles) : null);
   const trendLine = $derived(studies.supertrend ? supertrend(candles) : null);
+  const trendSides = $derived(trendLine && {
+    up: trendLine.value.map((val, i) => (trendLine.up[i] ? val : null)),
+    down: trendLine.value.map((val, i) => (trendLine.up[i] ? null : val)),
+  });
   const onBalance = $derived(studies.obv ? obv(candles) : null);
   const pivotLevels = $derived(studies.pivots && chart ? pivots(candles, pivotPeriod(chart.interval, chart.meta.gmtoffset ?? 0)) : null);
   const sessionKeys = $derived.by(() => {
@@ -303,6 +307,8 @@
       i0,
       i1,
       j1: Math.max(i1, Math.ceil(start + view.count) - 1),
+      from: Math.max(0, i0 - 1),
+      to: Math.min(n - 1, i1 + 1),
       step,
       lo,
       hi,
@@ -349,9 +355,9 @@
     if (shadeSessions && hasExtended) {
       clipPlot(ctx);
       ctx.fillStyle = v("--ext-shade");
-      candles.forEach((_, i) => {
+      for (let i = g.from; i <= g.to; i++) {
         if (isExtendedSession(sessions[i])) ctx.fillRect(g.x(i) - g.step / 2, PAD.t, g.step + 0.5, bottom - PAD.t);
-      });
+      }
       ctx.restore();
     }
 
@@ -394,12 +400,13 @@
     // Volume.
     clipPlot(ctx);
     const bw = Math.max(1, g.step * 0.65);
-    candles.forEach((c, i) => {
+    for (let i = g.from; i <= g.to; i++) {
+      const c = candles[i];
       ctx.fillStyle = c.c >= c.o ? up : down;
       ctx.globalAlpha = 0.28;
       const y = g.vy(c.v);
       ctx.fillRect(g.x(i) - bw / 2, y, bw, g.volTop + g.volH - y);
-    });
+    }
     ctx.globalAlpha = 1;
 
     if (g.scale === "log") {
@@ -433,8 +440,8 @@
     }
 
     if (ohlc) {
-      candles.forEach((c, i) => {
-        if (i < g.i0 - 1 || i > g.i1 + 1) return;
+      for (let i = g.from; i <= g.to; i++) {
+        const c = candles[i];
         const x = Math.round(g.x(i)) + 0.5;
         const col = c.c >= c.o ? up : down;
         ctx.strokeStyle = col;
@@ -457,7 +464,7 @@
           ctx.clearRect(x - bw / 2, top, bw, h);
           ctx.strokeRect(Math.round(x - bw / 2) + 0.5, Math.round(top) + 0.5, Math.max(1, Math.round(bw) - 1), Math.max(1, Math.round(h) - 1));
         } else ctx.fillRect(x - bw / 2, top, bw, h);
-      });
+      }
     } else if (g.n > 0) {
       const priceBottom = PAD.t + g.priceH;
       const baseY = mode === "baseline" ? Math.round(g.y(prevClose ?? g.base)) + 0.5 : priceBottom;
@@ -470,13 +477,13 @@
           ctx.clip();
         }
         ctx.beginPath();
-        candles.forEach((c, i) => (i === 0 ? ctx.moveTo(g.x(i), g.y(c.c)) : ctx.lineTo(g.x(i), g.y(c.c))));
+        for (let i = g.from; i <= g.to; i++) (i === g.from ? ctx.moveTo(g.x(i), g.y(candles[i].c)) : ctx.lineTo(g.x(i), g.y(candles[i].c)));
         ctx.strokeStyle = col;
         ctx.lineWidth = 1.6;
         ctx.lineJoin = "round";
         ctx.stroke();
-        ctx.lineTo(g.x(g.n - 1), baseY);
-        ctx.lineTo(g.x(0), baseY);
+        ctx.lineTo(g.x(g.to), baseY);
+        ctx.lineTo(g.x(g.from), baseY);
         ctx.closePath();
         if (mode === "line") {
           const grad = ctx.createLinearGradient(0, PAD.t, 0, priceBottom);
@@ -676,7 +683,7 @@
       ctx.setLineDash(warm ? [3, 3] : []);
       ctx.beginPath();
       let pen = false;
-      for (let i = 0; i < g.n; i++) {
+      for (let i = g.from; i <= g.to; i++) {
         const k = align[i];
         const val = valueAt(line, i);
         if (val == null || (y === g.y && g.scale === "log" && val <= 0) || (warm ? k > line.full_from : k < line.full_from)) {
@@ -758,11 +765,14 @@
     };
     if (s.bollinger) {
       const [up, mid, lo] = a.series.bollinger;
-      const pts = (line: Line) =>
-        [...Array(g.n).keys()].flatMap((i) => {
+      const pts = (line: Line) => {
+        const out: [number, number][] = [];
+        for (let i = g.from; i <= g.to; i++) {
           const val = valueAt(line, i);
-          return val == null ? [] : [[g.x(i), g.y(val)]];
-        });
+          if (val != null) out.push([g.x(i), g.y(val)]);
+        }
+        return out;
+      };
       const band = [...pts(up), ...pts(lo).reverse()];
       if (band.length) {
         ctx.beginPath();
@@ -802,9 +812,9 @@
       ctx.fillStyle = col;
       ctx.globalAlpha = 0.08;
       let box: [number, number, number][] = [];
-      for (let i = 0; i <= g.n; i++) {
-        const hi = i < g.n ? valueAt(orHigh, i) : null;
-        const lo = i < g.n ? valueAt(orLow, i) : null;
+      for (let i = g.from; i <= g.to + 1; i++) {
+        const hi = i <= g.to ? valueAt(orHigh, i) : null;
+        const lo = i <= g.to ? valueAt(orLow, i) : null;
         if (hi != null && lo != null) {
           box.push([g.x(i), g.y(hi), g.y(lo)]);
           continue;
@@ -885,6 +895,7 @@
     // Pattern markers: ▲ under bullish candles, ▼ over bearish ones.
     if (s.patterns) {
       for (const [i, list] of patternsAt) {
+        if (i < g.from || i > g.to) continue;
         const c = candles[i];
         const bull = list.some((p) => p.direction === "bullish");
         const bear = list.some((p) => p.direction === "bearish");
@@ -995,7 +1006,7 @@
     if (trendLine) {
       for (const rising of [true, false]) {
         ctx.strokeStyle = v(rising ? "--up" : "--down");
-        plot(ctx, g, trendLine.value.map((val, i) => (trendLine.up[i] === rising ? val : null)), g.y);
+        plot(ctx, g, rising ? trendSides!.up : trendSides!.down, g.y);
       }
       legend(legendText("Supertrend 10 3", [trendLine.value[at]]), v(trendLine.up[at] ? "--up" : "--down"));
     }
