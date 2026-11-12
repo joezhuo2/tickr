@@ -130,8 +130,9 @@
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 28px;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 22px;
     padding: 14px 10px 8px 4px;
     overflow: auto;
     overscroll-behavior: contain;
