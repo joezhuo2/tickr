@@ -7,6 +7,7 @@
   import { TWO_POINT, anchoredVwap, fibLevels, hitBox, positionLevels, rayEnd, timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
   import { legendText, volumeProfile, paneLayout } from "./lib/indicators";
   import { untrack } from "svelte";
+  import { displayCandles, isOhlc } from "./lib/charttypes";
   import { fadeIn } from "./lib/motion";
   import { follow, full, isFull, pan, reveal, visible, zoom, type View } from "./lib/viewport";
   import { barAt, viewWindow, windowView, type TimeWindow } from "./lib/chartsync";
@@ -79,7 +80,8 @@
     return () => clearInterval(tick);
   });
 
-  const candles = $derived(chart?.candles ?? []);
+  const candles = $derived(displayCandles(chart?.candles ?? [], mode));
+  const ohlc = $derived(isOhlc(mode));
   const isDay = $derived(chart?.range === "1d");
   const prevClose = $derived(isDay ? (chart?.meta.prev_close ?? null) : null);
   const clock = $derived<Clock>({ timezone: chart?.meta.timezone, gmtoffset: chart?.meta.gmtoffset ?? 0 });
@@ -195,7 +197,7 @@
     let vmax = 0;
     for (let i = i0; i <= i1; i++) {
       const c = candles[i];
-      prices.push(...(mode === "candles" ? [c.l, c.h, c.o, c.c] : [c.c]));
+      prices.push(...(ohlc ? [c.l, c.h, c.o, c.c] : [c.c]));
       vmax = Math.max(vmax, c.v);
     }
     if (prevClose != null) {
@@ -354,8 +356,9 @@
       ctx.setLineDash([]);
     }
 
-    if (mode === "candles") {
+    if (ohlc) {
       candles.forEach((c, i) => {
+        if (i < g.i0 - 1 || i > g.i1 + 1) return;
         const x = Math.round(g.x(i)) + 0.5;
         const col = c.c >= c.o ? up : down;
         ctx.strokeStyle = col;
@@ -367,28 +370,59 @@
         ctx.stroke();
         const top = g.y(Math.max(c.o, c.c));
         const h = Math.max(1, g.y(Math.min(c.o, c.c)) - top);
-        ctx.fillRect(x - bw / 2, top, bw, h);
+        if (mode === "bars") {
+          ctx.beginPath();
+          ctx.moveTo(x - bw / 2, Math.round(g.y(c.o)) + 0.5);
+          ctx.lineTo(x, Math.round(g.y(c.o)) + 0.5);
+          ctx.moveTo(x, Math.round(g.y(c.c)) + 0.5);
+          ctx.lineTo(x + bw / 2, Math.round(g.y(c.c)) + 0.5);
+          ctx.stroke();
+        } else if (mode === "hollow" && c.c >= c.o && bw >= 3) {
+          ctx.clearRect(x - bw / 2, top, bw, h);
+          ctx.strokeRect(Math.round(x - bw / 2) + 0.5, Math.round(top) + 0.5, Math.max(1, Math.round(bw) - 1), Math.max(1, Math.round(h) - 1));
+        } else ctx.fillRect(x - bw / 2, top, bw, h);
       });
     } else if (g.n > 0) {
-      const col = trendUp ? up : down;
-      ctx.beginPath();
-      candles.forEach((c, i) => (i === 0 ? ctx.moveTo(g.x(i), g.y(c.c)) : ctx.lineTo(g.x(i), g.y(c.c))));
-      ctx.strokeStyle = col;
-      ctx.lineWidth = 1.6;
-      ctx.lineJoin = "round";
-      ctx.stroke();
-      // Area fill under the line.
-      const priceBottom = g.y(g.lo);
-      ctx.lineTo(g.x(g.n - 1), priceBottom);
-      ctx.lineTo(g.x(0), priceBottom);
-      ctx.closePath();
-      const grad = ctx.createLinearGradient(0, PAD.t, 0, priceBottom);
-      grad.addColorStop(0, col);
-      grad.addColorStop(1, "transparent");
-      ctx.globalAlpha = 0.18;
-      ctx.fillStyle = grad;
-      ctx.fill();
-      ctx.globalAlpha = 1;
+      const priceBottom = PAD.t + g.priceH;
+      const baseY = mode === "baseline" ? Math.round(g.y(prevClose ?? g.base)) + 0.5 : priceBottom;
+      for (const above of mode === "baseline" ? [true, false] : [true]) {
+        const col = mode === "baseline" ? (above ? up : down) : mode === "area" ? v("--accent") : trendUp ? up : down;
+        ctx.save();
+        if (mode === "baseline") {
+          ctx.beginPath();
+          ctx.rect(0, above ? 0 : baseY, width, above ? baseY : height - baseY);
+          ctx.clip();
+        }
+        ctx.beginPath();
+        candles.forEach((c, i) => (i === 0 ? ctx.moveTo(g.x(i), g.y(c.c)) : ctx.lineTo(g.x(i), g.y(c.c))));
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 1.6;
+        ctx.lineJoin = "round";
+        ctx.stroke();
+        ctx.lineTo(g.x(g.n - 1), baseY);
+        ctx.lineTo(g.x(0), baseY);
+        ctx.closePath();
+        if (mode === "line") {
+          const grad = ctx.createLinearGradient(0, PAD.t, 0, priceBottom);
+          grad.addColorStop(0, col);
+          grad.addColorStop(1, "transparent");
+          ctx.fillStyle = grad;
+        } else ctx.fillStyle = col;
+        ctx.globalAlpha = 0.18;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+      if (mode === "baseline") {
+        ctx.strokeStyle = v("--muted");
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath();
+        ctx.moveTo(PAD.l, baseY);
+        ctx.lineTo(width - PAD.r, baseY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
     }
     ctx.restore();
 
@@ -466,7 +500,7 @@
       ctx.lineTo(width - PAD.r, y);
       ctx.stroke();
       ctx.setLineDash([]);
-      if (mode === "line") {
+      if (!ohlc) {
         ctx.fillStyle = trendUp ? up : down;
         ctx.beginPath();
         ctx.arc(x, y, 3.5, 0, Math.PI * 2);
@@ -721,7 +755,7 @@
         const x = g.x(i);
         const sz = 4;
         if (bull) {
-          const y = g.y(mode === "candles" ? c.l : c.c) + 5;
+          const y = g.y(ohlc ? c.l : c.c) + 5;
           ctx.fillStyle = v("--up");
           ctx.beginPath();
           ctx.moveTo(x, y);
@@ -730,7 +764,7 @@
           ctx.fill();
         }
         if (bear) {
-          const y = g.y(mode === "candles" ? c.h : c.c) - 5;
+          const y = g.y(ohlc ? c.h : c.c) - 5;
           ctx.fillStyle = v("--down");
           ctx.beginPath();
           ctx.moveTo(x, y);
@@ -874,7 +908,7 @@
   let viewN = 0;
   let savedView: { key: string; view: View; n: number } | null = null;
   $effect(() => {
-    const base = chart ? `${chart.meta.symbol} ${chart.range} ${chart.interval}` : "";
+    const base = chart ? `${chart.meta.symbol} ${chart.range} ${chart.interval}${mode === "renko" ? " renko" : ""}` : "";
     const key = replay ? `${base} replay` : base;
     const n = candles.length;
     const current = untrack(() => view);
@@ -1371,7 +1405,7 @@
   }
 
   function copyCsv() {
-    navigator.clipboard.writeText(candlesCsv(candles)).then(() => flash("csv"), console.warn);
+    navigator.clipboard.writeText(candlesCsv(chart?.candles ?? [])).then(() => flash("csv"), console.warn);
   }
 
   function copyImage() {
