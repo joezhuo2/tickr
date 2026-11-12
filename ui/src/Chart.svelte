@@ -1221,18 +1221,18 @@
   }
 
   type Tool = "cursor" | "ruler" | Drawing["kind"];
-  const tools: { tool: Tool; label: string }[] = [
-    { tool: "cursor", label: "Cursor" },
-    { tool: "hline", label: "Level" },
-    { tool: "trend", label: "Trend" },
-    { tool: "text", label: "Text" },
-    { tool: "ruler", label: "Ruler" },
-    { tool: "pen", label: "Pen" },
-    { tool: "rect", label: "Box" },
-    { tool: "ray", label: "Ray" },
-    { tool: "fib", label: "Fib" },
-    { tool: "position", label: "R:R" },
-    { tool: "avwap", label: "AVWAP" },
+  const tools: { tool: Tool; label: string; icon: string }[] = [
+    { tool: "cursor", label: "Cursor", icon: "M5 3l14 8-6 2-2 6z" },
+    { tool: "hline", label: "Level", icon: "M3 12h18" },
+    { tool: "trend", label: "Trend", icon: "M4 19L20 5M4 19h.01M20 5h.01" },
+    { tool: "text", label: "Text", icon: "M6 6V4h12v2M12 4v16M9 20h6" },
+    { tool: "ruler", label: "Ruler", icon: "M3.5 15.5l12-12 5 5-12 12zM7 12l2 2M10 9l2 2M13 6l2 2" },
+    { tool: "pen", label: "Pen", icon: "M4 20l1-4L16 5l3 3L8 19zM14 7l3 3" },
+    { tool: "rect", label: "Box", icon: "M4 6h16v12H4z" },
+    { tool: "ray", label: "Ray", icon: "M5 18L20 7M15 6.5l5 .5-1 5M5 18h.01" },
+    { tool: "fib", label: "Fib", icon: "M3 4h18M3 9h18M3 15h18M3 20h18" },
+    { tool: "position", label: "R:R", icon: "M4 4h16v7H4zM4 11h16v9H4z" },
+    { tool: "avwap", label: "AVWAP", icon: "M4 6v14M4 18c5 0 6-8 11-8 2 0 3 1 5 1" },
   ];
   const moreTools: { tool: Drawing["kind"]; label: string }[] = [
     { tool: "channel", label: "Channel" },
@@ -1858,7 +1858,7 @@
     <div class="drawing-bar">
     <div class="drawing-tools" role="toolbar" aria-label="Drawing tools">
       {#each tools as item}
-        <button aria-label={item.label} aria-pressed={tool === item.tool} title={item.label} onclick={() => chooseTool(item.tool)}>{item.label}</button>
+        <button aria-label={item.label} aria-pressed={tool === item.tool} title={item.label} onclick={() => chooseTool(item.tool)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d={item.icon} /></svg></button>
       {/each}
       <select aria-label="More drawing tools" value={moreTools.some((m) => m.tool === tool) ? tool : ""} onchange={(e) => chooseTool((e.currentTarget.value || "cursor") as Tool)}>
         <option value="">More</option>
@@ -2038,6 +2038,16 @@
     color: var(--muted);
   }
   .drawing-tools button[aria-pressed="true"] { background: var(--surface); color: var(--text); }
+  .drawing-tools button svg {
+    display: block;
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
   .drawing-tools button:disabled { opacity: 0.4; }
   .drawing-tools select { font-size: 10px; padding: 2px 4px; }
   .drawing-style { align-items: center; }
