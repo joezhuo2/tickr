@@ -6,6 +6,12 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.41] - 2026-11-12
+
+### Changed
+- **Watchlist cards** show the price and the % change on two lines instead of
+  side by side.
+
 ## [0.11.40] - 2026-11-11
 
 ### Added
