@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.46] - 2026-11-12
+
+### Added
+- **Chart windows:** open the current symbol in its own window with the
+  button beside 1 / Side / Stack or `=` (rebindable). Each window keeps its own
+  symbol, interval and view, and closing one leaves the main window and tray
+  alone. Extra windows poll quotes every 15 s.
+
 ## [0.11.45] - 2026-11-12
 
 ### Fixed
