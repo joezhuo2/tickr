@@ -6,6 +6,15 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.44] - 2026-11-12
+
+### Changed
+- **Economic calendar importance:** every release gets a High, Medium or Low
+  rating from a curated table of release names (Yahoo gives none), shown as a
+  three-bar marker on each row. The Key toggle is now a High / Medium+ / All
+  filter; a saved Key filter becomes High. Non-US releases rate one level
+  below the US one.
+
 ## [0.11.43] - 2026-11-12
 
 ### Added
