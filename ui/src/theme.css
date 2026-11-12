@@ -290,6 +290,40 @@ select:not([multiple]) {
   background-repeat: no-repeat !important;
   cursor: pointer;
 }
+:root select:not([multiple]) {
+  padding: 3px 20px 3px 10px !important;
+  border: 1px solid var(--faint);
+  border-radius: 6px;
+  background-color: var(--surface);
+  color: var(--text);
+}
+:root select:not([multiple]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+:root input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]),
+:root textarea {
+  border: 1px solid var(--faint);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+}
+:root input:not([type]),
+:root input[type="text"],
+:root input[type="search"],
+:root input[type="password"],
+:root textarea {
+  padding: 5px 10px;
+}
+:root input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]):focus,
+:root textarea:focus {
+  border-color: var(--accent);
+}
+:root input[aria-invalid="true"],
+:root input.bad {
+  border-color: var(--down);
+}
 select[data-open] {
   background-image: linear-gradient(135deg, transparent 50%, var(--accent) 50%), linear-gradient(45deg, var(--accent) 50%, transparent 50%) !important;
 }
@@ -302,9 +336,9 @@ select:disabled {
   max-width: 320px;
   max-height: min(300px, 60vh);
   overflow-y: auto;
-  padding: 4px;
+  padding: 6px;
   border: 1px solid var(--faint);
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--bg);
   color: var(--text);
   box-shadow: var(--shadow);
@@ -321,8 +355,8 @@ select:disabled {
 }
 .mi-menu [role="option"] {
   position: relative;
-  padding: 4px 26px 4px 9px;
-  border-radius: 6px;
+  padding: 3px 26px 3px 6px;
+  border-radius: 5px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -348,10 +382,10 @@ select:disabled {
 }
 .mi-glide {
   position: absolute;
-  left: 4px;
-  right: 4px;
+  left: 6px;
+  right: 6px;
   top: 0;
-  border-radius: 6px;
+  border-radius: 5px;
   background: var(--surface);
   opacity: 0;
 }
