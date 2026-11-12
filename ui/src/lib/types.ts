@@ -169,7 +169,7 @@ export interface Consensus {
 }
 
 export interface DrawingPoint { t: number; price: number }
-export interface Drawing { id: number; kind: "hline" | "trend" | "text" | "pen" | "rect" | "ray" | "fib" | "position" | "avwap"; points: DrawingPoint[]; text: string; color?: string; width?: number; dashed?: boolean; locked?: boolean }
+export interface Drawing { id: number; kind: "hline" | "trend" | "text" | "pen" | "rect" | "ray" | "fib" | "position" | "avwap" | "vline" | "hray" | "arrow" | "prange" | "drange" | "channel" | "fibext" | "pitchfork"; points: DrawingPoint[]; text: string; color?: string; width?: number; dashed?: boolean; locked?: boolean }
 
 export interface Init {
   theme: Theme;

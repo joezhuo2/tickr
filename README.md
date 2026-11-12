@@ -142,6 +142,11 @@ taskbar to keep it visible.
   Drag to move them or adjust trend endpoints, and Delete removes the selection.
   Ctrl+Z undoes, Ctrl+Shift+Z redoes, and Escape returns to Cursor. The ruler
   measures price, percent, bars and elapsed time without saving.
+  The **More** menu adds a parallel channel, vertical line, horizontal ray,
+  arrow, price range, date range, trend-based Fibonacci extension and
+  pitchfork. Channel, Fibonacci extension and pitchfork take three clicks: the
+  first two set the base move and the third sets the channel width, the
+  projection start, or the second pitchfork tine. These tools have no hotkeys.
   Select a drawing to style it: a row under the toolbar sets its color, line
   width (1 to 3 px), a dashed line, and **Lock**, which stops it being moved or
   deleted until unlocked. **Magnet** snaps new points and dragged endpoints to
