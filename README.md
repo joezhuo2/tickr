@@ -158,6 +158,12 @@ taskbar to keep it visible.
   pitchfork. Channel, Fibonacci extension and pitchfork take three clicks: the
   first two set the base move and the third sets the channel width, the
   projection start, or the second pitchfork tine. These tools have no hotkeys.
+  The **Note** tool (`` ` ``) pins a multi-line note to a candle: it shows as a
+  small marker, hovering shows the text, and clicking opens a popover to edit it,
+  pick a color or delete it. Notes stay on their candle when you change the candle
+  interval, appear on the second chart and chart windows, are hidden by Hide and
+  during bar replay, and are listed under Notes in the Alerts panel, where
+  clicking one scrolls the chart to it.
   Select a drawing to style it: a row under the toolbar sets its color, line
   width (1 to 3 px), a dashed line, and **Lock**, which stops it being moved or
   deleted until unlocked. **Magnet** snaps new points and dragged endpoints to
@@ -497,6 +503,7 @@ typing in a text field.
 | | `;` | Draw Fibonacci retracement |
 | | `'` | Draw long / short position |
 | | `/` | Anchored VWAP |
+| | `` ` `` | Pin a note |
 | | `J` | Toggle second chart |
 | | `=` | Open in new window |
 | | `Y` | Toggle bar replay |

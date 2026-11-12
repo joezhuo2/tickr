@@ -13,6 +13,9 @@
   import { studies } from "./lib/studyStore.svelte";
   import { displayCandles, isOhlc } from "./lib/charttypes";
   import { fadeIn } from "./lib/motion";
+  import ColorPicker from "./ColorPicker.svelte";
+  import { MAIN_PRESETS } from "./lib/display";
+  import { NOTE_MAX, noteBar, noteTitle, snapNoteTime } from "./lib/notes";
   import { center, firstAtOrAfter, follow, full, isFull, pan, reveal, visible, zoom, type View } from "./lib/viewport";
   import { barAt, viewWindow, windowView, type TimeWindow } from "./lib/chartsync";
 
@@ -1226,6 +1229,7 @@
     { tool: "hline", label: "Level", icon: "M3 12h18" },
     { tool: "trend", label: "Trend", icon: "M4 19L20 5M4 19h.01M20 5h.01" },
     { tool: "text", label: "Text", icon: "M6 6V4h12v2M12 4v16M9 20h6" },
+    { tool: "note", label: "Note", icon: "M5 4h14v12h-7l-4 4v-4H5z" },
     { tool: "ruler", label: "Ruler", icon: "M3.5 15.5l12-12 5 5-12 12zM7 12l2 2M10 9l2 2M13 6l2 2" },
     { tool: "pen", label: "Pen", icon: "M4 20l1-4L16 5l3 3L8 19zM14 7l3 3" },
     { tool: "rect", label: "Box", icon: "M4 6h16v12H4z" },
@@ -1274,11 +1278,49 @@
   let preview = $state<Drawing | null>(null);
   let editing = $state<{ point: DrawingPoint; x: number; y: number } | null>(null);
   let inputText = $state("");
+  let noteEdit = $state<{ id: number | null; point: DrawingPoint; text: string; color: string; x: number; y: number } | null>(null);
+  let notePicking = $state(false);
+
+  function openNote(d: Drawing, x: number, y: number) {
+    cancelDrawing();
+    noteEdit = { id: d.id, point: d.points[0], text: d.text, color: d.color ?? "", x, y };
+  }
+
+  function saveNote() {
+    const e = noteEdit;
+    if (!e || drawingBusy) return;
+    const text = e.text.trim();
+    const now = Date.now();
+    if (!text) noteEdit = null;
+    else if (e.id == null) addDrawing({ id: 0, kind: "note", points: [e.point], text, color: e.color, created: now, edited: now });
+    else { void changeDrawings(list.map((d) => (d.id === e.id ? { ...d, text, color: e.color, edited: now } : d))); noteEdit = null; }
+  }
+
+  function deleteNote() {
+    const e = noteEdit;
+    if (!e || drawingBusy) return;
+    if (e.id != null) void changeDrawings(list.filter((d) => d.id !== e.id));
+    noteEdit = null;
+  }
+
+  export function showNote(id: number) {
+    const d = list.find((x) => x.id === id);
+    const i = d ? noteBar(times, d.points[0].t) : null;
+    if (i == null) return;
+    view = reveal(view, geo.n, i);
+    emitWindow();
+  }
   let gesture: { start: Pixel; original: Drawing | null; endpoint: number; moved: boolean; second: boolean } | null = null;
   const drawingSymbol = $derived(chart?.meta.symbol.toUpperCase() ?? "");
   const list = $derived(replay ? [] : (drawings[drawingSymbol] ?? []));
   const selectedDrawing = $derived(selected == null ? null : (list.find((d) => d.id === selected) ?? null));
   const times = $derived(candles.map((c) => c.t));
+  const noteMarks = $derived(hideDrawings || replay ? [] : list.flatMap((d) => {
+    const i = d.kind === "note" ? noteBar(times, d.points[0].t) : null;
+    if (i == null) return [];
+    const at = { x: geo.x(i), y: geo.y(d.points[0].price) };
+    return inPlot(at) ? [{ d, ...at }] : [];
+  }));
   const linkedIndex = $derived(linkedTime == null ? -1 : barAt(times, linkedTime));
   $effect(() => {
     const t = hover != null ? (candles[hover]?.t ?? null) : null;
@@ -1306,6 +1348,8 @@
     preview = null;
     placed = 0;
     editing = null;
+    noteEdit = null;
+    notePicking = false;
     gesture = null;
     dragX = null;
     axisY = null;
@@ -1434,7 +1478,7 @@
   }
 
   function onDown(e: PointerEvent) {
-    if (e.button !== 0 || geo.n === 0 || (e.target as Element).closest(".exports, .drawing-tools, input")) return;
+    if (e.button !== 0 || geo.n === 0 || (e.target as Element).closest(".exports, .drawing-tools, .note-marker, .note-pop, input")) return;
     wrap!.focus();
     const p = pixel(e);
     if (!inPlot(p)) {
@@ -1466,6 +1510,11 @@
       return;
     }
     if (tool === "hline" || tool === "avwap" || tool === "vline" || tool === "hray") { addDrawing({ id: 0, kind: tool, points: [point], text: "" }); return; }
+    if (tool === "note") {
+      tool = "cursor";
+      noteEdit = { id: null, point: { ...point, t: snapNoteTime(times, point.t) }, text: "", color: "", x: p.x, y: p.y };
+      return;
+    }
     if (tool === "text") {
       editing = { point, x: Math.min(p.x, Math.max(PAD.l, width - 220)), y: p.y };
       inputText = "";
@@ -1569,7 +1618,7 @@
 
   function drawDrawings(ctx: CanvasRenderingContext2D, v: (name: string) => string) {
     ctx.font = `11px ${v("--font")}`;
-    const items = [...(hideDrawings ? [] : list.filter((d) => !preview || !gesture?.original || d.id !== preview.id)), ...(preview ? [preview] : [])];
+    const items = [...(hideDrawings ? [] : list.filter((d) => d.kind !== "note" && (!preview || !gesture?.original || d.id !== preview.id))), ...(preview ? [preview] : [])];
     for (const d of items) {
       const a = screen(d.points[0]);
       const two = multi(d.kind);
@@ -1906,6 +1955,24 @@
   {#if countdown}
     <div class="countdown" title="Time until this candle closes">{countdown}</div>
   {/if}
+  {#each noteMarks as m (m.d.id)}
+    <button class="note-marker" aria-label={`Note: ${noteTitle(m.d.text)}`} title={m.d.text.slice(0, 300)} style:left="{m.x}px" style:top="{m.y}px" style:--note={m.d.color || "var(--accent)"} onclick={() => openNote(m.d, m.x, m.y)}></button>
+  {/each}
+  {#if noteEdit}
+    <div class="note-pop" role="dialog" aria-label="Note" style:left="{Math.max(4, Math.min(noteEdit.x + 10, width - 244))}px" style:top="{Math.max(4, Math.min(noteEdit.y + 10, height - 170))}px">
+      <!-- svelte-ignore a11y_autofocus -->
+      <textarea aria-label="Note text" rows="5" maxlength={NOTE_MAX} autofocus bind:value={noteEdit.text} onkeydown={(e) => { if (e.key === "Escape") { e.stopPropagation(); noteEdit = null; } }}></textarea>
+      <div class="note-actions">
+        <button aria-label="Note color" title="Note color" class="swatch" style:--swatch={noteEdit.color || "var(--accent)"} onclick={() => (notePicking = true)}></button>
+        <button onclick={saveNote} disabled={drawingBusy || !noteEdit.text.trim()}>Save</button>
+        {#if noteEdit.id != null}<button onclick={deleteNote} disabled={drawingBusy}>Delete</button>{/if}
+        <button onclick={() => (noteEdit = null)}>Close</button>
+      </div>
+    </div>
+    {#if notePicking}
+      <ColorPicker label="Note color" value={noteEdit.color} presets={MAIN_PRESETS} onchange={(hex) => { if (noteEdit) noteEdit.color = hex; }} onreset={() => { if (noteEdit) noteEdit.color = ""; notePicking = false; }} onclose={() => (notePicking = false)} />
+    {/if}
+  {/if}
   {#if editing}
     <input class="drawing-input" aria-label="Drawing text" maxlength="200" style:left={`${editing.x}px`} style:top={`${editing.y}px`} bind:value={inputText} onkeydown={textKey} use:focusInput />
   {/if}
@@ -2064,6 +2131,31 @@
   .drawing-style .swatch { width: 14px; height: 14px; padding: 0; background: var(--swatch); }
   .drawing-style .swatch[aria-pressed="true"] { background: var(--swatch); box-shadow: 0 0 0 2px var(--text); }
   .drawing-input { position: absolute; width: 200px; z-index: 2; }
+  .note-marker {
+    position: absolute;
+    z-index: 2;
+    width: 12px;
+    height: 12px;
+    margin: -6px 0 0 -6px;
+    padding: 0;
+    border: 1.5px solid var(--bg);
+    border-radius: 50% 50% 50% 0;
+    background: var(--note);
+  }
+  .note-pop {
+    position: absolute;
+    z-index: 3;
+    width: 240px;
+    padding: 6px;
+    border: 1px solid var(--faint);
+    border-radius: 6px;
+    background: var(--bg);
+    box-shadow: var(--shadow);
+  }
+  .note-pop textarea { box-sizing: border-box; width: 100%; resize: none; font: inherit; font-size: 12px; }
+  .note-actions { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+  .note-actions button { font-size: 11px; padding: 2px 8px; }
+  .note-actions .swatch { width: 16px; height: 16px; padding: 0; border-radius: 50%; background: var(--swatch); }
   .goto { position: absolute; top: 34px; right: 8px; z-index: 2; cursor: default; }
   .countdown {
     position: absolute;

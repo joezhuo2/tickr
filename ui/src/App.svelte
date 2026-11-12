@@ -1629,11 +1629,12 @@
       case "draw_fib":
       case "draw_position":
       case "draw_avwap":
+      case "draw_note":
       case "draw_pen": {
         if (e.repeat) break;
         if (view !== "chart" && view !== "technicals" && view !== "paper" && view !== "backtest") view = "chart";
         await tick();
-        const tools = { draw_level: "hline", draw_trend: "trend", draw_text: "text", draw_ruler: "ruler", draw_pen: "pen", draw_rect: "rect", draw_ray: "ray", draw_fib: "fib", draw_position: "position", draw_avwap: "avwap" } as const;
+        const tools = { draw_level: "hline", draw_trend: "trend", draw_text: "text", draw_ruler: "ruler", draw_pen: "pen", draw_rect: "rect", draw_ray: "ray", draw_fib: "fib", draw_position: "position", draw_avwap: "avwap", draw_note: "note" } as const;
         chartView?.drawTool(tools[action]);
         break;
       }
@@ -2195,7 +2196,7 @@
             <h2>Alerts</h2>
             <button class="close" aria-label="Close" onclick={() => (alertsOpen = false)}>×</button>
           </header>
-          <Alerts {symbol} {quote} {alerts} onchange={(next) => (alerts = next)} onopen={(s) => { alertsOpen = false; openWatched(s); }} interval={chart?.interval ?? ""} drawings={drawings[symbol.toUpperCase()] ?? []} />
+          <Alerts {symbol} {quote} {alerts} onchange={(next) => (alerts = next)} onopen={(s) => { alertsOpen = false; openWatched(s); }} interval={chart?.interval ?? ""} drawings={drawings[symbol.toUpperCase()] ?? []} onnote={(id) => { alertsOpen = false; view = "chart"; void tick().then(() => chartView?.showNote(id)); }} />
         </div>
       </div>
     {/if}
