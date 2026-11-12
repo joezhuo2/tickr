@@ -47,3 +47,13 @@ export function follow(v: View, prevN: number, n: number): View {
 export function visible(v: View, n: number): [number, number] {
   return [Math.max(0, Math.floor(v.start)), Math.min(n - 1, Math.ceil(v.start + v.count) - 1)];
 }
+
+export function center(v: View, n: number, i: number, bars = 80): View {
+  const count = isFull(v, n) ? Math.min(n, bars) : v.count;
+  return clamp({ start: i + 0.5 - count / 2, count }, n);
+}
+
+export function firstAtOrAfter(times: number[], t: number): number {
+  const i = times.findIndex((x) => x >= t);
+  return i < 0 ? times.length - 1 : i;
+}

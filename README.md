@@ -167,6 +167,11 @@ taskbar to keep it visible.
   drag or scroll sideways to pan, and double-click to see the whole range
   again. With the chart focused, + and - zoom and 0 resets. The price axis
   fits the visible bars, and a zoomed view follows new bars at the right edge.
+- **Go to date:** the calendar button at the top right of the chart opens a
+  date box (date and time on intraday charts). Picking a date centers the
+  first candle at or after it and puts the crosshair there. It moves within
+  the candles already loaded for the range, so the box only accepts dates
+  inside it.
 - **Price axis:** drag the price axis up or down to stretch or compress the
   price scale. While it is set by hand the scale stays locked as you pan and
   zoom, and dragging the chart also moves it vertically. Double-click the axis,
@@ -301,6 +306,12 @@ it is instant.
   hours shown on the chart. On a 1D chart the prior day comes from one extra
   daily-candle request per analysis.
 
+  Two more volume profiles sit beside the visible-range one. **Session volume
+  profile**, in Studies, draws one profile per day on intraday charts (per
+  month on daily charts, per year on longer ones), growing from the start of
+  each session. **Volume profile (range)**, in the drawing toolbar's More
+  menu, is a two-click drawing that profiles the candles between its two ends
+  and is saved with the symbol like any other drawing.
   **Studies** at the bottom of the Technicals tab add Stochastic (14, 3, 3) and
   OBV in their own panes, and Ichimoku (9, 26, 52), Supertrend (10, 3) and
   classic pivot points (P, R1, R2, S1, S2) over the price. They are drawn on
@@ -589,8 +600,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.24
-git push origin v0.11.24
+git tag v0.11.25
+git push origin v0.11.25
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
