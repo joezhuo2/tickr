@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.48] - 2026-11-12
+
+### Fixed
+- **Restart state:** the drawing toolbar's Hide toggle and the Technicals
+  "Indicator settings" section now come back as you left them, and both are in
+  Backup. Drawings, studies, indicator settings and magnet were already
+  restored.
+
 ## [0.11.47] - 2026-11-12
 
 ### Added

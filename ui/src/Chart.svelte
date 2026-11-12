@@ -1249,11 +1249,21 @@
   let placed = 0;
   let tool = $state<Tool>("cursor");
   let selected = $state<number | null>(null);
-  let hideDrawings = $state(false);
+  let hideDrawings = $state(readFlag("tickr.hideDrawings"));
   let magnet = $state(readMagnet());
 
+  function readFlag(key: string) {
+    try { return localStorage.getItem(key) === "1"; } catch { return false; }
+  }
+
   function readMagnet() {
-    try { return localStorage.getItem("tickr.magnet") === "1"; } catch { return false; }
+    return readFlag("tickr.magnet");
+  }
+
+  function toggleHideDrawings() {
+    hideDrawings = !hideDrawings;
+    selected = null;
+    try { localStorage.setItem("tickr.hideDrawings", hideDrawings ? "1" : "0"); } catch { /* storage unavailable */ }
   }
 
   function toggleMagnet() {
@@ -1867,7 +1877,7 @@
       <button aria-label="Undo" aria-pressed={false} title="Undo (Ctrl+Z); redo (Ctrl+Shift+Z)" disabled={!history.past.length || drawingBusy} onclick={() => { cancelDrawing(); void changeDrawings("undo"); }}>Undo</button>
       <button aria-label="Delete" aria-pressed={false} title="Delete (Delete / Backspace)" disabled={selected == null || drawingBusy || !!selectedDrawing?.locked} onclick={removeDrawing}>Delete</button>
       <button aria-label="Magnet" aria-pressed={magnet} title="Magnet: snap new points and dragged endpoints to the open, high, low or close" onclick={toggleMagnet}>Magnet</button>
-      <button aria-label="Hide drawings" aria-pressed={hideDrawings} title="Hide all drawings" onclick={() => { hideDrawings = !hideDrawings; selected = null; }}>Hide</button>
+      <button aria-label="Hide drawings" aria-pressed={hideDrawings} title="Hide all drawings" onclick={toggleHideDrawings}>Hide</button>
     </div>
     {#if selectedDrawing}
       {@const d = selectedDrawing}

@@ -111,6 +111,18 @@
     resize((panel?.offsetHeight ?? 0) + (e.key === "ArrowUp" ? 16 : -16));
   }
 
+  const SETTINGS_KEY = "tickr.technicalsSettingsOpen";
+  let settingsOpen = $state(readSettingsOpen());
+
+  function readSettingsOpen() {
+    try { return localStorage.getItem(SETTINGS_KEY) === "1"; } catch { return false; }
+  }
+
+  function rememberSettings(open: boolean) {
+    settingsOpen = open;
+    try { localStorage.setItem(SETTINGS_KEY, open ? "1" : "0"); } catch { /* storage unavailable */ }
+  }
+
   let settingsError = $state<string | null>(null);
   let saving = $state(false);
   let presetName = $state("");
@@ -274,7 +286,7 @@
       <label><input type="checkbox" checked={studies[s.id]} onchange={(e) => toggleStudy(s.id, e.currentTarget.checked)} /> {s.label}</label>
     {/each}
   </fieldset>
-  <details class="indicator-settings">
+  <details class="indicator-settings" open={settingsOpen} ontoggle={(e) => rememberSettings(e.currentTarget.open)}>
     <summary>Indicator settings</summary>
     <fieldset disabled={saving}>
       <legend class="sr">Indicator settings</legend>

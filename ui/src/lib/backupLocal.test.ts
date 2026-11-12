@@ -15,6 +15,8 @@ describe("backup local state", () => {
       "tickr.studies": JSON.stringify({ ichimoku: true }),
       "tickr.chartAlerts": JSON.stringify([alert]),
       "tickr.magnet": "1",
+      "tickr.hideDrawings": "1",
+      "tickr.technicalsSettingsOpen": "1",
     });
     const text = withLocal('{"app":"tickr","settings":{}}', src);
     const dst = fake();
@@ -23,6 +25,8 @@ describe("backup local state", () => {
     expect(JSON.parse(dst.getItem("tickr.studies")!).ichimoku).toBe(true);
     expect(JSON.parse(dst.getItem("tickr.chartAlerts")!)).toEqual([alert]);
     expect(dst.getItem("tickr.magnet")).toBe("1");
+    expect(dst.getItem("tickr.hideDrawings")).toBe("1");
+    expect(dst.getItem("tickr.technicalsSettingsOpen")).toBe("1");
   });
 
   it("an old backup leaves existing local state alone", () => {
@@ -30,6 +34,7 @@ describe("backup local state", () => {
     applyLocal(dst, parseLocal('{"app":"tickr","settings":{}}'));
     expect(dst.getItem("tickr.studies")).toBe('{"ichimoku":true}');
     expect(dst.getItem("tickr.magnet")).toBe("1");
+    expect(dst.getItem("tickr.hideDrawings")).toBeNull();
   });
 
   it("drops malformed entries", () => {
