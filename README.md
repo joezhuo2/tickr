@@ -150,6 +150,11 @@ taskbar to keep it visible.
   drag or scroll sideways to pan, and double-click to see the whole range
   again. With the chart focused, + and - zoom and 0 resets. The price axis
   fits the visible bars, and a zoomed view follows new bars at the right edge.
+- **Price axis:** drag the price axis up or down to stretch or compress the
+  price scale. While it is set by hand the scale stays locked as you pan and
+  zoom, and dragging the chart also moves it vertically. Double-click the axis,
+  or use the **Auto price scale** button at the top right, to fit the visible
+  bars again; changing symbol, range or scale type also returns to auto.
 - **Event dots** along the bottom of the chart; hover the candle for details:
 
   | Dot | Marks |
@@ -557,8 +562,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.19
-git push origin v0.11.19
+git tag v0.11.20
+git push origin v0.11.20
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

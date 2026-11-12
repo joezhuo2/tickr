@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitScale, forward, inverse, scaleLabel, scaleTicks } from "./scale";
+import { fitScale, forward, inverse, scaleLabel, scaleTicks, shiftRange, stretchRange } from "./scale";
 import { niceTicks } from "./format";
 
 describe("price scales", () => {
@@ -50,5 +50,15 @@ describe("price scales", () => {
         expect(fit.hi).toBeGreaterThan(fit.lo);
       }
     }
+  });
+});
+
+describe("manual price range", () => {
+  it("stretches around the middle and shifts by a fraction of the range", () => {
+    expect(stretchRange(100, 200, "linear", 2)).toEqual({ lo: 50, hi: 250 });
+    expect(shiftRange(100, 200, "linear", 0.1)).toEqual({ lo: 110, hi: 210 });
+    const log = stretchRange(10, 1000, "log", 0.5);
+    expect(log.lo).toBeCloseTo(10 ** 1.5);
+    expect(log.hi).toBeCloseTo(10 ** 2.5);
   });
 });

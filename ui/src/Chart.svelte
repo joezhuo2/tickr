@@ -2,7 +2,7 @@
   import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, num, price, quarterLabel, volume } from "./lib/format";
   import { candleCountdown, classifyBars, displayOffset, isExtendedSession, isIntraday, zoneLabel, type Clock } from "./lib/session";
   import type { Analysis, Article, Chart, ChartMode, ChartScale, ChartTimeZone, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
-  import { fitScale, forward, inverse, scaleLabel, scaleTicks } from "./lib/scale";
+  import { fitScale, forward, inverse, scaleLabel, scaleTicks, shiftRange, stretchRange } from "./lib/scale";
   import type { Drawing, DrawingPoint } from "./lib/types";
   import { TWO_POINT, anchoredVwap, fibLevels, hitBox, positionLevels, rayEnd, timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
   import { legendText, volumeProfile, paneLayout } from "./lib/indicators";
@@ -65,6 +65,9 @@
   let copied = $state<"image" | "csv" | null>(null);
   let view = $state<View>(full(0));
   let dragX = $state<number | null>(null);
+  let dragY = 0;
+  let axisY: number | null = null;
+  let manual = $state<{ lo: number; hi: number } | null>(null);
 
   const PAD = { l: 6, r: 62, t: 38, b: 22 };
 
@@ -217,7 +220,9 @@
     }
     for (const t of targetLevels) fitValues.push(t.price);
     const base = candles[i0]?.c ?? 0;
-    const { lo, hi, scale: activeScale } = fitScale(prices, fitValues, scale, base);
+    const fit = fitScale(prices, fitValues, scale, base);
+    const activeScale = fit.scale;
+    const { lo, hi } = manual ?? fit;
     const step = plotW / Math.max(view.count, 1);
     const start = view.start;
     return {
@@ -879,6 +884,7 @@
       view = full(n);
     } else if (!replay && savedView?.key === key) view = follow(savedView.view, savedView.n, n);
     else view = full(n);
+    if (key !== viewKey) manual = null;
     if (!replay) savedView = null;
     viewKey = key;
     viewN = n;
@@ -912,7 +918,13 @@
     onMove(e);
   }
 
+  $effect(() => {
+    void scale;
+    manual = null;
+  });
+
   function resetView() {
+    manual = null;
     view = full(candles.length);
     hover = null;
     emitWindow();
@@ -976,6 +988,7 @@
     editing = null;
     gesture = null;
     dragX = null;
+    axisY = null;
   }
 
   export function drawTool(next: Tool) {
@@ -1043,6 +1056,10 @@
     return Math.max(a.x, b.x, Math.min(a.x, b.x) + 90);
   }
 
+  function onAxis(p: Pixel) {
+    return p.x > width - PAD.r && p.y >= PAD.t && p.y <= PAD.t + geo.priceH;
+  }
+
   function inPlot(p: Pixel) {
     return p.x >= PAD.l && p.x <= width - PAD.r && p.y >= PAD.t && p.y <= PAD.t + geo.priceH;
   }
@@ -1083,7 +1100,10 @@
     wrap!.focus();
     const p = pixel(e);
     if (!inPlot(p)) {
-      if (tool === "cursor") { dragX = e.clientX; wrap!.setPointerCapture(e.pointerId); }
+      if (onAxis(p)) axisY = e.clientY;
+      else if (tool === "cursor") { dragX = e.clientX; dragY = e.clientY; }
+      else return;
+      wrap!.setPointerCapture(e.pointerId);
       return;
     }
     if (drawingBusy) return;
@@ -1093,7 +1113,7 @@
       const hit = hitDrawing(p);
       selected = hit?.drawing.id ?? null;
       if (hit) gesture = { start: p, original: hit.drawing, endpoint: hit.endpoint, moved: false, second: false };
-      else dragX = e.clientX;
+      else { dragX = e.clientX; dragY = e.clientY; }
       return;
     }
     const point = anchor(p);
@@ -1180,6 +1200,7 @@
       gesture = null;
     }
     dragX = null;
+    axisY = null;
     if (wrap?.hasPointerCapture(e.pointerId)) wrap.releasePointerCapture(e.pointerId);
   }
 
@@ -1289,11 +1310,19 @@
   }
 
   function onMove(e: MouseEvent) {
+    if (axisY != null) {
+      manual = stretchRange(geo.lo, geo.hi, geo.scale, Math.exp((e.clientY - axisY) * 0.006));
+      axisY = e.clientY;
+      hover = null;
+      return;
+    }
     if (moveDrawing(e)) return;
     if (tool !== "cursor" || (e.target instanceof Element && e.target.closest(".drawing-tools, input"))) { hover = null; return; }
     if (dragX != null) {
       view = pan(view, geo.n, (dragX - e.clientX) / geo.step);
+      if (manual) manual = shiftRange(geo.lo, geo.hi, geo.scale, (e.clientY - dragY) / geo.priceH);
       dragX = e.clientX;
+      dragY = e.clientY;
       hover = null;
       emitWindow();
       return;
@@ -1386,7 +1415,9 @@
   onpointercancel={cancelDrawing}
   onpointerleave={() => (hover = null)}
   ondblclick={(e) => {
-    if (!(e.target as Element).closest(".exports, .drawing-tools, input") && tool === "cursor" && selected == null) resetView();
+    if ((e.target as Element).closest(".exports, .drawing-tools, input")) return;
+    if (onAxis(pixel(e))) manual = null;
+    else if (tool === "cursor" && selected == null) resetView();
   }}
   onkeydown={onKey}
 >
@@ -1399,6 +1430,9 @@
       <button aria-label="Undo" aria-pressed={false} title="Undo (Ctrl+Z); redo (Ctrl+Shift+Z)" disabled={!history.past.length || drawingBusy} onclick={() => { cancelDrawing(); void changeDrawings("undo"); }}>Undo</button>
       <button aria-label="Delete" aria-pressed={false} title="Delete (Delete / Backspace)" disabled={selected == null || drawingBusy} onclick={removeDrawing}>Delete</button>
     </div>
+  {/if}
+  {#if candles.length}
+    <div class="axis-grip" style:top="{PAD.t}px" style:width="{PAD.r}px" style:height="{geo.priceH}px"></div>
   {/if}
   {#if staleNote}
     <div class="stale-note" role="status">{staleNote}</div>
@@ -1424,6 +1458,11 @@
       <button class:done={copied === "csv"} title="Copy candles as CSV" aria-label="Copy candles as CSV" onclick={copyCsv}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6M8 13h8M8 17h8" /></svg>
       </button>
+      {#if manual}
+        <button title="Auto price scale (double-click the price axis)" aria-label="Auto price scale" onclick={() => (manual = null)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4" /></svg>
+        </button>
+      {/if}
       {#if !isFull(view, candles.length)}
         <button title="Reset zoom (double-click)" aria-label="Reset zoom" onclick={resetView}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
@@ -1493,6 +1532,11 @@
   canvas {
     position: absolute;
     inset: 0;
+  }
+  .axis-grip {
+    position: absolute;
+    right: 0;
+    cursor: ns-resize;
   }
   .drawing-tools {
     position: absolute;

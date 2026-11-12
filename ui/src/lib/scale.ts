@@ -68,3 +68,12 @@ export function fitScale(candles: number[], values: number[], requested: ChartSc
   }
   return { lo, hi, scale };
 }
+
+export function stretchRange(lo: number, hi: number, scale: ChartScale, factor: number) {
+  const f = Math.min(50, Math.max(0.02, factor));
+  return { lo: inverse(0.5 - f / 2, lo, hi, scale), hi: inverse(0.5 + f / 2, lo, hi, scale) };
+}
+
+export function shiftRange(lo: number, hi: number, scale: ChartScale, fraction: number) {
+  return { lo: inverse(fraction, lo, hi, scale), hi: inverse(1 + fraction, lo, hi, scale) };
+}

@@ -6,6 +6,10 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.20] - 2026-11-11
+
+### Added\n- **Manual price scale:** drag the price axis to stretch or compress it. The\n  scale then stays locked while you pan and zoom; double-click the axis for\n  auto.
+
 ## [0.11.19] - 2026-11-11
 
 ### Added\n- **Live legend:** indicator labels on the chart show their values at the\n  crosshair, or at the latest bar on screen when nothing is hovered.
