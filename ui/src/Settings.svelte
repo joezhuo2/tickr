@@ -1,6 +1,7 @@
 <script lang="ts">
   import ColorPicker from "./ColorPicker.svelte";
-  import { FONTS, MAIN_PRESETS, MONO_FONTS, NO_CUSTOM, SUB_PRESETS, saveCustom, type Custom } from "./lib/display";
+  import { FONTS, MAIN_PRESETS, MONO_FONTS, NO_CUSTOM, SUB_PRESETS, TOKENS, saveCustom, type Custom } from "./lib/display";
+  import { cssToHex } from "./lib/color";
   import { invoke } from "@tauri-apps/api/core";
   import { ago } from "./lib/format";
   import { accelerator, display } from "./lib/hotkey";
@@ -49,7 +50,20 @@
     onclose: () => void;
   } = $props();
 
-  let picking = $state<"main" | "sub" | null>(null);
+  let picking = $state<string | null>(null);
+  const TOKEN_GROUPS = [...new Set(TOKENS.map((t) => t.group))].map((g) => ({ name: g, tokens: TOKENS.filter((t) => t.group === g) }));
+
+  function tokenColor(name: string): string {
+    void custom;
+    return custom.colors[name] || cssToHex(getComputedStyle(document.documentElement).getPropertyValue(`--${name}`));
+  }
+
+  function setToken(name: string, hex: string) {
+    const colors = { ...custom.colors };
+    if (hex) colors[name] = hex;
+    else delete colors[name];
+    setCustom({ colors });
+  }
 
   function setCustom(change: Partial<Custom>) {
     custom = { ...custom, ...change };
@@ -416,8 +430,18 @@
       <button class="close" aria-label="Close" onclick={onclose}>×</button>
     </header>
 
-    {#if picking}
-      {@const kind = picking}
+    {#if picking && picking !== "main" && picking !== "sub"}
+      {@const name = picking}
+      <ColorPicker
+        label={TOKENS.find((t) => t.name === name)?.label ?? name}
+        value={tokenColor(name)}
+        presets={MAIN_PRESETS}
+        onchange={(hex) => setToken(name, hex)}
+        onreset={() => { setToken(name, ""); picking = null; }}
+        onclose={() => (picking = null)}
+      />
+    {:else if picking}
+      {@const kind = picking as "main" | "sub"}
       <ColorPicker
         label={kind === "main" ? "Main color" : "Sub color"}
         value={shown(kind)}
@@ -449,6 +473,10 @@
       <div class="section" in:paneIn={{ y: 8 }}>
     {#if tab === "display"}
     <h3>Display</h3>
+    <div class="row">
+      <span>Reset all colors</span>
+      <button class="btn" disabled={!custom.main && !custom.sub && !Object.keys(custom.colors).length} onclick={() => setCustom({ main: "", sub: "", colors: {} })}>Reset to defaults</button>
+    </div>
     <label class="row">
       <span>Theme</span>
       <select class="field" value={theme} disabled={displayBusy} onchange={(e) => { const next = e.currentTarget.value as Theme; saveDisplay("set_theme", { theme: next }, () => theme = next); }}>
@@ -484,9 +512,23 @@
         {#each MONO_FONTS as f (f.id)}<option value={f.id}>{f.label}</option>{/each}
       </select>
     </label>
-    {#if custom.main || custom.sub || custom.font || custom.mono}
+    {#if custom.main || custom.sub || custom.font || custom.mono || Object.keys(custom.colors).length}
       <div class="row"><span></span><button class="link" onclick={() => setCustom(NO_CUSTOM)}>Reset colors and fonts</button></div>
     {/if}
+    <h3>Colors</h3>
+    <p class="hint">Every color tickr draws with. A color set here wins over Main, Sub and the gain/loss palette.</p>
+    {#each TOKEN_GROUPS as g (g.name)}
+      <h3>{g.name}</h3>
+      {#each g.tokens as t (t.name)}
+        <div class="row">
+          <span>{t.label}</span>
+          <span class="keys">
+            {#if custom.colors[t.name]}<button class="link" onclick={() => setToken(t.name, "")}>Reset</button>{/if}
+            <button class="color" aria-label="Choose the {t.label.toLowerCase()} color" onclick={() => (picking = t.name)}><span style:background={custom.colors[t.name] || `var(--${t.name})`}></span>{custom.colors[t.name] || "Theme default"}</button>
+          </span>
+        </div>
+      {/each}
+    {/each}
     <label class="row">
       <span>Text size</span>
       <select class="field" value={textSize} disabled={displayBusy} onchange={(e) => { const next = Number(e.currentTarget.value) as TextSize; saveDisplay("set_text_size", { percent: next }, () => textSize = next); }}>

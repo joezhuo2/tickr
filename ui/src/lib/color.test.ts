@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hexToHsv, hsvToHex, isHex, luminance, mix } from "./color";
+import { cssToHex, hexToHsv, hsvToHex, isHex, luminance, mix } from "./color";
 import { FONTS, customVars, sanitizeCustom } from "./display";
 
 describe("color math", () => {
@@ -25,17 +25,17 @@ describe("color math", () => {
 
 describe("custom theme", () => {
   it("sets nothing for an empty customization", () => {
-    expect(customVars({ main: "", sub: "", font: "", mono: "" })).toEqual({ vars: {}, scheme: null });
+    expect(customVars({ main: "", sub: "", font: "", mono: "", colors: {} })).toEqual({ vars: {}, scheme: null });
   });
 
   it("derives a readable palette from the sub color", () => {
-    const dark = customVars({ main: "#ff9f0a", sub: "#0b1220", font: "", mono: "" });
+    const dark = customVars({ main: "#ff9f0a", sub: "#0b1220", font: "", mono: "", colors: {} });
     expect(dark.scheme).toBe("dark");
     expect(dark.vars["--accent"]).toBe("#ff9f0a");
     expect(dark.vars["--bg"]).toBe("#0b1220");
     expect(luminance(dark.vars["--text"])).toBeGreaterThan(0.8);
     expect(luminance(dark.vars["--surface"])).toBeGreaterThan(luminance("#0b1220"));
-    const light = customVars({ main: "", sub: "#f5f1e8", font: "", mono: "" });
+    const light = customVars({ main: "", sub: "#f5f1e8", font: "", mono: "", colors: {} });
     expect(light.scheme).toBe("light");
     expect(light.vars["--accent"]).toBeUndefined();
     expect(luminance(light.vars["--text"])).toBeLessThan(0.05);
@@ -43,8 +43,27 @@ describe("custom theme", () => {
 
   it("maps font choices to stacks and drops anything unknown", () => {
     const serif = FONTS.find((f) => f.id === "serif")!;
-    expect(customVars({ main: "", sub: "", font: "serif", mono: "" }).vars).toEqual({ "--font": serif.stack });
-    expect(sanitizeCustom({ main: "red", sub: "#ABCDEF", font: "comic", mono: 4 })).toEqual({ main: "", sub: "#abcdef", font: "", mono: "" });
-    expect(sanitizeCustom(null)).toEqual({ main: "", sub: "", font: "", mono: "" });
+    expect(customVars({ main: "", sub: "", font: "serif", mono: "", colors: {} }).vars).toEqual({ "--font": serif.stack });
+    expect(sanitizeCustom({ main: "red", sub: "#ABCDEF", font: "comic", mono: 4 })).toEqual({ main: "", sub: "#abcdef", font: "", mono: "", colors: {} });
+    expect(sanitizeCustom(null)).toEqual({ main: "", sub: "", font: "", mono: "", colors: {} });
+  });
+});
+
+describe("color overrides", () => {
+  it("converts computed CSS colors to hex", () => {
+    expect(cssToHex(" #4C8DFF ")).toBe("#4c8dff");
+    expect(cssToHex("#fa0")).toBe("#ffaa00");
+    expect(cssToHex("rgba(0, 122, 204, 0.8)")).toBe("#007acc");
+    expect(cssToHex("rgb(255 0 0)")).toBe("#ff0000");
+    expect(cssToHex("var(--x)")).toBe("");
+  });
+
+  it("applies token overrides over the derived palette and keeps only known tokens", () => {
+    const c = sanitizeCustom({ sub: "#0b1220", colors: { up: "#00FF00", text: "#ffffff", bogus: "#123456", down: "red" } });
+    expect(c.colors).toEqual({ up: "#00ff00", text: "#ffffff" });
+    const { vars } = customVars(c);
+    expect(vars["--up"]).toBe("#00ff00");
+    expect(vars["--text"]).toBe("#ffffff");
+    expect(vars["--down"]).toBeUndefined();
   });
 });

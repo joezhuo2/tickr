@@ -81,7 +81,7 @@ update themselves: install v0.5.1 once from Releases.
 ## Features
 
 - **Display settings:** choose System, Light or Dark, text size from 100% to 150%, and standard or accessible blue/orange gain and loss colors. Changes apply immediately and are saved.
-- **Theme colors and fonts:** Settings > Display also has a **Main color** (the accent on buttons, links and highlights) and a **Sub color** (the background; text, panels and borders are derived from it, and it decides light or dark by itself, overriding Theme). Both open a themed color picker with a saturation and brightness square, a hue slider, presets and a hex box; changes preview live, and Reset returns to the theme's own color. **Font** and **Number font** pick from font families already on your computer, so a choice that is not installed falls back to the next in its list. Gain and loss colors are not affected. These four are remembered on this computer and are not part of Backup.
+- **Theme colors and fonts:** Settings > Display also has a **Main color** (the accent on buttons, links and highlights) and a **Sub color** (the background; text, panels and borders are derived from it, and it decides light or dark by itself, overriding Theme). Both open a themed color picker with a saturation and brightness square, a hue slider, presets and a hex box; changes preview live, and Reset returns to the theme's own color. **Font** and **Number font** pick from font families already on your computer, so a choice that is not installed falls back to the next in its list. Below them, **Colors** lists every color tickr draws with (interface, gain/loss and every chart overlay and marker), each with its own picker and Reset; a color set there wins over Main, Sub and the gain/loss palette. **Reset to defaults** at the top of Display clears every color choice at once. All of these are remembered on this computer and are not part of Backup.
 
 ### Tray and hotkey
 
@@ -653,8 +653,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.39
-git push origin v0.11.39
+git tag v0.11.40
+git push origin v0.11.40
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

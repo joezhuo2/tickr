@@ -1,3 +1,4 @@
+import { TOKENS } from "./display";
 import { groupActions, type Category } from "./keybinds";
 
 export type SettingsTab = "display" | "hotkeys" | "chart" | "data" | "ai" | "backup" | "connections";
@@ -12,7 +13,7 @@ export interface SettingEntry {
 const entry = (tab: SettingsTab, section: string, labels: string[]): SettingEntry[] => labels.map((label) => ({ label, section, tab }));
 
 export const SETTINGS: SettingEntry[] = [
-  ...entry("display", "Display", ["Theme", "Main color", "Sub color", "Font", "Number font", "Text size", "Gain/loss colors", "Background refresh"]),
+  ...entry("display", "Display", ["Theme", "Main color", "Sub color", "Font", "Number font", "Text size", "Gain/loss colors", "Background refresh", "Reset all colors", ...TOKENS.map((t) => t.label)]),
   { label: "Show or hide tickr", section: "Hotkeys · General", tab: "hotkeys", group: "general" },
   ...groupActions().flatMap((g) => g.actions.map((a) => ({ label: a.label, section: `Hotkeys · ${g.label}`, tab: "hotkeys" as const, group: g.id }))),
   ...entry("chart", "Chart", ["Extended-hours candles", "Shade pre-market and after-hours", "Chart times", "Earnings", "News", "Analyst ratings"]),
