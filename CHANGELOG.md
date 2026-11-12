@@ -6,6 +6,10 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.34] - 2026-11-11
+
+### Changed\n- Text boxes share the look of the symbol search box, and dropdowns the look\n  of the calendar country menu.
+
 ## [0.11.33] - 2026-11-11
 
 ### Added\n- **Theme colors:** a main (accent) and sub (background) color in Settings >\n  Display, chosen in a themed color picker.\n- **Fonts:** pick the text font and the number font.

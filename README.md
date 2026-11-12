@@ -279,7 +279,7 @@ range, to close its panel. Zoom on the chart resets when a panel opens or
 closes. Technicals, Paper trading and Strategy keep their own layout with the
 chart on top.
 Views fade in, the watchlist slides up, Settings scales open and switching
-line / candles fades the chart. With the OS reduced-motion setting on, all of
+line / candles fades the chart. Text boxes across the app share the look of the symbol search box, and dropdowns share the look of the calendar's country menu. With the OS reduced-motion setting on, all of
 it is instant.
 
 - **Technicals:** click **Analyze** to run RSI, moving averages, candlestick
@@ -644,8 +644,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.33
-git push origin v0.11.33
+git tag v0.11.34
+git push origin v0.11.34
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
