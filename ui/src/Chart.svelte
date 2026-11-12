@@ -1957,13 +1957,16 @@
     if (geo.n === 0 || e.ctrlKey || e.altKey || e.metaKey) return;
     const anchor = hover == null ? 1 : (hover + 0.5 - view.start) / view.count;
     if (e.key === "ArrowLeft") hover = hover == null ? geo.i1 : Math.max(0, hover - 1);
-    else if (e.key === "ArrowRight") hover = hover == null ? geo.i0 : Math.min(geo.n - 1, hover + 1);
+    else if (e.key === "ArrowRight") hover = hover == null ? geo.i0 : Math.min(axisTimes.length - 1, hover + 1);
     else if (e.key === "Escape") hover = null;
     else if (e.key === "+" || e.key === "=") view = zoom(view, geo.n, 1 / 1.25, anchor);
     else if (e.key === "-") view = zoom(view, geo.n, 1.25, anchor);
     else if (e.key === "0") resetView();
     else return;
-    if (hover != null) view = reveal(view, geo.n, hover);
+    if (hover != null) {
+      view = reveal(view, geo.n, hover);
+      hover = Math.min(hover, geo.j1);
+    }
     emitWindow();
     e.preventDefault();
     if (/^[-+=0]$/.test(e.key)) e.stopPropagation();
