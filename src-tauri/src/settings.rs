@@ -297,24 +297,29 @@ pub fn validate_drawings(map: &HashMap<String, Vec<Drawing>>) -> Result<(), Stri
     if map.len() > 500 { return Err("At most 500 symbols can have drawings.".into()); }
     for (symbol, drawings) in map {
         if symbol.is_empty() || symbol != &symbol.to_uppercase() { return Err("Invalid drawing symbol.".into()); }
-        if drawings.len() > 200 { return Err("At most 200 drawings per symbol.".into()); }
-        let mut ids = HashSet::new();
-        for d in drawings {
-            let valid = match d.kind.as_str() {
-                "hline" | "text" | "avwap" | "vline" | "hray" | "note" => d.points.len() == 1,
-                "trend" | "rect" | "ray" | "fib" | "position" | "arrow" | "prange" | "drange" | "vprofile" => d.points.len() == 2,
-                "channel" | "fibext" | "pitchfork" => d.points.len() == 3,
-                "pen" => (2..=PEN_MAX_POINTS).contains(&d.points.len()),
-                _ => return Err("Unknown drawing kind.".into()),
-            };
-            if !valid { return Err("Invalid drawing points.".into()); }
-            if d.points.iter().any(|p| !p.price.is_finite() || p.price <= 0.0) { return Err("Invalid drawing price.".into()); }
-            let max_text = if d.kind == "note" { 2000 } else { 200 };
-            if d.text.chars().count() > max_text || (if d.kind == "text" || d.kind == "note" { d.text.trim().is_empty() } else { !d.text.is_empty() }) { return Err("Invalid drawing text.".into()); }
-            if !ids.insert(d.id) { return Err("Duplicate drawing ID.".into()); }
-            let hex = d.color.len() == 7 && d.color.starts_with('#') && d.color[1..].bytes().all(|b| b.is_ascii_hexdigit());
-            if !(d.color.is_empty() || hex) || d.width > 4 { return Err("Invalid drawing style.".into()); }
-        }
+        validate_drawing_list(drawings)?;
+    }
+    Ok(())
+}
+
+pub fn validate_drawing_list(drawings: &[Drawing]) -> Result<(), String> {
+    if drawings.len() > 200 { return Err("At most 200 drawings per symbol.".into()); }
+    let mut ids = HashSet::new();
+    for d in drawings {
+        let valid = match d.kind.as_str() {
+            "hline" | "text" | "avwap" | "vline" | "hray" | "note" => d.points.len() == 1,
+            "trend" | "rect" | "ray" | "fib" | "position" | "arrow" | "prange" | "drange" | "vprofile" => d.points.len() == 2,
+            "channel" | "fibext" | "pitchfork" => d.points.len() == 3,
+            "pen" => (2..=PEN_MAX_POINTS).contains(&d.points.len()),
+            _ => return Err("Unknown drawing kind.".into()),
+        };
+        if !valid { return Err("Invalid drawing points.".into()); }
+        if d.points.iter().any(|p| !p.price.is_finite() || p.price <= 0.0) { return Err("Invalid drawing price.".into()); }
+        let max_text = if d.kind == "note" { 2000 } else { 200 };
+        if d.text.chars().count() > max_text || (if d.kind == "text" || d.kind == "note" { d.text.trim().is_empty() } else { !d.text.is_empty() }) { return Err("Invalid drawing text.".into()); }
+        if !ids.insert(d.id) { return Err("Duplicate drawing ID.".into()); }
+        let hex = d.color.len() == 7 && d.color.starts_with('#') && d.color[1..].bytes().all(|b| b.is_ascii_hexdigit());
+        if !(d.color.is_empty() || hex) || d.width > 4 { return Err("Invalid drawing style.".into()); }
     }
     Ok(())
 }
