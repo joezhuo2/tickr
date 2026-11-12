@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.56] - 2026-11-12
+
+### Fixed
+- **Indicators on older days:** on 1D, after scrolling back to load earlier
+  days, moving averages, Bollinger bands, VWAP, the opening range, levels, RSI,
+  MACD and the volume average are drawn on every loaded day instead of only the
+  latest one. VWAP restarts each day.
+
 ## [0.11.55] - 2026-11-12
 
 ### Added
