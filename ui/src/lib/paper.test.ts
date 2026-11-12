@@ -14,6 +14,8 @@ import {
   equity,
   liveBlock,
   marketOrder,
+  moveOrder,
+  orderLines,
   newAccount,
   openBook,
   placeOrder,
@@ -541,5 +543,33 @@ describe("bracket orders", () => {
     expect(P.bracketError("buy", null)).toBeNull();
     expect(P.marketOrder(P.newAccount(), "AAPL", "buy", 1, 100, 1, { stop: 101, target: null }).ok).toBe(false);
     expect(P.placeOrder(P.newAccount(), { symbol: "AAPL", side: "buy", qty: 1, kind: "limit", price: 100, bracket: { stop: 101, target: null } }, 0).ok).toBe(false);
+  });
+});
+
+describe("order lines", () => {
+  const placed = () => {
+    const r = placeOrder(newAccount(), { symbol: "AAPL", side: "buy", qty: 10, kind: "limit", price: 100, bracket: { stop: 95, target: 110 } }, 1);
+    if (!r.ok) throw new Error(r.error);
+    return r.account;
+  };
+
+  it("lists the entry and its bracket for the symbol only", () => {
+    const a = placed();
+    expect(orderLines(a, "AAPL").map((l) => [l.id, l.price, l.side])).toEqual([["price:1", 100, "buy"], ["stop:1", 95, "sell"], ["target:1", 110, "sell"]]);
+    expect(orderLines(a, "MSFT")).toEqual([]);
+    expect(orderLines(null, "AAPL")).toEqual([]);
+  });
+
+  it("moves a price, rounds it and keeps the bracket valid", () => {
+    const a = placed();
+    const moved = moveOrder(a, "price:1", 101.237);
+    expect(moved.ok && moved.account.orders[0].price).toBe(101.24);
+    const stop = moveOrder(a, "stop:1", 97);
+    expect(stop.ok && stop.account.orders[0].bracket).toEqual({ stop: 97, target: 110 });
+    expect(moveOrder(a, "stop:1", 105).ok).toBe(false);
+    expect(moveOrder(a, "price:1", 120).ok).toBe(false);
+    expect(moveOrder(a, "price:9", 100).ok).toBe(false);
+    expect(moveOrder(a, "price:1", -1).ok).toBe(false);
+    expect(a.orders[0].price).toBe(100);
   });
 });

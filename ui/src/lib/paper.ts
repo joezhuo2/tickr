@@ -443,3 +443,38 @@ export function seekBook(book: Book, bars: readonly Bar[], cursor: number, symbo
   }
   return { book: { ...book, states }, events };
 }
+
+export interface OrderLine {
+  id: string;
+  price: number;
+  side: Side;
+  label: string;
+}
+
+export function orderLines(a: Account | null, symbol: string): OrderLine[] {
+  const lines: OrderLine[] = [];
+  for (const o of a?.orders ?? []) {
+    if (o.symbol !== symbol) continue;
+    const exit: Side = o.side === "buy" ? "sell" : "buy";
+    if (o.price != null) lines.push({ id: `price:${o.id}`, price: o.price, side: o.side, label: `${o.side === "buy" ? "Buy" : "Sell"} ${o.kind} ${o.qty}` });
+    if (o.bracket?.stop != null) lines.push({ id: `stop:${o.id}`, price: o.bracket.stop, side: exit, label: `Stop-loss ${o.qty}` });
+    if (o.bracket?.target != null) lines.push({ id: `target:${o.id}`, price: o.bracket.target, side: exit, label: `Take-profit ${o.qty}` });
+  }
+  return lines;
+}
+
+export function moveOrder(a: Account, lineId: string, to: number): Outcome {
+  const [field, raw] = lineId.split(":");
+  const order = a.orders.find((o) => o.id === Number(raw));
+  if (!order) return { ok: false, error: "That order is no longer open" };
+  const price = to >= 1 ? Math.round(to * 100) / 100 : Math.round(to * 10000) / 10000;
+  const error = priceError(price, "Price");
+  if (error) return { ok: false, error };
+  let next: Order;
+  if (field === "price" && order.price != null) next = { ...order, price };
+  else if ((field === "stop" || field === "target") && order.bracket) next = { ...order, bracket: { ...order.bracket, [field]: price } };
+  else return { ok: false, error: "That order has no such price" };
+  const bErr = bracketError(next.side, next.bracket, next.price);
+  if (bErr) return { ok: false, error: bErr };
+  return { ok: true, account: { ...a, orders: a.orders.map((o) => (o === order ? next : o)) }, order: next };
+}
