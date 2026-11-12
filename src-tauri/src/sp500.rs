@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 
 use futures_util::future::try_join_all;
 use serde::Serialize;
@@ -81,7 +80,7 @@ mod tests {
         let rows = constituents();
         assert!(rows.len() > 480);
         assert!(rows.iter().all(|(s, n, g)| !s.is_empty() && !n.is_empty() && !g.is_empty()));
-        assert_eq!(rows.iter().map(|r| r.0).collect::<HashSet<_>>().len(), rows.len());
+        assert_eq!(rows.iter().map(|r| r.0).collect::<std::collections::HashSet<_>>().len(), rows.len());
     }
 
     #[test]
