@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.42] - 2026-11-12
+
+### Changed
+- **Drawing toolbar:** the tool buttons (Cursor, Level, Trend, Text, Ruler,
+  Pen, Box, Ray, Fib, R:R, AVWAP) are icons, with the tool name in the themed
+  tooltip on hover.
+
 ## [0.11.41] - 2026-11-12
 
 ### Changed
