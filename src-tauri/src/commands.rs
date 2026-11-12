@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use base64::Engine;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_notification::NotificationExt;
 
 use crate::ai::AiConfig;
@@ -235,6 +235,15 @@ pub async fn set_symbol(app: AppHandle, shared: State<'_, Arc<Shared>>, symbol: 
 }
 
 #[tauri::command]
+pub async fn open_chart_window(app: AppHandle, symbol: String) -> Result<(), String> {
+    let symbol = symbol.trim().to_uppercase();
+    if symbol.is_empty() {
+        return Err("empty symbol".into());
+    }
+    crate::window::open_chart(&app, &symbol).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn refresh_quote(shared: State<'_, Arc<Shared>>) {
     shared.wake.notify_one();
 }
@@ -264,7 +273,7 @@ pub fn set_interval(shared: State<'_, Arc<Shared>>, interval: String) -> Result<
 
 #[tauri::command]
 pub fn set_theme(app: AppHandle, shared: State<'_, Arc<Shared>>, theme: Theme) -> Result<(), String> {
-    if let Some(win) = crate::window::get(&app) {
+    for win in app.webview_windows().into_values() {
         win.set_background_color(Some(crate::window::background(theme))).map_err(|e| e.to_string())?;
     }
     shared.update_settings(|s| s.theme = theme);
@@ -275,7 +284,7 @@ pub fn set_theme(app: AppHandle, shared: State<'_, Arc<Shared>>, theme: Theme) -
 #[tauri::command]
 pub fn set_text_size(app: AppHandle, shared: State<'_, Arc<Shared>>, percent: u16) -> Result<(), String> {
     validate_text_size(percent)?;
-    if let Some(win) = crate::window::get(&app) {
+    for win in app.webview_windows().into_values() {
         win.set_zoom(f64::from(percent) / 100.0).map_err(|e| e.to_string())?;
     }
     shared.update_settings(|s| s.text_size = percent);
@@ -360,7 +369,7 @@ pub fn import_settings(app: AppHandle, shared: State<'_, Arc<Shared>>, text: Str
     drop(settings);
     lock(&shared.alert_prices).clear();
     *lock(&shared.hotkey_error) = None;
-    if let Some(win) = crate::window::get(&app) {
+    for win in app.webview_windows().into_values() {
         let _ = win.set_background_color(Some(crate::window::background(theme)));
         let _ = win.set_zoom(f64::from(text_size) / 100.0);
     }
@@ -1180,7 +1189,7 @@ fn provider_changed(app: &AppHandle, shared: &Shared) -> DataProvider {
     shared.stream_wake.notify_one();
     shared.wake.notify_one();
     let payload = provider_payload(shared);
-    let _ = app.emit_to(crate::window::LABEL, "data-provider", &payload);
+    let _ = app.emit("data-provider", &payload);
     payload
 }
 

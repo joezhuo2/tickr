@@ -341,6 +341,7 @@ pub struct Keybinds {
     pub draw_position: String,
     pub draw_avwap: String,
     pub chart_split: String,
+    pub new_window: String,
     pub chart_replay: String,
     pub practice: String,
     pub refresh: String,
@@ -389,6 +390,7 @@ impl Default for Keybinds {
             draw_position: "'".into(),
             draw_avwap: "/".into(),
             chart_split: "j".into(),
+            new_window: "=".into(),
             chart_replay: "y".into(),
             practice: "q".into(),
             refresh: "r".into(),
@@ -891,6 +893,7 @@ mod tests {
         assert_eq!(s.keybinds.draw_pen, "5");
         assert_eq!([&s.keybinds.draw_rect, &s.keybinds.draw_ray, &s.keybinds.draw_fib, &s.keybinds.draw_position, &s.keybinds.draw_avwap], ["[", "]", ";", "'", "/"]);
         assert_eq!(s.keybinds.chart_split, "j");
+        assert_eq!(s.keybinds.new_window, "=");
         assert_eq!(s.keybinds.chart_replay, "y");
         assert_eq!(s.keybinds.practice, "q");
         assert_eq!(s.keybinds.paper, "h");

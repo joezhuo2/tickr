@@ -64,10 +64,10 @@ async fn wait(shared: &Shared, delay: Duration, failures: u32) {
     }
 }
 
-/// Sends the current quote state to the window, if it exists.
+/// Sends the current quote state to every open window.
 pub fn emit(app: &AppHandle, shared: &Shared) {
     let q: QuoteState = lock(&shared.quote).clone();
-    let _ = app.emit_to(crate::window::LABEL, "quote", q);
+    let _ = app.emit("quote", q);
 }
 
 async fn refresh_logo(shared: &Shared, symbol: &str) {

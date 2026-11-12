@@ -254,6 +254,7 @@ export interface Keybinds {
   draw_position: string;
   draw_avwap: string;
   chart_split: string;
+  new_window: string;
   chart_replay: string;
   practice: string;
   refresh: string;
@@ -624,6 +625,7 @@ declare global {
   interface Window {
     /** Injected by the backend before the page loads (window.rs). */
     __TICKR_INIT__?: Init | null;
+    __TICKR_CHART__?: string;
   }
 }
 

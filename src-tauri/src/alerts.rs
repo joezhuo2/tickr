@@ -334,7 +334,7 @@ fn describe(alert: &PriceAlert, symbol: &str, current: f64, currency: &str) -> S
 
 pub fn emit(app: &AppHandle, shared: &Shared) {
     let alerts = lock(&shared.settings).alerts.clone();
-    let _ = app.emit_to(crate::window::LABEL, "alerts", alerts);
+    let _ = app.emit("alerts", alerts);
 }
 
 /// Re-check the live configuration after network requests: deleted or paused

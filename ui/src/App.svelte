@@ -2,10 +2,11 @@
   import { applyCustom, loadCustom } from "./lib/display";
   import * as Scrollback from "./lib/scrollback";
   import * as ChartAlertRules from "./lib/chartAlerts";
-  import { chartAlerts, setChartAlerts } from "./lib/chartAlertStore.svelte";
+  import { chartAlerts, claimChartAlerts } from "./lib/chartAlertStore.svelte";
   import { CHART_MODES, nextMode } from "./lib/charttypes";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
   import { onMount, tick, untrack } from "svelte";
   import Analysts from "./Analysts.svelte";
   import Alerts from "./Alerts.svelte";
@@ -66,6 +67,7 @@
     type RatingChange,
     type StatSection,
     type WatchDates,
+    type WatchQuote,
   } from "./lib/types";
   import { actionFor, bindKey, keyLabel, nextGroupTab, overlayFor, practiceAllows, replayAllows } from "./lib/keybinds";
   import ReplayBar from "./ReplayBar.svelte";
@@ -94,6 +96,8 @@
   const reloaded = sessionStorage.getItem("tickr-reload-state") !== null;
   sessionStorage.removeItem("tickr-reload-state");
   const boot = reloaded ? null : (window.__TICKR_INIT__ ?? null);
+  const chartSymbol = window.__TICKR_CHART__ ?? null;
+  const persist = !chartSymbol;
 
   let dataProvider = $state<DataProvider>({ provider: "yahoo", feed: "iex", has_keys: false, stream: { kind: "off" } });
   let ready = $state(false);
@@ -314,7 +318,8 @@
     palette = init.palette;
     applyDisplay(document.documentElement, theme, palette);
     dataProvider = init.data_provider;
-    symbol = init.symbol;
+    const own = !chartSymbol || chartSymbol === init.symbol;
+    symbol = chartSymbol ?? init.symbol;
     range = init.range;
     interval = validInterval(range, init.interval);
     drawings = init.drawings ?? {};
@@ -324,7 +329,7 @@
     chartExtended = init.chart_extended_hours ?? true;
     shadeSessions = init.chart_shade_sessions ?? true;
     chartTimeZone = init.chart_time_zone ?? "exchange";
-    if (init.chart_layout) layout = init.chart_layout;
+    if (init.chart_layout) layout = persist ? init.chart_layout : { ...init.chart_layout, split: false };
     hotkey = init.hotkey;
     defaultHotkey = init.default_hotkey;
     hotkeyError = init.hotkey_error;
@@ -332,7 +337,7 @@
     dots = init.dots;
     indicators = init.indicators;
     indicatorPresets = init.indicator_presets;
-    qs = init.quote;
+    if (own) qs = init.quote;
     watchlist = init.watchlist ?? [];
     groups = init.groups ?? [];
     watchlistSort = init.watchlist_sort ?? DEFAULT_WATCHLIST_SORT;
@@ -342,19 +347,70 @@
     eventFilter = savedEventFilter = init.event_filter ?? DEFAULT_EVENT_FILTER;
     alerts = init.alerts ?? [];
     recent = init.recent_symbols ?? [];
-    if (init.logo_known) logo = init.logo;
-    if (init.analyst_known) analyst = init.analyst;
+    const logoKnown = own && init.logo_known;
+    const analystKnown = own && init.analyst_known;
+    if (logoKnown) logo = init.logo;
+    if (analystKnown) analyst = init.analyst;
     // Shown at once, refreshed by loadChart (at = 0 marks it stale).
-    if (init.chart) cache.set(cacheKey(), { chart: init.chart, at: 0 });
+    if (own && init.chart) cache.set(cacheKey(), { chart: init.chart, at: 0 });
     ready = true;
     loadChart();
-    if (!init.logo_known) loadLogo();
-    if (!init.analyst_known) loadAnalyst();
+    if (!persist) void pollOwn();
+    if (!logoKnown) loadLogo();
+    if (!analystKnown) loadAnalyst();
     loadEarnings();
     loadRatingChanges();
     loadStats();
     loadNews();
     loadPaper();
+  }
+
+  function keep<T>(now: T, next: T): T {
+    return JSON.stringify(now) === JSON.stringify(next) ? now : next;
+  }
+
+  // shortcut: other windows' edits arrive when this window gains focus, not live; broadcast a settings event if side-by-side editing needs it
+  function syncShared(init: Init) {
+    if (!ready) return;
+    theme = init.theme;
+    textSize = init.text_size;
+    palette = init.palette;
+    watchlist = keep(watchlist, init.watchlist ?? []);
+    groups = keep(groups, init.groups ?? []);
+    screens = keep(screens, init.screens ?? []);
+    alerts = keep(alerts, init.alerts ?? []);
+    drawings = keep(drawings, init.drawings ?? {});
+    indicators = keep(indicators, init.indicators);
+    indicatorPresets = keep(indicatorPresets, init.indicator_presets);
+    keybinds = keep(keybinds, init.keybinds);
+    dots = keep(dots, init.dots);
+    paperWrite = paperWrite.then(loadPaper);
+  }
+
+  async function ownQuote(next: string): Promise<QuoteState> {
+    const [w] = await invoke<WatchQuote[]>("get_watch_quotes", { symbols: [next] });
+    if (!w?.quote) throw w?.error ?? `No quote for ${next}`;
+    return { quote: w.quote, error: null, updated_at: Date.now() / 1000 };
+  }
+
+  // shortcut: chart windows poll Yahoo every 15 s instead of joining the backend poller and stream, extend those to several symbols if windows need tick-level quotes
+  async function pollOwn() {
+    const sym = symbol;
+    try {
+      const next = await ownQuote(sym);
+      if (sym === symbol) {
+        qs = next;
+        refreshChart();
+      }
+      finishQuote?.();
+    } catch (e) {
+      if (sym === symbol) qs = { ...qs, error: String(e) };
+      finishQuote?.(String(e));
+    }
+  }
+
+  function openWindow() {
+    if (symbol) invoke("open_chart_window", { symbol }).catch(console.warn);
   }
 
   const quote = $derived(qs.quote && qs.quote.symbol === symbol ? qs.quote : null);
@@ -891,10 +947,8 @@
     untrack(() => {
       const fired = ChartAlertRules.due(chartAlerts.list, c.meta.symbol, c.interval, c.candles, clockFor(c.meta));
       if (!fired.length) return;
-      const ids = new Set(fired.map((a) => a.id));
-      const now = Math.floor(Date.now() / 1000);
-      setChartAlerts(chartAlerts.list.map((a) => (ids.has(a.id) ? { ...a, enabled: false, fired_at: now } : a)));
-      for (const a of fired) invoke("send_notification", { title: `tickr · ${a.symbol} chart alert`, body: `${a.label} (${a.interval})` }).catch(console.warn);
+      const claimed = claimChartAlerts(new Set(fired.map((a) => a.id)), Math.floor(Date.now() / 1000));
+      for (const a of claimed) invoke("send_notification", { title: `tickr · ${a.symbol} chart alert`, body: `${a.label} (${a.interval})` }).catch(console.warn);
     });
   });
 
@@ -1134,7 +1188,7 @@
 
   async function switchSymbol(next: string): Promise<string | null> {
     try {
-      qs = await invoke<QuoteState>("set_symbol", { symbol: next });
+      qs = persist ? await invoke<QuoteState>("set_symbol", { symbol: next }) : await ownQuote(next);
       exitReplay();
       symbol = qs.quote?.symbol ?? next.toUpperCase();
       recent = pushRecent(recent, symbol);
@@ -1218,9 +1272,10 @@
     range = r;
     interval = validInterval(range, interval);
     clearAnalysis();
-    chartSettingsWrite = chartSettingsWrite
-      .then(() => invoke<void>("set_range", { range: r }))
-      .catch(console.warn);
+    if (persist)
+      chartSettingsWrite = chartSettingsWrite
+        .then(() => invoke<void>("set_range", { range: r }))
+        .catch(console.warn);
     loadChart();
   }
 
@@ -1233,10 +1288,11 @@
     interval = validInterval(range, next);
     const saved = interval;
     clearAnalysis();
-    chartSettingsWrite = chartSettingsWrite
-      .then(() => (moved ? invoke<void>("set_range", { range: r }) : undefined))
-      .then(() => invoke<void>("set_interval", { interval: saved }))
-      .catch(console.warn);
+    if (persist)
+      chartSettingsWrite = chartSettingsWrite
+        .then(() => (moved ? invoke<void>("set_range", { range: r }) : undefined))
+        .then(() => invoke<void>("set_interval", { interval: saved }))
+        .catch(console.warn);
     loadChart(true);
   }
 
@@ -1373,7 +1429,8 @@
       };
       refreshTimer = setTimeout(() => finishQuote?.("Quote refresh timed out"), 15_000);
     });
-    invoke("refresh_quote").catch((e) => finishQuote?.(String(e)));
+    if (persist) invoke("refresh_quote").catch((e) => finishQuote?.(String(e)));
+    else void pollOwn();
     const chartDone = loadChart(true, true);
     void secondView?.load(true);
     let panelDone: Promise<string | void>;
@@ -1397,7 +1454,7 @@
 
   function setScale(s: ChartScale) {
     scale = s;
-    invoke("set_chart_scale", { scale: s }).catch(console.warn);
+    if (persist) invoke("set_chart_scale", { scale: s }).catch(console.warn);
   }
 
   function saveChartExtended(enabled: boolean) {
@@ -1424,7 +1481,7 @@
     if (!next.split) syncHover = null;
     if (next.split && view !== "chart") view = "chart";
     layout = next;
-    layoutWrite = layoutWrite.then(() => invoke<ChartLayout>("set_chart_layout", { layout: next })).then(() => undefined, console.warn);
+    if (persist) layoutWrite = layoutWrite.then(() => invoke<ChartLayout>("set_chart_layout", { layout: next })).then(() => undefined, console.warn);
   }
 
   function hoverFrom(source: Pane, t: number | null) {
@@ -1478,7 +1535,7 @@
   function setMode(m: ChartMode) {
     if (view !== "technicals" && view !== "paper" && view !== "backtest") view = "chart";
     mode = m;
-    invoke("set_chart_mode", { mode: m }).catch(console.warn);
+    if (persist) invoke("set_chart_mode", { mode: m }).catch(console.warn);
   }
 
   async function onKey(e: KeyboardEvent) {
@@ -1559,6 +1616,9 @@
           view = "chart";
           saveLayout({ split });
         }
+        break;
+      case "new_window":
+        if (!e.repeat) openWindow();
         break;
       case "draw_level":
       case "draw_trend":
@@ -1653,6 +1713,10 @@
 
   if (boot) apply(boot);
 
+  $effect(() => {
+    if (!persist && symbol) getCurrentWindow().setTitle(`tickr · ${symbol}`).catch(console.warn);
+  });
+
   onMount(() => {
     const onVisible = () => {
       if (refreshMode === "low_power" && !document.hidden) refreshChart();
@@ -1660,6 +1724,7 @@
     document.addEventListener("visibilitychange", onVisible);
     if (!boot) invoke<Init>("get_init").then(apply);
     const un = listen<QuoteState>("quote", (e) => {
+      if (!persist && e.payload.quote?.symbol !== symbol) return;
       qs = e.payload;
       finishQuote?.(e.payload.error ?? undefined);
       // Keep intraday-candle charts (1D, 5D, 1M) current; daily ones barely move.
@@ -1680,7 +1745,14 @@
     const unStream = listen<StreamStatus>("stream-status", (e) => (dataProvider.stream = e.payload));
     invoke<DataProvider>("get_data_provider").then((c) => (dataProvider = c)).catch(console.warn);
     const unAlerts = listen<PriceAlert[]>("alerts", (e) => (alerts = e.payload));
+    const onFocus = () => invoke<Init>("get_init").then(syncShared).catch(console.warn);
+    window.addEventListener("focus", onFocus);
+    const poll = persist ? undefined : setInterval(() => {
+      if (refreshMode !== "low_power" || !document.hidden) void pollOwn();
+    }, 15_000);
     return () => {
+      window.removeEventListener("focus", onFocus);
+      clearInterval(poll);
       un.then((f) => f());
       unProvider.then((f) => f());
       unStream.then((f) => f());
@@ -1835,6 +1907,9 @@
               {@const on = view === "chart" && (l.id === "single" ? !layout.split : layout.split && layout.orientation === l.id)}
               <button class:on aria-pressed={on} title={l.title} aria-label={l.title} disabled={!!replay} onclick={() => saveLayout(l.id === "single" ? { split: false } : { split: true, orientation: l.id as ChartLayout["orientation"] })}>{l.label}</button>
             {/each}
+            <button class="icon" title="Open {symbol} in a new window ({keyLabel(keybinds.new_window)})" aria-label="Open in new window" disabled={!!replay} onclick={openWindow}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-8 8M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" /></svg>
+            </button>
           </div>
           {#if layout.split}
             <div class="seg" role="group" aria-label="Chart sync">
@@ -2336,6 +2411,20 @@
       background-color var(--motion-fast) var(--ease-out),
       color var(--motion-fast) var(--ease-out),
       box-shadow var(--motion-fast) var(--ease-out);
+  }
+  .seg button.icon {
+    display: flex;
+    align-items: center;
+    padding: 3px 6px;
+  }
+  .seg button.icon svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   .seg button.on {
     background: var(--bg);

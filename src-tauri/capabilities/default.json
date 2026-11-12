@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main window",
-  "windows": ["main"],
-  "permissions": ["core:default", "core:event:default"]
+  "description": "Main window and chart windows",
+  "windows": ["main", "chart-*"],
+  "permissions": ["core:default", "core:event:default", "core:window:allow-set-title"]
 }

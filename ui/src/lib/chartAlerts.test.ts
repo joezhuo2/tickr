@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_CHART_ALERTS, PRESETS, addError, due, holds, lineBroken, lineValue, type ChartAlert } from "./chartAlerts";
+import { MAX_CHART_ALERTS, PRESETS, addError, claim, due, holds, lineBroken, lineValue, type ChartAlert } from "./chartAlerts";
 import type { Candle } from "./types";
 
 const closes = (...values: number[]): Candle[] => values.map((c, i) => ({ t: i * 60, o: c, h: c, l: c, c, v: 1 }));
@@ -41,5 +41,12 @@ describe("chart alerts", () => {
     expect(addError([], null)).toBeNull();
     expect(addError(Array.from({ length: MAX_CHART_ALERTS }, (_, id) => alert({ id })), null)).not.toBeNull();
     for (const p of PRESETS) expect(addError([], p.expr)).toBeNull();
+  });
+  it("claims only alerts still armed in storage, so a second window does not fire again", () => {
+    const stored = [alert({ id: 1 }), alert({ id: 2, enabled: false, fired_at: 5 }), alert({ id: 3 })];
+    const { list, claimed } = claim(stored, new Set([1, 2]), 9);
+    expect(claimed.map((a) => a.id)).toEqual([1]);
+    expect(list.map((a) => [a.id, a.enabled, a.fired_at])).toEqual([[1, false, 9], [2, false, 5], [3, true, null]]);
+    expect(claim(list, new Set([1]), 10).claimed).toEqual([]);
   });
 });

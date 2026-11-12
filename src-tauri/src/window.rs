@@ -2,7 +2,7 @@
 //! and remember position and size across re-creations.
 
 use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::{Duration, Instant};
 
 use tauri::window::Color;
@@ -17,6 +17,7 @@ use crate::state::{lock, Shared};
 pub const LABEL: &str = "main";
 
 static SHOWN: AtomicBool = AtomicBool::new(false);
+static CHARTS: AtomicU32 = AtomicU32::new(1);
 
 /// When the window last lost focus. Clicking the Windows tray icon activates
 /// the taskbar first, so the window is no longer focused when the click lands.
@@ -91,30 +92,45 @@ fn dismiss(w: &WebviewWindow) {
     }
 }
 
-fn create(app: &AppHandle) -> tauri::Result<()> {
+fn build(app: &AppHandle, label: &str, title: &str, script: &str) -> tauri::Result<WebviewWindow> {
     let shared = app.state::<Arc<Shared>>().inner().clone();
     let settings = lock(&shared.settings).clone();
     let on_top = settings.always_on_top;
-    let geometry = *lock(&shared.geometry);
     // The page reads this before its first frame instead of invoking get_init.
     let init = serde_json::to_string(&crate::commands::init_payload(&shared)).unwrap_or_else(|_| "null".into());
     // Match the page background so the window never flashes white.
     let bg = background(settings.theme);
 
-    let builder = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html".into()));
+    let builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()));
     #[cfg(windows)]
     let builder = builder.additional_browser_args(BROWSER_ARGS);
     let win = builder
-        .title("tickr")
+        .title(title)
         .inner_size(800.0, 420.0)
         .min_inner_size(640.0, 360.0)
         .always_on_top(on_top)
         .background_color(bg)
-        .initialization_script(format!("window.__TICKR_INIT__ = {init};"))
+        .initialization_script(format!("window.__TICKR_INIT__ = {init};{script}"))
         .visible(false)
         .build()?;
 
     win.set_zoom(f64::from(settings.text_size) / 100.0)?;
+    Ok(win)
+}
+
+pub fn open_chart(app: &AppHandle, symbol: &str) -> tauri::Result<()> {
+    let label = format!("chart-{}", CHARTS.fetch_add(1, Ordering::Relaxed));
+    let script = format!("window.__TICKR_CHART__ = {};", serde_json::to_string(symbol).unwrap_or_else(|_| "null".into()));
+    let win = build(app, &label, &format!("tickr · {symbol}"), &script)?;
+    win.show()?;
+    win.set_focus()?;
+    Ok(())
+}
+
+fn create(app: &AppHandle) -> tauri::Result<()> {
+    let shared = app.state::<Arc<Shared>>().inner().clone();
+    let geometry = *lock(&shared.geometry);
+    let win = build(app, LABEL, "tickr", "")?;
     match geometry.filter(|g| on_screen(&win, g)) {
         Some(g) => {
             win.set_size(PhysicalSize::new(g.w, g.h))?;

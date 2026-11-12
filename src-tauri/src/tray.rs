@@ -230,7 +230,7 @@ fn on_menu(app: &AppHandle, ev: MenuEvent) {
         }
         "always_on_top" => {
             let s = shared.update_settings(|s| s.always_on_top = !s.always_on_top);
-            if let Some(w) = crate::window::get(app) {
+            for w in app.webview_windows().into_values() {
                 let _ = w.set_always_on_top(s.always_on_top);
             }
         }
