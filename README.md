@@ -212,7 +212,7 @@ taskbar to keep it visible.
   high, low, close, volume). A button turns green once the copy lands.
 - **Refresh:** the button in the bottom bar fetches the quote and reloads the
   chart right away, then force-reloads the panel on screen (News, Earnings,
-  Stats, Financials, Analysts, Events, Market, Options or the Watchlist cards). The bar
+  Stats, Analysts, Events, Market, Options or the Watchlist cards). The bar
   says "<Panel> refreshed" or shows the error, and a failed refresh keeps what
   was already shown. **Background refresh** in Settings defaults to **Balanced**:
   quotes update every 15 seconds during regular trading, 60 seconds pre/post-market,
@@ -276,7 +276,7 @@ The stock overview on the left can be resized: drag its right edge (or focus
 it and press ← or →); the width is remembered. Hide or show it with the
 button left of the back arrow, or `\`.
 
-The Watchlist, Alerts, Analysts, Earnings, Stats, Financials, Market, Events,
+The Watchlist, Alerts, Analysts, Earnings, Stats, Market, Events,
 Options and News open in a column to the right of the chart, so the chart
 stays on screen. Drag the border between them (or focus it and press ← or →)
 to resize the column; the width is remembered. Turn **Dock** off in the
@@ -365,7 +365,7 @@ it is instant.
 - **Stats:** key statistics in Valuation, Trading, Dividends & splits, Shares
   & short interest, Profitability and Financials. ETFs get a Fund section and
   crypto a Crypto section. Changes, growth and returns are green or red.
-- **Financials:** revenue, net income, free cash flow and gross, operating and
+- **Financials** (below the statistics in Stats): revenue, net income, free cash flow and gross, operating and
   net margins over the reported periods, with an Annual / Quarterly toggle, two
   small trend charts and a table. Margins are computed from revenue, and
   figures Yahoo does not report show as —. Cached for 12 hours; ETFs, indices

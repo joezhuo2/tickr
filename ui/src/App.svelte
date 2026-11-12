@@ -515,9 +515,9 @@
     }
   }
 
-  function toggleFinancials() {
-    view = view === "financials" ? "chart" : "financials";
-    if (view === "financials" && financialsSym !== symbol) loadFinancials();
+  function toggleStats() {
+    view = view === "stats" ? "chart" : "stats";
+    if (view === "stats" && financialsSym !== symbol) loadFinancials();
   }
 
   async function loadRatingChanges(manual = false) {
@@ -1152,7 +1152,7 @@
       financials = undefined;
       financialsSym = "";
       financialsError = null;
-      if (view === "financials") loadFinancials();
+      if (view === "stats") loadFinancials();
       loadNews();
       options = undefined;
       if (view === "options") loadOptions();
@@ -1379,8 +1379,7 @@
     switch (activeView) {
       case "news": panelDone = newsScope === "symbol" ? loadNews(true) : loadFeed(newsScope, [...feedSymbols], true); break;
       case "earnings": panelDone = loadEarnings(true); break;
-      case "stats": panelDone = loadStats(true); break;
-      case "financials": panelDone = loadFinancials(true); break;
+      case "stats": panelDone = Promise.all([loadStats(true), loadFinancials(true)]).then(([a, b]) => a ?? b); break;
       case "analysts": panelDone = Promise.all([loadAnalyst(true), loadRatingChanges(true)]).then((errors) => errors.find(Boolean)); break;
       case "events": panelDone = eventsTab === "watchlist" ? loadWatchCalendar(true, true) : eventsTab === "calendar" ? Promise.all([loadEvents(true, true), loadWatchCalendar(true, true)]).then((errors) => errors.find(Boolean)) : loadEvents(true, true); break;
       case "market": panelDone = loadMarket(true); break;
@@ -1433,7 +1432,7 @@
     else if (syncHover?.source === source) syncHover = null;
   }
 
-  const DOCKABLE = new Set(["watchlist", "alerts", "analysts", "earnings", "stats", "financials", "market", "events", "options", "news"]);
+  const DOCKABLE = new Set(["watchlist", "alerts", "analysts", "earnings", "stats", "market", "events", "options", "news"]);
   const DOCK_MIN = 280;
 
   function stored(key: string): string | null {
@@ -1799,11 +1798,8 @@
             <button role="tab" aria-selected={view === "earnings"} class:on={view === "earnings"} disabled={!!replay} onclick={() => (view = view === "earnings" ? "chart" : "earnings")}>
               Earnings
             </button>
-            <button role="tab" aria-selected={view === "stats"} class:on={view === "stats"} disabled={!!replay} onclick={() => (view = view === "stats" ? "chart" : "stats")}>
+            <button role="tab" aria-selected={view === "stats"} class:on={view === "stats"} disabled={!!replay} onclick={toggleStats}>
               Stats
-            </button>
-            <button role="tab" aria-selected={view === "financials"} class:on={view === "financials"} disabled={!!replay} onclick={toggleFinancials}>
-              Financials
             </button>
             <button role="tab" aria-selected={view === "paper"} class:on={view === "paper"} title={`Simulated paper trading (${keyLabel(keybinds.paper)})`} disabled={!!practice} onclick={() => (view = view === "paper" ? "chart" : "paper")}>
               Paper
@@ -1905,9 +1901,10 @@
             {:else if view === "earnings"}
               <EarningsView {symbol} {earnings} />
             {:else if view === "stats"}
-              <StatsView {symbol} {stats} />
-            {:else if view === "financials"}
-              <FinancialsView {symbol} {financials} error={financialsError} onretry={() => loadFinancials()} />
+              <div class="stats-scroll">
+                <StatsView {symbol} {stats} />
+                <FinancialsView {symbol} {financials} error={financialsError} onretry={() => loadFinancials()} />
+              </div>
             {:else if view === "market"}
               <MarketView {market} error={marketError} onretry={() => loadMarket()} onopen={openWatched} />
             {:else if view === "events"}
@@ -2168,6 +2165,15 @@
     border-left: 1px solid var(--faint);
     cursor: col-resize;
     touch-action: none;
+  }
+  .stats-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .stats-scroll > :global(*) {
+    overflow: visible;
   }
   .left-wrap {
     flex: none;
