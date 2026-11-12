@@ -72,6 +72,7 @@ pub struct Init {
     indicator_presets: Vec<IndicatorPreset>,
     alerts: Vec<PriceAlert>,
     recent_symbols: Vec<String>,
+    recent_intervals: Vec<String>,
 }
 
 fn data_uri(png: &[u8]) -> String {
@@ -127,6 +128,7 @@ pub fn init_payload(shared: &Shared) -> Init {
         indicator_presets: s.indicator_presets,
         alerts: s.alerts,
         recent_symbols: s.recent_symbols,
+        recent_intervals: s.recent_intervals,
     }
 }
 
@@ -200,7 +202,7 @@ fn history_for(shared: &Shared, symbol: &str, interval: &str) -> Result<Chart, S
 /// Reuses the last fetched chart when it matches, so the analysis covers the
 /// same candles the window shows; fetches otherwise.
 #[tauri::command]
-pub async fn analyze(shared: State<'_, Arc<Shared>>, symbol: String, range: String, interval: String, extended: bool, until: Option<i64>) -> Result<Analysis, String> {
+pub async fn analyze(shared: State<'_, Arc<Shared>>, symbol: String, range: String, interval: String, extended: bool, until: Option<i64>, candles: Option<Vec<Candle>>) -> Result<Analysis, String> {
     let revision = shared.revision();
     let cached = if range == quote::PERIOD_RANGE {
         Some(history_for(&shared, &symbol, &interval)?)
@@ -219,6 +221,10 @@ pub async fn analyze(shared: State<'_, Arc<Shared>>, symbol: String, range: Stri
             *lock(&shared.last_chart) = Some(c.clone());
             c
         }
+    };
+    let chart = match candles {
+        Some(candles) => Chart { last_bar_time: candles.last().map(|c| c.t), candles, ..chart },
+        None => chart,
     };
     let chart = match until {
         Some(t) => crate::analysis::reveal_until(&chart, t),
@@ -287,7 +293,7 @@ pub fn set_range(shared: State<'_, Arc<Shared>>, range: String) -> Result<(), St
         return Err(format!("unknown range {range}"));
     }
     shared.update_settings(|s| {
-        if !quote::intervals_for(&range).contains(&s.interval.as_str()) {
+        if !quote::interval_supported(&range, &s.interval) {
             s.interval = "auto".into();
         }
         s.range = range;
@@ -297,10 +303,13 @@ pub fn set_range(shared: State<'_, Arc<Shared>>, range: String) -> Result<(), St
 
 #[tauri::command]
 pub fn set_interval(shared: State<'_, Arc<Shared>>, interval: String) -> Result<(), String> {
-    if interval != "auto" && !quote::intervals_for(&lock(&shared.settings).range).contains(&interval.as_str()) {
+    if interval != "auto" && !quote::interval_supported(&lock(&shared.settings).range, &interval) {
         return Err(format!("unknown interval {interval}"));
     }
-    shared.update_settings(|s| s.interval = interval);
+    shared.update_settings(|s| {
+        crate::settings::remember_interval(&mut s.recent_intervals, &interval);
+        s.interval = interval;
+    });
     Ok(())
 }
 
@@ -369,7 +378,10 @@ pub fn set_chart_time_zone(shared: State<'_, Arc<Shared>>, zone: ChartTimeZone) 
 #[tauri::command]
 pub fn set_chart_layout(shared: State<'_, Arc<Shared>>, layout: ChartLayout) -> Result<ChartLayout, String> {
     let layout = layout.cleaned()?;
-    shared.update_settings(|s| s.chart_layout = layout.clone());
+    shared.update_settings(|s| {
+        crate::settings::remember_interval(&mut s.recent_intervals, &layout.interval);
+        s.chart_layout = layout.clone();
+    });
     Ok(layout)
 }
 

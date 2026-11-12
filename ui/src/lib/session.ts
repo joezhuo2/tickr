@@ -1,5 +1,5 @@
 import { localOffset } from "./freshness";
-import type { ChartTimeZone, Period } from "./types";
+import { intervalSpec, type ChartTimeZone, type Period } from "./types";
 
 export type Session = "pre" | "regular" | "post" | "closed";
 
@@ -68,7 +68,8 @@ export function exchangeOffset(t: number, clock: Clock): number {
 }
 
 export function isIntraday(interval: string): boolean {
-  return /\dm$/.test(interval);
+  const unit = intervalSpec(interval)?.unit;
+  return unit === "m" || unit === "h";
 }
 
 export function displayOffset(t: number, zone: ChartTimeZone, clock: Clock, interval: string, localZone?: string): number {
@@ -145,11 +146,15 @@ export function isExtendedSession(session: Session): boolean {
   return session !== "regular";
 }
 
+function yearOf(day: number): number {
+  return new Date(day * DAY * 1000).getUTCFullYear();
+}
+
 export function futureTimes(times: readonly number[], interval: string, clock: Clock, count: number): number[] {
   const n = times.length;
-  const unit = /^(\d+)(mo|wk|m|d)$/.exec(interval);
-  if (!n || !unit || !(count > 0)) return [];
-  const size = Number(unit[1]);
+  const spec = intervalSpec(interval);
+  if (!n || !spec || !(count > 0)) return [];
+  const size = spec.count;
   const offsets = new Map<number, number>();
   const off = (t: number) => {
     const hour = Math.floor(t / 3600);
@@ -177,23 +182,32 @@ export function futureTimes(times: readonly number[], interval: string, clock: C
   let w = last + lastOffset;
   const out: number[] = [];
   while (out.length < count) {
-    if (unit[2] === "m") {
-      w += size * 60;
+    if (spec.unit === "m" || spec.unit === "h") {
+      w += spec.seconds;
       let day = Math.floor(w / DAY);
       let tod = w - day * DAY;
       if (tod > close) { day++; tod = open; }
       else if (tod < open) tod = open;
       while (skip(day)) { day++; tod = open; }
       w = day * DAY + tod;
-    } else if (unit[2] === "d") {
+    } else if (spec.unit === "d") {
       let day = Math.floor(w / DAY);
       const tod = w - day * DAY;
+      const year = yearOf(day);
       for (let k = 0; k < size; k++) do day++; while (skip(day));
+      if (size > 1 && yearOf(day) !== year) {
+        day = Date.UTC(yearOf(day), 0, 2) / 1000 / DAY;
+        while (skip(day)) day++;
+      }
       w = day * DAY + tod;
-    } else if (unit[2] === "wk") w += size * 7 * DAY;
-    else {
+    } else if (spec.unit === "wk") {
+      const day = Math.floor(w / DAY);
+      w = size === 1 ? w + 7 * DAY : ((Math.floor(Math.floor((day - 4) / 7) / size) + 1) * size * 7 + 4 - day) * DAY + w;
+    } else {
       const d = new Date(w * 1000);
-      d.setUTCMonth(d.getUTCMonth() + size);
+      const month = Math.floor(d.getUTCMonth() / size) * size + size;
+      if (month >= 12) d.setUTCFullYear(d.getUTCFullYear() + 1, 0);
+      else d.setUTCMonth(month);
       w = d.getTime() / 1000;
     }
     out.push(w - off(w - lastOffset));
@@ -203,8 +217,8 @@ export function futureTimes(times: readonly number[], interval: string, clock: C
 
 /** Time left in the candle that started at `lastBar`, as m:ss; null when that candle is not forming now. */
 export function candleCountdown(interval: string, lastBar: number | undefined, now: number): string | null {
-  if (!isIntraday(interval) || lastBar == null) return null;
-  const length = parseInt(interval) * 60;
+  const length = intervalSpec(interval)?.seconds;
+  if (!isIntraday(interval) || lastBar == null || !length) return null;
   const left = Math.ceil(lastBar + length - now);
   if (!(left > 0 && left <= length)) return null;
   return `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;

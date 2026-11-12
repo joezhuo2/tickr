@@ -214,6 +214,7 @@ export interface Init {
   indicator_presets: IndicatorPreset[];
   alerts: PriceAlert[];
   recent_symbols: string[];
+  recent_intervals?: string[];
 }
 
 export interface PriceAlert {
@@ -670,16 +671,106 @@ export function intervalsFor(range: string): readonly string[] {
   }
 }
 
-export function nextInterval(range: string, interval: string): string {
-  const intervals = ["auto", ...intervalsFor(range)];
+export const NATIVE_INTERVALS: readonly string[] = ["1m", "5m", "15m", "30m", "60m", "1d", "1wk", "1mo"];
+export const PRESET_INTERVALS: readonly string[] = ["2m", "3m", "10m", "45m", "2h", "3h", "4h", "2d", "3d"];
+
+export type IntervalUnit = "m" | "h" | "d" | "wk" | "mo";
+export interface IntervalSpec {
+  count: number;
+  unit: IntervalUnit;
+  seconds: number;
+  bases: readonly string[];
+}
+
+const UNIT_SECONDS: Record<IntervalUnit, number> = { m: 60, h: 3600, d: 86_400, wk: 604_800, mo: 2_592_000 };
+const UNIT_MAX: Record<IntervalUnit, number> = { m: 1440, h: 24, d: 30, wk: 8, mo: 12 };
+const UNIT_NAMES: Record<IntervalUnit, string> = { m: "Minutes", h: "Hours", d: "Days", wk: "Weeks", mo: "Months" };
+const UNIT_ALIASES = new Map<string, IntervalUnit>([["m", "m"], ["min", "m"], ["h", "h"], ["hr", "h"], ["d", "d"], ["w", "wk"], ["wk", "wk"], ["mo", "mo"]]);
+const ONE: Record<IntervalUnit, string> = { m: "1m", h: "60m", d: "1d", wk: "1wk", mo: "1mo" };
+const HOUR_BASES = ["30m", "60m"];
+const YEAR_RANGES = ["ytd", "1y", "5y", "max"];
+
+function basesFor(interval: string, count: number, unit: IntervalUnit): readonly string[] {
+  if (NATIVE_INTERVALS.includes(interval)) return [interval];
+  if (unit === "h" || (unit === "m" && count % 60 === 0)) return HOUR_BASES;
+  if (unit === "m") return [30, 15, 5, 1].filter((b) => count % b === 0).map((b) => `${b}m`);
+  return [`1${unit}`];
+}
+
+export function intervalSpec(interval: string): IntervalSpec | null {
+  const m = /^([1-9]\d*)(m|h|d|wk|mo)$/.exec(interval);
+  if (!m) return null;
+  const count = Number(m[1]);
+  const unit = m[2] as IntervalUnit;
+  if (count > UNIT_MAX[unit]) return null;
+  return { count, unit, seconds: count * UNIT_SECONDS[unit], bases: basesFor(interval, count, unit) };
+}
+
+export function isCustom(interval: string): boolean {
+  return intervalSpec(interval) !== null && !NATIVE_INTERVALS.includes(interval);
+}
+
+export function baseFor(interval: string, range: string): string | null {
+  const spec = intervalSpec(interval);
+  if (!spec || (spec.unit === "d" && spec.count > 1 && !YEAR_RANGES.includes(range))) return null;
+  return spec.bases.find((b) => intervalsFor(range).includes(b)) ?? null;
+}
+
+export function pickerIntervals(extra: readonly string[] = []): string[] {
+  const all = new Set([...NATIVE_INTERVALS, ...PRESET_INTERVALS, ...extra.filter((i) => intervalSpec(i))]);
+  return [...all].sort((a, b) => intervalSpec(a)!.seconds - intervalSpec(b)!.seconds);
+}
+
+export function nextInterval(range: string, interval: string, extra: readonly string[] = []): string {
+  const intervals = ["auto", ...pickerIntervals(extra).filter((i) => baseFor(i, range))];
   return intervals[(intervals.indexOf(interval) + 1) % intervals.length];
 }
 
 export function validInterval(range: string, interval: string): string {
-  return intervalsFor(range).includes(interval) ? interval : "auto";
+  return baseFor(interval, range) ? interval : "auto";
 }
 
-export const INTERVAL_LABELS: Record<string, string> = { "60m": "1h", "1d": "1D", "1wk": "1W", "1mo": "1M" };
+const LABELS: Record<string, string> = { "60m": "1h", "1d": "1D", "1wk": "1W", "1mo": "1M" };
+const UNIT_LABELS: Record<IntervalUnit, string> = { m: "m", h: "h", d: "D", wk: "W", mo: "M" };
+
+export function intervalLabel(interval: string): string {
+  const spec = intervalSpec(interval);
+  if (!spec) return interval;
+  return LABELS[interval] ?? `${spec.count}${UNIT_LABELS[spec.unit]}`;
+}
+
+function minutes(n: number): string {
+  return n % 60 ? `${n}m` : `${n / 60}h`;
+}
+
+export function intervalHint(interval: string): string | null {
+  const spec = intervalSpec(interval);
+  if (!spec || !isCustom(interval)) return null;
+  if (spec.bases === HOUR_BASES) return "Built from 30m bars, or 60m bars on 6M, YTD and 1Y.";
+  if (spec.unit === "d") return "Built from daily bars, counted from each year's first trading day; shown on YTD, 1Y, 5Y and Max.";
+  if (spec.unit === "wk") return "Built from weekly bars, counted from Monday 5 January 1970.";
+  if (spec.unit === "mo") return "Built from monthly bars, counted from January.";
+  if (spec.bases[0] !== "1m") return `Built from ${spec.bases[0]} bars.`;
+  const lo = Math.floor(spec.count / 5) * 5;
+  const near = [lo ? minutes(lo) : null, minutes(lo + 5)].filter(Boolean).join(" or ");
+  return `Built from 1m bars, so history is short: Yahoo serves 1m bars for about the last 30 days. ${near} reach further back.`;
+}
+
+export type ParsedInterval = { interval: string; hint: string | null } | { error: string };
+
+export function parseInterval(text: string): ParsedInterval {
+  const m = /^(\d+)\s*([a-z]+)$/.exec(text.trim().toLowerCase());
+  let unit = m ? UNIT_ALIASES.get(m[2]) : undefined;
+  if (!m || !unit) return { error: "Type a number and a unit, such as 45m, 4h, 2D, 3W or 2mo." };
+  let count = Number(m[1]);
+  if (!(count >= 1 && count <= UNIT_MAX[unit])) return { error: `${UNIT_NAMES[unit]} go from 1 to ${UNIT_MAX[unit]}.` };
+  if (unit === "m" && count % 60 === 0) {
+    count /= 60;
+    unit = "h";
+  }
+  const interval = count === 1 ? ONE[unit] : `${count}${unit}`;
+  return { interval, hint: intervalHint(interval) };
+}
 
 export interface IndicatorStyle { color: string; visible: boolean }
 export interface LengthIndicator extends IndicatorStyle { length: number }

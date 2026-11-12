@@ -1,6 +1,6 @@
 import { holds, type ChartAlert } from "./chartAlerts";
 import type { SessionClock } from "./strategy";
-import type { Candle } from "./types";
+import { intervalSpec, isCustom, type Candle } from "./types";
 
 const TABLE = new Map<string, { range: string; seconds: number }>([
   ["1m", { range: "5d", seconds: 60 }],
@@ -23,24 +23,30 @@ export interface Group {
   key: string;
   symbol: string;
   interval: string;
+  base: string;
   range: string;
 }
 
+export function alertBase(interval: string): string | null {
+  const base = isCustom(interval) ? intervalSpec(interval)!.bases[0] : interval;
+  return TABLE.has(base) ? base : null;
+}
+
 export function cadence(interval: string): number | null {
-  const row = TABLE.get(interval);
-  return row ? Math.min(CAP, Math.max(FLOOR, row.seconds)) : null;
+  const base = alertBase(interval);
+  return base ? Math.min(CAP, Math.max(FLOOR, TABLE.get(base)!.seconds)) : null;
 }
 
 export function inBackground(alert: Pick<ChartAlert, "interval">): boolean {
-  return TABLE.has(alert.interval);
+  return alertBase(alert.interval) !== null;
 }
 
 export function groups(alerts: readonly ChartAlert[]): Group[] {
   const out = new Map<string, Group>();
   for (const a of alerts) {
-    const row = TABLE.get(a.interval);
+    const base = alertBase(a.interval);
     const key = `${a.symbol}|${a.interval}`;
-    if (a.enabled && row && !out.has(key)) out.set(key, { key, symbol: a.symbol, interval: a.interval, range: row.range });
+    if (a.enabled && base && !out.has(key)) out.set(key, { key, symbol: a.symbol, interval: a.interval, base, range: TABLE.get(base)!.range });
   }
   return [...out.values()];
 }

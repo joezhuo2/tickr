@@ -2,7 +2,7 @@
 //!
 //! These endpoints are unofficial and need a browser-like User-Agent.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 const CHART_URL: &str = "https://query1.finance.yahoo.com/v8/finance/chart";
@@ -42,7 +42,36 @@ pub fn resolve_interval(range: &str, interval: &str, extended: bool) -> Option<(
     })
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+fn custom_bases(interval: &str) -> &'static [&'static str] {
+    let (digits, unit) = interval.split_at(interval.find(|c: char| !c.is_ascii_digit()).unwrap_or(interval.len()));
+    let n: u32 = match digits.parse() {
+        Ok(n) if !digits.starts_with('0') => n,
+        _ => return &[],
+    };
+    match unit {
+        "m" if n <= 1440 && n % 60 == 0 => &["30m", "60m"],
+        "m" if n <= 1440 && n % 30 == 0 => &["30m", "15m", "5m", "1m"],
+        "m" if n <= 1440 && n % 15 == 0 => &["15m", "5m", "1m"],
+        "m" if n <= 1440 && n % 5 == 0 => &["5m", "1m"],
+        "m" if n <= 1440 => &["1m"],
+        "h" if n <= 24 => &["30m", "60m"],
+        "d" if n <= 30 => &["1d"],
+        "wk" if n <= 8 => &["1wk"],
+        "mo" if n <= 12 => &["1mo"],
+        _ => &[],
+    }
+}
+
+pub fn interval_supported(range: &str, interval: &str) -> bool {
+    let natives = intervals_for(range);
+    if natives.contains(&interval) {
+        return true;
+    }
+    let year_counted = interval.ends_with('d') && !matches!(range, "ytd" | "1y" | "5y" | "max");
+    !year_counted && custom_bases(interval).iter().any(|b| natives.contains(b))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Candle {
     pub t: i64,
     pub o: f64,
@@ -661,6 +690,33 @@ mod tests {
             assert_eq!(intervals_for(range), ["1d", "1wk", "1mo"]);
         }
         assert!(intervals_for("2h").is_empty());
+    }
+
+    #[test]
+    fn custom_intervals_need_a_base_the_range_serves() {
+        for range in RANGES {
+            for &interval in intervals_for(range) {
+                assert!(interval_supported(range, interval), "{range} {interval}");
+            }
+            assert!(!interval_supported(range, "auto"));
+        }
+        for (range, interval) in [("1d", "2m"), ("5d", "7m"), ("1d", "45m"), ("1mo", "45m"), ("1mo", "10m"), ("1d", "90m"), ("1d", "4h"), ("1mo", "2h"), ("1y", "4h"), ("6mo", "24h"),
+            ("1d", "1440m"), ("ytd", "2d"), ("1y", "3d"), ("max", "30d"), ("1y", "2wk"), ("5y", "8wk"), ("max", "12mo"), ("5y", "3mo")] {
+            assert!(interval_supported(range, interval), "{range} {interval}");
+        }
+        for (range, interval) in [("1mo", "2m"), ("1y", "45m"), ("5y", "4h"), ("1mo", "2d"), ("6mo", "2d"), ("5d", "2d"), ("5d", "2wk"), ("1y", "2mo"), ("1d", "0m"), ("1d", "07m"),
+            ("1d", "1441m"), ("1d", "25h"), ("1y", "31d"), ("1y", "9wk"), ("max", "13mo"), ("1d", "2x"), ("1d", "m"), ("1d", ""), ("1d", "99999999999m"), ("1y", "1d5")] {
+            assert!(!interval_supported(range, interval), "{range} {interval}");
+        }
+        assert_eq!(custom_bases("4h"), ["30m", "60m"]);
+        assert_eq!(custom_bases("45m"), ["15m", "5m", "1m"]);
+        assert_eq!(custom_bases("7m"), ["1m"]);
+    }
+
+    #[test]
+    fn candles_round_trip_through_json() {
+        let k = Candle { t: 1, o: 2.0, h: 3.0, l: 1.0, c: 2.5, v: 10.0 };
+        assert_eq!(serde_json::from_value::<Vec<Candle>>(serde_json::json!([{"t":1,"o":2,"h":3,"l":1,"c":2.5,"v":10}])).unwrap(), [k]);
     }
 
     #[test]

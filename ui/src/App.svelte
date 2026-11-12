@@ -23,12 +23,15 @@
   import News from "./News.svelte";
   import Search from "./Search.svelte";
   import SecondChart from "./SecondChart.svelte";
+  import IntervalPicker from "./IntervalPicker.svelte";
+  import { aggregateChart } from "./lib/aggregate";
   import Settings from "./Settings.svelte";
   import Technicals from "./Technicals.svelte";
   import Watchlist from "./Watchlist.svelte";
   import {
     RANGES,
-    INTERVAL_LABELS,
+    baseFor,
+    isCustom,
     intervalsFor,
     nextInterval,
     validInterval,
@@ -220,6 +223,7 @@
   let groupTab = $state<string | null>(null);
   let alerts = $state<PriceAlert[]>([]);
   let recent = $state<string[]>([]);
+  let recentIntervals = $state<string[]>([]);
   let history = $state<History>(emptyHistory());
   let paper = $state.raw<Paper.Account>(Paper.newAccount());
   let backtestRules = $state.raw<Backtest.Rules | null>(null);
@@ -348,12 +352,13 @@
     eventFilter = savedEventFilter = init.event_filter ?? DEFAULT_EVENT_FILTER;
     alerts = init.alerts ?? [];
     recent = init.recent_symbols ?? [];
+    recentIntervals = init.recent_intervals ?? [];
     const logoKnown = own && init.logo_known;
     const analystKnown = own && init.analyst_known;
     if (logoKnown) logo = init.logo;
     if (analystKnown) analyst = init.analyst;
     // Shown at once, refreshed by loadChart (at = 0 marks it stale).
-    if (own && init.chart) cache.set(cacheKey(), { chart: init.chart, at: 0 });
+    if (own && init.chart && init.chart.interval === (baseFor(interval, range) ?? init.chart.interval)) cache.set(cacheKey(), { chart: init.chart, at: 0 });
     ready = true;
     loadChart();
     if (!persist) void pollOwn();
@@ -382,6 +387,7 @@
     screens = keep(screens, init.screens ?? []);
     alerts = keep(alerts, init.alerts ?? []);
     drawings = keep(drawings, init.drawings ?? {});
+    recentIntervals = keep(recentIntervals, init.recent_intervals ?? []);
     indicators = keep(indicators, init.indicators);
     indicatorPresets = keep(indicatorPresets, init.indicator_presets);
     keybinds = keep(keybinds, init.keybinds);
@@ -462,20 +468,22 @@
   async function loadOlder() {
     const c = chart;
     const key = cacheKey();
-    if (!c || replay || olderBusy || olderDone.has(key) || !c.candles.length) return;
-    const first = c.candles[0].t;
-    const w = c.candles.length < Scrollback.MAX_CANDLES ? Scrollback.olderWindow(c.interval, first, c.candles[c.candles.length - 1].t) : null;
+    const base = cache.get(key)?.chart;
+    if (!c || !base || replay || olderBusy || olderDone.has(key) || !base.candles.length) return;
+    const first = base.candles[0].t;
+    const w = base.candles.length < Scrollback.MAX_CANDLES ? Scrollback.olderWindow(base.interval, first, base.candles[base.candles.length - 1].t) : null;
     if (!w) return;
     olderBusy = true;
     try {
-      const older = await invoke<Candle[]>("get_older", { symbol: c.meta.symbol, interval: c.interval, start: w.start, end: w.end, extended: c.extended ?? false });
+      const older = await invoke<Candle[]>("get_older", { symbol: base.meta.symbol, interval: base.interval, start: w.start, end: w.end, extended: base.extended ?? false });
       const add = older.filter((k) => k.t < first);
       if (!add.length) olderDone.add(key);
       else {
         olderKept.set(key, [...add, ...(olderKept.get(key) ?? [])]);
         if (chart === c && cacheKey() === key) {
-          chart = withOlder(key, c);
-          cache.set(key, { chart, at: cache.get(key)?.at ?? Date.now() });
+          const merged = withOlder(key, cache.get(key)?.chart ?? base);
+          cache.set(key, { chart: merged, at: cache.get(key)?.at ?? Date.now() });
+          chart = aggregateChart(merged, interval);
         }
       }
     } catch {
@@ -491,7 +499,7 @@
     const mine = ++chartSeq;
     const key = cacheKey();
     const hit = cache.get(key);
-    if (!manual) chart = hit?.chart ?? null;
+    if (!manual) chart = hit ? aggregateChart(hit.chart, interval) : null;
     chartError = null;
     if (hit && !force && !shouldAnalyze(!!analysis, indicators?.keep_analysis ?? false) && Date.now() - hit.at < FRESH_MS) {
       loading = false;
@@ -500,11 +508,11 @@
     }
     loading = true;
     try {
-      const c = await invoke<Chart>("get_chart", { symbol, range, interval, extended: chartExtended });
+      const c = await invoke<Chart>("get_chart", { symbol, range, interval: baseFor(interval, range) ?? interval, extended: chartExtended });
       if (mine !== chartSeq) return;
       const merged = withOlder(key, c);
       cache.set(key, { chart: merged, at: Date.now() });
-      chart = merged;
+      chart = aggregateChart(merged, interval);
       chartAt = Date.now();
       loading = false;
       if (shouldAnalyze(!!analysis, indicators?.keep_analysis ?? false)) void runAnalysis(true);
@@ -1060,7 +1068,7 @@
     const session = replaySession;
     const req = practice
       ? { symbol: practice.symbol, range: Practice.PERIOD_RANGE, interval: practice.setup.interval, extended: false }
-      : { symbol, range, interval, extended: chartExtended };
+      : analyzeArgs(replayBase);
     try {
       let until: number;
       do {
@@ -1071,7 +1079,7 @@
           const a = await invoke<Analysis>("analyze", { ...req, until });
           if (!replay || session !== replaySession) return;
           if (a.as_of <= replayBars[replay.cursor].t) {
-            replayAnalysis = a;
+            replayAnalysis = { ...a, interval: replayBase?.interval ?? a.interval };
             replayAnalysisError = null;
           }
         } catch (e) {
@@ -1107,6 +1115,11 @@
   });
   const chartFills = $derived(practice ? Practice.markers(practiceResult, replayBars) : view === "backtest" ? Backtest.markers(backtestReport) : paperFills);
 
+  function analyzeArgs(shown: Chart | null) {
+    const custom = isCustom(interval) && shown?.interval === interval;
+    return { symbol, range, interval: baseFor(interval, range) ?? interval, extended: chartExtended, candles: custom ? shown.candles : undefined };
+  }
+
   /** Runs the local technical analysis on the chart on screen. */
   async function runAnalysis(background = false) {
     if (replay) {
@@ -1119,9 +1132,9 @@
     analyzing = !background;
     analysisError = null;
     try {
-      const a = await invoke<Analysis>("analyze", { symbol, range, interval, extended: chartExtended });
+      const a = await invoke<Analysis>("analyze", analyzeArgs(chart));
       if (mine !== analysisSeq || key !== cacheKey()) return;
-      analysis = a;
+      analysis = { ...a, interval: chart?.interval ?? a.interval };
       analysisKey = key;
     } catch (e) {
       if (mine === analysisSeq) analysisError = String(e);
@@ -1284,6 +1297,7 @@
     range = r;
     interval = validInterval(range, next);
     const saved = interval;
+    if (isCustom(saved)) recentIntervals = pushRecent(recentIntervals, saved);
     clearAnalysis();
     if (persist)
       chartSettingsWrite = chartSettingsWrite
@@ -1477,6 +1491,7 @@
     if (!next.split || !next.sync_range) syncWindow = null;
     if (!next.split) syncHover = null;
     if (next.split && view !== "chart") view = "chart";
+    if (patch.interval && isCustom(patch.interval)) recentIntervals = pushRecent(recentIntervals, patch.interval);
     layout = next;
     if (persist) layoutWrite = layoutWrite.then(() => invoke<ChartLayout>("set_chart_layout", { layout: next })).then(() => undefined, console.warn);
   }
@@ -1605,7 +1620,7 @@
         setScale(scale === "linear" ? "log" : scale === "log" ? "percent" : "linear");
         break;
       case "chart_interval":
-        changeInterval(nextInterval(range, interval));
+        changeInterval(nextInterval(range, interval, recentIntervals));
         break;
       case "chart_split":
         if (!e.repeat) {
@@ -1706,7 +1721,7 @@
 
   function refreshChart() {
     if (refreshMode === "low_power" && (document.hidden || loading)) return;
-    if (/^\d+m$/.test(chart?.interval ?? "") && Date.now() - chartAt > FRESH_MS) loadChart(true);
+    if (isIntraday(chart?.interval ?? "") && Date.now() - chartAt > FRESH_MS) loadChart(true);
   }
 
   if (boot) apply(boot);
@@ -1891,12 +1906,7 @@
                 aria-label="Loading"
               ></span>{/if}
           </div>
-          <select aria-label="Candle interval" value={interval} disabled={!!practice} onchange={(event) => changeInterval(event.currentTarget.value)}>
-            <option value="auto">Auto</option>
-            {#each Scrollback.ALL_INTERVALS as i (i)}
-              <option value={i}>{INTERVAL_LABELS[i] ?? i}</option>
-            {/each}
-          </select>
+          <IntervalPicker label="Candle interval" value={interval} recent={recentIntervals} disabled={!!practice} onchange={changeInterval} />
           {#if range === "1d"}
             <div class="seg" role="group" aria-label="Extended hours">
               <button class:on={chartExtended} aria-pressed={chartExtended} title="Show pre-market and after-hours candles" disabled={!!practice} onclick={() => saveChartExtended(!chartExtended)}>Ext</button>
@@ -2073,6 +2083,7 @@
                     extended={chartExtended}
                     {refreshMode}
                     {recent}
+                    {recentIntervals}
                     redrawKey={displayKey}
                     {mode}
                     {scale}
@@ -2441,14 +2452,6 @@
     align-items: center;
     gap: 6px;
     flex-wrap: wrap;
-  }
-  .range-controls select {
-    background: var(--surface);
-    color: var(--text);
-    border: 1px solid var(--faint);
-    border-radius: 6px;
-    padding: 3px;
-    font-size: 12px;
   }
   .ranges {
     display: flex;

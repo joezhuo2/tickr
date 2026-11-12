@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ALL_INTERVALS, axisRange, mergeOlder, olderWindow, rangeFor } from "./scrollback";
-import { RANGES, intervalsFor, type Candle } from "./types";
+import { axisRange, mergeOlder, olderWindow, rangeFor } from "./scrollback";
+import { RANGES, baseFor, intervalsFor, pickerIntervals, type Candle } from "./types";
 
 const DAY = 86_400;
 const k = (t: number): Candle => ({ t, o: 1, h: 1, l: 1, c: 1, v: 1 });
@@ -12,7 +12,12 @@ describe("scroll-back history", () => {
     expect(rangeFor("1y", "5m")).toBe("1mo");
     expect(rangeFor("1d", "1wk")).toBe("6mo");
     expect(rangeFor("max", "1m")).toBe("5d");
-    for (const r of RANGES) for (const i of ALL_INTERVALS) expect(intervalsFor(rangeFor(r.id, i))).toContain(i);
+    for (const r of RANGES) for (const i of pickerIntervals(["7m", "90m", "5h", "10d", "3wk", "6mo"])) expect(intervalsFor(rangeFor(r.id, i))).toContain(baseFor(i, rangeFor(r.id, i)));
+    expect(rangeFor("5d", "2d")).toBe("ytd");
+    expect(rangeFor("1d", "4h")).toBe("1d");
+    expect(rangeFor("5y", "4h")).toBe("1y");
+    expect(rangeFor("1y", "45m")).toBe("1mo");
+    expect(rangeFor("1y", "7m")).toBe("5d");
   });
 
   it("asks for one loaded span of older candles, within the provider's limit per interval", () => {
@@ -38,5 +43,7 @@ describe("scroll-back history", () => {
     expect(axisRange("1mo", "1d", 300 * DAY)).toBe("1mo");
     expect(axisRange("1mo", "1d", 900 * DAY)).toBe("max");
     expect(axisRange("max", "1mo", 9000 * DAY)).toBe("max");
+    expect(axisRange("1mo", "4h", 300 * DAY)).toBe("1y");
+    expect(axisRange("1y", "2d", 900 * DAY)).toBe("max");
   });
 });

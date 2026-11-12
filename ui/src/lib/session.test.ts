@@ -255,8 +255,8 @@ describe("classifying bars", () => {
   });
 
   it("tells intraday intervals apart", () => {
-    for (const i of ["1m", "5m", "15m", "30m", "60m"]) expect(isIntraday(i), i).toBe(true);
-    for (const i of ["1d", "1wk", "1mo", "auto"]) expect(isIntraday(i), i).toBe(false);
+    for (const i of ["1m", "5m", "15m", "30m", "60m", "2m", "45m", "2h", "4h", "24h"]) expect(isIntraday(i), i).toBe(true);
+    for (const i of ["1d", "1wk", "1mo", "auto", "2d", "3wk", "2mo", "constructor"]) expect(isIntraday(i), i).toBe(false);
   });
 });
 
@@ -366,4 +366,7 @@ it("counts down to the close of the forming intraday candle", async () => {
   expect(candleCountdown("1d", 1000, 1001)).toBeNull();
   expect(candleCountdown("1mo", 1000, 1001)).toBeNull();
   expect(candleCountdown("1m", undefined, 1001)).toBeNull();
+  expect(candleCountdown("45m", 0, 2690)).toBe("0:10");
+  expect(candleCountdown("4h", 0, 3600)).toBe("180:00");
+  expect(candleCountdown("2d", 0, 1)).toBeNull();
 });

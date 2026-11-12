@@ -1,4 +1,5 @@
 import { indexToTime, timeToIndex } from "./drawing";
+import { isIntraday } from "./session";
 import { clamp, type View } from "./viewport";
 
 export interface TimeWindow {
@@ -49,6 +50,6 @@ export function windowView(times: number[], w: TimeWindow): View | null {
 }
 
 export function secondaryDefaults(range: string, interval: string): { range: string; interval: string } {
-  const intraday = interval === "auto" ? ["1d", "5d", "1mo"].includes(range) : /^\d+m$/.test(interval);
+  const intraday = interval === "auto" ? ["1d", "5d", "1mo"].includes(range) : isIntraday(interval);
   return intraday ? { range: "1y", interval: "1d" } : { range: "5d", interval: "auto" };
 }

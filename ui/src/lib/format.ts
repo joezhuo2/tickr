@@ -1,3 +1,4 @@
+import { isIntraday } from "./session";
 import type { Candle, PriceAlert, Sentiment } from "./types";
 
 const SYMBOLS: Record<string, string> = { USD: "$", EUR: "€", GBP: "£", JPY: "¥" };
@@ -95,7 +96,7 @@ function hm(d: Date): string {
 /** Short axis label for a candle time. */
 export function axisTime(t: number, gmtoffset: number, range: string, interval = "auto"): string {
   const d = local(t, gmtoffset);
-  if (/\dm$/.test(interval) && ["6mo", "ytd", "1y"].includes(range)) {
+  if (isIntraday(interval) && ["6mo", "ytd", "1y"].includes(range)) {
     return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()} ${hm(d)}`;
   }
   switch (range) {
@@ -116,7 +117,7 @@ export function axisTime(t: number, gmtoffset: number, range: string, interval =
 export function fullTime(t: number, gmtoffset: number, interval: string): string {
   const d = local(t, gmtoffset);
   const date = `${DAYS[d.getUTCDay()]} ${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
-  return /\dm$/.test(interval) ? `${date} ${hm(d)}` : date;
+  return isIntraday(interval) ? `${date} ${hm(d)}` : date;
 }
 
 /** How long ago a Unix time was: "now", "5m ago", "3h ago", "2d ago". */

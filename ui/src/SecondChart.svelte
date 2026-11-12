@@ -1,12 +1,15 @@
 <script lang="ts">
-  import { ALL_INTERVALS, rangeFor } from "./lib/scrollback";
+  import { rangeFor } from "./lib/scrollback";
   import { invoke } from "@tauri-apps/api/core";
   import { untrack } from "svelte";
   import ChartView from "./Chart.svelte";
   import ChartSkeleton from "./ChartSkeleton.svelte";
+  import IntervalPicker from "./IntervalPicker.svelte";
   import Search from "./Search.svelte";
+  import { aggregateChart } from "./lib/aggregate";
   import { secondaryDefaults, type TimeWindow } from "./lib/chartsync";
-  import { INTERVAL_LABELS, RANGES, intervalsFor, validInterval, type Chart, type ChartLayout, type ChartMode, type ChartScale, type ChartTimeZone, type Drawing, type RefreshMode } from "./lib/types";
+  import { isIntraday } from "./lib/session";
+  import { RANGES, baseFor, validInterval, type Chart, type ChartLayout, type ChartMode, type ChartScale, type ChartTimeZone, type Drawing, type RefreshMode } from "./lib/types";
 
   let {
     layout,
@@ -16,6 +19,7 @@
     extended,
     refreshMode,
     recent,
+    recentIntervals = [],
     redrawKey = 0,
     mode,
     scale,
@@ -37,6 +41,7 @@
     extended: boolean;
     refreshMode: RefreshMode;
     recent: string[];
+    recentIntervals?: string[];
     redrawKey?: number;
     mode: ChartMode;
     scale: ChartScale;
@@ -67,7 +72,9 @@
   const cache = new Map<string, { chart: Chart; at: number }>();
 
   async function fetchChart(sym: string) {
-    return invoke<Chart>("get_chart", { symbol: sym, range, interval, extended, secondary: true });
+    const shown = interval;
+    const c = await invoke<Chart>("get_chart", { symbol: sym, range, interval: baseFor(shown, range) ?? shown, extended, secondary: true });
+    return aggregateChart(c, shown);
   }
 
   export async function load(force = false): Promise<string | undefined> {
@@ -108,7 +115,7 @@
   $effect(() => {
     const every = refreshMode === "low_power" ? 600_000 : 300_000;
     const timer = setInterval(() => {
-      if (document.hidden || loading || !/^\d+m$/.test(chart?.interval ?? "")) return;
+      if (document.hidden || loading || !isIntraday(chart?.interval ?? "")) return;
       if (Date.now() - at >= every) void load(true);
     }, 60_000);
     return () => clearInterval(timer);
@@ -150,12 +157,7 @@
         <option value={r.id}>{r.label}</option>
       {/each}
     </select>
-    <select aria-label="Second chart interval" value={interval} onchange={(e) => chooseInterval(e.currentTarget.value)}>
-      <option value="auto">Auto</option>
-      {#each ALL_INTERVALS as i (i)}
-        <option value={i}>{INTERVAL_LABELS[i] ?? i}</option>
-      {/each}
-    </select>
+    <IntervalPicker label="Second chart interval" value={interval} recent={recentIntervals} onchange={chooseInterval} />
     {#if loading}<span class="spin" aria-label="Loading"></span>{/if}
   </div>
   {#if chart}

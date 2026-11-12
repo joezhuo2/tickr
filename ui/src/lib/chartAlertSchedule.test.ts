@@ -11,8 +11,10 @@ const cross = "crosses_above(close, sma(2))";
 describe("background chart alert schedule", () => {
   it("checks once per bar, at least every minute and at most every 15 minutes", () => {
     expect(["1m", "5m", "15m", "30m", "60m", "1d", "1wk", "1mo"].map(cadence)).toEqual([60, 300, 900, 900, 900, 900, 900, 900]);
-    expect(cadence("2h")).toBeNull();
+    expect(["2m", "10m", "45m", "2h", "4h", "2d", "3wk", "2mo"].map(cadence)).toEqual([60, 300, 900, 900, 900, 900, 900, 900]);
+    expect(cadence("constructor")).toBeNull();
     expect(inBackground({ interval: "1d" })).toBe(true);
+    expect(inBackground({ interval: "4h" })).toBe(true);
     expect(inBackground({ interval: "constructor" })).toBe(false);
   });
 
@@ -25,7 +27,7 @@ describe("background chart alert schedule", () => {
     expect(stagger("AAPL|5m")).toBeLessThan(30);
   });
 
-  it("groups armed alerts by symbol and interval and skips paused or unsupported ones", () => {
+  it("groups armed alerts by symbol and interval, fetching custom intervals at their base, and skips paused or unsupported ones", () => {
     const list = [
       alert({ id: 1 }),
       alert({ id: 2, expr: cross }),
@@ -33,8 +35,18 @@ describe("background chart alert schedule", () => {
       alert({ id: 4, interval: "1d" }),
       alert({ id: 5, symbol: "TSLA", enabled: false }),
       alert({ id: 6, interval: "2h" }),
+      alert({ id: 7, interval: "7m" }),
+      alert({ id: 8, interval: "2d" }),
+      alert({ id: 9, interval: "auto" }),
     ];
-    expect(groups(list).map((g) => [g.key, g.range])).toEqual([["AAPL|5m", "5d"], ["MSFT|5m", "5d"], ["AAPL|1d", "1y"]]);
+    expect(groups(list).map((g) => [g.key, g.base, g.range])).toEqual([
+      ["AAPL|5m", "5m", "5d"],
+      ["MSFT|5m", "5m", "5d"],
+      ["AAPL|1d", "1d", "1y"],
+      ["AAPL|2h", "30m", "1mo"],
+      ["AAPL|7m", "1m", "5d"],
+      ["AAPL|2d", "1d", "1y"],
+    ]);
   });
 
   it("returns groups never checked or past their next check", () => {
