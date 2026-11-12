@@ -6,7 +6,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { ago } from "./lib/format";
   import { accelerator, display } from "./lib/hotkey";
-  import { actionFor, bindKey, groupActions, keyLabel, rebind, type Action, type Category } from "./lib/keybinds";
+  import { DEFAULT_KEYBINDS, actionFor, bindKey, groupActions, keybindsCustomized, keyLabel, rebind, type Action, type Category } from "./lib/keybinds";
   import { backdrop, dialog, expand, paneIn } from "./lib/motion";
   import { onMount, tick } from "svelte";
   import { matchSettings, type SettingEntry } from "./lib/settingsSearch";
@@ -306,6 +306,11 @@
     invoke("set_keybinds", { keybinds: next }).catch(console.warn);
   }
 
+  function resetKeybinds() {
+    saveKeybinds({ ...DEFAULT_KEYBINDS });
+    if (hotkey !== defaultHotkey) saveHotkey(defaultHotkey);
+  }
+
   async function saveHotkey(next: string) {
     recording = null;
     try {
@@ -493,7 +498,7 @@
     <h3>Display</h3>
     <div class="row">
       <span>Reset all colors</span>
-      <button class="btn" disabled={!custom.main && !custom.sub && !Object.keys(custom.colors).length} onclick={() => setCustom({ main: "", sub: "", colors: {} })}>Reset to defaults</button>
+      <button class="link" disabled={!custom.main && !custom.sub && !Object.keys(custom.colors).length} onclick={() => setCustom({ main: "", sub: "", colors: {} })}>Reset to defaults</button>
     </div>
     <label class="row">
       <span>Theme</span>
@@ -591,6 +596,10 @@
       </span>
     </div>
     {#if error}<p class="error">{error}</p>{/if}
+    <div class="row">
+      <span>Reset all keybinds</span>
+      <button class="link" disabled={hotkey === defaultHotkey && !keybindsCustomized(keybinds)} onclick={resetKeybinds}>Reset to defaults</button>
+    </div>
     {/if}
     {#each keys.actions as a (a.id)}
       <div class="row">
@@ -1018,6 +1027,14 @@
     color: var(--accent);
     cursor: pointer;
     padding: 0;
+  }
+  .link:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .link:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
   }
   .field {
     width: 220px;
