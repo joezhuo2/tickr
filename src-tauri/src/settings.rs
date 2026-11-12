@@ -275,6 +275,14 @@ pub struct Drawing {
     pub kind: String,
     pub points: Vec<DrawingPoint>,
     pub text: String,
+    #[serde(default)]
+    pub color: String,
+    #[serde(default)]
+    pub width: u8,
+    #[serde(default)]
+    pub dashed: bool,
+    #[serde(default)]
+    pub locked: bool,
 }
 
 const PEN_MAX_POINTS: usize = 500;
@@ -296,6 +304,8 @@ pub fn validate_drawings(map: &HashMap<String, Vec<Drawing>>) -> Result<(), Stri
             if d.points.iter().any(|p| !p.price.is_finite() || p.price <= 0.0) { return Err("Invalid drawing price.".into()); }
             if d.text.chars().count() > 200 || (if d.kind == "text" { d.text.trim().is_empty() } else { !d.text.is_empty() }) { return Err("Invalid drawing text.".into()); }
             if !ids.insert(d.id) { return Err("Duplicate drawing ID.".into()); }
+            let hex = d.color.len() == 7 && d.color.starts_with('#') && d.color[1..].bytes().all(|b| b.is_ascii_hexdigit());
+            if !(d.color.is_empty() || hex) || d.width > 4 { return Err("Invalid drawing style.".into()); }
         }
     }
     Ok(())

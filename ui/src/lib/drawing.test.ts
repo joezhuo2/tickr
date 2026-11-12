@@ -1,5 +1,5 @@
 ﻿import { describe, expect, it } from "vitest";
-import { PEN_MAX_POINTS, hitPolyline, hitTest, indexToTime, pathBounds, polylineDistance, rulerMeasurement, segmentDistance, simplifyPath, timeToIndex, undoReducer, type History } from "./drawing";
+import { PEN_MAX_POINTS, snapPrice, hitPolyline, hitTest, indexToTime, pathBounds, polylineDistance, rulerMeasurement, segmentDistance, simplifyPath, timeToIndex, undoReducer, type History } from "./drawing";
 import { forward, inverse, scaleLabel } from "./scale";
 import type { Drawing } from "./types";
 
@@ -138,5 +138,15 @@ describe("box, ray, Fibonacci, position and anchored VWAP helpers", () => {
     expect(rayEnd({ x: 50, y: 10 }, { x: 50, y: 20 }, 0, 110)).toEqual({ x: 50, y: 20 });
     expect(hitBox({ x: 10, y: 52 }, { x: 10, y: 10 }, { x: 100, y: 100 })).toBe(true);
     expect(hitBox({ x: 55, y: 55 }, { x: 10, y: 10 }, { x: 100, y: 100 })).toBe(false);
+  });
+});
+
+describe("snapPrice", () => {
+  it("snaps to the nearest OHLC value within the tolerance", () => {
+    const candle = { o: 10, h: 12, l: 9, c: 11 };
+    expect(snapPrice(11.8, candle, 0.5)).toBe(12);
+    expect(snapPrice(10.4, candle, 0.5)).toBe(10);
+    expect(snapPrice(10.5, candle, 0.2)).toBe(10.5);
+    expect(snapPrice(10.5, undefined, 5)).toBe(10.5);
   });
 });

@@ -142,6 +142,11 @@ taskbar to keep it visible.
   Drag to move them or adjust trend endpoints, and Delete removes the selection.
   Ctrl+Z undoes, Ctrl+Shift+Z redoes, and Escape returns to Cursor. The ruler
   measures price, percent, bars and elapsed time without saving.
+  Select a drawing to style it: a row under the toolbar sets its color, line
+  width (1 to 3 px), a dashed line, and **Lock**, which stops it being moved or
+  deleted until unlocked. **Magnet** snaps new points and dragged endpoints to
+  the open, high, low or close of the candle under the cursor when within 12
+  pixels, and **Hide** hides every drawing until you click it again.
 - **Candle interval:** choose Auto to keep the default resolution for each
   range, or select a supported interval independently. The choice is saved
   and resets to Auto when switching to a range that does not support it.

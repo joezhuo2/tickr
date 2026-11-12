@@ -135,3 +135,15 @@ export function hitBox(p: Pixel, a: Pixel, b: Pixel): boolean {
   const corners = [a, { x: b.x, y: a.y }, b, { x: a.x, y: b.y }, a];
   return hitPolyline(p, corners);
 }
+
+export const DRAWING_COLORS = ["", "#ef4444", "#22c55e", "#3b82f6", "#f59e0b", "#a855f7"];
+
+export function snapPrice(price: number, candle: Pick<Candle, "o" | "h" | "l" | "c"> | undefined, tolerance: number): number {
+  if (!candle) return price;
+  let best = price;
+  let gap = tolerance;
+  for (const v of [candle.o, candle.h, candle.l, candle.c]) {
+    if (Math.abs(v - price) <= gap) { best = v; gap = Math.abs(v - price); }
+  }
+  return best;
+}
