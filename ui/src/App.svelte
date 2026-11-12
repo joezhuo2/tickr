@@ -83,7 +83,7 @@
   import type { Theme, TextSize, Palette } from "./lib/types";
   import { refreshOutcome, type RefreshView } from "./lib/refresh";
   import { chartNote, chartSegment, chartTime, classifyChart, classifyQuote, delayLabel, localOffset, quoteNote, quoteSegment, quoteStatus, quoteTime, sourceName } from "./lib/freshness";
-  import { paneIn } from "./lib/motion";
+  import { paneIn, sideIn } from "./lib/motion";
   import { displayOffset, isIntraday } from "./lib/session";
   import { emptyHistory, goBack, goForward, previous, pushRecent, visit, type History, type Move } from "./lib/history";
   import { DEFAULT_EVENT_FILTER, localDay, weekRange, type EventsTab } from "./lib/calendar";
@@ -1693,6 +1693,7 @@
   <div class="app">
     <main>
       {#if leftOn}
+      <div class="left-wrap" transition:sideIn>
       <Left
         width={leftWidth}
         symbol={practice?.symbol ?? symbol}
@@ -1728,6 +1729,7 @@
           setLeftWidth(leftWidth + (e.key === "ArrowRight" ? 24 : -24));
         }}
       ></div>
+      </div>
       {/if}
       <section>
         <div class="toolbar">
@@ -2166,6 +2168,11 @@
     border-left: 1px solid var(--faint);
     cursor: col-resize;
     touch-action: none;
+  }
+  .left-wrap {
+    flex: none;
+    display: flex;
+    min-height: 0;
   }
   .left-grip {
     flex: none;

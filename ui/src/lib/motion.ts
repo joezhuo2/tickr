@@ -22,6 +22,10 @@ export function paneIn(node: Element, { y = 6, speed = "base" }: { y?: number; s
   return fly(node, { y, duration: duration(speed), easing: cubicOut });
 }
 
+export function sideIn(node: Element) {
+  return slide(node, { axis: "x", duration: duration("base"), easing: cubicOut });
+}
+
 export function backdrop(node: Element) {
   return fade(node, { duration: duration("base") });
 }
