@@ -6,6 +6,10 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.25] - 2026-11-11
+
+### Added\n- **Go to date:** jump the chart to a date within the loaded range.\n- **Session volume profile** study and a **Volume profile (range)** drawing.
+
 ## [0.11.24] - 2026-11-11
 
 ### Added\n- **Studies:** Stochastic, Ichimoku, Supertrend, OBV and pivot points, toggled\n  from the Technicals tab and drawn without running Analyze.
