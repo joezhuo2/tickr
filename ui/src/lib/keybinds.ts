@@ -56,6 +56,7 @@ export const ACTIONS: { id: Action; label: string; category: Category }[] = [
   { id: "watchlist", label: "Next watchlist stock", category: "watchlist" },
   { id: "add_watchlist", label: "Add stock to Watchlist", category: "watchlist" },
   { id: "next_group", label: "Next watchlist group", category: "watchlist" },
+  { id: "side_panel", label: "Toggle stock overview", category: "general" },
   { id: "search", label: "Focus search", category: "general" },
   { id: "previous_symbol", label: "Previous symbol", category: "general" },
   { id: "settings", label: "Toggle Settings", category: "general" },
@@ -87,13 +88,13 @@ export function rebind(binds: Keybinds, id: Action, key: string): Keybinds {
   return next;
 }
 
-const REPLAY_ACTIONS = new Set<Action>(["chart_mode", "chart_scale", "chart_interval", "chart_replay", "practice", "range", "refresh", "technicals", "paper", "analyze", "toggle_opening_range", "toggle_levels", "toggle_volume_ma", "toggle_volume_profile", "search", "previous_symbol", "watchlist", "add_watchlist", "settings"]);
+const REPLAY_ACTIONS = new Set<Action>(["chart_mode", "chart_scale", "chart_interval", "chart_replay", "practice", "range", "refresh", "technicals", "paper", "analyze", "toggle_opening_range", "toggle_levels", "toggle_volume_ma", "toggle_volume_profile", "search", "previous_symbol", "watchlist", "add_watchlist", "settings", "side_panel"]);
 
 export function replayAllows(action: Action): boolean {
   return REPLAY_ACTIONS.has(action);
 }
 
-const PRACTICE_ACTIONS = new Set<Action>(["chart_mode", "chart_scale", "practice", "technicals", "analyze", "settings"]);
+const PRACTICE_ACTIONS = new Set<Action>(["chart_mode", "chart_scale", "practice", "technicals", "analyze", "settings", "side_panel"]);
 
 export function practiceAllows(action: Action): boolean {
   return PRACTICE_ACTIONS.has(action);

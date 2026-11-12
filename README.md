@@ -48,7 +48,10 @@ it. The builds come from the public
 into them.
 
 - **Windows:** SmartScreen says "Windows protected your PC". Click
-  **More info**, then **Run anyway**. You only see this once.
+  **More info**, then **Run anyway**. You only see this once. If Microsoft
+  Defender removes tickr as `Trojan:Win32/Bearfoos` (a false positive on the
+  unsigned build), update to the newest release, or restore it under
+  **Windows Security > Protection history**.
 - **macOS 15 (Sequoia) or later:** open tickr and close the warning that it
   can't be verified. Go to **System Settings > Privacy & Security**, scroll
   down to the message about tickr and click **Open Anyway**, then confirm
@@ -268,6 +271,10 @@ taskbar to keep it visible.
   buy-and-hold comparison, and marks trades on the chart.
 
 ### Views
+
+The stock overview on the left can be resized: drag its right edge (or focus
+it and press ← or →); the width is remembered. Hide or show it with the
+button left of the back arrow, or `\`.
 
 The Watchlist, Alerts, Analysts, Earnings, Stats, Financials, Market, Events,
 Options and News open in a column to the right of the chart, so the chart
@@ -509,6 +516,7 @@ typing in a text field.
 | General | `S` | Focus search |
 | | `B` | Previous symbol (toggles between two) |
 | | `,` | Toggle Settings |
+| | `\` | Toggle stock overview |
 | Fixed | `Alt+←` | Back to the previous symbol in history |
 | | `Alt+→` | Forward in history |
 
@@ -644,8 +652,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.34
-git push origin v0.11.34
+git tag v0.11.35
+git push origin v0.11.35
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

@@ -14,8 +14,10 @@
     onanalysts,
     onstar,
     replay = null,
+    width = 230,
   }: {
     symbol: string;
+    width?: number;
     quote: Quote | null;
     logo: string | null | undefined;
     analyst: Consensus | null | undefined;
@@ -38,7 +40,7 @@
   };
 </script>
 
-<aside>
+<aside style:width="{width}px">
   {#if logo === undefined}
     <span class="icon sk"></span>
   {:else}
