@@ -81,7 +81,7 @@ update themselves: install v0.5.1 once from Releases.
 ## Features
 
 - **Display settings:** choose System, Light or Dark, text size from 100% to 150%, and standard or accessible blue/orange gain and loss colors. Changes apply immediately and are saved.
-- **Theme colors and fonts:** Settings > Display also has a **Main color** (the accent on buttons, links and highlights) and a **Sub color** (the background; text, panels and borders are derived from it, and it decides light or dark by itself, overriding Theme). Both open a themed color picker with a saturation and brightness square, a hue slider, presets and a hex box; changes preview live, and Reset returns to the theme's own color. **Font** and **Number font** pick from font families already on your computer, so a choice that is not installed falls back to the next in its list. Below them, **Colors** lists every color tickr draws with (interface, gain/loss and every chart overlay and marker), each with its own picker and Reset; a color set there wins over Main, Sub and the gain/loss palette. **Reset to defaults** at the top of Display clears every color choice at once. All of these are remembered on this computer and are not part of Backup.
+- **Theme colors and fonts:** Settings > Display also has a **Main color** (the accent on buttons, links and highlights) and a **Sub color** (the background; text, panels and borders are derived from it, and it decides light or dark by itself, overriding Theme). Both open a themed color picker with a saturation and brightness square, a hue slider, presets and a hex box; changes preview live, and Reset returns to the theme's own color. **Font** and **Number font** pick from font families already on your computer, so a choice that is not installed falls back to the next in its list. Below them, **Colors** lists every color tickr draws with (interface, gain/loss and every chart overlay and marker), each with its own picker and Reset; a color set there wins over Main, Sub and the gain/loss palette. **Reset to defaults** at the top of Display clears every color choice at once. All of these are remembered on this computer and are included in Backup.
 
 ### Tray and hotkey
 
@@ -352,8 +352,8 @@ it is instant.
   and use fixed settings. Pivots come from the previous day on intraday charts,
   the previous month on daily charts and the previous year on longer ones. The
   Ichimoku cloud stops at the latest bar, since the chart has no room to the
-  right of it. Which studies are on is remembered on this computer but is not
-  part of Backup or indicator presets.
+  right of it. Which studies are on is remembered on this computer and is in
+  Backup, but not in indicator presets.
 
 - **Analysts:** the rating (Strong buy to Sell), average 12-month target and
   its upside also sit under the price on the left. The tab adds the target
@@ -441,7 +441,7 @@ open; they do not run in the background the way price alerts do. They fire
 once with a desktop notification, then show **Triggered** until you **Rearm**
 them. A line alert keeps the line as it was when the alert was added, so
 moving the drawing later does not move the alert. They are saved on this
-computer and are not part of Backup.
+computer and are included in Backup.
 
 With an Alpaca stream connected, alerts on the symbol on screen are also
 checked on each streamed trade, about four times a second.
@@ -522,8 +522,9 @@ typing in a text field.
 | | `Alt+→` | Forward in history |
 
 **Backup** exports your settings, watchlists, groups, drawings, alerts, saved
-screens, keybinds and indicator presets to a JSON file, and **Import** restores
-one after checking it. API keys stay in `.env` and are never exported; the data
+screens, keybinds, indicator presets, indicator alerts, study toggles, theme
+colors and fonts and the magnet toggle to a JSON file, and **Import** restores
+one after checking it (older backups without those parts leave them as they are). API keys stay in `.env` and are never exported; the data
 provider, window position and start-at-login setting are kept on import.
 
 ### AI news analysis
@@ -654,8 +655,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.44
-git push origin v0.11.44
+git tag v0.11.45
+git push origin v0.11.45
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

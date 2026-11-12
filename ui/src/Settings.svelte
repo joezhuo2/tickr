@@ -2,6 +2,7 @@
   import ColorPicker from "./ColorPicker.svelte";
   import { FONTS, MAIN_PRESETS, MONO_FONTS, NO_CUSTOM, SUB_PRESETS, TOKENS, saveCustom, type Custom } from "./lib/display";
   import { cssToHex } from "./lib/color";
+  import { applyLocal, parseLocal, withLocal } from "./lib/backupLocal";
   import { invoke } from "@tauri-apps/api/core";
   import { ago } from "./lib/format";
   import { accelerator, display } from "./lib/hotkey";
@@ -185,7 +186,7 @@
     backupStatus = "";
     backupError = false;
     try {
-      const text = await invoke<string>("export_settings");
+      const text = withLocal(await invoke<string>("export_settings"), localStorage);
       const link = document.createElement("a");
       link.href = URL.createObjectURL(new Blob([text], { type: "application/json" }));
       link.download = `tickr-backup-${new Date().toISOString().slice(0, 10)}.json`;
@@ -217,7 +218,9 @@
     const text = pendingImport;
     pendingImport = null;
     try {
+      const local = parseLocal(text ?? "");
       await invoke("import_settings", { text });
+      applyLocal(localStorage, local);
       sessionStorage.setItem("tickr-reload-state", "1");
       location.reload();
     } catch (e) {

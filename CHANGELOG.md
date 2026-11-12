@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.45] - 2026-11-12
+
+### Fixed
+- **Backup** now includes indicator alerts, theme colors and fonts, study
+  toggles and the magnet setting. Older backup files still import and leave
+  those untouched.
+
 ## [0.11.44] - 2026-11-12
 
 ### Changed
