@@ -189,4 +189,35 @@ describe("opening range breakout", () => {
 it("labels a sweep parameter by the call it sits in", () => {
   const labels = parameters({ entry: "crosses_above(ema(20), sma(50)) and close > 5", exit: "rsi(14) > 70" } as Parameters<typeof parameters>[0]).map((p) => p.label);
   expect(labels).toEqual(["Entry: ema(20)", "Entry: sma(50)", "Entry: 5", "Exit: rsi(14)", "Exit: 70"]);
+  const multi = parameters({ entry: "macd(12, 26, 9) > bb_upper(20, 2.5)", exit: "", stop_pct: null, target_pct: null }).map((p) => p.label);
+  expect(multi).toEqual(["Entry: macd(12)", "Entry: macd(…, 26)", "Entry: macd(…, 9)", "Entry: bb_upper(20)", "Entry: bb_upper(…, 2.5)"]);
+});
+
+describe("short side", () => {
+  const entry = "close == 100 and high == 100";
+  const open = [flat(0, 100), flat(1, 100)];
+
+  it("sells at the next open, gains when price falls and keeps buy and hold long", () => {
+    const r = backtest([...open, bar(2, 100, 101, 90, 90), flat(3, 80)], rules({ entry, side: "short" }));
+    expect(r.side).toBe("short");
+    expect(r.trades).toHaveLength(1);
+    expect(r.trades[0]).toMatchObject({ entry_time: 1, entry_price: 100, exit_time: 3, exit_price: 80, reason: "end" });
+    expect(r.trades[0].return_pct).toBeCloseTo(20);
+    expect(r.total_return).toBeCloseTo(20);
+    expect(r.buy_hold).toBeCloseTo(-20);
+    expect(r.curve[2].equity).toBeCloseTo(1.1);
+    expect(markers(r)).toEqual([{ t: 1, side: "sell", price: 100 }, { t: 3, side: "buy", price: 80 }]);
+  });
+
+  it("puts the stop above the entry and the target below", () => {
+    const stop = backtest([...open, bar(2, 100, 106, 99, 100), flat(3, 100)], rules({ entry, side: "short", stop_pct: 5, target_pct: 10 }));
+    expect(stop.trades[0]).toMatchObject({ exit_time: 2, exit_price: 105, reason: "stop" });
+    expect(stop.trades[0].return_pct).toBeCloseTo(-5);
+    const target = backtest([...open, bar(2, 100, 101, 89, 100)], rules({ entry, side: "short", stop_pct: 5, target_pct: 10 }));
+    expect(target.trades[0]).toMatchObject({ exit_time: 2, exit_price: 90, reason: "target" });
+    expect(target.trades[0].return_pct).toBeCloseTo(10);
+    const gap = backtest([...open, bar(2, 110, 112, 108, 110)], rules({ entry, side: "short", stop_pct: 5 }));
+    expect(gap.trades[0]).toMatchObject({ exit_price: 110, reason: "stop" });
+    expect(backtest([...open, flat(2, 90)], rules({ entry })).side).toBe("long");
+  });
 });
