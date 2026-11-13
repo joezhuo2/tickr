@@ -2349,7 +2349,7 @@
               </div>
             {:else if view === "backtest"}
               <div class="below">
-              <BacktestView report={backtestReport} bars={mainChart?.candles.length ?? 0} currency={mainChart?.meta.currency ?? "USD"} when={chartWhen} onrun={(rules) => (backtestRules = rules)} />
+              <BacktestView report={backtestReport} bars={mainChart?.candles.length ?? 0} candles={mainChart?.candles ?? []} clock={mainChart ? clockFor(mainChart.meta) : undefined} currency={mainChart?.meta.currency ?? "USD"} when={chartWhen} onrun={(rules) => (backtestRules = rules)} />
               </div>
             {/if}
           </div>
