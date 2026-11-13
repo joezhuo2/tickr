@@ -14,6 +14,7 @@ export const SETTING_FIELDS = {
   cci: { length: len(20) },
   willr: { length: len(14) },
   mfi: { length: len(14) },
+  volumeProfile: { area: { label: "Value area %", def: 70, min: 50, max: 95, step: 1 } },
   psar: { step: { label: "Step", def: 0.02, min: 0.001, max: 1, step: 0.001 }, max: { label: "Max", def: 0.2, min: 0.01, max: 1, step: 0.01 } },
 } as const;
 
@@ -21,7 +22,7 @@ export type SettingGroup = keyof typeof SETTING_FIELDS;
 
 export type StudySettings = {
   [G in SettingGroup]: { [F in keyof (typeof SETTING_FIELDS)[G]]: number };
-} & { pivotType: PivotType };
+} & { pivotType: PivotType; showPoc: boolean };
 
 export const SETTING_LABELS: Record<SettingGroup, string> = {
   stoch: "Stochastic",
@@ -33,6 +34,7 @@ export const SETTING_LABELS: Record<SettingGroup, string> = {
   willr: "Williams %R",
   mfi: "MFI",
   psar: "Parabolic SAR",
+  volumeProfile: "Volume profile",
 };
 
 export function cleanSettings(v: unknown): StudySettings {
@@ -50,6 +52,7 @@ export function cleanSettings(v: unknown): StudySettings {
   const psar = out.psar as { step: number; max: number };
   psar.max = Math.max(psar.max, psar.step);
   out.pivotType = PIVOT_TYPES.includes(o.pivotType as PivotType) ? o.pivotType : "classic";
+  out.showPoc = typeof o.showPoc === "boolean" ? o.showPoc : true;
   return out as StudySettings;
 }
 

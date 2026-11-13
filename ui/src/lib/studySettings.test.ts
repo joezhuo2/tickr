@@ -8,6 +8,9 @@ describe("study settings", () => {
     expect(d.ichimoku).toEqual({ conversion: 9, base: 26, spanB: 52, displacement: 26 });
     expect(d.supertrend).toEqual({ length: 10, multiplier: 3 });
     expect(d.pivotType).toBe("classic");
+    expect(d.volumeProfile).toEqual({ area: 70 });
+    expect(d.showPoc).toBe(true);
+    expect(cleanSettings({ volumeProfile: { area: 99 }, showPoc: false })).toMatchObject({ volumeProfile: { area: 95 }, showPoc: false });
   });
 
   it("clamps, rounds and rejects bad values", () => {

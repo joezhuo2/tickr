@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alertLevels, chartPatternKinds, clampPanel, legendText, overlayVisibility, paneLayout, volumeProfile, shouldAnalyze, toggleChartPattern, toggleOverlay } from "./indicators";
+import { alertLevels, chartPatternKinds, clampPanel, legendText, overlayVisibility, paneLayout, valueArea, volumeProfile, shouldAnalyze, toggleChartPattern, toggleOverlay } from "./indicators";
 import { CHART_PATTERN_KINDS } from "./patternInfo";
 import type { IndicatorConfig, Overlays } from "./types";
 
@@ -51,6 +51,28 @@ it("spreads each candle's volume over the price bins it touches", () => {
   expect(volumeProfile(candles, 1, 1, 4)?.volumes.reduce((a, b) => a + b)).toBe(100);
   expect(volumeProfile([bar(5, 5, 10)], 0, 0)).toBeNull();
   expect(volumeProfile([], 0, 0)).toBeNull();
+});
+
+describe("valueArea", () => {
+  it("extends from the POC toward the heavier side", () => {
+    expect(valueArea([5, 10, 30, 20, 5, 2, 28], 60)).toEqual({ poc: 2, lo: 1, hi: 3 });
+    expect(valueArea([5, 10, 30, 20, 5, 2, 28], 70)).toEqual({ poc: 2, lo: 0, hi: 4 });
+    expect(valueArea([5, 10, 30, 20, 5, 2, 28], 90)).toEqual({ poc: 2, lo: 0, hi: 6 });
+  });
+  it("breaks ties toward the first peak and the upper side", () => {
+    expect(valueArea([10, 10, 10], 50)).toEqual({ poc: 0, lo: 0, hi: 1 });
+    expect(valueArea([10, 40, 10, 10, 10, 10, 10], 50)).toEqual({ poc: 1, lo: 1, hi: 2 });
+  });
+  it("handles single bins and empty input", () => {
+    expect(valueArea([7], 70)).toEqual({ poc: 0, lo: 0, hi: 0 });
+    expect(valueArea([], 70)).toBeNull();
+    expect(valueArea([0, 0], 70)).toBeNull();
+  });
+  it("keeps the percent within 50 to 95 and stops at the edges", () => {
+    expect(valueArea([10, 10, 10, 10], 0)).toEqual({ poc: 0, lo: 0, hi: 1 });
+    expect(valueArea([10, 10, 10, 10], 100)).toEqual({ poc: 0, lo: 0, hi: 3 });
+    expect(valueArea([0, 10, 0], 95)).toEqual({ poc: 1, lo: 1, hi: 1 });
+  });
 });
 
 it("lists the latest known breakout levels with their alert direction", () => {
