@@ -18,6 +18,7 @@
   import { displayCandles, isOhlc } from "./lib/charttypes";
   import { fadeIn } from "./lib/motion";
   import { patternInfo } from "./lib/patternInfo";
+  import type { ChartPattern } from "./lib/chartPatterns";
   import ColorPicker from "./ColorPicker.svelte";
   import { MAIN_PRESETS } from "./lib/display";
   import { NOTE_MAX, noteBar, noteTitle, snapNoteTime } from "./lib/notes";
@@ -47,6 +48,7 @@
     replay = false,
     fills = [],
     highlight = null,
+    chartPatterns = [],
     orderLines = [],
     onmoveorder,
     onolder,
@@ -76,6 +78,7 @@
     replay?: boolean;
     fills?: { t: number; side: "buy" | "sell"; price: number }[];
     highlight?: { from: number; to: number } | null;
+    chartPatterns?: ChartPattern[];
     orderLines?: { id: string; price: number; side: "buy" | "sell"; label: string }[];
     onmoveorder?: (id: string, price: number) => void;
   } = $props();
@@ -991,6 +994,38 @@
         }
       }
     }
+    if (s.chart_patterns) {
+      ctx.font = `10px ${v("--font")}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      for (const p of chartPatterns) {
+        const xs = p.points.map((q) => indexOf.get(q.t));
+        if (xs.some((i) => i == null) || xs[xs.length - 1]! < g.from || xs[0]! > g.to) continue;
+        const col = v(p.bias === "bullish" ? "--up" : p.bias === "bearish" ? "--down" : "--muted");
+        ctx.strokeStyle = col;
+        ctx.fillStyle = col;
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        p.points.forEach((q, k) => (k ? ctx.lineTo(g.x(xs[k]!), g.y(q.price)) : ctx.moveTo(g.x(xs[k]!), g.y(q.price))));
+        ctx.stroke();
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 3]);
+        for (const [a, b] of p.lines) {
+          const i = indexOf.get(a.t);
+          const j = indexOf.get(b.t);
+          if (i == null || j == null) continue;
+          ctx.beginPath();
+          ctx.moveTo(g.x(i), g.y(a.price));
+          ctx.lineTo(g.x(j), g.y(b.price));
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+        const k = p.points.reduce((best, q, n) => (q.price > p.points[best].price ? n : best), 0);
+        ctx.fillText(`${p.name}${p.confirmed ? "" : "?"}`, g.x(xs[k]!), g.y(p.points[k].price) - 6);
+      }
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+    }
     ctx.restore();
 
     if (s.volume_ma) {
@@ -1249,6 +1284,19 @@
     // Redraw when any of these change.
     void [rr.reward, stoch, ichi, trendLine, onBalance, pivotLevels, sessionKeys, redrawKey, list, preview, selected, tool, hideDrawings, orderLines, orderDrag, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt, fillMarks, highlight];
     draw();
+  });
+
+  $effect(() => {
+    const h = highlight;
+    if (!h) return;
+    untrack(() => {
+      const i = indexOf.get(h.from);
+      const j = indexOf.get(h.to);
+      const [i0, i1] = visible(view, candles.length);
+      if (i == null || j == null || (i >= i0 && j <= i1)) return;
+      view = center(view, candles.length, Math.round((i + j) / 2));
+      emitWindow();
+    });
   });
 
   $effect(() => {
@@ -2022,7 +2070,8 @@
     const rsi = show?.rsi && analysis ? valueAt(analysis.series.rsi, hover) : null;
     const macd = show?.macd && analysis ? analysis.series.macd.map((line) => ({ label: line.label, value: valueAt(line, hover!) })) : [];
     const pats = show?.patterns ? (patternsAt.get(hover) ?? []) : [];
-    return { c, x, left, ext: isExtendedSession(sessions[hover]), rsi, macd, pats, earn: earningsAt.get(hover), grades: ratingsAt.get(hover) ?? [], heads: newsAt.get(hover) ?? [], div: dividendsAt.get(hover), split: splitsAt.get(hover) };
+    const chartPats = show?.chart_patterns ? chartPatterns.filter((p) => p.points[0].t <= c.t && c.t <= p.points[p.points.length - 1].t) : [];
+    return { c, x, left, ext: isExtendedSession(sessions[hover]), rsi, macd, pats, chartPats, earn: earningsAt.get(hover), grades: ratingsAt.get(hover) ?? [], heads: newsAt.get(hover) ?? [], div: dividendsAt.get(hover), split: splitsAt.get(hover) };
   });
 </script>
 
@@ -2230,6 +2279,10 @@
         <div class="pat {p.direction === 'bullish' ? 'up' : 'down'}">{p.direction === "bullish" ? "▲" : "▼"} {p.name}</div>
         {@const info = patternInfo(p.kind)}
         {#if info}<div class="pat-info">{info.bias} · {info.text}</div>{/if}
+      {/each}
+      {#each tip.chartPats as p, k (k)}
+        <div class="pat {p.bias === 'bullish' ? 'up' : p.bias === 'bearish' ? 'down' : ''}">{p.bias === "bullish" ? "▲" : p.bias === "bearish" ? "▼" : "•"} {p.name} <span class="pat-info">{p.confirmed ? "confirmed" : "forming"}</span></div>
+        <div class="pat-info">{p.bias} · {patternInfo(p.kind)?.text}</div>
       {/each}
     </div>
   {/if}

@@ -12,6 +12,8 @@ describe("settings search", () => {
     expect(matchSettings("model").map((e) => e.label)).toEqual(["Model", "News model", "Events model"]);
     expect(matchSettings("backup").map((e) => e.label)).toEqual(["Export", "Import"]);
     expect(matchSettings("zzz")).toEqual([]);
+    expect(matchSettings("auto an")[0]).toMatchObject({ label: "Auto analyze", tab: "chart" });
+    expect(matchSettings("head and")[0]).toMatchObject({ label: "Head and shoulders", section: "Technical analysis" });
   });
 
   it("points hotkey entries at their category and respects the limit", () => {

@@ -1,5 +1,7 @@
 import { TOKENS } from "./display";
 import { groupActions, type Category } from "./keybinds";
+import { OVERLAY_TOGGLES } from "./indicators";
+import { CHART_PATTERN_INFO, CHART_PATTERN_KINDS } from "./patternInfo";
 
 export type SettingsTab = "display" | "hotkeys" | "chart" | "data" | "ai" | "backup" | "connections";
 
@@ -19,6 +21,7 @@ export const SETTINGS: SettingEntry[] = [
   ...groupActions().flatMap((g) => g.actions.map((a) => ({ label: a.label, section: `Hotkeys · ${g.label}`, tab: "hotkeys" as const, group: g.id }))),
   ...entry("chart", "Chart", ["Extended-hours candles", "Shade pre-market and after-hours", "Chart times", "R:R reward multiple", "Earnings", "News", "Analyst ratings"]),
   ...entry("chart", "Chart alerts", ["Check indicator and drawing alerts in the background"]),
+  ...entry("chart", "Technical analysis", ["Auto analyze", ...OVERLAY_TOGGLES.map((o) => o.label), ...CHART_PATTERN_KINDS.map((k) => CHART_PATTERN_INFO[k].name)]),
   ...entry("data", "Market data", ["Provider", "Clear cached history"]),
   ...entry("ai", "AI", ["News analysis", "Base URL", "Model", "News model", "Events model", "API key"]),
   ...entry("backup", "Backup", ["Export", "Import"]),
