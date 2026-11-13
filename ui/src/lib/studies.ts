@@ -1,6 +1,7 @@
+import { bucketIndex, type Frame } from "./aggregate";
 import { isIntraday } from "./session";
 import { rsi } from "./strategy";
-import type { PivotType } from "./studySettings";
+import type { PivotType, SettingGroup, StudyInstance } from "./studySettings";
 import { intervalSpec, type Candle } from "./types";
 
 export type Series = (number | null)[];
@@ -27,6 +28,8 @@ export const STUDIES = [
   { id: "aroon", label: "Aroon" },
   { id: "cmf", label: "CMF" },
   { id: "roc", label: "ROC" },
+  { id: "rsi_study", label: "RSI study" },
+  { id: "macd_study", label: "MACD study" },
 ] as const;
 
 export type StudyId = (typeof STUDIES)[number]["id"];
@@ -302,8 +305,21 @@ export function linearRegression(candles: readonly Candle[], length = 100, devia
   return { upper, mid, lower };
 }
 
+export function rsiSeries(candles: readonly Candle[], length = 14): Series {
+  return rsi(candles.map((c) => c.c), length).map((x) => (Number.isNaN(x) ? null : x));
+}
+
+export function macd(candles: readonly Candle[], fast = 12, slow = 26, signal = 9): { line: Series; signal: Series; hist: Series } {
+  const closes = candles.map((c) => c.c);
+  const f = ema(closes, fast);
+  const s = ema(closes, slow);
+  const line = f.map((x, i) => (x == null || s[i] == null ? null : x - s[i]!));
+  const sig = ema(line, signal);
+  return { line, signal: sig, hist: line.map((x, i) => (x == null || sig[i] == null ? null : x - sig[i]!)) };
+}
+
 export function stochRsi(candles: readonly Candle[], rsiLength = 14, stochLength = 14, smoothK = 3, smoothD = 3): { k: Series; d: Series } {
-  const strength: Series = rsi(candles.map((c) => c.c), rsiLength).map((x) => (Number.isNaN(x) ? null : x));
+  const strength = rsiSeries(candles, rsiLength);
   const raw: Series = strength.map((x, i) => {
     if (x == null || i < stochLength - 1) return null;
     const win = strength.slice(i - stochLength + 1, i + 1);
@@ -396,4 +412,58 @@ export function pivotPeriod(interval: string, gmtoffset: number): (t: number) =>
   const date = (t: number) => new Date((t + gmtoffset) * 1000);
   if (intervalSpec(interval)?.unit === "d") return (t) => date(t).getUTCFullYear() * 12 + date(t).getUTCMonth();
   return (t) => date(t).getUTCFullYear();
+}
+
+export const PANE_STUDIES: readonly SettingGroup[] = ["stoch", "cci", "willr", "mfi", "stochrsi", "aroon", "cmf", "roc", "rsi_study", "macd_study"];
+
+const sides = (r: { value: Series; up: boolean[] }) => ({ value: r.value, up: r.value.map((x, i) => (r.up[i] ? x : null)), down: r.value.map((x, i) => (r.up[i] ? null : x)) });
+
+export function computeStudy(study: SettingGroup, candles: readonly Candle[], p: Record<string, number>): Record<string, Series> {
+  switch (study) {
+    case "stoch": return stochastic(candles, p.k, p.smooth, p.d);
+    case "ichimoku": return ichimoku(candles, p.conversion, p.base, p.spanB, p.displacement);
+    case "supertrend": return sides(supertrend(candles, p.length, p.multiplier));
+    case "keltner": return keltner(candles, p.ema, p.atr, p.multiplier);
+    case "donchian": return donchian(candles, p.length);
+    case "psar": return sides(parabolicSar(candles, p.step, p.max));
+    case "linreg": return linearRegression(candles, p.length, p.deviations);
+    case "stochrsi": return stochRsi(candles, p.rsi, p.stoch, p.k, p.d);
+    case "aroon": return aroon(candles, p.length);
+    case "macd_study": return macd(candles, p.fast, p.slow, p.signal);
+    case "cci": return { value: cci(candles, p.length) };
+    case "willr": return { value: williamsR(candles, p.length) };
+    case "mfi": return { value: mfi(candles, p.length) };
+    case "wma": return { value: wma(candles, p.length) };
+    case "hma": return { value: hma(candles, p.length) };
+    case "vwma": return { value: vwma(candles, p.length) };
+    case "zigzag": return { value: zigzag(candles, p.percent) };
+    case "cmf": return { value: cmf(candles, p.length) };
+    case "roc": return { value: roc(candles, p.length) };
+    case "rsi_study": return { value: rsiSeries(candles, p.length) };
+  }
+}
+
+export function onHigherTimeframe(candles: readonly Candle[], index: readonly number[], compute: (c: Candle[]) => Record<string, Series>, window = 300): Record<string, Series> {
+  const out: Record<string, Series> = {};
+  const done: Candle[] = [];
+  let bar: Candle | null = null;
+  candles.forEach((c, i) => {
+    if (bar && index[i] !== index[i - 1]) { done.push(bar); bar = null; }
+    bar = bar ? { ...bar, h: Math.max(bar.h, c.h), l: Math.min(bar.l, c.l), c: c.c, v: bar.v + c.v } : { ...c };
+    const tail = done.slice(Math.max(0, done.length - window));
+    for (const [key, s] of Object.entries(compute([...tail, bar]))) (out[key] ??= candles.map(() => null))[i] = s[tail.length] ?? null;
+  });
+  return out;
+}
+
+export function studyTimeframe(tf: string, chartInterval: string | undefined): string | null {
+  const a = intervalSpec(tf);
+  const b = chartInterval ? intervalSpec(chartInterval) : null;
+  return a && b && a.seconds > b.seconds ? tf : null;
+}
+
+export function instanceOutput(inst: StudyInstance, candles: readonly Candle[], interval?: string, frame?: Frame): Record<string, Series> {
+  const tf = frame ? studyTimeframe(inst.tf, interval) : null;
+  const run = (c: readonly Candle[]) => computeStudy(inst.study, c, inst.params);
+  return tf && frame ? onHigherTimeframe(candles, bucketIndex(candles, tf, frame), run) : run(candles);
 }

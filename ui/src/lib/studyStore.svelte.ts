@@ -1,5 +1,5 @@
 import { STUDIES, type StudyId } from "./studies";
-import { cleanSettings, type StudySettings } from "./studySettings";
+import { cleanSettings, nextKey, type SettingGroup, type StudySettings } from "./studySettings";
 
 const KEY = "tickr.studies";
 const SETTINGS_KEY = "tickr.studySettings";
@@ -27,4 +27,14 @@ export function changeSettings(edit: (s: StudySettings) => void) {
   edit(next);
   Object.assign(studySettings, cleanSettings(next));
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(studySettings)); } catch { /* storage unavailable */ }
+}
+
+export function addInstance(study: SettingGroup) {
+  if (!studies[study]) toggleStudy(study, true);
+  else changeSettings((s) => s.extras.push({ key: nextKey(study, s), study, params: {}, tf: "chart" }));
+}
+
+export function removeInstance(key: string) {
+  if (key in studies) toggleStudy(key as StudyId, false);
+  else changeSettings((s) => (s.extras = s.extras.filter((x) => x.key !== key)));
 }

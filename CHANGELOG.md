@@ -6,6 +6,19 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.74] - 2026-11-13
+
+### Added
+- **Study instances and timeframes:** Indicator settings can add more copies of
+  a study, each with its own parameters and pane or overlay, and give each copy
+  a higher timeframe than the chart. Higher-timeframe values use only the
+  candles revealed so far, also in replay. RSI and MACD are available as
+  studies next to the Analyze panes.
+
+### Changed
+- **Study legends** show each study's own settings, for example
+  "Williams %R 14".
+
 ## [0.11.73] - 2026-11-13
 
 ### Added
