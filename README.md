@@ -26,7 +26,9 @@
 > macOS menu bar. Hover over the tray icon for a quote, or use a global hotkey
 > to open charts, watchlists, alerts and market research. Compare two charts,
 > replay historical candles, and practice trades with simulated orders or
-> randomly selected setups.
+> randomly selected setups. Backtest entry and exit rules, screen your
+> watchlist, add studies and drawings, and quiz yourself on candle and chart
+> patterns.
 
 <p align="center"><img src="assets/tickr-demo.gif" alt="Tickr demo showing linked chart crosshairs, candle-by-candle replay, a simulated order filling, and a historical practice result" width="100%"></p>
 
@@ -136,8 +138,8 @@ taskbar to keep it visible.
   one, so pressing it again toggles between two. The list
   under the search box slides open on focus and shut when you leave it.
 - **Chart types:** Line, Area, Baseline, Candles, Hollow candles, Bars (OHLC),
-  Heikin Ashi and Renko, from the menu next to the price scale or by pressing C
-  to cycle. Baseline colors the line green above and red below the previous
+  Heikin Ashi, Renko, Range bars, Line break, Kagi and Point & Figure, from the
+  **Chart type** menu next to the price scale or by pressing C to cycle. Baseline colors the line green above and red below the previous
   close on 1D, or the first bar on screen otherwise. Heikin Ashi and Renko show
   smoothed prices, so the tooltip values are not traded prices. Renko bricks
   are one 14-bar average true range tall, are built from closes, and are not
@@ -340,14 +342,14 @@ taskbar to keep it visible.
   tags (such as a setup name) and a note to each trade. R is the trade's return
   divided by the 14-bar ATR at the decision candle, since practice trades have
   no stop.
-  skipping the trade.
-- **Candle pattern trainer** is a second mode in the Practice bar. **Name the
-  pattern** highlights the candles of a detected pattern with its label hidden
-  and offers four choices, then explains the answer. **Next move** names the
-  pattern and asks whether the close five candles later is higher or lower.
-  **Name the chart pattern** does the same with a confirmed chart pattern
-  (head and shoulders, double top, triangle, flag, wedge and so on).
-  The session keeps your score and streak. Detected patterns: doji, spinning
+- **Pattern trainer:** the **Mode** menu in the Practice bar has three quizzes
+  besides Trade. **Name the pattern** highlights the candles of a detected
+  candle pattern with its label hidden and offers four choices, then explains
+  the answer. **Next move** names the pattern and asks whether the close five
+  candles later is higher or lower. **Name the chart pattern** works like Name
+  the pattern, with a confirmed chart pattern (head and shoulders, double top,
+  triangle, flag, wedge and so on).
+  The session keeps your score and streak. Detected candle patterns: doji, spinning
   top, hammer, inverted hammer, hanging man, shooting star, bullish and bearish
   marubozu, bullish and bearish engulfing, bullish and bearish harami, piercing
   line, dark cloud cover, tweezer top and bottom, morning star, evening star,
@@ -398,8 +400,8 @@ line / candles fades the chart. Text boxes across the app share the look of the 
 it is instant.
 
 - **Technicals:** click **Analyze** to run RSI, moving averages, candlestick
-  patterns and volatility/Fibonacci targets on the candles of the selected
-  range, on your machine (same candles, same result). You get a score from
+  and chart patterns and volatility/Fibonacci targets on the candles of the
+  selected range, on your machine (same candles, same result). You get a score from
   −100 to +100 with a bias and confidence, upside and downside targets for the
   next 10 bars, an invalidation level and the signals behind the score.
   Checkboxes toggle moving averages, Bollinger bands, VWAP, the opening range,
@@ -521,10 +523,10 @@ Click the star next to the ticker to add or remove it. The star in the bottom
 bar shows starred stocks as cards with price and percent move for the current
 session, including pre-market or after-hours when available. Sort by change,
 price or volume, or switch to a heatmap whose tiles are colored by day change
-and sized by the magnitude of the move. Use the screener to filter the
-watchlist and save filters you want to reuse.
+and sized by the magnitude of the move.
 
-**Screen** lets you add any number of conditions. Each picks a field, a
+**Screen** filters the watchlist into a table. Add any number of conditions
+with **Add filter…**; a stock must match all of them. Each picks a field, a
 condition (above, below or between a range) and a value; **Sector** uses
 **is** or **is any of**. Fields are price, volume, relative volume, gap and daily
 change; performance over 1W, 1M, 3M, 6M, YTD and 1Y, distance from the 52-week
@@ -535,7 +537,8 @@ bars of the past year. Fundamentals come from Yahoo and are fetched only while a
 fundamentals column or condition is in use, then cached for six hours. Rows with a
 missing value never match a condition. **Columns** chooses what the results show
 (kept between sessions), and clicking a header sorts by it, with missing values
-last.
+last. Type a name and click **Save** to keep a filter; saved filters appear as
+buttons above the conditions.
 
 **Groups** split the watchlist into tabs such as "Tech" or "Crypto"; **All**
 always shows every starred stock. Click **+** and type a name to add a group.
@@ -616,7 +619,9 @@ you type (or the first few when empty); pick one with the mouse or ↑ ↓ and
 Enter to open its section, scroll to it and flash it. Hotkeys holds
 the global hotkey (click the field and press a new combination; **Reset**
 restores the default) and the in-window keybinds; Chart holds the session
-shading and chart dot toggles. Esc or a click outside closes it.
+shading and chart dot toggles, the R:R reward multiple and **Technical
+analysis** (Auto analyze, the chart overlays and which chart patterns to
+detect). Esc or a click outside closes it.
 
 Keybinds are grouped by category. Click a keybind and press a new key to rebind it (an action already on that
 key takes the old one), or Backspace to unbind it. Keybinds are ignored while
@@ -658,6 +663,7 @@ typing in a text field.
 | | `K` | Open Events |
 | | `N` | Open News |
 | | `O` | Open Options |
+| | `.` | Open Strategy backtest |
 | Options | `U` | Switch calls / puts |
 | | `D` | Next expiry date (wraps around) |
 | Watchlist | `W` | Toggle Watchlist |
@@ -749,6 +755,11 @@ size.
 | [![Replay chart with a buy fill and the simulated position panel](assets/screenshots/paper-trading.png)](assets/screenshots/paper-trading.png)<br>**Paper trading** shows the filled order and open position. | [![Historical practice result with return, bars held and a Skip comparison](assets/screenshots/historical-practice.png)](assets/screenshots/historical-practice.png)<br>**Historical practice** shows how a trade performed against skipping. |
 | [![AAPL candle chart with an OHLC tooltip and event markers](assets/screenshots/chart.png)](assets/screenshots/chart.png)<br>**Chart** shows candle details and lets you copy a PNG or CSV. | [![AAPL chart with indicator overlays, RSI and a technical analysis score](assets/screenshots/technicals.webp)](assets/screenshots/technicals.webp)<br>**Technicals** computes signals and targets from the chart's candles. |
 | [![Market overview with indices, macro quotes, sectors and movers](assets/screenshots/market.png)](assets/screenshots/market.png)<br>**Market** groups indices, sectors and daily movers. | [![Stock watchlist with session prices and named groups](assets/screenshots/watchlist.png)](assets/screenshots/watchlist.png)<br>**Watchlist** keeps prices and session moves for starred symbols together. |
+| [![Bar replay with a daily chart and a weekly second chart stopped at the same date](assets/screenshots/multi-timeframe-replay.png)](assets/screenshots/multi-timeframe-replay.png)<br>**Multi-timeframe replay** keeps the second chart on the replay moment at its own interval. | [![Practice view with saved runs, a stats card, breakdowns by symbol and tag, and a trade history](assets/screenshots/practice-stats.png)](assets/screenshots/practice-stats.png)<br>**Practice stats** summarize saved runs and list each trade with its tags and note. |
+| [![Name the pattern quiz with four choices and the explanation of the correct answer](assets/screenshots/pattern-trainer.png)](assets/screenshots/pattern-trainer.png)<br>**Pattern trainer** asks you to name the highlighted candles, then explains the answer. | [![Chart with a double top and a falling wedge drawn on it and listed in Technicals](assets/screenshots/chart-patterns.png)](assets/screenshots/chart-patterns.png)<br>**Chart patterns** are drawn on the chart and listed in Technicals with a quality score. |
+| [![Strategy backtest with trade markers, an equity curve with drawdown and a parameter sweep heatmap](assets/screenshots/backtest-report.png)](assets/screenshots/backtest-report.png)<br>**Backtest report** charts equity and drawdown and sweeps two parameters into a heatmap. | [![Chart with Keltner channels, Parabolic SAR dots and a CCI pane](assets/screenshots/studies.png)](assets/screenshots/studies.png)<br>**Studies** add channels, Parabolic SAR and oscillator panes without running Analyze. |
+| [![Watchlist screener with three conditions and a results table sorted by one-month performance](assets/screenshots/screener.png)](assets/screenshots/screener.png)<br>**Screener** filters the watchlist by conditions you build and shows the columns you pick. | [![Point and Figure chart with X and O columns and a column tooltip](assets/screenshots/point-and-figure.png)](assets/screenshots/point-and-figure.png)<br>**Chart types** include Point & Figure, Kagi, Line break and Range bars. |
+| [![Chart with an Elliott impulse, an XABCD pattern and a callout, and the Objects list open](assets/screenshots/drawing-objects.png)](assets/screenshots/drawing-objects.png)<br>**Objects** lists every drawing so you can hide, lock, rename or delete it. | |
 
 ## Data
 
