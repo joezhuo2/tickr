@@ -1,4 +1,8 @@
-﻿<script lang="ts">
+﻿<script module lang="ts">
+  let clipboard: import("./lib/types").Drawing | null = null;
+</script>
+
+<script lang="ts">
   import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, num, price, quarterLabel, volume } from "./lib/format";
   import { candleCountdown, classifyBars, displayOffset, futureTimes, isExtendedSession, isIntraday, zoneLabel, type Clock } from "./lib/session";
   import type { Analysis, Article, Chart, ChartMode, ChartScale, ChartTimeZone, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
@@ -6,6 +10,7 @@
   import type { Drawing, DrawingIcon, DrawingPoint } from "./lib/types";
   import { DRAWING_COLORS, POINT_COUNT, arrowHead, channelLines, fibExtLevels, pitchforkLines, snapPrice, anchoredVwap, fibLevels, hitBox, positionLevels, rayEnd, timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
   import { MAX_TEMPLATES, SHAPE_LABELS, calloutGeometry, harmonicRatios, hitCallout, inBounds, markerPath, necklineEnds, pointLabel, saveTemplate, shapeSegments, type DrawingStyle } from "./lib/drawing";
+  import { INTERVAL_CLASSES, WIDTHS, clampWidth, copyDrawing, intervalClass, nextDrawingId, toggleVisible, visibleOn } from "./lib/drawing";
   import { ICONS, PEN_MAX_POINTS, brushWidth, dropRepeats, fibFanRays, fibTimeZones, gannFanRays, hitBrush, hitEllipse, iconBounds, iconShape } from "./lib/drawing";
   import { drawingStyles, setDrawingStyles } from "./lib/drawingStyleStore.svelte";
   import DrawingTree from "./DrawingTree.svelte";
@@ -1590,6 +1595,7 @@
   let inputText = $state("");
   let treeOpen = $state(false);
   let stylesOpen = $state(false);
+  let visibleOpen = $state(false);
   let templateName = $state("");
   let noteEdit = $state<{ id: number | null; point: DrawingPoint; text: string; color: string; x: number; y: number } | null>(null);
   let notePicking = $state(false);
@@ -1628,6 +1634,7 @@
   const drawingSymbol = $derived(chart?.meta.symbol.toUpperCase() ?? "");
   const list = $derived(drawings[drawingSymbol] ?? []);
   const selectedDrawing = $derived(selected == null ? null : (list.find((d) => d.id === selected) ?? null));
+  const intervalCls = $derived(intervalClass(chart?.interval ?? ""));
   const times = $derived(candles.map((c) => c.t));
   const axisTimes = $derived([...times, ...futureTimes(times, chart?.interval ?? "", clock, MAX_FUTURE)]);
   const noteMarks = $derived(hideDrawings ? [] : list.flatMap((d) => {
@@ -1706,12 +1713,19 @@
 
   function addDrawing(d: Drawing) {
     if (list.length >= 200) { cancelDrawing(); return; }
-    const ids = new Set(list.map((d) => d.id));
-    let id = 0;
-    while (ids.has(id)) id++;
+    const id = nextDrawingId(list);
     const s = drawingStyles.defaults[d.kind];
     void changeDrawings([...list, { ...d, ...(s && { color: d.color || s.color, width: s.width, dashed: s.dashed }), id }]);
     cancelDrawing();
+  }
+
+  function pasteDrawing(d: Drawing) {
+    if (drawingBusy || list.length >= 200) return;
+    const shift = geo.hi > geo.lo && geo.hi > 0 ? Math.min(0.2, ((geo.hi - geo.lo) * 0.03) / geo.hi) : 0.01;
+    const copy = copyDrawing(d, list, axisTimes, 3, shift);
+    cancelDrawing();
+    void changeDrawings([...list, copy]);
+    selected = copy.id;
   }
 
   function finishShape(d: Drawing) {
@@ -1804,7 +1818,7 @@
     const ctx = canvas?.getContext("2d");
     if (ctx) ctx.font = `11px ${getComputedStyle(canvas!).getPropertyValue("--font")}`;
     for (const d of [...list].reverse()) {
-      if (d.hidden || d.locked) continue;
+      if (d.hidden || d.locked || !visibleOn(d, intervalCls)) continue;
       if (stroked(d.kind)) {
         if (d.kind === "brush" ? hitBrush(p, d.points.map(screen), d.width) : hitPolyline(p, d.points.map(screen))) return { drawing: d, endpoint: -1 };
         continue;
@@ -2004,7 +2018,7 @@
 
   function drawDrawings(ctx: CanvasRenderingContext2D, v: (name: string) => string) {
     ctx.font = `11px ${v("--font")}`;
-    const items = [...(hideDrawings ? [] : list.filter((d) => d.kind !== "note" && !d.hidden && (!preview || !gesture?.original || d.id !== preview.id))), ...(preview ? [preview] : [])];
+    const items = [...(hideDrawings ? [] : list.filter((d) => d.kind !== "note" && !d.hidden && visibleOn(d, intervalCls) && (!preview || !gesture?.original || d.id !== preview.id))), ...(preview ? [preview] : [])];
     for (const d of items) {
       const a = screen(d.points[0]);
       const two = handles(d.kind);
@@ -2340,7 +2354,12 @@
     if (!chart) return;
     if (replay && (["ArrowLeft", "ArrowRight", " "].includes(e.key) || (e.key === "Escape" && tool === "cursor" && selected == null))) return;
     let handled = true;
-    if (e.ctrlKey && e.key.toLowerCase() === "z") { cancelDrawing(); void changeDrawings(e.shiftKey ? "redo" : "undo"); }
+    const mod = e.ctrlKey || e.metaKey;
+    const key = e.key.toLowerCase();
+    if (mod && key === "z") { cancelDrawing(); void changeDrawings(e.shiftKey ? "redo" : "undo"); }
+    else if (mod && !e.shiftKey && key === "c" && selectedDrawing) clipboard = selectedDrawing;
+    else if (mod && !e.shiftKey && key === "v" && clipboard) pasteDrawing(clipboard);
+    else if (mod && !e.shiftKey && key === "d" && selectedDrawing) pasteDrawing(selectedDrawing);
     else if ((e.key === "Delete" || e.key === "Backspace") && selected != null) removeDrawing();
     else if (e.key === "Enter" && tool === "polyline" && preview) finishPolyline();
     else if (e.key === "Escape" && (tool !== "cursor" || selected != null)) { cancelDrawing(); selected = null; hover = null; }
@@ -2460,9 +2479,9 @@
         {#each DRAWING_COLORS as color}
           <button class="swatch" aria-label={color ? `Color ${color}` : "Default color"} aria-pressed={(d.color ?? "") === color} disabled={drawingBusy} style:--swatch={color || "var(--muted)"} onclick={() => restyle({ color })}></button>
         {/each}
-        {#each [1, 2, 3] as w}
-          <button aria-label={`Width ${w}`} aria-pressed={(d.width || 1) === w} disabled={drawingBusy} onclick={() => restyle({ width: w })}>{w}px</button>
-        {/each}
+        <select aria-label="Line width" title="Line width" value={d.width || 1} disabled={drawingBusy} onchange={(e) => restyle({ width: clampWidth(Number(e.currentTarget.value)) })}>
+          {#each WIDTHS as w}<option value={w}>{w}px</option>{/each}
+        </select>
         <button aria-label="Dashed" aria-pressed={!!d.dashed} disabled={drawingBusy} onclick={() => restyle({ dashed: !d.dashed })}>Dash</button>
         <button aria-label="Lock" aria-pressed={!!d.locked} title="Locked drawings cannot be moved or deleted" disabled={drawingBusy} onclick={() => restyle({ locked: !d.locked })}>Lock</button>
         {#if d.kind === "text" || d.kind === "callout"}
@@ -2470,7 +2489,19 @@
         {/if}
         <button aria-label="Save as default for this tool" aria-pressed={!!def && def.color === (d.color ?? "") && def.width === (d.width || 1) && def.dashed === !!d.dashed} title="New drawings of this tool start with this style" onclick={() => setDrawingStyles({ ...drawingStyles, defaults: { ...drawingStyles.defaults, [d.kind]: styleOf(d) } })}>Default</button>
         <button aria-label="Style templates" aria-pressed={stylesOpen} aria-expanded={stylesOpen} onclick={() => (stylesOpen = !stylesOpen)}>Templates</button>
+        <button aria-label="Visible on intervals" aria-pressed={!!d.visible?.length} aria-expanded={visibleOpen} title="Choose the candle intervals this drawing shows on" onclick={() => (visibleOpen = !visibleOpen)}>Intervals</button>
+        <button aria-label="Clone" title="Clone (Ctrl+D); copy and paste with Ctrl+C and Ctrl+V" disabled={drawingBusy || list.length >= 200} onclick={() => pasteDrawing(d)}>Clone</button>
       </div>
+      {#if visibleOpen}
+        <div class="drawing-tools drawing-style" role="group" aria-label="Visible on">
+          <span class="label">Visible on</span>
+          <button aria-pressed={!d.visible?.length} disabled={drawingBusy} onclick={() => restyle({ visible: undefined })}>All intervals</button>
+          {#each INTERVAL_CLASSES as c}
+            <button aria-pressed={!!d.visible?.includes(c.cls)} disabled={drawingBusy} onclick={() => restyle({ visible: toggleVisible(d.visible, c.cls) })}>{c.label}</button>
+          {/each}
+          {#if !visibleOn(d, intervalCls)}<span class="label">Hidden on this interval</span>{/if}
+        </div>
+      {/if}
       {#if stylesOpen}
         <div class="drawing-tools drawing-style" role="group" aria-label="Style templates">
           {#each drawingStyles.templates as t (t.name)}
@@ -2483,7 +2514,7 @@
       {/if}
     {/if}
     {#if treeOpen}
-      <DrawingTree {list} {selected} busy={drawingBusy} onselect={selectDrawing} onchange={treeChange} onclose={() => { treeOpen = false; wrap?.focus(); }} />
+      <DrawingTree {list} {selected} interval={intervalCls} busy={drawingBusy} onselect={selectDrawing} onchange={treeChange} onclose={() => { treeOpen = false; wrap?.focus(); }} />
     {/if}
     </div>
   {/if}
@@ -2728,6 +2759,7 @@
   .drawing-style .swatch[aria-pressed="true"] { background: var(--swatch); box-shadow: 0 0 0 2px var(--text); }
   .drawing-style .template { border-left: 3px solid var(--swatch); color: var(--text); }
   .drawing-style input { width: 110px; font-size: 10px; padding: 1px 4px; }
+  .drawing-style .label { font-size: 10px; color: var(--muted); padding: 0 4px; }
   .drawing-input { position: absolute; width: 200px; z-index: 2; }
   .note-marker {
     position: absolute;
