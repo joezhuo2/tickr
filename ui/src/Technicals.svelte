@@ -350,6 +350,9 @@
           {#each Object.entries(SETTING_FIELDS[group]) as [key, f]}
             <label>{f.label} <input type="number" aria-label={`${SETTING_LABELS[group]} ${f.label}`} min={f.min} max={f.max} step={f.step} value={(studySettings[group] as Record<string, number>)[key]} onchange={(e) => changeSettings((s) => ((s[group] as Record<string, number>)[key] = e.currentTarget.valueAsNumber))} /></label>
           {/each}
+          {#if group === "volumeProfile"}
+            <label><input type="checkbox" aria-label="Show POC and value area" checked={studySettings.showPoc} onchange={(e) => changeSettings((s) => (s.showPoc = e.currentTarget.checked))} /> Show POC and value area</label>
+          {/if}
         </div>
       {/each}
       <div class="indicator-row">

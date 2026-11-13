@@ -445,7 +445,12 @@ it is instant.
   **VWAP bands** (Bands σ in Indicator settings, 0 to 5, off at 0) draw lines
   that many volume-weighted standard deviations above and below VWAP.
   **Volume profile** (off by default) shows volume by price for the candles on
-  screen as bars along the right edge, with the busiest price band darker. The
+  screen as bars along the right edge, with the busiest price band darker. A
+  solid line marks the point of control (the price band with the most volume)
+  and dashed lines mark the value area high and low, the band around the point
+  of control that holds 70% of the volume; bars inside the value area are
+  darker, and the levels show in the legend. Set **Value area %** (50 to 95) or
+  turn off **Show POC and value area** under Indicator settings. The
   Indicators list also shows **ADX 14** next to the existing ATR 14.
   With the opening range or key levels computed, an **Alert when price crosses**
   row offers one-click price alerts at the opening range high and low, PDH, PDL,
@@ -467,7 +472,8 @@ it is instant.
   month on daily charts, per year on longer ones), growing from the start of
   each session. **Volume profile (range)**, in the drawing toolbar's More
   menu, is a two-click drawing that profiles the candles between its two ends
-  and is saved with the symbol like any other drawing.
+  and is saved with the symbol like any other drawing. Both draw the point of
+  control and value area across their own span, with the same settings.
   **Studies** at the bottom of the Technicals tab add Stochastic, OBV, CCI,
   Williams %R and MFI in their own panes, and Ichimoku, Supertrend, Keltner
   channels, Donchian channels, Parabolic SAR (dots) and pivot points (P, R1,
