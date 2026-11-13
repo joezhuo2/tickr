@@ -365,6 +365,11 @@
         {/each}
       {/each}
       <div class="indicator-row">
+        <b>VOLUME PROFILE</b>
+        <label>Value area % <input type="number" aria-label="Volume profile Value area %" min="50" max="95" step="1" value={studySettings.vpArea} onchange={(e) => changeSettings((s) => (s.vpArea = e.currentTarget.valueAsNumber))} /></label>
+        <label><input type="checkbox" aria-label="Show POC and value area" checked={studySettings.showPoc} onchange={(e) => changeSettings((s) => (s.showPoc = e.currentTarget.checked))} /> Show POC and value area</label>
+      </div>
+      <div class="indicator-row">
         <b>PIVOT POINTS</b>
         <label>Type <select aria-label="Pivot points type" value={studySettings.pivotType} onchange={(e) => changeSettings((s) => (s.pivotType = e.currentTarget.value as PivotType))}>{#each PIVOT_TYPES as t (t)}<option value={t}>{t}</option>{/each}</select></label>
       </div>

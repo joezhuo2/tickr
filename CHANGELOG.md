@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.76] - 2026-11-13
+
+### Added
+- **Point of control and value area:** the visible-range, session and range
+  volume profiles draw a POC line and dashed value area high and low lines, and
+  shade the bins inside the value area. Value area % (50 to 95, default 70) and
+  a Show POC and value area toggle are under Indicator settings.
+
 ## [0.11.75] - 2026-11-13
 
 ### Added

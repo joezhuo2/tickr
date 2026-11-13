@@ -38,7 +38,7 @@ export interface StudyInstance { key: string; study: SettingGroup; params: Recor
 
 export type StudySettings = {
   [G in SettingGroup]: { [F in keyof (typeof SETTING_FIELDS)[G]]: number };
-} & { pivotType: PivotType; timeframes: Partial<Record<SettingGroup, string>>; extras: StudyInstance[] };
+} & { pivotType: PivotType; timeframes: Partial<Record<SettingGroup, string>>; extras: StudyInstance[]; showPoc: boolean; vpArea: number };
 
 export const SETTING_LABELS: Record<SettingGroup, string> = {
   stoch: "Stochastic",
@@ -95,6 +95,8 @@ export function cleanSettings(v: unknown): StudySettings {
     seen.add(x.key);
     return [{ key: x.key, study: x.study, params: cleanGroup(x.study, x.params), tf: cleanTimeframe(x.study, x.tf) }];
   }).slice(0, MAX_EXTRAS);
+  out.vpArea = typeof o.vpArea === "number" && Number.isFinite(o.vpArea) ? Math.min(95, Math.max(50, Math.round(o.vpArea))) : 70;
+  out.showPoc = typeof o.showPoc === "boolean" ? o.showPoc : true;
   return out as StudySettings;
 }
 
