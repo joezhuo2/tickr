@@ -6,6 +6,15 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.65] - 2026-11-12
+
+### Added
+- **Practice stats and journal:** the Practice view summarises saved runs with
+  trades, win rate, average R, expectancy, profit factor and win/loss streaks,
+  broken down by symbol and by tag. A filterable trade history lets each trade
+  carry tags (such as a setup name) and a note. R is the return divided by the
+  14-bar ATR at the decision candle.
+
 ## [0.11.64] - 2026-11-12
 
 ### Added

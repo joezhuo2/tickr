@@ -856,6 +856,13 @@
     if (now !== drawn) void saveTempDrawings(key, now);
   }
 
+  function annotatePracticeRun(id: number, note: string, tags: string[]) {
+    const run = practiceRuns.find((r) => r.id === id);
+    if (!run) return;
+    practiceError = null;
+    void writePracticeRuns("save_practice_run", { run: { ...run, note, tags } }, "Could not save the note");
+  }
+
   function deletePracticeRun(id: number) {
     practiceError = null;
     void writePracticeRuns("delete_practice_run", { id }, "Could not delete the run");
@@ -2071,6 +2078,7 @@
             onsave={savePracticeRun}
             onopen={openPracticeRun}
             ondelete={deletePracticeRun}
+            onannotate={annotatePracticeRun}
           />
         {/if}
             {#snippet panel()}
