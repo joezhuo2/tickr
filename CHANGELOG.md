@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.71] - 2026-11-12
+
+### Added
+- **More chart types:** Range bars, Line break, Kagi and Point & Figure join
+  the Chart type menu, with box size, reversal and line count settings beside
+  it. They are rebuilt from the candles on screen, so replay and practice never
+  show future data.
+
 ## [0.11.70] - 2026-11-12
 
 ### Added
