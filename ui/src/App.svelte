@@ -2,7 +2,7 @@
   import { applyCustom, loadCustom } from "./lib/display";
   import * as Scrollback from "./lib/scrollback";
   import * as ChartAlertRules from "./lib/chartAlerts";
-  import { chartAlerts, fireChartAlerts, startBackgroundChartAlerts } from "./lib/chartAlertStore.svelte";
+  import { addChartAlert, chartAlerts, fireChartAlerts, setChartAlerts, startBackgroundChartAlerts } from "./lib/chartAlertStore.svelte";
   import { CHART_MODES, nextMode } from "./lib/charttypes";
   import { changeTypeSettings, typeSettings } from "./lib/typeStore.svelte";
   import { invoke } from "@tauri-apps/api/core";
@@ -22,7 +22,12 @@
   import StatsView from "./Stats.svelte";
   import Left from "./Left.svelte";
   import News from "./News.svelte";
-  import Search from "./Search.svelte";
+  import CommandSearch from "./CommandSearch.svelte";
+  import UndoFuse, { type UndoEntry } from "./UndoFuse.svelte";
+  import type { Command, Panel } from "./lib/command";
+  import type { SettingEntry } from "./lib/settingsSearch";
+  import { addedAlert } from "./lib/alerts";
+  import { studies, toggleStudy } from "./lib/studyStore.svelte";
   import SecondChart from "./SecondChart.svelte";
   import IntervalPicker from "./IntervalPicker.svelte";
   import { aggregateChart } from "./lib/aggregate";
@@ -167,7 +172,10 @@
   let dots = $state<Dots>() as Dots;
   let settingsOpen = $state(false);
   let alertsOpen = $state(false);
-  let search: Search | undefined = $state();
+  let searchOpen = $state(false);
+  let settingsJump = $state<SettingEntry | null>(null);
+  let undoEntry = $state<UndoEntry | null>(null);
+  let undoSeq = 0;
   let qs = $state<QuoteState>({ quote: null, error: null, updated_at: 0 });
   let chart = $state<Chart | null>(null);
   let chartError = $state<string | null>(null);
@@ -1071,23 +1079,23 @@
     } else savePaper(next);
   }
 
-  function paperOrder(req: Paper.OrderRequest) {
+  function paperOrder(req: Paper.OrderRequest): boolean {
     const account = paperAccount;
     paperError = null;
     paperNotice = null;
-    if (!account) return;
+    if (!account) return false;
     let r: Paper.Outcome;
     if (replay) {
       if (req.kind === "market" && paperMarketBlock) {
         paperError = paperMarketBlock;
-        return;
+        return false;
       }
       const bar = replayBars[replay.cursor];
       r = Paper.placeOrder(account, req, bar.t, paperMark ?? bar.c);
     } else if (req.kind === "market") {
       if (liveBlock || !quote) {
         paperError = liveBlock ?? "No live quote yet";
-        return;
+        return false;
       }
       r = Paper.marketOrder(account, req.symbol, req.side, req.qty, quote.price, quoteTime(quote) ?? quote.market_time, req.bracket ?? null);
     } else {
@@ -1095,11 +1103,12 @@
     }
     if (!r.ok) {
       paperError = r.error;
-      return;
+      return false;
     }
     setPaperAccount(r.account);
     if (r.fill) paperNotice = `Simulated ${r.fill.side} ${r.fill.qty} ${r.fill.symbol} filled at ${r.fill.price.toFixed(2)}`;
     else if (r.order) paperNotice = r.order.kind === "market" ? "Simulated market order queued for the next bar's open" : `Simulated ${r.order.kind} order placed`;
+    return true;
   }
 
   $effect(() => {
@@ -1708,6 +1717,223 @@
     store("tickr.leftWidth", String(leftWidth));
   }
 
+  function toggleSplit() {
+    const split = view !== "chart" || !layout.split;
+    view = "chart";
+    saveLayout({ split });
+  }
+
+  const CHART_VIEWS: RefreshView[] = ["chart", "technicals", "paper", "backtest"];
+  const REPLAY_BLOCKED: Panel[] = ["news", "options", "market", "events", "analysts", "earnings", "stats", "backtest"];
+
+  async function openPanel(panel: Panel): Promise<string | null> {
+    if (practice) return "Exit practice first";
+    if (replay && REPLAY_BLOCKED.includes(panel)) return "Exit bar replay first";
+    if (panel === "alerts") alertsOpen = true;
+    else if (panel === "screener") {
+      view = "watchlist";
+      await tick();
+      watchlistView?.screen();
+    } else if (view === panel) return null;
+    else if (panel === "news") toggleNews();
+    else if (panel === "options") toggleOptions();
+    else if (panel === "market") toggleMarket();
+    else if (panel === "events") toggleEvents();
+    else if (panel === "stats") toggleStats();
+    else view = panel;
+    return null;
+  }
+
+  async function showChart() {
+    if (!CHART_VIEWS.includes(view)) view = "chart";
+    await tick();
+    return chartView;
+  }
+
+  async function restoreChart(before: { symbol: string; range: string; interval: string }) {
+    if (symbol !== before.symbol) {
+      if (history.back.at(-1) === before.symbol) await navigate(goBack);
+      else await pickSymbol(before.symbol);
+    }
+    if (range !== before.range) setRange(before.range);
+    if (interval !== before.interval) changeInterval(before.interval);
+  }
+
+  function watchSnapshot() {
+    const saved = { watchlist: [...watchlist], groups: groups.map((g) => ({ ...g, symbols: [...g.symbols] })) };
+    return async () => {
+      await saveWatchlist(saved.watchlist);
+      await saveGroups(saved.groups);
+    };
+  }
+
+  async function execute(c: Command): Promise<string | (() => unknown) | null> {
+    switch (c.kind) {
+      case "open":
+      case "chart": {
+        const before = { symbol, range, interval };
+        if (c.kind === "open" && c.symbol !== symbol) {
+          const error = await pickSymbol(c.symbol);
+          if (error) return error;
+        }
+        if (c.range) setRange(c.range);
+        if (c.interval) changeInterval(c.interval);
+        return symbol === before.symbol && range === before.range && interval === before.interval ? null : () => restoreChart(before);
+      }
+      case "alert": {
+        const before = alerts;
+        try {
+          alerts = await invoke<PriceAlert[]>("add_alert", { symbol: c.symbol, kind: c.alert, direction: c.direction, level: c.level, recurring: false, cooldownMins: 15, regularOnly: false });
+        } catch (e) {
+          return String(e);
+        }
+        const added = addedAlert(before, alerts);
+        return added ? async () => (alerts = await invoke<PriceAlert[]>("delete_alert", { id: added.id })) : null;
+      }
+      case "chart_alert": {
+        const r = addChartAlert(c.symbol, chart?.interval ?? "", c.expr, c.expr, null);
+        if ("error" in r) return r.error;
+        return () => setChartAlerts(chartAlerts.list.filter((a) => a.id !== r.id));
+      }
+      case "panel":
+        return openPanel(c.panel);
+      case "settings":
+        settingsJump = c.entry;
+        settingsOpen = true;
+        return null;
+      case "action":
+        if (c.action === "toggle_overview") toggleLeft();
+        else if (c.action === "refresh") void refresh();
+        else if (practice) return "Exit practice first";
+        else if (c.action === "practice") {
+          if (!practiceOpen) togglePractice();
+        } else if (c.action === "second_chart") toggleSplit();
+        else if (c.action === "new_window") {
+          if (replay) return "Exit bar replay first";
+          openWindow();
+        } else if (c.action === "analyze") {
+          await showChart();
+          if (!analyzing) void runAnalysis();
+        }
+        return null;
+      case "replay":
+        if (practice) return "Exit practice first";
+        if (!replay) {
+          if (!canStartReplay) return "Bar replay needs more candles";
+          enterReplay();
+        }
+        if (c.date) restartReplay(c.date);
+        return null;
+      case "mode": {
+        const before = mode;
+        if (before === c.mode) return null;
+        setMode(c.mode);
+        return () => setMode(before);
+      }
+      case "scale": {
+        const before = scale;
+        if (before === c.scale) return null;
+        setScale(c.scale);
+        return () => setScale(before);
+      }
+      case "goto": {
+        const shown = await showChart();
+        if (!shown) return "Load a chart first";
+        shown.goTo(c.date);
+        return null;
+      }
+      case "extended": {
+        const before = chartExtended;
+        if (before === c.on) return null;
+        saveChartExtended(c.on);
+        return () => saveChartExtended(before);
+      }
+      case "watch": {
+        if (watchlist.includes(c.symbol) === c.on) return null;
+        const undo = watchSnapshot();
+        await saveWatchlist(c.on ? [...watchlist, c.symbol] : watchlist.filter((s) => s !== c.symbol));
+        return undo;
+      }
+      case "member": {
+        const g = groups.find((x) => x.name === c.group);
+        if (!g) return `No group named ${c.group}`;
+        if (g.symbols.includes(c.symbol) === c.on) return null;
+        const undo = watchSnapshot();
+        if (c.on && !watchlist.includes(c.symbol)) await saveWatchlist([...watchlist, c.symbol]);
+        await saveGroups(groups.map((x) => (x.name === g.name ? { ...x, symbols: c.on ? [...x.symbols, c.symbol] : x.symbols.filter((s) => s !== c.symbol) } : x)));
+        return undo;
+      }
+      case "group":
+        view = "watchlist";
+        groupTab = c.group;
+        return null;
+      case "toggle": {
+        const t = c.toggle;
+        if (t.type === "study") {
+          const was = studies[t.id];
+          const on = c.on ?? !was;
+          if (on === was) return null;
+          toggleStudy(t.id, on);
+          return () => toggleStudy(t.id, was);
+        }
+        if (!indicators || !overlays) return "Indicators are still loading";
+        const was = overlays[t.key];
+        const on = c.on ?? !was;
+        if (on === was) return null;
+        try {
+          await saveIndicators(toggleOverlay(indicators, t.key, on));
+        } catch (e) {
+          return String(e);
+        }
+        return () => indicators && saveIndicators(toggleOverlay(indicators, t.key, was));
+      }
+      case "draw": {
+        const shown = await showChart();
+        if (!shown) return "Load a chart first";
+        shown.drawTool(c.tool);
+        return null;
+      }
+      case "drawings": {
+        const shown = await showChart();
+        if (!shown) return "Load a chart first";
+        if (c.op !== "delete") {
+          const was = shown.drawingsHidden();
+          const on = c.op === "hide";
+          if (was === on) return null;
+          shown.setDrawingsHidden(on);
+          return () => chartView?.setDrawingsHidden(was);
+        }
+        const key = (mainChart?.meta.symbol ?? symbol).toUpperCase();
+        const save = replay ? saveTempDrawings : saveDrawings;
+        const before = (replay ? tempDrawings : drawings)[key] ?? [];
+        const kept = before.filter((d) => d.locked);
+        if (kept.length === before.length) return "No unlocked drawings on this chart";
+        if (!(await save(key, kept))) return "Could not delete the drawings";
+        return () => save(key, before);
+      }
+      case "order": {
+        if (practice) return "Exit practice first";
+        if (c.symbol !== symbol) return `Open ${c.symbol} first`;
+        const before = paperAccount;
+        if (!before) return paperError ?? "The paper account is still loading";
+        const side = c.verb === "buy" || c.verb === "cover" ? "buy" : "sell";
+        if (!paperOrder({ symbol: c.symbol, side, qty: c.qty, kind: c.order, price: c.price, bracket: null })) return paperError ?? "Order rejected";
+        const inReplay = !!replay;
+        return () => {
+          if (!!replay === inReplay) setPaperAccount(before);
+        };
+      }
+    }
+  }
+
+  async function runCommand(c: Command, label: string): Promise<string | null> {
+    const r = await execute(c);
+    if (typeof r === "string") return r;
+    searchOpen = false;
+    if (r) undoEntry = { id: ++undoSeq, label, undo: () => Promise.resolve(r()).catch(console.warn) };
+    return null;
+  }
+
   function setMode(m: ChartMode) {
     if (view !== "technicals" && view !== "paper" && view !== "backtest") view = "chart";
     mode = m;
@@ -1716,6 +1942,12 @@
 
   async function onKey(e: KeyboardEvent) {
     if (!ready || settingsOpen || e.defaultPrevented) return;
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      if (!e.repeat && !practice) searchOpen = !searchOpen;
+      return;
+    }
+    if (searchOpen) return;
     if (alertsOpen && e.key === "Escape") {
       e.preventDefault();
       alertsOpen = false;
@@ -1787,11 +2019,7 @@
         changeInterval(nextInterval(range, interval, recentIntervals));
         break;
       case "chart_split":
-        if (!e.repeat) {
-          const split = view !== "chart" || !layout.split;
-          view = "chart";
-          saveLayout({ split });
-        }
+        if (!e.repeat) toggleSplit();
         break;
       case "new_window":
         if (!e.repeat) openWindow();
@@ -1875,7 +2103,7 @@
         break;
       }
       case "search":
-        search?.focus();
+        if (!e.repeat) searchOpen = true;
         break;
       case "previous_symbol":
         if (!e.repeat) navigate(previous);
@@ -2003,7 +2231,11 @@
             <button title="Forward (Alt+→)" aria-label="Forward (Alt+→)" disabled={!history.forward.length} onclick={() => navigate(goForward)}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
             </button>
-            <Search bind:this={search} onpick={pickSymbol} {recent} current={symbol} />
+            <button class="search-open" title="Search and commands ({keyLabel(keybinds.search)} or {navigator.platform.startsWith("Mac") ? "Cmd" : "Ctrl"}+K)" aria-label="Search and commands" aria-haspopup="dialog" disabled={!!practice} onclick={() => (searchOpen = true)}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></svg>
+              <span>Search</span>
+              {#if keybinds.search}<kbd>{keyLabel(keybinds.search)}</kbd>{/if}
+            </button>
           </div>
           <div class="views">
             <div class="seg">
@@ -2410,8 +2642,12 @@
       </div>
     {/if}
     {#if settingsOpen}
-      <Settings bind:custom bind:theme bind:textSize bind:palette bind:refreshMode extended={chartExtended} shade={shadeSessions} timeZone={chartTimeZone} onextended={saveChartExtended} onshade={saveShadeSessions} ontimezone={saveChartTimeZone} bind:hotkey bind:error={hotkeyError} {defaultHotkey} bind:keybinds bind:dots {indicators} onindicators={saveIndicators} onclose={() => (settingsOpen = false)} />
+      <Settings bind:custom bind:theme bind:textSize bind:palette bind:refreshMode extended={chartExtended} shade={shadeSessions} timeZone={chartTimeZone} onextended={saveChartExtended} onshade={saveShadeSessions} ontimezone={saveChartTimeZone} bind:hotkey bind:error={hotkeyError} {defaultHotkey} bind:keybinds bind:dots {indicators} onindicators={saveIndicators} jump={settingsJump} onclose={() => { settingsOpen = false; settingsJump = null; }} />
     {/if}
+    {#if searchOpen}
+      <CommandSearch {recent} current={symbol} groups={groups.map((g) => g.name)} onrun={runCommand} onclose={() => (searchOpen = false)} />
+    {/if}
+    <UndoFuse entry={undoEntry} ondone={() => (undoEntry = null)} />
   </div>
 {/if}
 
@@ -2593,6 +2829,40 @@
   .nav button:disabled {
     opacity: 0.4;
     cursor: default;
+  }
+  .nav .search-open {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: auto;
+    min-width: 150px;
+    margin-left: 4px;
+    padding: 3px 6px 3px 8px;
+    border: 1px solid var(--faint);
+    border-radius: 7px;
+    background: var(--surface);
+    font: inherit;
+    color: var(--muted);
+  }
+  .nav .search-open:hover:not(:disabled) {
+    border-color: var(--accent);
+  }
+  .nav .search-open svg {
+    flex: none;
+    width: 14px;
+    height: 14px;
+  }
+  .nav .search-open span {
+    flex: 1;
+    text-align: left;
+  }
+  .nav .search-open kbd {
+    padding: 0 5px;
+    border: 1px solid var(--faint);
+    border-radius: 4px;
+    font: inherit;
+    font-size: 10px;
+    line-height: 16px;
   }
   .nav svg {
     width: 100%;

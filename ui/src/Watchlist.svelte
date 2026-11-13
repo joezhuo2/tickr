@@ -97,6 +97,11 @@
     tab = shownTab = name;
   }
 
+  export function screen() {
+    editing = false;
+    screening = true;
+  }
+
   function remove() {
     if (!group) return;
     ongroups(groups.filter((g) => g.name !== group.name));

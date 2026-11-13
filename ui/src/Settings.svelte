@@ -37,6 +37,7 @@
     indicators,
     onindicators,
     onclose,
+    jump = null,
   }: {
     indicators?: IndicatorConfig;
     onindicators: (config: IndicatorConfig) => Promise<void>;
@@ -58,6 +59,7 @@
     onshade: (enabled: boolean) => void;
     ontimezone: (zone: ChartTimeZone) => void;
     onclose: () => void;
+    jump?: SettingEntry | null;
   } = $props();
 
   let picking = $state<string | null>(null);
@@ -416,6 +418,10 @@
     row.classList.add("flash-setting");
     setTimeout(() => row.classList.remove("flash-setting"), 1600);
   }
+
+  onMount(() => {
+    if (jump) void goTo(jump);
+  });
 
   function findKey(e: KeyboardEvent) {
     if (e.key === "Escape") {
