@@ -6,6 +6,16 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.70] - 2026-11-12
+
+### Added
+- **Deeper screener:** build filters from any number of conditions on price,
+  volume, relative volume, gap, performance (1W to 1Y and YTD), 52-week
+  high/low distance, ATR %, RSI, price vs SMA 20/50/200, MACD, market cap,
+  P/E, EPS, dividend yield, revenue growth, profit margin, beta and sector.
+  Choose and sort result columns; columns persist, and existing saved filters
+  keep working.
+
 ## [0.11.69] - 2026-11-12
 
 ### Added

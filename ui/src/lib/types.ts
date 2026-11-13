@@ -30,12 +30,13 @@ export interface WatchlistSort {
   key: WatchlistSortKey;
   dir: WatchlistSortDir;
 }
-export type ScreenKind = "rsi" | "sma" | "change";
-export type ScreenOp = "above" | "below";
+export type ScreenOp = "above" | "below" | "between" | "is" | "any";
 export interface ScreenRule {
-  kind: ScreenKind;
+  kind: string;
   op: ScreenOp;
   value: number;
+  value2?: number | null;
+  values?: string[];
 }
 export interface SavedScreen {
   name: string;
@@ -49,10 +50,36 @@ export interface ScreenRow {
   sma20: number | null;
   sma50: number | null;
   sma200: number | null;
+  perf_1w: number | null;
+  perf_1m: number | null;
+  perf_3m: number | null;
+  perf_6m: number | null;
+  perf_ytd: number | null;
+  perf_1y: number | null;
+  volume: number | null;
+  rel_volume: number | null;
+  from_high_52w: number | null;
+  from_low_52w: number | null;
+  atr_pct: number | null;
+  macd_hist: number | null;
+  gap_pct: number | null;
   score: number | null;
   bias: Bias | null;
   error: string | null;
 }
+export interface ScreenFundamentals {
+  symbol: string;
+  market_cap: number | null;
+  pe: number | null;
+  eps: number | null;
+  dividend_yield: number | null;
+  revenue_growth: number | null;
+  profit_margin: number | null;
+  beta: number | null;
+  sector: string | null;
+  error: string | null;
+}
+export type ScreenItem = ScreenRow & Partial<Omit<ScreenFundamentals, "symbol" | "error">>;
 export interface IvRank {
   symbol: string;
   iv: number | null;
@@ -207,6 +234,7 @@ export interface Init {
   watchlist_view: WatchlistView;
   watchlist_columns: WatchlistColumns;
   screens: SavedScreen[];
+  screen_columns: string[];
   event_filter: EventFilter;
   keybinds: Keybinds;
   dots: Dots;
