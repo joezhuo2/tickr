@@ -6,6 +6,13 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.77] - 2026-11-13
+
+### Added
+- **More drawing tools:** Gann fan, Fib fan, Fib time zones, ellipse, polyline,
+  brush and icon stamps in the More menu, saved per symbol and listed in
+  Objects like the other tools.
+
 ## [0.11.76] - 2026-11-13
 
 ### Added

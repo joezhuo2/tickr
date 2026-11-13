@@ -192,7 +192,17 @@ taskbar to keep it visible.
   AD/XA ratios on the dashed XB, AC, BD and XD lines) and **Head and
   shoulders** (five clicks: left shoulder, first neckline point, head, second
   neckline point, right shoulder; the neckline is extended across the
-  pattern). These tools have no hotkeys.
+  pattern). It also has a **Gann fan** (two clicks: the origin and the 1x1
+  point; rays from 1x8 to 8x1, labelled), a **Fib fan** (two clicks; rays
+  from the first point through the 0.236 to 0.786 levels of the move at the
+  second point), **Fib time zones** (two clicks set the unit width; vertical
+  lines at 0, 1, 2, 3, 5, 8 … 89 units), an **Ellipse** (two clicks for the
+  corners, lightly filled), a **Polyline** (click to add points, double-click
+  or Enter to finish, Escape cancels), a **Brush** (a wide see-through
+  highlighter stroke, drawn like the pen) and **Icon** stamps (pick check,
+  cross, star, flag, question, exclamation or an up or down triangle in the
+  row under the toolbar, then click; select an icon to change it). These tools
+  have no hotkeys.
   **Objects** opens the object tree: every drawing on the chart, newest first,
   with its price or text. Click a row to select it and scroll it into view
   (a note opens its popover), and each row can be hidden, locked, deleted or,
@@ -855,8 +865,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.76
-git push origin v0.11.76
+git tag v0.11.77
+git push origin v0.11.77
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
