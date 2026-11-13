@@ -1,22 +1,54 @@
 import { describe, expect, it } from "vitest";
 import {
   canSave,
+  cleanColumns,
+  fieldOf,
   findScreen,
+  formatField,
   matchesRule,
+  mergeItems,
+  migrateRule,
+  needsFundamentals,
   newRule,
   ruleLabel,
   ruleValid,
   sameRules,
   screenRows,
   smaOf,
+  sortItems,
 } from "./screener";
-import type { ScreenRow, ScreenRule } from "./types";
+import type { ScreenFundamentals, ScreenItem, ScreenRow, ScreenRule } from "./types";
 
-function row(symbol: string, over: Partial<ScreenRow> = {}): ScreenRow {
-  return { symbol, price: 100, change_pct: 1, rsi: 50, sma20: 95, sma50: 90, sma200: 80, score: null, bias: null, error: null, ...over };
+function row(symbol: string, over: Partial<ScreenItem> = {}): ScreenItem {
+  return {
+    symbol,
+    price: 100,
+    change_pct: 1,
+    rsi: 50,
+    sma20: 95,
+    sma50: 90,
+    sma200: 80,
+    perf_1w: null,
+    perf_1m: null,
+    perf_3m: null,
+    perf_6m: null,
+    perf_ytd: null,
+    perf_1y: null,
+    volume: null,
+    rel_volume: null,
+    from_high_52w: null,
+    from_low_52w: null,
+    atr_pct: null,
+    macd_hist: null,
+    gap_pct: null,
+    score: null,
+    bias: null,
+    error: null,
+    ...over,
+  };
 }
 
-const rule = (kind: ScreenRule["kind"], op: ScreenRule["op"], value: number): ScreenRule => ({ kind, op, value });
+const rule = (kind: ScreenRule["kind"], op: ScreenRule["op"], value: number, extra: Partial<ScreenRule> = {}): ScreenRule => ({ kind, op, value, ...extra });
 
 describe("matchesRule", () => {
   it("compares RSI strictly above or below the value", () => {
@@ -131,5 +163,107 @@ describe("saving", () => {
     const screens = [{ name: "Oversold", rules: ok }];
     expect(findScreen(screens, "  oversold ")).toBe(screens[0]);
     expect(findScreen(screens, "other")).toBeUndefined();
+  });
+});
+
+describe("new fields and operators", () => {
+  it("matches between inclusively, in either order", () => {
+    const r = row("A", { perf_1m: 5 });
+    expect(matchesRule(r, rule("perf_1m", "between", 5, { value2: 10 }))).toBe(true);
+    expect(matchesRule(r, rule("perf_1m", "between", 10, { value2: 5 }))).toBe(true);
+    expect(matchesRule(r, rule("perf_1m", "between", 5.1, { value2: 10 }))).toBe(false);
+    expect(ruleValid(rule("perf_1m", "between", 5))).toBe(false);
+  });
+  it("never matches a missing value, including between", () => {
+    expect(matchesRule(row("A", { perf_1w: null }), rule("perf_1w", "above", -1000))).toBe(false);
+    expect(matchesRule(row("A", { perf_1w: null }), rule("perf_1w", "between", -1000, { value2: 1000 }))).toBe(false);
+    expect(matchesRule(row("A"), rule("pe", "below", 1000))).toBe(false);
+    expect(matchesRule(row("A", { sector: null }), rule("sector", "any", 0, { values: ["Energy"] }))).toBe(false);
+  });
+  it("scales market cap to billions and volume to millions", () => {
+    const r = row("A", { market_cap: 5e11, volume: 2_500_000 });
+    expect(matchesRule(r, rule("market_cap", "above", 100))).toBe(true);
+    expect(matchesRule(r, rule("market_cap", "above", 600))).toBe(false);
+    expect(matchesRule(r, rule("volume", "between", 2, { value2: 3 }))).toBe(true);
+  });
+  it("computes price versus a moving average in percent", () => {
+    const r = row("A", { price: 110, sma50: 100 });
+    expect(matchesRule(r, rule("vs_sma50", "above", 9.9))).toBe(true);
+    expect(matchesRule(r, rule("vs_sma50", "above", 10.1))).toBe(false);
+    expect(matchesRule(row("A", { sma200: null }), rule("vs_sma200", "below", 100))).toBe(false);
+  });
+  it("matches a sector with is and any-of, ignoring case", () => {
+    const r = row("A", { sector: "Technology" });
+    expect(matchesRule(r, rule("sector", "is", 0, { values: ["technology"] }))).toBe(true);
+    expect(matchesRule(r, rule("sector", "is", 0, { values: ["Energy"] }))).toBe(false);
+    expect(matchesRule(r, rule("sector", "any", 0, { values: ["Energy", "Technology"] }))).toBe(true);
+    expect(matchesRule(r, rule("sector", "any", 0, { values: ["Energy", "Utilities"] }))).toBe(false);
+  });
+  it("validates sector and numeric operators", () => {
+    expect(ruleValid(rule("sector", "is", 0, { values: [] }))).toBe(false);
+    expect(ruleValid(rule("sector", "is", 0, { values: ["A", "B"] }))).toBe(false);
+    expect(ruleValid(rule("sector", "any", 0, { values: ["A", "B"] }))).toBe(true);
+    expect(ruleValid(rule("sector", "above", 0, { values: ["A"] }))).toBe(false);
+    expect(ruleValid(rule("pe", "is", 0, { values: ["A"] }))).toBe(false);
+    expect(ruleValid(rule("nope", "above", 1))).toBe(false);
+    expect(ruleValid(rule("rsi", "between", 20, { value2: 120 }))).toBe(false);
+  });
+  it("migrates the old moving-average rule and keeps it equal to its saved form", () => {
+    expect(migrateRule(rule("sma", "below", 200))).toEqual(rule("vs_sma200", "below", 0));
+    expect(migrateRule(rule("rsi", "below", 30))).toEqual(rule("rsi", "below", 30));
+    expect(sameRules([rule("sma", "above", 50)], [rule("vs_sma50", "above", 0)])).toBe(true);
+    expect(sameRules([rule("sector", "any", 0, { values: ["A"] })], [rule("sector", "any", 0, { values: ["B"] })])).toBe(false);
+  });
+  it("starts every field with a valid default except text lists", () => {
+    for (const k of ["pe", "perf_ytd", "from_high_52w", "rel_volume", "macd_hist"]) expect(ruleValid(newRule(k))).toBe(true);
+    expect(newRule("sector").op).toBe("is");
+    expect(ruleValid(newRule("sector"))).toBe(false);
+  });
+  it("describes the new rules", () => {
+    expect(ruleLabel(rule("pe", "between", 5, { value2: 15 }))).toBe("P/E between 5 and 15");
+    expect(ruleLabel(rule("sector", "any", 0, { values: ["Energy", "Utilities"] }))).toBe("Sector is any of Energy, Utilities");
+  });
+});
+
+describe("sortItems", () => {
+  const items = [row("B", { pe: 20 }), row("A", { pe: null }), row("C", { pe: 5 }), row("D", { pe: 30 })];
+  it("sorts numbers both ways with missing values last", () => {
+    expect(sortItems(items, "pe", "asc").map((r) => r.symbol)).toEqual(["C", "B", "D", "A"]);
+    expect(sortItems(items, "pe", "desc").map((r) => r.symbol)).toEqual(["D", "B", "C", "A"]);
+  });
+  it("sorts text and symbols, missing last", () => {
+    const s = [row("A", { sector: "Technology" }), row("B", { sector: null }), row("C", { sector: "Energy" })];
+    expect(sortItems(s, "sector", "asc").map((r) => r.symbol)).toEqual(["C", "A", "B"]);
+    expect(sortItems(s, "sector", "desc").map((r) => r.symbol)).toEqual(["A", "C", "B"]);
+    expect(sortItems(s, "symbol", "desc").map((r) => r.symbol)).toEqual(["C", "B", "A"]);
+  });
+  it("keeps order without a key and does not modify its input", () => {
+    expect(sortItems(items, null, "asc")).toBe(items);
+    const copy = [...items];
+    sortItems(items, "pe", "asc");
+    expect(items).toEqual(copy);
+  });
+});
+
+describe("columns and data", () => {
+  it("drops unknown columns and falls back to the defaults", () => {
+    expect(cleanColumns(["pe", "pe", "bogus", "rsi"])).toEqual(["pe", "rsi"]);
+    expect(cleanColumns([])).toEqual(["price", "change", "rsi"]);
+    expect(cleanColumns(undefined)).toEqual(["price", "change", "rsi"]);
+  });
+  it("asks for fundamentals only when a column or rule needs them", () => {
+    expect(needsFundamentals(["price", "rsi"], [rule("rsi", "below", 30)])).toBe(false);
+    expect(needsFundamentals(["pe"], [])).toBe(true);
+    expect(needsFundamentals(["price"], [rule("beta", "above", 1)])).toBe(true);
+  });
+  it("merges fundamentals into rows and formats fields", () => {
+    const f: ScreenFundamentals = { symbol: "A", market_cap: 2.5e12, pe: 30.123, eps: 5, dividend_yield: 0.5, revenue_growth: -3, profit_margin: 20, beta: 1.1, sector: "Energy", error: null };
+    const [item, bare] = mergeItems([row("A") as ScreenRow, row("B") as ScreenRow], new Map([["A", f]]));
+    expect(item.sector).toBe("Energy");
+    expect(bare.pe).toBeUndefined();
+    expect(formatField(fieldOf("market_cap")!, item)).toBe("2,500.0B");
+    expect(formatField(fieldOf("revenue_growth")!, item)).toBe("−3.0%");
+    expect(formatField(fieldOf("sector")!, item)).toBe("Energy");
+    expect(formatField(fieldOf("pe")!, bare)).toBe("—");
   });
 });

@@ -16,6 +16,7 @@ pub mod connections;
 pub mod earnings;
 pub mod events;
 pub mod financials;
+pub mod fundamentals;
 pub mod grades;
 pub mod hotkey;
 pub mod ivrank;
@@ -156,6 +157,8 @@ pub fn run() {
             commands::set_watchlist_columns,
             commands::get_watch_quotes,
             commands::get_screener_data,
+            commands::get_screener_fundamentals,
+            commands::set_screen_columns,
             commands::get_iv_ranks,
             commands::save_screen,
             commands::delete_screen,
