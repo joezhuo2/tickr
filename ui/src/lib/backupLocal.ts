@@ -1,6 +1,6 @@
 import { MAX_CHART_ALERTS, type ChartAlert } from "./chartAlerts";
 import { sanitizeCustom, type Custom } from "./display";
-import { clampReward } from "./drawing";
+import { clampReward, cleanDrawingStyles, type DrawingStyles } from "./drawing";
 import { STUDIES } from "./studies";
 import { cleanSettings, type StudySettings } from "./studySettings";
 import { cleanPanes, type PaneState } from "./panes";
@@ -15,11 +15,12 @@ export interface LocalBackup {
   technicals_settings_open?: boolean;
   panes?: PaneState;
   rr?: number;
+  drawing_styles?: DrawingStyles;
 }
 
 type Store = Pick<Storage, "getItem" | "setItem">;
 
-const KEYS = { custom: "tickr.custom", studies: "tickr.studies", study_settings: "tickr.studySettings", chart_alerts: "tickr.chartAlerts", magnet: "tickr.magnet", hide_drawings: "tickr.hideDrawings", technicals_settings_open: "tickr.technicalsSettingsOpen", panes: "tickr.panes", rr: "tickr.rr" };
+const KEYS = { custom: "tickr.custom", studies: "tickr.studies", study_settings: "tickr.studySettings", chart_alerts: "tickr.chartAlerts", magnet: "tickr.magnet", hide_drawings: "tickr.hideDrawings", technicals_settings_open: "tickr.technicalsSettingsOpen", panes: "tickr.panes", rr: "tickr.rr", drawing_styles: "tickr.drawingStyles" };
 
 function read(store: Store, key: string): unknown {
   try { return JSON.parse(store.getItem(key) ?? "null"); } catch { return null; }
@@ -49,6 +50,8 @@ export function collectLocal(store: Store): LocalBackup {
   if (panes != null) out.panes = cleanPanes(panes);
   const rr = store.getItem(KEYS.rr);
   if (rr != null) out.rr = clampReward(Number(rr));
+  const styles = read(store, KEYS.drawing_styles);
+  if (styles != null) out.drawing_styles = cleanDrawingStyles(styles);
   out.magnet = store.getItem(KEYS.magnet) === "1";
   out.hide_drawings = store.getItem(KEYS.hide_drawings) === "1";
   out.technicals_settings_open = store.getItem(KEYS.technicals_settings_open) === "1";
@@ -68,6 +71,7 @@ export function parseLocal(text: string): LocalBackup {
   if (typeof l.technicals_settings_open === "boolean") out.technicals_settings_open = l.technicals_settings_open;
   if ("panes" in l) out.panes = cleanPanes(l.panes);
   if (typeof l.rr === "number") out.rr = clampReward(l.rr);
+  if ("drawing_styles" in l) out.drawing_styles = cleanDrawingStyles(l.drawing_styles);
   return out;
 }
 
@@ -79,6 +83,7 @@ export function applyLocal(store: Store, local: LocalBackup) {
     if (local.chart_alerts) store.setItem(KEYS.chart_alerts, JSON.stringify(local.chart_alerts));
     if (local.panes) store.setItem(KEYS.panes, JSON.stringify(local.panes));
     if (local.rr !== undefined) store.setItem(KEYS.rr, String(local.rr));
+    if (local.drawing_styles) store.setItem(KEYS.drawing_styles, JSON.stringify(local.drawing_styles));
     if (local.magnet !== undefined) store.setItem(KEYS.magnet, local.magnet ? "1" : "0");
     if (local.hide_drawings !== undefined) store.setItem(KEYS.hide_drawings, local.hide_drawings ? "1" : "0");
     if (local.technicals_settings_open !== undefined) store.setItem(KEYS.technicals_settings_open, local.technicals_settings_open ? "1" : "0");

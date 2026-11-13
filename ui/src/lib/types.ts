@@ -196,7 +196,7 @@ export interface Consensus {
 }
 
 export interface DrawingPoint { t: number; price: number }
-export interface Drawing { id: number; kind: "hline" | "trend" | "text" | "pen" | "rect" | "ray" | "fib" | "position" | "avwap" | "vline" | "hray" | "arrow" | "prange" | "drange" | "channel" | "fibext" | "pitchfork" | "vprofile" | "note"; points: DrawingPoint[]; text: string; color?: string; width?: number; dashed?: boolean; locked?: boolean; created?: number; edited?: number }
+export interface Drawing { id: number; kind: "hline" | "trend" | "text" | "pen" | "rect" | "ray" | "fib" | "position" | "avwap" | "vline" | "hray" | "arrow" | "prange" | "drange" | "channel" | "fibext" | "pitchfork" | "vprofile" | "note" | "arrowup" | "arrowdown" | "callout" | "impulse" | "corrective" | "xabcd" | "headshoulders"; points: DrawingPoint[]; text: string; color?: string; width?: number; dashed?: boolean; locked?: boolean; hidden?: boolean; created?: number; edited?: number }
 
 export interface Init {
   theme: Theme;

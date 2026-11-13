@@ -1,4 +1,5 @@
-﻿import type { Candle, Drawing, DrawingPoint } from "./types";
+﻿import { num } from "./format";
+import type { Candle, Drawing, DrawingPoint } from "./types";
 
 function spacing(times: number[]): number {
   return times.length > 1 ? (times[times.length - 1] - times[0]) / (times.length - 1) || 1 : 1;
@@ -153,9 +154,10 @@ export function snapPrice(price: number, candle: Pick<Candle, "o" | "h" | "l" | 
 }
 
 export const POINT_COUNT: Partial<Record<Drawing["kind"], number>> = {
-  hline: 1, text: 1, avwap: 1, vline: 1, hray: 1, note: 1,
-  trend: 2, rect: 2, ray: 2, fib: 2, position: 2, arrow: 2, prange: 2, drange: 2, vprofile: 2,
+  hline: 1, text: 1, avwap: 1, vline: 1, hray: 1, note: 1, arrowup: 1, arrowdown: 1,
+  trend: 2, rect: 2, ray: 2, fib: 2, position: 2, arrow: 2, prange: 2, drange: 2, vprofile: 2, callout: 2,
   channel: 3, fibext: 3, pitchfork: 3,
+  corrective: 4, xabcd: 5, headshoulders: 5, impulse: 6,
 };
 
 export const FIB_EXT_RATIOS = [0, 0.618, 1, 1.618, 2.618];
@@ -181,4 +183,109 @@ export function arrowHead(a: Pixel, b: Pixel, size = 9): [Pixel, Pixel] {
   const angle = Math.atan2(b.y - a.y, b.x - a.x);
   const wing = (turn: number) => ({ x: b.x - size * Math.cos(angle + turn), y: b.y - size * Math.sin(angle + turn) });
   return [wing(0.45), wing(-0.45)];
+}
+
+export const SHAPE_LABELS: Partial<Record<Drawing["kind"], string[]>> = {
+  impulse: ["0", "1", "2", "3", "4", "5"],
+  corrective: ["0", "A", "B", "C"],
+  xabcd: ["X", "A", "B", "C", "D"],
+  headshoulders: ["LS", "", "H", "", "RS"],
+};
+
+export function pointLabel(path: Pixel[], i: number, gap = 6): { x: number; y: number; above: boolean } {
+  const p = path[i];
+  const near = [path[i - 1], path[i + 1]].filter((q): q is Pixel => !!q);
+  const above = near.reduce((s, q) => s + q.y, 0) >= p.y * near.length;
+  return { x: p.x, y: above ? p.y - gap : p.y + gap, above };
+}
+
+export function harmonicRatios([x, a, b, c, d]: number[]): { from: number; to: number; label: string; ratio: number }[] {
+  const r = (n: number, m: number) => (m ? Math.abs(n / m) : 0);
+  return [
+    { from: 0, to: 2, label: "AB/XA", ratio: r(b - a, a - x) },
+    { from: 1, to: 3, label: "BC/AB", ratio: r(c - b, b - a) },
+    { from: 2, to: 4, label: "CD/BC", ratio: r(d - c, c - b) },
+    { from: 0, to: 4, label: "AD/XA", ratio: r(d - a, a - x) },
+  ];
+}
+
+export function necklineEnds(pts: Pixel[]): [Pixel, Pixel] {
+  const [n1, n2] = [pts[1], pts[3]];
+  const dx = n2.x - n1.x;
+  if (!dx) return [n1, n2];
+  const xs = pts.map((p) => p.x);
+  const at = (x: number) => ({ x, y: n1.y + ((n2.y - n1.y) * (x - n1.x)) / dx });
+  return [at(Math.min(...xs)), at(Math.max(...xs))];
+}
+
+export function shapeSegments(kind: Drawing["kind"], pts: Pixel[]): [Pixel, Pixel][] {
+  const legs = pts.slice(1).map((p, i): [Pixel, Pixel] => [pts[i], p]);
+  if (kind === "xabcd") return [...legs, ...[[0, 2], [1, 3], [2, 4], [0, 4]].map(([i, j]): [Pixel, Pixel] => [pts[i], pts[j]])];
+  if (kind === "headshoulders") return [...legs, necklineEnds(pts)];
+  return legs;
+}
+
+export function inBounds(p: Pixel, b: { minX: number; maxX: number; minY: number; maxY: number }, pad = 0): boolean {
+  return p.x >= b.minX - pad && p.x <= b.maxX + pad && p.y >= b.minY - pad && p.y <= b.maxY + pad;
+}
+
+export function markerPath(p: Pixel, up: boolean, size = 12): Pixel[] {
+  const s = up ? 1 : -1;
+  const head = p.y + s * (2 + size / 2), tail = p.y + s * (2 + size * 1.4), w = size / 2, stem = size / 5;
+  return [{ x: p.x, y: p.y + s * 2 }, { x: p.x + w, y: head }, { x: p.x + stem, y: head }, { x: p.x + stem, y: tail }, { x: p.x - stem, y: tail }, { x: p.x - stem, y: head }, { x: p.x - w, y: head }];
+}
+
+export function calloutGeometry(a: Pixel, b: Pixel, textWidth: number) {
+  const box = { minX: b.x, maxX: b.x + textWidth + 12, minY: b.y - 10, maxY: b.y + 10 };
+  const tail = { x: Math.max(box.minX, Math.min(box.maxX, a.x)), y: Math.max(box.minY, Math.min(box.maxY, a.y)) };
+  return { box, tail };
+}
+
+export const DRAWING_NAMES: Record<Drawing["kind"], string> = {
+  hline: "Level", trend: "Trend line", text: "Text", pen: "Pen", rect: "Box", ray: "Ray", fib: "Fib retracement",
+  position: "Long / short position", avwap: "Anchored VWAP", vline: "Vertical line", hray: "Horizontal ray", arrow: "Arrow",
+  prange: "Price range", drange: "Date range", channel: "Channel", fibext: "Fib extension", pitchfork: "Pitchfork",
+  vprofile: "Volume profile", note: "Note", arrowup: "Arrow up", arrowdown: "Arrow down", callout: "Callout",
+  impulse: "Elliott impulse (1-5)", corrective: "Elliott correction (A-B-C)", xabcd: "XABCD pattern", headshoulders: "Head and shoulders",
+};
+
+export function drawingSummary(d: Drawing): string {
+  if (d.text) {
+    const line = d.text.split("\n")[0].trim();
+    return line.length > 40 ? `${line.slice(0, 39)}…` : line;
+  }
+  if (d.kind === "pen") return `${d.points.length} points`;
+  const first = num(d.points[0].price);
+  return d.points.length > 1 ? `${first} → ${num(d.points[d.points.length - 1].price)}` : first;
+}
+
+export interface DrawingStyle { color: string; width: number; dashed: boolean }
+export interface StyleTemplate extends DrawingStyle { name: string }
+export interface DrawingStyles { defaults: Partial<Record<Drawing["kind"], DrawingStyle>>; templates: StyleTemplate[] }
+export const MAX_TEMPLATES = 20;
+
+export function cleanStyle(v: unknown): DrawingStyle {
+  const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+  return {
+    color: typeof o.color === "string" && /^#[0-9a-fA-F]{6}$/.test(o.color) ? o.color : "",
+    width: typeof o.width === "number" && Number.isInteger(o.width) && o.width >= 1 && o.width <= 4 ? o.width : 1,
+    dashed: o.dashed === true,
+  };
+}
+
+export function cleanDrawingStyles(v: unknown): DrawingStyles {
+  const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+  const raw = o.defaults && typeof o.defaults === "object" ? o.defaults : {};
+  const defaults = Object.fromEntries(Object.entries(raw).filter(([k]) => Object.hasOwn(DRAWING_NAMES, k)).map(([k, s]) => [k, cleanStyle(s)]));
+  let templates: StyleTemplate[] = [];
+  for (const t of Array.isArray(o.templates) ? o.templates : []) templates = saveTemplate(templates, typeof t?.name === "string" ? t.name : "", cleanStyle(t), false);
+  return { defaults, templates };
+}
+
+export function saveTemplate(list: StyleTemplate[], name: string, style: DrawingStyle, replace = true): StyleTemplate[] {
+  const n = name.trim().slice(0, 40);
+  const i = list.findIndex((t) => t.name === n);
+  if (!n || (i >= 0 && !replace) || (i < 0 && list.length >= MAX_TEMPLATES)) return list;
+  const next = { name: n, color: style.color, width: style.width, dashed: style.dashed };
+  return i >= 0 ? list.map((t, k) => (k === i ? next : t)) : [...list, next];
 }

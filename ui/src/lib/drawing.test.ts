@@ -1,5 +1,5 @@
 ﻿import { describe, expect, it } from "vitest";
-import { PEN_MAX_POINTS, POINT_COUNT, arrowHead, channelLines, fibExtLevels, pitchforkLines, snapPrice, hitPolyline, hitTest, indexToTime, pathBounds, polylineDistance, rulerMeasurement, segmentDistance, simplifyPath, timeToIndex, undoReducer, type History } from "./drawing";
+import { DRAWING_NAMES, MAX_TEMPLATES, PEN_MAX_POINTS, POINT_COUNT, SHAPE_LABELS, calloutGeometry, cleanDrawingStyles, drawingSummary, harmonicRatios, inBounds, markerPath, necklineEnds, pointLabel, saveTemplate, shapeSegments, arrowHead, channelLines, fibExtLevels, pitchforkLines, snapPrice, hitPolyline, hitTest, indexToTime, pathBounds, polylineDistance, rulerMeasurement, segmentDistance, simplifyPath, timeToIndex, undoReducer, type History } from "./drawing";
 import { forward, inverse, scaleLabel } from "./scale";
 import type { Drawing } from "./types";
 
@@ -183,5 +183,75 @@ describe("multi-point drawings", () => {
     expect(l.x).toBeLessThan(10);
     expect(l.y).toBeCloseTo(-r.y);
     expect(POINT_COUNT.pitchfork).toBe(3);
+  });
+});
+
+describe("pattern and annotation tools", () => {
+  it("computes harmonic ratios from the five prices", () => {
+    const [ab, bc, cd, ad] = harmonicRatios([100, 200, 138.2, 176.4, 121.4]);
+    expect(ab).toMatchObject({ from: 0, to: 2, label: "AB/XA" });
+    expect(ab.ratio).toBeCloseTo(0.618);
+    expect(bc.ratio).toBeCloseTo(0.618);
+    expect(cd.ratio).toBeCloseTo(1.44, 2);
+    expect(ad.ratio).toBeCloseTo(0.786);
+    expect(harmonicRatios([100, 100, 90, 95, 92])[0].ratio).toBe(0);
+  });
+
+  it("labels peaks above and troughs below", () => {
+    const path = [{ x: 0, y: 50 }, { x: 10, y: 10 }, { x: 20, y: 40 }, { x: 30, y: 0 }];
+    expect(pointLabel(path, 0)).toEqual({ x: 0, y: 56, above: false });
+    expect(pointLabel(path, 1)).toEqual({ x: 10, y: 4, above: true });
+    expect(pointLabel(path, 2).above).toBe(false);
+    expect(pointLabel(path, 3).above).toBe(true);
+    expect(SHAPE_LABELS.impulse).toHaveLength(POINT_COUNT.impulse!);
+    expect(SHAPE_LABELS.corrective).toHaveLength(POINT_COUNT.corrective!);
+    expect(SHAPE_LABELS.xabcd).toHaveLength(POINT_COUNT.xabcd!);
+    expect(SHAPE_LABELS.headshoulders).toEqual(["LS", "", "H", "", "RS"]);
+  });
+
+  it("hit-tests legs, harmonic connectors and the extended neckline", () => {
+    const pts = [{ x: 0, y: 50 }, { x: 20, y: 0 }, { x: 40, y: 30 }, { x: 60, y: 10 }, { x: 80, y: 40 }];
+    const hits = (kind: Drawing["kind"], p: { x: number; y: number }) => shapeSegments(kind, pts).some(([a, b]) => hitTest(p, a, b));
+    expect(hits("impulse", { x: 10, y: 25 })).toBe(true);
+    expect(hits("impulse", { x: 20, y: 40 })).toBe(false);
+    expect(hits("xabcd", { x: 20, y: 40 })).toBe(true);
+    expect(shapeSegments("xabcd", pts)).toHaveLength(8);
+    expect(necklineEnds(pts)).toEqual([{ x: 0, y: -5 }, { x: 80, y: 15 }]);
+    expect(hits("headshoulders", { x: 78, y: 14.5 })).toBe(true);
+    expect(hits("impulse", { x: 78, y: 14.5 })).toBe(false);
+    expect(necklineEnds([pts[0], { x: 5, y: 5 }, pts[2], { x: 5, y: 9 }, pts[4]])).toEqual([{ x: 5, y: 5 }, { x: 5, y: 9 }]);
+  });
+
+  it("places markers on the right side of the point and wires callouts to the box edge", () => {
+    const up = markerPath({ x: 50, y: 50 }, true);
+    expect(up[0]).toEqual({ x: 50, y: 52 });
+    expect(Math.min(...up.map((p) => p.y))).toBeGreaterThan(50);
+    expect(Math.max(...markerPath({ x: 50, y: 50 }, false).map((p) => p.y))).toBeLessThan(50);
+    expect(inBounds({ x: 53, y: 60 }, pathBounds(up))).toBe(true);
+    expect(inBounds({ x: 60, y: 45 }, pathBounds(up), 3)).toBe(false);
+    const { box, tail } = calloutGeometry({ x: 0, y: 0 }, { x: 40, y: 50 }, 30);
+    expect(box).toEqual({ minX: 40, maxX: 82, minY: 40, maxY: 60 });
+    expect(tail).toEqual({ x: 40, y: 40 });
+  });
+
+  it("names and summarizes every kind", () => {
+    expect(drawingSummary({ id: 1, kind: "callout", points: [], text: "Breakout\nline two" })).toBe("Breakout");
+    expect(drawingSummary({ id: 1, kind: "trend", points: [{ t: 1, price: 10 }, { t: 2, price: 12.5 }], text: "" })).toBe("10.00 → 12.50");
+    expect(drawingSummary(level)).toBe("125.00");
+    expect(drawingSummary({ id: 1, kind: "pen", points: [level.points[0], level.points[0]], text: "" })).toBe("2 points");
+    for (const kind of Object.keys(POINT_COUNT)) expect(DRAWING_NAMES[kind as Drawing["kind"]]).toBeTruthy();
+  });
+
+  it("cleans saved styles and keeps template names unique and capped", () => {
+    const s = cleanDrawingStyles({ defaults: { trend: { color: "#ABCDEF", width: 3, dashed: true }, toString: {}, bogus: {}, rect: { color: "red", width: 9 } }, templates: [{ name: " Red ", color: "#ff0000", width: 2 }, { name: "Red" }, { name: "" }, null] });
+    expect(s.defaults).toEqual({ trend: { color: "#ABCDEF", width: 3, dashed: true }, rect: { color: "", width: 1, dashed: false } });
+    expect(s.templates).toEqual([{ name: "Red", color: "#ff0000", width: 2, dashed: false }]);
+    expect(cleanDrawingStyles(null)).toEqual({ defaults: {}, templates: [] });
+    const blue = { color: "#0000ff", width: 1, dashed: false };
+    expect(saveTemplate(s.templates, "Red", blue)).toEqual([{ name: "Red", ...blue }]);
+    let many = s.templates;
+    for (let i = 0; i < 30; i++) many = saveTemplate(many, `T${i}`, blue);
+    expect(many).toHaveLength(MAX_TEMPLATES);
+    expect(saveTemplate(many, "  ", blue)).toBe(many);
   });
 });
