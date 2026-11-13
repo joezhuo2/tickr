@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.81] - 2026-11-13
+
+### Added
+- **Full financial statements:** Financials has Income, Balance sheet and Cash
+  flow tables next to the Overview, annual or quarterly.
+- **Older earnings quarters:** Earnings lists up to twelve quarters; the older
+  ones show the reported EPS only.
+
 ## [0.11.80] - 2026-11-13
 
 ### Added
