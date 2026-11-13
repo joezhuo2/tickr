@@ -1,5 +1,5 @@
 ﻿import { num } from "./format";
-import type { Candle, Drawing, DrawingPoint } from "./types";
+import type { Candle, Drawing, DrawingIcon, DrawingPoint } from "./types";
 
 function spacing(times: number[]): number {
   return times.length > 1 ? (times[times.length - 1] - times[0]) / (times.length - 1) || 1 : 1;
@@ -154,8 +154,9 @@ export function snapPrice(price: number, candle: Pick<Candle, "o" | "h" | "l" | 
 }
 
 export const POINT_COUNT: Partial<Record<Drawing["kind"], number>> = {
-  hline: 1, text: 1, avwap: 1, vline: 1, hray: 1, note: 1, arrowup: 1, arrowdown: 1,
+  hline: 1, text: 1, avwap: 1, vline: 1, hray: 1, note: 1, arrowup: 1, arrowdown: 1, icon: 1,
   trend: 2, rect: 2, ray: 2, fib: 2, position: 2, arrow: 2, prange: 2, drange: 2, vprofile: 2, callout: 2,
+  gannfan: 2, fibfan: 2, fibtime: 2, ellipse: 2,
   channel: 3, fibext: 3, pitchfork: 3,
   corrective: 4, xabcd: 5, headshoulders: 5, impulse: 6,
 };
@@ -177,6 +178,78 @@ export function pitchforkLines(a: Pixel, b: Pixel, c: Pixel, left: number, right
   const d = { x: mid.x - a.x, y: mid.y - a.y };
   const tine = (p: Pixel): [Pixel, Pixel] => [p, rayEnd(p, { x: p.x + d.x, y: p.y + d.y }, left, right)];
   return [[a, rayEnd(a, mid, left, right)], tine(b), tine(c), [b, c]];
+}
+
+export const GANN_RATIOS: [number, number][] = [[1, 8], [1, 4], [1, 3], [1, 2], [1, 1], [2, 1], [3, 1], [4, 1], [8, 1]];
+
+export function gannFanRays(a: Pixel, b: Pixel): { label: string; through: Pixel }[] {
+  return GANN_RATIOS.map(([price, time]) => ({ label: `${price}x${time}`, through: { x: b.x, y: a.y + ((b.y - a.y) * price) / time } }));
+}
+
+export const FIB_FAN_RATIOS = [0.236, 0.382, 0.5, 0.618, 0.786];
+
+export function fibFanRays(a: Pixel, b: Pixel): { ratio: number; through: Pixel }[] {
+  return FIB_FAN_RATIOS.map((ratio) => ({ ratio, through: { x: b.x, y: b.y + (a.y - b.y) * ratio } }));
+}
+
+export const FIB_TIME_STEPS = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89];
+
+export function fibTimeZones(from: number, to: number): { step: number; index: number }[] {
+  return FIB_TIME_STEPS.map((step) => ({ step, index: from + (to - from) * step }));
+}
+
+export function ellipsePath(a: Pixel, b: Pixel, segments = 64): Pixel[] {
+  const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2, rx = Math.abs(b.x - a.x) / 2, ry = Math.abs(b.y - a.y) / 2;
+  return Array.from({ length: segments + 1 }, (_, i) => ({ x: cx + rx * Math.cos((i / segments) * Math.PI * 2), y: cy + ry * Math.sin((i / segments) * Math.PI * 2) }));
+}
+
+export function hitEllipse(p: Pixel, a: Pixel, b: Pixel): boolean {
+  return hitPolyline(p, ellipsePath(a, b));
+}
+
+export function dropRepeats<T>(points: T[], pos: (p: T) => Pixel, min = 3): T[] {
+  const kept: T[] = [];
+  for (const q of points) {
+    const last = kept.length ? pos(kept[kept.length - 1]) : null;
+    const at = pos(q);
+    if (!last || Math.hypot(at.x - last.x, at.y - last.y) >= min) kept.push(q);
+  }
+  return kept;
+}
+
+export const brushWidth = (width = 1) => width * 4 + 6;
+
+export function hitBrush(p: Pixel, path: Pixel[], width?: number): boolean {
+  return polylineDistance(p, path) <= brushWidth(width) / 2 + 2;
+}
+
+export const ICONS: { icon: DrawingIcon; label: string; glyph: string }[] = [
+  { icon: "check", label: "Check", glyph: "✓" },
+  { icon: "cross", label: "Cross", glyph: "✕" },
+  { icon: "star", label: "Star", glyph: "★" },
+  { icon: "flag", label: "Flag", glyph: "⚑" },
+  { icon: "question", label: "Question", glyph: "?" },
+  { icon: "exclamation", label: "Exclamation", glyph: "!" },
+  { icon: "up", label: "Up triangle", glyph: "▲" },
+  { icon: "down", label: "Down triangle", glyph: "▼" },
+];
+
+export const ICON_SIZE = 16;
+
+export function iconBounds(p: Pixel, size = ICON_SIZE) {
+  return { minX: p.x - size / 2, maxX: p.x + size / 2, minY: p.y - size / 2, maxY: p.y + size / 2 };
+}
+
+export function iconShape(icon: DrawingIcon | undefined, p: Pixel, size = ICON_SIZE): { fill: Pixel[][]; stroke: Pixel[][]; text: string } {
+  const r = size / 2;
+  const at = (x: number, y: number) => ({ x: p.x + x * r, y: p.y + y * r });
+  if (icon === "check") return { fill: [], stroke: [[at(-0.8, 0), at(-0.25, 0.6), at(0.8, -0.6)]], text: "" };
+  if (icon === "cross") return { fill: [], stroke: [[at(-0.7, -0.7), at(0.7, 0.7)], [at(0.7, -0.7), at(-0.7, 0.7)]], text: "" };
+  if (icon === "star") return { fill: [Array.from({ length: 10 }, (_, i) => { const k = i % 2 ? 0.42 : 1, angle = -Math.PI / 2 + (i * Math.PI) / 5; return at(k * Math.cos(angle), k * Math.sin(angle)); })], stroke: [], text: "" };
+  if (icon === "flag") return { fill: [[at(-0.6, -0.9), at(0.8, -0.55), at(-0.6, -0.2)]], stroke: [[at(-0.6, -0.9), at(-0.6, 0.9)]], text: "" };
+  if (icon === "up") return { fill: [[at(0, -0.8), at(0.85, 0.7), at(-0.85, 0.7)]], stroke: [], text: "" };
+  if (icon === "down") return { fill: [[at(0, 0.8), at(0.85, -0.7), at(-0.85, -0.7)]], stroke: [], text: "" };
+  return { fill: [], stroke: [], text: icon === "exclamation" ? "!" : "?" };
 }
 
 export function arrowHead(a: Pixel, b: Pixel, size = 9): [Pixel, Pixel] {
@@ -252,6 +325,7 @@ export const DRAWING_NAMES: Record<Drawing["kind"], string> = {
   prange: "Price range", drange: "Date range", channel: "Channel", fibext: "Fib extension", pitchfork: "Pitchfork",
   vprofile: "Volume profile", note: "Note", arrowup: "Arrow up", arrowdown: "Arrow down", callout: "Callout",
   impulse: "Elliott impulse (1-5)", corrective: "Elliott correction (A-B-C)", xabcd: "XABCD pattern", headshoulders: "Head and shoulders",
+  gannfan: "Gann fan", fibfan: "Fib fan", fibtime: "Fib time zones", ellipse: "Ellipse", polyline: "Polyline", brush: "Brush", icon: "Icon",
 };
 
 export function drawingSummary(d: Drawing): string {
@@ -259,7 +333,8 @@ export function drawingSummary(d: Drawing): string {
     const line = d.text.split("\n")[0].trim();
     return line.length > 40 ? `${line.slice(0, 39)}…` : line;
   }
-  if (d.kind === "pen") return `${d.points.length} points`;
+  if (d.kind === "pen" || d.kind === "polyline" || d.kind === "brush") return `${d.points.length} points`;
+  if (d.kind === "icon") return `${ICONS.find((i) => i.icon === d.icon)?.label ?? ""} ${num(d.points[0].price)}`.trim();
   const first = num(d.points[0].price);
   return d.points.length > 1 ? `${first} → ${num(d.points[d.points.length - 1].price)}` : first;
 }
