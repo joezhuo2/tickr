@@ -1,4 +1,5 @@
 import { isIntraday } from "./session";
+import { rsi } from "./strategy";
 import type { PivotType } from "./studySettings";
 import { intervalSpec, type Candle } from "./types";
 
@@ -17,6 +18,15 @@ export const STUDIES = [
   { id: "cci", label: "CCI" },
   { id: "willr", label: "Williams %R" },
   { id: "mfi", label: "MFI" },
+  { id: "wma", label: "WMA" },
+  { id: "hma", label: "Hull MA" },
+  { id: "vwma", label: "VWMA" },
+  { id: "zigzag", label: "ZigZag" },
+  { id: "linreg", label: "Linear regression channel" },
+  { id: "stochrsi", label: "Stoch RSI" },
+  { id: "aroon", label: "Aroon" },
+  { id: "cmf", label: "CMF" },
+  { id: "roc", label: "ROC" },
 ] as const;
 
 export type StudyId = (typeof STUDIES)[number]["id"];
@@ -206,6 +216,139 @@ export function parabolicSar(candles: readonly Candle[], step = 0.02, max = 0.2)
     up.push(rising);
   });
   return { value, up };
+}
+
+function weighted(values: Series, n: number): Series {
+  const den = (n * (n + 1)) / 2;
+  return values.map((_, i) => {
+    if (i < n - 1) return null;
+    let sum = 0;
+    for (let k = 0; k < n; k++) {
+      const v = values[i - k];
+      if (v == null) return null;
+      sum += v * (n - k);
+    }
+    return sum / den;
+  });
+}
+
+export function wma(candles: readonly Candle[], length = 20): Series {
+  return weighted(candles.map((c) => c.c), length);
+}
+
+export function hma(candles: readonly Candle[], length = 20): Series {
+  const closes = candles.map((c) => c.c);
+  const half = weighted(closes, Math.max(1, Math.floor(length / 2)));
+  const full = weighted(closes, length);
+  return weighted(half.map((h, i) => (h == null || full[i] == null ? null : 2 * h - full[i]!)), Math.max(1, Math.floor(Math.sqrt(length))));
+}
+
+export function vwma(candles: readonly Candle[], length = 20): Series {
+  return candles.map((_, i) => {
+    if (i < length - 1) return null;
+    let pv = 0;
+    let vol = 0;
+    for (let k = i - length + 1; k <= i; k++) { pv += candles[k].c * candles[k].v; vol += candles[k].v; }
+    return vol ? pv / vol : null;
+  });
+}
+
+export function zigzag(candles: readonly Candle[], percent = 5): Series {
+  const out: Series = candles.map(() => null);
+  if (!candles.length) return out;
+  const r = percent / 100;
+  let dir = 0;
+  let hi = 0;
+  let lo = 0;
+  let ext = 0;
+  candles.forEach((c, i) => {
+    if (dir === 0) {
+      if (c.h > candles[hi].h) hi = i;
+      if (c.l < candles[lo].l) lo = i;
+      if (candles[hi].h >= candles[lo].l * (1 + r) && lo < hi) { out[lo] = candles[lo].l; dir = 1; ext = hi; }
+      else if (candles[lo].l <= candles[hi].h * (1 - r) && hi < lo) { out[hi] = candles[hi].h; dir = -1; ext = lo; }
+    } else if (dir === 1) {
+      if (c.h > candles[ext].h) ext = i;
+      else if (c.l <= candles[ext].h * (1 - r)) { out[ext] = candles[ext].h; dir = -1; ext = i; }
+    } else {
+      if (c.l < candles[ext].l) ext = i;
+      else if (c.h >= candles[ext].l * (1 + r)) { out[ext] = candles[ext].l; dir = 1; ext = i; }
+    }
+  });
+  if (dir) out[ext] = dir === 1 ? candles[ext].h : candles[ext].l;
+  return out;
+}
+
+export function linearRegression(candles: readonly Candle[], length = 100, deviations = 2): { upper: Series; mid: Series; lower: Series } {
+  const n = candles.length;
+  const mid: Series = candles.map(() => null);
+  const upper: Series = candles.map(() => null);
+  const lower: Series = candles.map(() => null);
+  if (length < 2 || n < length) return { upper, mid, lower };
+  const ys = candles.slice(n - length).map((c) => c.c);
+  const sx = ((length - 1) * length) / 2;
+  const sxx = ((length - 1) * length * (2 * length - 1)) / 6;
+  const sy = ys.reduce((a, b) => a + b, 0);
+  const sxy = ys.reduce((a, y, x) => a + x * y, 0);
+  const slope = (length * sxy - sx * sy) / (length * sxx - sx * sx);
+  const base = (sy - slope * sx) / length;
+  const dev = Math.sqrt(ys.reduce((a, y, x) => a + (y - base - slope * x) ** 2, 0) / length);
+  ys.forEach((_, x) => {
+    const line = base + slope * x;
+    mid[n - length + x] = line;
+    upper[n - length + x] = line + deviations * dev;
+    lower[n - length + x] = line - deviations * dev;
+  });
+  return { upper, mid, lower };
+}
+
+export function stochRsi(candles: readonly Candle[], rsiLength = 14, stochLength = 14, smoothK = 3, smoothD = 3): { k: Series; d: Series } {
+  const strength: Series = rsi(candles.map((c) => c.c), rsiLength).map((x) => (Number.isNaN(x) ? null : x));
+  const raw: Series = strength.map((x, i) => {
+    if (x == null || i < stochLength - 1) return null;
+    const win = strength.slice(i - stochLength + 1, i + 1);
+    if (win.some((v) => v == null)) return null;
+    const hi = Math.max(...(win as number[]));
+    const lo = Math.min(...(win as number[]));
+    return hi === lo ? 50 : ((x - lo) / (hi - lo)) * 100;
+  });
+  const k = average(raw, smoothK);
+  return { k, d: average(k, smoothD) };
+}
+
+export function aroon(candles: readonly Candle[], length = 25): { up: Series; down: Series } {
+  const up: Series = [];
+  const down: Series = [];
+  candles.forEach((_, i) => {
+    if (i < length) { up.push(null); down.push(null); return; }
+    let hi = i - length;
+    let lo = i - length;
+    for (let k = i - length; k <= i; k++) {
+      if (candles[k].h >= candles[hi].h) hi = k;
+      if (candles[k].l <= candles[lo].l) lo = k;
+    }
+    up.push((100 * (length - (i - hi))) / length);
+    down.push((100 * (length - (i - lo))) / length);
+  });
+  return { up, down };
+}
+
+export function cmf(candles: readonly Candle[], length = 20): Series {
+  const flow = candles.map((c) => (c.h === c.l ? 0 : ((c.c - c.l - (c.h - c.c)) / (c.h - c.l)) * c.v));
+  return candles.map((_, i) => {
+    if (i < length - 1) return null;
+    let mf = 0;
+    let vol = 0;
+    for (let k = i - length + 1; k <= i; k++) { mf += flow[k]; vol += candles[k].v; }
+    return vol ? mf / vol : 0;
+  });
+}
+
+export function roc(candles: readonly Candle[], length = 9): Series {
+  return candles.map((c, i) => {
+    const prev = i >= length ? candles[i - length].c : 0;
+    return prev ? ((c.c - prev) / prev) * 100 : null;
+  });
 }
 
 export interface Pivot { p: number; r1: number; r2: number; s1: number; s2: number }

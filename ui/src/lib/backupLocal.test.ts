@@ -33,7 +33,7 @@ describe("backup local state", () => {
     expect(dst.getItem("tickr.rr")).toBe("3.5");
     expect(JSON.parse(dst.getItem("tickr.drawingStyles")!)).toEqual({ defaults: { trend: { color: "#ff0000", width: 2, dashed: true } }, templates: [{ name: "Red", color: "#ff0000", width: 3, dashed: false }] });
     expect(dst.getItem("tickr.technicalsSettingsOpen")).toBe("1");
-    expect(JSON.parse(dst.getItem("tickr.panes")!)).toEqual({ groups: [["price"], ["macd", "rsi"], ["stoch"], ["obv"], ["cci"], ["willr"], ["mfi"]], left: "percent" });
+    expect(JSON.parse(dst.getItem("tickr.panes")!)).toEqual({ groups: [["price"], ["macd", "rsi"], ["stoch"], ["obv"], ["cci"], ["willr"], ["mfi"], ["stochrsi"], ["aroon"], ["cmf"], ["roc"]], left: "percent" });
     expect(JSON.parse(dst.getItem("tickr.studySettings")!).ichimoku.displacement).toBe(30);
     expect(JSON.parse(dst.getItem("tickr.studySettings")!).stoch.k).toBe(14);
   });

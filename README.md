@@ -469,14 +469,20 @@ it is instant.
   menu, is a two-click drawing that profiles the candles between its two ends
   and is saved with the symbol like any other drawing.
   **Studies** at the bottom of the Technicals tab add Stochastic, OBV, CCI,
-  Williams %R and MFI in their own panes, and Ichimoku, Supertrend, Keltner
-  channels, Donchian channels, Parabolic SAR (dots) and pivot points (P, R1,
-  R2, S1, S2) over the price. They are drawn on both charts without running
-  Analyze, follow replay, and do not feed the score. Their parameters (defaults:
-  Stochastic 14/3/3, Ichimoku 9/26/52 with a 26-bar displacement, Supertrend
-  10/3, Keltner 20/10/2, Donchian 20, CCI 20, Williams %R 14, MFI 14, SAR
-  0.02/0.2) and the pivot type (classic, Fibonacci, Camarilla or Woodie) are
-  set under Indicator settings. Pivots come from the previous day on intraday
+  Williams %R, MFI, Stoch RSI, Aroon (up and down), CMF and ROC in their own
+  panes, and Ichimoku, Supertrend, Keltner channels, Donchian channels,
+  Parabolic SAR (dots), pivot points (P, R1, R2, S1, S2), WMA, Hull MA, VWMA,
+  ZigZag and a linear regression channel over the price. They are drawn on
+  both charts without running Analyze, follow replay, and do not feed the
+  score. Their parameters (defaults: Stochastic 14/3/3, Ichimoku 9/26/52 with
+  a 26-bar displacement, Supertrend 10/3, Keltner 20/10/2, Donchian 20, CCI
+  20, Williams %R 14, MFI 14, SAR 0.02/0.2, WMA, Hull MA and VWMA 20, ZigZag
+  5%, linear regression 100 bars with bands 2 standard deviations out, Stoch
+  RSI 14/14/3/3, Aroon 25, CMF 20, ROC 9) and the pivot type (classic,
+  Fibonacci, Camarilla or Woodie) are set under Indicator settings. ZigZag
+  joins swing highs and lows that reversed by at least the set percent; only
+  its last leg moves as new bars arrive, so confirmed swings stay put in
+  replay. The regression channel covers the latest bars only. Pivots come from the previous day on intraday
   charts, the previous month on daily charts and the previous year on longer
   ones. The Ichimoku cloud is projected by the displacement past the latest bar
   into the empty space on the right, and the lagging line sits that far back.

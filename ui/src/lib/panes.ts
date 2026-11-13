@@ -1,13 +1,13 @@
 import { paneLayout } from "./indicators";
 
-export const PANES = ["rsi", "macd", "stoch", "obv", "cci", "willr", "mfi"] as const;
+export const PANES = ["rsi", "macd", "stoch", "obv", "cci", "willr", "mfi", "stochrsi", "aroon", "cmf", "roc"] as const;
 export type PaneId = (typeof PANES)[number];
 export type Slot = PaneId | "price";
 export const LEFT_SCALES = ["off", "same", "percent"] as const;
 export type LeftScale = (typeof LEFT_SCALES)[number];
 export interface PaneState { groups: Slot[][]; left: LeftScale }
 
-export const PANE_NAMES: Record<Slot, string> = { price: "Price", rsi: "RSI", macd: "MACD", stoch: "Stochastic", obv: "OBV", cci: "CCI", willr: "Williams %R", mfi: "MFI" };
+export const PANE_NAMES: Record<Slot, string> = { price: "Price", rsi: "RSI", macd: "MACD", stoch: "Stochastic", obv: "OBV", cci: "CCI", willr: "Williams %R", mfi: "MFI", stochrsi: "Stoch RSI", aroon: "Aroon", cmf: "CMF", roc: "ROC" };
 
 export function defaultPanes(): PaneState {
   return { groups: [["price"], ...PANES.map((id) => [id])], left: "off" };

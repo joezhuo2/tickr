@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cci, donchian, ichimoku, keltner, mfi, obv, parabolicSar, pivotPeriod, pivots, stochastic, supertrend, williamsR } from "./studies";
+import { aroon, cci, cmf, donchian, hma, ichimoku, keltner, linearRegression, mfi, obv, parabolicSar, pivotPeriod, pivots, roc, stochRsi, stochastic, supertrend, vwma, williamsR, wma, zigzag } from "./studies";
 import type { Candle } from "./types";
 
 const k = (t: number, h: number, l: number, c: number, v = 10): Candle => ({ t, o: c, h, l, c, v });
@@ -119,5 +119,55 @@ describe("studies", () => {
     const flip = parabolicSar([k(0, 11, 9, 10), k(1, 12, 10, 11), k(2, 9, 5, 6)]);
     expect(flip.value[2]).toBe(12);
     expect(flip.up[2]).toBe(false);
+  });
+
+  it("weights WMA, Hull MA and VWMA", () => {
+    expect(wma(ramp(5), 3)[1]).toBeNull();
+    expect(wma(ramp(5), 3)[2]).toBeCloseTo(68 / 6);
+    const h = hma(ramp(8), 4);
+    expect(h[3]).toBeNull();
+    expect(h[4]).toBeCloseTo(14);
+    expect(h[7]).toBeCloseTo(17);
+    expect(vwma([k(0, 10, 10, 10, 1), k(1, 20, 20, 20, 3)], 2)).toEqual([null, 17.5]);
+    expect(vwma([k(0, 10, 10, 10, 0)], 1)).toEqual([null]);
+  });
+
+  it("marks ZigZag pivots on percent reversals and never moves a confirmed one", () => {
+    const c = [100, 110, 104, 103, 112, 100].map((p, i) => k(i, p, p, p));
+    const full = zigzag(c, 5);
+    expect(full).toEqual([100, 110, null, 103, 112, 100]);
+    for (let m = 1; m <= c.length; m++) {
+      const part = zigzag(c.slice(0, m), 5);
+      const shown = part.flatMap((v, i) => (v == null ? [] : [i]));
+      for (const i of shown.slice(0, -1)) expect(part[i]).toBe(full[i]);
+    }
+    expect(zigzag([], 5)).toEqual([]);
+  });
+
+  it("fits a linear regression channel over the last bars", () => {
+    const line = linearRegression(ramp(5), 3, 2);
+    expect(line.mid[1]).toBeNull();
+    expect(line.mid.slice(2)).toEqual([12, 13, 14].map((x) => expect.closeTo(x, 9)));
+    expect(line.upper[4]).toBeCloseTo(14);
+    const bent = linearRegression([1, 3, 2].map((p, i) => k(i, p, p, p)), 3, 2);
+    expect(bent.mid[2]).toBeCloseTo(2.5);
+    expect(bent.upper[2]).toBeCloseTo(2.5 + 2 * Math.sqrt(0.5));
+    expect(bent.lower[0]).toBeCloseTo(1.5 - 2 * Math.sqrt(0.5));
+    expect(linearRegression(ramp(2), 3).mid).toEqual([null, null]);
+  });
+
+  it("computes Stoch RSI, Aroon, CMF and ROC by hand", () => {
+    const c = [10, 11, 10, 12, 11].map((p, i) => k(i, p, p, p));
+    expect(stochRsi(c, 1, 2, 1, 1).k).toEqual([null, null, 0, 100, 0]);
+    const smooth = stochRsi(c, 1, 2, 2, 1);
+    expect(smooth.k).toEqual([null, null, null, 50, 50]);
+    expect(smooth.d[4]).toBe(50);
+    const a = aroon(ramp(4), 2);
+    expect(a.up[1]).toBeNull();
+    expect(a.up[3]).toBe(100);
+    expect(a.down[3]).toBe(0);
+    expect(cmf([k(0, 12, 8, 11, 10)], 1)).toEqual([0.5]);
+    expect(cmf([k(0, 12, 8, 11, 10), k(1, 9, 9, 9, 30)], 2)[1]).toBeCloseTo(0.125);
+    expect(roc(ramp(5), 2).slice(0, 3)).toEqual([null, null, 20]);
   });
 });
