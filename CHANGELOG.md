@@ -6,6 +6,15 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.66] - 2026-11-12
+
+### Added
+- **Candle pattern trainer:** Practice has a quiz mode: name the highlighted
+  pattern from four choices, or call the next move up or down, with a session
+  score and streak. Hovering a pattern marker explains what it is. The detector
+  finds 11 more patterns: marubozu, tweezer top and bottom, spinning top, three
+  inside up and down, kicker and abandoned baby.
+
 ## [0.11.65] - 2026-11-12
 
 ### Added
