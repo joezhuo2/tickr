@@ -49,6 +49,7 @@
     type ChartLayout,
     type Market,
     type Options,
+    type Pattern,
     type Consensus,
     type Dots,
     type Earnings,
@@ -77,6 +78,7 @@
   import * as Replay from "./lib/replay";
   import PracticeView from "./Practice.svelte";
   import * as Practice from "./lib/practice";
+  import * as Quiz from "./lib/quiz";
   import PaperView from "./Paper.svelte";
   import * as Paper from "./lib/paper";
   import BacktestView from "./Backtest.svelte";
@@ -701,6 +703,12 @@
   let practiceRunId = $state<number | null>(null);
   let practiceSaving = $state(false);
   let practiceWrite: Promise<unknown> = Promise.resolve();
+  let practiceMode = $state<Quiz.PracticeMode>("trade");
+  let quiz = $state.raw<Quiz.Question | null>(null);
+  let quizGuess = $state<string | null>(null);
+  let quizScore = $state<Quiz.Score>(Quiz.EMPTY_SCORE);
+  const quizOutcome = $derived(quiz && quizGuess != null ? Quiz.outcome(replayBars, quiz.end) : null);
+  const quizHighlight = $derived(quiz && replayBars[quiz.start] && replayBars[quiz.end] ? { from: replayBars[quiz.start].t, to: replayBars[quiz.end].t } : null);
   const practiceCount = $derived(Practice.scopeSymbols(practiceSetup.scope, watchlist, groups).length);
   const practiceResult = $derived(practice?.trade && replay ? Practice.evaluate(practice.trade, replayBars, replay.cursor) : null);
   const practiceSummary = $derived(practice?.ended && practice.trade ? Practice.summarize(practice.trade, replayBars) : null);
@@ -787,6 +795,24 @@
           continue;
         }
         if (mine !== practiceSeq) return;
+        if (practiceMode !== "trade") {
+          let found: Pattern[];
+          try {
+            found = (await invoke<Analysis>("analyze", { symbol: c.meta.symbol || pick, range: Practice.PERIOD_RANGE, interval: setup.interval, extended: false, candles: c.candles })).patterns;
+          } catch (e) {
+            if (mine !== practiceSeq) return;
+            misses.push(`${pick}: ${e}`);
+            continue;
+          }
+          if (mine !== practiceSeq) return;
+          const built = Quiz.build(found, c.candles, w.from, practiceMode, rng);
+          if (!built) {
+            misses.push(`${pick}: no patterns found`);
+            continue;
+          }
+          beginQuiz(setup, pick, c, built);
+          return;
+        }
         const start = Practice.pickStart(c.candles, w.from, rng);
         if (!start) {
           misses.push(`${pick}: not enough history`);
@@ -810,6 +836,26 @@
     }
     const base: Chart = { ...c, range: Practice.displayRange(setup.interval), meta: { ...c.meta, prev_close: null }, candles: w.bars, last_bar_time: w.bars[w.bars.length - 1].t };
     showExercise({ setup, symbol: c.meta.symbol || pick, name: c.meta.name, start: w.start, volatile: start.volatile, trade: null, ended: false }, base, next);
+  }
+
+  function beginQuiz(setup: Practice.Setup, pick: string, c: Chart, built: { bars: Candle[]; question: Quiz.Question }) {
+    const { bars, question } = built;
+    const next = Replay.startAt(bars, bars[question.end].t, Replay.MIN_CONTEXT);
+    if (!next || next.start !== question.end) {
+      practiceError = "Could not start the question";
+      return;
+    }
+    const base: Chart = { ...c, range: Practice.displayRange(setup.interval), meta: { ...c.meta, prev_close: null }, candles: bars, last_bar_time: bars[bars.length - 1].t };
+    showExercise({ setup, symbol: c.meta.symbol || pick, name: c.meta.name, start: question.end, volatile: false, trade: null, ended: false }, base, { ...next, total: next.start + 1 });
+    quiz = question;
+    quizGuess = null;
+  }
+
+  function answerQuiz(guess: string) {
+    if (!quiz || quizGuess != null || !replay) return;
+    quizGuess = guess;
+    quizScore = Quiz.record(quizScore, Quiz.grade(quiz, guess, replayBars));
+    replay = { ...replay, total: replayBars.length, cursor: quiz.mode === "move" ? quiz.end + Quiz.NEXT_BARS : replay.cursor };
   }
 
   function showExercise(exercise: Practice.Exercise, base: Chart, next: Replay.ReplayState) {
@@ -892,6 +938,8 @@
     if (!replay) return;
     const wasPractice = !!practice;
     practice = null;
+    quiz = null;
+    quizGuess = null;
     practiceBusy = false;
     practiceSeq++;
     replaySession++;
@@ -1161,7 +1209,8 @@
   }
 
   const activeAnalysis = $derived(analysis && analysisKey === cacheKey() ? analysis : null);
-  const techAnalysis = $derived(replay ? shownReplayAnalysis : activeAnalysis);
+  const shownAnalysis = $derived(replay ? shownReplayAnalysis : activeAnalysis);
+  const techAnalysis = $derived(shownAnalysis && quiz?.mode === "name" && quizGuess == null ? { ...shownAnalysis, patterns: [] } : shownAnalysis);
   const mainChart = $derived(replay ? replayChart : chart);
   const split = $derived(layout.split && !replay);
   const analysisOffset = $derived(
@@ -2040,6 +2089,13 @@
             canDecide={practiceCanDecide}
             canClose={practiceCanClose}
             whenAt={(i) => (replayBars[i] ? replayWhen(replayBars[i].t) : "")}
+            mode={practiceMode}
+            onmode={(next) => (practiceMode = next)}
+            {quiz}
+            {quizGuess}
+            {quizScore}
+            {quizOutcome}
+            onanswer={answerQuiz}
             onsetup={(next) => (practiceSetup = next)}
             onstart={startPractice}
             oncancel={cancelPractice}
@@ -2133,6 +2189,7 @@
                     onwindow={showSecond && layout.sync_range ? (w) => (syncWindow = { source: "main", w }) : undefined}
                     replay={!!replay}
                     fills={chartFills}
+                    highlight={quizHighlight}
                     orderLines={paperLines}
                     onmoveorder={paperMove}
                     onolder={loadOlder}

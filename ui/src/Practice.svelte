@@ -2,6 +2,8 @@
   import { direction, newsDate, price, signed } from "./lib/format";
   import { localOffset } from "./lib/freshness";
   import { INTERVALS, INTERVAL_LABELS, RANGES, isInterval, rangesFor, scopes, validSetup, type Decision, type Exercise, type Result, type SavedRun, type Setup, type Summary } from "./lib/practice";
+  import { PATTERN_INFO } from "./lib/patternInfo";
+  import { MODE_LABELS, NEXT_BARS, type PracticeMode, type Question, type Score } from "./lib/quiz";
   import type { Group } from "./lib/types";
 
   let {
@@ -17,6 +19,13 @@
     canDecide,
     canClose,
     whenAt,
+    mode,
+    onmode,
+    quiz,
+    quizGuess,
+    quizScore,
+    quizOutcome,
+    onanswer,
     onsetup,
     onstart,
     oncancel,
@@ -44,6 +53,13 @@
     canDecide: boolean;
     canClose: boolean;
     whenAt: (index: number) => string;
+    mode: PracticeMode;
+    onmode: (next: PracticeMode) => void;
+    quiz: Question | null;
+    quizGuess: string | null;
+    quizScore: Score;
+    quizOutcome: { move: string; pct: number } | null;
+    onanswer: (guess: string) => void;
     onsetup: (next: Setup) => void;
     onstart: () => void;
     oncancel: () => void;
@@ -65,6 +81,9 @@
   const LABELS: Record<Decision, string> = { long: "Long", short: "Short", skip: "Skip" };
   const rangeLabel = (id: string) => RANGES.find((r) => r.id === id)?.label ?? id;
   const pct = (v: number) => `${signed(v, 2)}%`;
+  const MODES = Object.keys(MODE_LABELS) as PracticeMode[];
+  const answered = $derived(quizGuess != null);
+  const right = $derived(!!quiz && quizGuess != null && (quiz.mode === "name" ? quizGuess === quiz.kind : quizOutcome?.move === quizGuess));
 </script>
 
 <div class="practice" role="region" aria-label="Practice">
@@ -77,6 +96,14 @@
       }}
     >
       <span class="tag">Practice</span>
+      <label>
+        <span>Mode</span>
+        <select aria-label="Practice mode" value={mode} disabled={busy} onchange={(e) => onmode(e.currentTarget.value as PracticeMode)}>
+          {#each MODES as m (m)}
+            <option value={m}>{MODE_LABELS[m]}</option>
+          {/each}
+        </select>
+      </label>
       <label>
         <span>Symbols</span>
         <select aria-label="Practice symbols" value={setup.scope} disabled={busy} onchange={(e) => onsetup(validSetup({ ...setup, scope: e.currentTarget.value }, groups))}>
@@ -138,6 +165,44 @@
         {/each}
       </div>
     {/if}
+  {:else if quiz}
+    {@const info = PATTERN_INFO[quiz.kind]}
+    <div class="card" role="region" aria-label="Pattern quiz">
+      <div class="head">
+        <span class="tag sim">{MODE_LABELS[quiz.mode]}</span>
+        <span class="muted">Score {quizScore.correct}/{quizScore.total} · streak {quizScore.streak}</span>
+      </div>
+      {#if quiz.mode === "name"}
+        <div id="quiz-question">Which pattern do the highlighted candles form?</div>
+        <div class="decide" role="group" aria-labelledby="quiz-question">
+          {#each quiz.choices as k (k)}
+            <button class:good={answered && k === quiz.kind} class:bad={answered && k === quizGuess && k !== quiz.kind} disabled={answered} onclick={() => onanswer(k)}>{PATTERN_INFO[k].name}</button>
+          {/each}
+        </div>
+      {:else}
+        <div id="quiz-question"><strong>{info.name}</strong> <span class="muted">({info.bias})</span> {info.text}</div>
+        <div id="quiz-ask">Will the close {NEXT_BARS} candles after the highlighted pattern be higher or lower?</div>
+        <div class="decide" role="group" aria-labelledby="quiz-ask">
+          <button class="long" class:good={answered && quizOutcome?.move === "up"} disabled={answered} onclick={() => onanswer("up")}>Higher</button>
+          <button class="short" class:good={answered && quizOutcome?.move === "down"} disabled={answered} onclick={() => onanswer("down")}>Lower</button>
+        </div>
+      {/if}
+      {#if answered}
+        <div role="status">
+          <strong class={right ? "up" : "down"}>{right ? "Correct" : "Not quite"}</strong>
+          {#if quiz.mode === "name"}
+            · {info.name} <span class="muted">({info.bias})</span>. {info.text}
+          {:else if quizOutcome}
+            · the close moved <span class={direction(quizOutcome.pct)}>{pct(quizOutcome.pct)}</span> over {NEXT_BARS} candles.
+          {/if}
+        </div>
+        <div class="actions">
+          <button class="primary" disabled={busy} onclick={onnext}>{busy ? "Finding a question…" : "Next question"}</button>
+          <button disabled={busy} onclick={onchange}>Change setup</button>
+          {#if error}<span class="error" role="alert">{error}</span>{/if}
+        </div>
+      {/if}
+    </div>
   {:else if !exercise.ended}
     <div class="row">
       <span class="tag sim">Simulated</span>
@@ -265,6 +330,14 @@
   button.primary {
     border-color: var(--accent);
     color: var(--accent);
+  }
+  button.good {
+    border-color: var(--up);
+    color: var(--up);
+  }
+  button.bad {
+    border-color: var(--down);
+    color: var(--down);
   }
   button.long {
     color: var(--up);
