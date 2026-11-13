@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { aggregateChart } from "./aggregate";
-import { claim, type ChartAlert } from "./chartAlerts";
+import { addError, claim, type ChartAlert, type LineSpec } from "./chartAlerts";
 import { CONCURRENCY, dueGroups, groups, triggered, type Group } from "./chartAlertSchedule";
 import { clockFor } from "./strategy";
 import type { Chart } from "./types";
@@ -27,6 +27,14 @@ addEventListener("storage", (e) => {
 export function setChartAlerts(next: ChartAlert[]) {
   chartAlerts.list = next;
   try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
+}
+
+export function addChartAlert(symbol: string, interval: string, label: string, expr: string | null, line: LineSpec | null): { id: number } | { error: string } {
+  const error = !interval ? "Load a chart first" : addError(chartAlerts.list, expr);
+  if (error) return { error };
+  const id = chartAlerts.list.reduce((m, a) => Math.max(m, a.id), 0) + 1;
+  setChartAlerts([...chartAlerts.list, { id, symbol: symbol.toUpperCase(), interval, label, expr, line, enabled: true, fired_at: null }]);
+  return { id };
 }
 
 function claimChartAlerts(ids: ReadonlySet<number>, now: number): ChartAlert[] {
