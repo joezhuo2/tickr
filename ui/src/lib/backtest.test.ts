@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { backtest, markers, type Rules } from "./backtest";
+import { backtest, grid, markers, parameters, profitFactor, sharpe, steps, sweepRow, withParam, type Rules } from "./backtest";
 import type { Candle } from "./types";
 
 const bar = (t: number, o: number, h: number, l: number, c: number): Candle => ({ t, o, h, l, c, v: 1 });
@@ -85,6 +85,64 @@ describe("metrics", () => {
   });
 });
 
+describe("report depth", () => {
+  const sweepRules = rules({ entry: "close > sma(2)", exit: "close < ema(3)", stop_pct: 5 });
+
+  it("builds an equity curve with drawdown per bar", () => {
+    const r = backtest([flat(0, 100), flat(1, 100), flat(2, 80), flat(3, 120), flat(4, 90)], rules({ entry: "close == 100" }));
+    expect(r.curve.map((p) => p.t)).toEqual([0, 1, 2, 3, 4]);
+    expect(r.curve.map((p) => p.equity)).toEqual([1, 1, 0.8, 1.2, 0.9]);
+    expect(r.curve.map((p) => p.drawdown)).toEqual([0, 0, expect.closeTo(0.2), 0, expect.closeTo(0.25)]);
+  });
+
+  it("computes profit factor edge cases", () => {
+    expect(profitFactor([])).toBeNull();
+    expect(profitFactor([10, -5, 5])).toBe(3);
+    expect(profitFactor([4, 6])).toBe(Infinity);
+    expect(profitFactor([-4, -6])).toBe(0);
+    expect(profitFactor([0])).toBeNull();
+    expect(backtest([flat(0, 10), flat(1, 12)], rules({})).profit_factor).toBeNull();
+  });
+
+  it("annualizes per-bar Sharpe and returns null with zero variance", () => {
+    const day = 86_400;
+    const curve = [1, 1.01, 1, 1.02].map((equity, i) => ({ t: i * day, equity, drawdown: 0 }));
+    const r = [1.01 - 1, 1 / 1.01 - 1, 1.02 - 1];
+    const mean = r.reduce((a, b) => a + b) / 3;
+    const sd = Math.sqrt(r.reduce((a, b) => a + (b - mean) ** 2, 0) / 2);
+    expect(sharpe(curve)).toBeCloseTo((mean / sd) * Math.sqrt(365.25));
+    expect(sharpe([1, 1, 1, 1].map((equity, i) => ({ t: i * day, equity, drawdown: 0 })))).toBeNull();
+    expect(sharpe(curve.slice(0, 2))).toBeNull();
+    expect(backtest([flat(0, 10), flat(1, 12), flat(2, 12)], rules({})).sharpe).toBeNull();
+  });
+
+  it("finds and rewrites numeric parameters", () => {
+    const p = parameters(sweepRules);
+    expect(p.map((x) => [x.id, x.value])).toEqual([["entry:0", 2], ["exit:0", 3], ["stop_pct", 5]]);
+    expect(withParam(sweepRules, "entry:0", 7).entry).toBe("close > sma(7)");
+    expect(withParam(sweepRules, "exit:0", 9).exit).toBe("close < ema(9)");
+    expect(withParam(sweepRules, "stop_pct", 2).stop_pct).toBe(2);
+  });
+
+  it("generates grids and caps them", () => {
+    expect(steps({ from: 0.1, to: 0.5, step: 0.1 })).toEqual([0.1, 0.2, 0.3, 0.4, 0.5]);
+    expect(steps({ from: 5, to: 1, step: 1 })).toEqual([]);
+    expect(steps({ from: 1, to: 5, step: 0 })).toEqual([]);
+    expect(grid([{ from: 1, to: 2, step: 1 }, { from: 10, to: 30, step: 10 }]).points).toEqual([[1, 10], [1, 20], [1, 30], [2, 10], [2, 20], [2, 30]]);
+    expect(grid([{ from: 1, to: 401, step: 1 }])).toMatchObject({ points: [], total: 401, capped: true });
+    expect(grid([{ from: 1, to: 400, step: 1 }]).capped).toBe(false);
+    expect(grid([{ from: 1, to: 20, step: 1 }, { from: 1, to: 21, step: 1 }]).capped).toBe(true);
+    expect(grid([{ from: 3, to: 1, step: 1 }])).toEqual({ points: [], total: 0, capped: false });
+  });
+
+  it("runs one sweep row", () => {
+    const candles = [10, 11, 12, 11, 10, 11, 13, 12].map((p, i) => flat(i, p));
+    const row = sweepRow(candles, sweepRules, ["entry:0"], [3]);
+    expect(row.values).toEqual([3]);
+    expect(row.total_return).toBeCloseTo(backtest(candles, withParam(sweepRules, "entry:0", 3)).total_return);
+  });
+});
+
 describe("opening range breakout", () => {
   const OPEN = 34_200;
   const at = (min: number, o: number, h: number, l: number, c: number, day = 0) => ({ t: day * 86_400 + OPEN + min * 60, o, h, l, c, v: 100 });
@@ -126,4 +184,9 @@ describe("opening range breakout", () => {
     expect(backtest(day.slice(0, 5), { entry: "time >= 930", entry_stop: "or_high(15)", exit: "", stop_pct: null, target_pct: null }).count).toBe(0);
     expect(() => backtest(day, { entry: "close > 1", entry_stop: "close > 1", exit: "", stop_pct: null, target_pct: null })).toThrow();
   });
+});
+
+it("labels a sweep parameter by the call it sits in", () => {
+  const labels = parameters({ entry: "crosses_above(ema(20), sma(50)) and close > 5", exit: "rsi(14) > 70" } as Parameters<typeof parameters>[0]).map((p) => p.label);
+  expect(labels).toEqual(["Entry: ema(20)", "Entry: sma(50)", "Entry: 5", "Exit: rsi(14)", "Exit: 70"]);
 });

@@ -29,6 +29,34 @@ export interface Report {
   max_drawdown: number;
   buy_hold: number;
   avg_trade: number | null;
+  profit_factor: number | null;
+  sharpe: number | null;
+  curve: CurvePoint[];
+}
+
+export interface CurvePoint {
+  t: number;
+  equity: number;
+  drawdown: number;
+}
+
+const YEAR_SECONDS = 365.25 * 86_400;
+
+export function profitFactor(returns: readonly number[]): number | null {
+  if (!returns.length) return null;
+  const win = returns.filter((r) => r > 0).reduce((a, b) => a + b, 0);
+  const loss = -returns.filter((r) => r < 0).reduce((a, b) => a + b, 0);
+  return loss > 0 ? win / loss : win > 0 ? Infinity : null;
+}
+
+export function sharpe(curve: readonly CurvePoint[]): number | null {
+  const n = curve.length - 1;
+  const span = n > 0 ? curve[n].t - curve[0].t : 0;
+  if (n < 2 || span <= 0) return null;
+  const r = curve.slice(1).map((p, i) => p.equity / curve[i].equity - 1);
+  const mean = r.reduce((a, b) => a + b, 0) / n;
+  const sd = Math.sqrt(r.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1));
+  return sd > 1e-12 ? (mean / sd) * Math.sqrt((n / span) * YEAR_SECONDS) : null;
 }
 
 export function backtest(candles: readonly Candle[], rules: Rules, clock: SessionClock = DEFAULT_CLOCK): Report {
@@ -41,6 +69,7 @@ export function backtest(candles: readonly Candle[], rules: Rules, clock: Sessio
   let equity = 1;
   let peak = 1;
   let drawdown = 0;
+  const curve: CurvePoint[] = [];
 
   const close = (t: number, price: number, reason: ExitReason) => {
     const r = price / pos!.price - 1;
@@ -67,6 +96,7 @@ export function backtest(candles: readonly Candle[], rules: Rules, clock: Sessio
     const marked = pos ? equity * (c.c / pos.price) : equity;
     peak = Math.max(peak, marked);
     drawdown = Math.max(drawdown, 1 - marked / peak);
+    curve.push({ t: c.t, equity: marked, drawdown: 1 - marked / peak });
   }
 
   const last = candles[candles.length - 1];
@@ -80,6 +110,9 @@ export function backtest(candles: readonly Candle[], rules: Rules, clock: Sessio
     max_drawdown: drawdown * 100,
     buy_hold: candles.length ? (last.c / candles[0].c - 1) * 100 : 0,
     avg_trade: trades.length ? returns.reduce((a, b) => a + b, 0) / trades.length : null,
+    profit_factor: profitFactor(returns),
+    sharpe: sharpe(curve),
+    curve,
   };
 }
 
@@ -88,4 +121,73 @@ export function markers(report: Report | null): { t: number; side: "buy" | "sell
     { t: t.entry_time, side: "buy" as const, price: t.entry_price },
     { t: t.exit_time, side: "sell" as const, price: t.exit_price },
   ]);
+}
+
+export const MAX_RUNS = 400;
+
+export interface Param {
+  id: string;
+  label: string;
+  value: number;
+}
+
+export interface Range {
+  from: number;
+  to: number;
+  step: number;
+}
+
+export interface SweepRow {
+  values: number[];
+  total_return: number;
+  profit_factor: number | null;
+  sharpe: number | null;
+  max_drawdown: number;
+  win_rate: number | null;
+  count: number;
+}
+
+const FIELDS = ["entry", "entry_stop", "exit"] as const;
+const FIELD_LABEL = { entry: "Entry", entry_stop: "Entry stop", exit: "Exit" };
+const NUMBER = /\d+(?:\.\d+)?/g;
+
+export function parameters(rules: Rules): Param[] {
+  const out: Param[] = [];
+  for (const f of FIELDS) {
+    const text = rules[f] ?? "";
+    [...text.matchAll(NUMBER)].forEach((m, i) => {
+      const at = m.index!;
+      const fn = /([a-z_]+)\(\s*$/i.exec(text.slice(0, at))?.[1];
+      out.push({ id: `${f}:${i}`, label: `${FIELD_LABEL[f]}: ${fn ? `${fn}(${m[0]})` : m[0]}`, value: Number(m[0]) });
+    });
+  }
+  if (rules.stop_pct != null) out.push({ id: "stop_pct", label: "Stop-loss %", value: rules.stop_pct });
+  if (rules.target_pct != null) out.push({ id: "target_pct", label: "Take-profit %", value: rules.target_pct });
+  return out;
+}
+
+export function withParam(rules: Rules, id: string, value: number): Rules {
+  if (id === "stop_pct" || id === "target_pct") return { ...rules, [id]: value };
+  const [field, index] = id.split(":") as [(typeof FIELDS)[number], string];
+  let k = 0;
+  return { ...rules, [field]: (rules[field] ?? "").replace(NUMBER, (m) => (k++ === Number(index) ? String(value) : m)) };
+}
+
+export function steps({ from, to, step }: Range): number[] {
+  if (![from, to, step].every(Number.isFinite) || step <= 0 || to < from) return [];
+  const n = Math.floor((to - from) / step + 1e-9);
+  return Array.from({ length: n + 1 }, (_, i) => Number((from + i * step).toFixed(10)));
+}
+
+export function grid(ranges: readonly Range[], max = MAX_RUNS): { points: number[][]; total: number; capped: boolean } {
+  const axes = ranges.map(steps);
+  const total = axes.length && axes.every((a) => a.length) ? axes.reduce((n, a) => n * a.length, 1) : 0;
+  if (total > max) return { points: [], total, capped: true };
+  const points = total ? axes.reduce<number[][]>((acc, a) => acc.flatMap((p) => a.map((v) => [...p, v])), [[]]) : [];
+  return { points, total, capped: false };
+}
+
+export function sweepRow(candles: readonly Candle[], rules: Rules, ids: readonly string[], values: number[], clock: SessionClock = DEFAULT_CLOCK): SweepRow {
+  const r = backtest(candles, ids.reduce((acc, id, i) => withParam(acc, id, values[i]), rules), clock);
+  return { values, total_return: r.total_return, profit_factor: r.profit_factor, sharpe: r.sharpe, max_drawdown: r.max_drawdown, win_rate: r.win_rate, count: r.count };
 }

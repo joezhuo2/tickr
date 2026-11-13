@@ -6,6 +6,15 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.68] - 2026-11-12
+
+### Added
+- **Backtest report depth:** the report charts an equity curve with a drawdown
+  strip and hover readout, and adds profit factor and an annualized Sharpe
+  ratio. A parameter sweep runs the rules across a from/to/step grid of one or
+  two numbers (up to 400 runs) into a sortable table, plus a heatmap for two
+  parameters. Clicking a result applies those values.
+
 ## [0.11.67] - 2026-11-12
 
 ### Added
