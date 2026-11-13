@@ -11,13 +11,14 @@
   import { rr } from "./lib/rrStore.svelte";
   import { legendText, volumeProfile } from "./lib/indicators";
   import { columnPen, columns, type Sink } from "./lib/decimate";
-  import { LEFT_SCALES, PANE_NAMES, mergeUp, movePane, paneRects, unmerge, visibleGroups, type PaneId, type Slot } from "./lib/panes";
+  import { LEFT_SCALES, mergeUp, movePane, paneName, paneRects, unmerge, visibleGroups, withPanes, type PaneId, type Slot } from "./lib/panes";
   import { panes, setPanes } from "./lib/paneStore.svelte";
   import { untrack } from "svelte";
   import { axisRange } from "./lib/scrollback";
   import { clamp } from "./lib/viewport";
-  import { aroon, cci, cmf, donchian, hma, ichimoku, keltner, linearRegression, mfi, obv, parabolicSar, pivotPeriod, pivots, roc, stochRsi, stochastic, supertrend, vwma, williamsR, wma, zigzag } from "./lib/studies";
-  import { studies, studySettings as ss } from "./lib/studyStore.svelte";
+  import { PANE_STUDIES, instanceOutput, obv, pivotPeriod, pivots, studyTimeframe, type Series } from "./lib/studies";
+  import { removeInstance, studies, studySettings as ss } from "./lib/studyStore.svelte";
+  import { SETTING_LABELS, studyInstances, type StudyInstance } from "./lib/studySettings";
   import { displayCandles, isOhlc, isReshaped, type Brick } from "./lib/charttypes";
   import { typeSettings } from "./lib/typeStore.svelte";
   import { fadeIn } from "./lib/motion";
@@ -121,30 +122,16 @@
 
   // Analysis overlays: only when there is an analysis and a toggle set.
   const show = $derived(analysis && overlays ? overlays : null);
-  const stoch = $derived(studies.stoch ? stochastic(candles, ss.stoch.k, ss.stoch.smooth, ss.stoch.d) : null);
-  const ichi = $derived(studies.ichimoku ? ichimoku(candles, ss.ichimoku.conversion, ss.ichimoku.base, ss.ichimoku.spanB, ss.ichimoku.displacement) : null);
-  const trendLine = $derived(studies.supertrend ? supertrend(candles, ss.supertrend.length, ss.supertrend.multiplier) : null);
-  const trendSides = $derived(trendLine && {
-    up: trendLine.value.map((val, i) => (trendLine.up[i] ? val : null)),
-    down: trendLine.value.map((val, i) => (trendLine.up[i] ? null : val)),
-  });
+  const frame = $derived(chart ? { clock: { timezone: chart.meta.timezone, gmtoffset: chart.meta.gmtoffset }, periods: chart.meta.periods, extended: chart.extended } : undefined);
+  const computed = $derived(studyInstances(studies, ss).map((inst) => ({ inst, r: instanceOutput(inst, candles, chart?.interval, frame), htf: !!studyTimeframe(inst.tf, chart?.interval) })));
+  const byKey = $derived(new Map(computed.filter((x) => PANE_STUDIES.includes(x.inst.study)).map((x) => [x.inst.key, x])));
+  const overlayStudies = $derived(computed.filter((x) => !PANE_STUDIES.includes(x.inst.study)));
+  const layout = $derived(withPanes(panes, [...byKey.keys()] as PaneId[]));
+  const studyLegend = (inst: StudyInstance) => `${SETTING_LABELS[inst.study]} ${Object.values(inst.params).join(" ")}${inst.tf !== "chart" && studyTimeframe(inst.tf, chart?.interval) ? ` ${inst.tf}` : ""}`;
+  const TINTS = ["--ma-1", "--ma-2", "--accent", "--rsi"];
+  const tint = (inst: StudyInstance, base: number) => TINTS[(base + Math.max(0, Number(inst.key.split("-")[1] ?? 1) - 1)) % TINTS.length];
   const onBalance = $derived(studies.obv ? obv(candles) : null);
   const pivotLevels = $derived(studies.pivots && chart ? pivots(candles, pivotPeriod(chart.interval, chart.meta.gmtoffset ?? 0), ss.pivotType) : null);
-  const keltnerBands = $derived(studies.keltner ? keltner(candles, ss.keltner.ema, ss.keltner.atr, ss.keltner.multiplier) : null);
-  const donchianBands = $derived(studies.donchian ? donchian(candles, ss.donchian.length) : null);
-  const sar = $derived(studies.psar ? parabolicSar(candles, ss.psar.step, ss.psar.max) : null);
-  const commodity = $derived(studies.cci ? cci(candles, ss.cci.length) : null);
-  const williams = $derived(studies.willr ? williamsR(candles, ss.willr.length) : null);
-  const moneyFlow = $derived(studies.mfi ? mfi(candles, ss.mfi.length) : null);
-  const weightedMa = $derived(studies.wma ? wma(candles, ss.wma.length) : null);
-  const hullMa = $derived(studies.hma ? hma(candles, ss.hma.length) : null);
-  const volumeMa = $derived(studies.vwma ? vwma(candles, ss.vwma.length) : null);
-  const zig = $derived(studies.zigzag ? zigzag(candles, ss.zigzag.percent) : null);
-  const regression = $derived(studies.linreg ? linearRegression(candles, ss.linreg.length, ss.linreg.deviations) : null);
-  const stochStrength = $derived(studies.stochrsi ? stochRsi(candles, ss.stochrsi.rsi, ss.stochrsi.stoch, ss.stochrsi.k, ss.stochrsi.d) : null);
-  const aroonLines = $derived(studies.aroon ? aroon(candles, ss.aroon.length) : null);
-  const chaikin = $derived(studies.cmf ? cmf(candles, ss.cmf.length) : null);
-  const rateOfChange = $derived(studies.roc ? roc(candles, ss.roc.length) : null);
   const sessionKeys = $derived.by(() => {
     if (!studies.svp || !chart) return null;
     const period = pivotPeriod(chart.interval, chart.meta.gmtoffset ?? 0);
@@ -192,8 +179,8 @@
   }
   const rsiOn = $derived(!!show?.rsi);
   const macdOn = $derived(!!show?.macd);
-  const paneOn = (id: PaneId) => (id === "rsi" ? rsiOn : id === "macd" ? macdOn : id === "stoch" ? !!stoch : id === "cci" ? !!commodity : id === "willr" ? !!williams : id === "mfi" ? !!moneyFlow : id === "stochrsi" ? !!stochStrength : id === "aroon" ? !!aroonLines : id === "cmf" ? !!chaikin : id === "roc" ? !!rateOfChange : !!onBalance);
-  const shownPanes = $derived(visibleGroups(panes.groups, paneOn));
+  const paneOn = (id: PaneId) => (id === "rsi" ? rsiOn : id === "macd" ? macdOn : id === "obv" ? !!onBalance : byKey.has(id));
+  const shownPanes = $derived(visibleGroups(layout.groups, paneOn));
   const leftAxis = $derived(panes.left !== "off" || shownPanes.some((g) => g.length > 1));
   let maxPane = $state<Slot | null>(null);
   /** Series index for each candle on screen (-1 for candles newer than the analysis). */
@@ -1117,20 +1104,23 @@
     ctx.font = `11px ${v("--font")}`;
   }
 
-  function plot(ctx: CanvasRenderingContext2D, g: Geo, values: (number | null)[], y: (v: number) => number) {
+  function plot(ctx: CanvasRenderingContext2D, g: Geo, values: (number | null)[], y: (v: number) => number, step = false) {
     ctx.beginPath();
     const pen = linePen(ctx);
+    let prev: number | null = null;
     for (let i = Math.max(0, g.i0 - 1); i <= Math.min(values.length - 1, g.j1 + 1); i++) {
       const val = values[i];
-      if (val == null || !Number.isFinite(val)) pen.lift();
-      else pen.to(g.x(i), y(val));
+      if (val == null || !Number.isFinite(val)) { pen.lift(); prev = null; continue; }
+      if (step && prev != null && prev !== val) pen.to(g.x(i), y(prev));
+      pen.to(g.x(i), y(val));
+      prev = val;
     }
     pen.lift();
     ctx.stroke();
   }
 
   function drawStudies(ctx: CanvasRenderingContext2D, g: Geo, v: (name: string) => string) {
-    if (g.n === 0 || !(stoch || ichi || trendLine || onBalance || pivotLevels || sessionKeys || keltnerBands || donchianBands || sar || weightedMa || hullMa || volumeMa || zig || regression)) return;
+    if (g.n === 0 || !(overlayStudies.length || pivotLevels || sessionKeys)) return;
     const at = hover != null && candles[hover] ? hover : g.i1;
     const right = width - PAD.r;
     ctx.save();
@@ -1159,36 +1149,6 @@
         i = j + 1;
       }
     }
-    if (ichi) {
-      ctx.globalAlpha = 0.1;
-      for (const rising of [true, false]) {
-        ctx.beginPath();
-        for (let i = Math.max(1, g.i0); i <= Math.min(ichi.spanA.length - 1, g.j1 + 1); i++) {
-          const a0 = ichi.spanA[i - 1], a1 = ichi.spanA[i], b0 = ichi.spanB[i - 1], b1 = ichi.spanB[i];
-          if (a0 == null || a1 == null || b0 == null || b1 == null || a1 >= b1 !== rising) continue;
-          ctx.moveTo(g.x(i - 1), g.y(a0));
-          ctx.lineTo(g.x(i), g.y(a1));
-          ctx.lineTo(g.x(i), g.y(b1));
-          ctx.lineTo(g.x(i - 1), g.y(b0));
-          ctx.closePath();
-        }
-        ctx.fillStyle = v(rising ? "--up" : "--down");
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-      for (const [line, col] of [[ichi.tenkan, "--ma-1"], [ichi.kijun, "--ma-2"], [ichi.spanA, "--up"], [ichi.spanB, "--down"], [ichi.chikou, "--muted"]] as const) {
-        ctx.strokeStyle = v(col);
-        plot(ctx, g, line, g.y);
-      }
-      legend(legendText(`Ichimoku ${ss.ichimoku.conversion} ${ss.ichimoku.base} ${ss.ichimoku.spanB} ${ss.ichimoku.displacement}`, [ichi.tenkan[at], ichi.kijun[at], ichi.spanA[at], ichi.spanB[at]]), v("--ma-1"));
-    }
-    if (trendLine) {
-      for (const rising of [true, false]) {
-        ctx.strokeStyle = v(rising ? "--up" : "--down");
-        plot(ctx, g, rising ? trendSides!.up : trendSides!.down, g.y);
-      }
-      legend(legendText(`Supertrend ${ss.supertrend.length} ${ss.supertrend.multiplier}`, [trendLine.value[at]]), v(trendLine.up[at] ? "--up" : "--down"));
-    }
     if (pivotLevels) {
       const names = ["p", "r1", "r2", "s1", "s2"] as const;
       ctx.lineWidth = 1;
@@ -1215,62 +1175,71 @@
       }
       legend(`Pivots ${ss.pivotType}`, v("--muted"));
     }
-    if (keltnerBands) {
-      ctx.lineWidth = 1;
-      for (const [line, col] of [[keltnerBands.upper, "--ma-2"], [keltnerBands.mid, "--ma-1"], [keltnerBands.lower, "--ma-2"]] as const) {
-        ctx.strokeStyle = v(col);
-        plot(ctx, g, line, g.y);
-      }
-      legend(legendText(`Keltner ${ss.keltner.ema} ${ss.keltner.atr} ${ss.keltner.multiplier}`, [keltnerBands.upper[at], keltnerBands.mid[at], keltnerBands.lower[at]]), v("--ma-2"));
-    }
-    if (donchianBands) {
-      ctx.lineWidth = 1;
-      for (const [line, col] of [[donchianBands.upper, "--up"], [donchianBands.mid, "--muted"], [donchianBands.lower, "--down"]] as const) {
-        ctx.strokeStyle = v(col);
-        plot(ctx, g, line, g.y);
-      }
-      legend(legendText(`Donchian ${ss.donchian.length}`, [donchianBands.upper[at], donchianBands.mid[at], donchianBands.lower[at]]), v("--muted"));
-    }
-    if (sar) {
-      for (const rising of [true, false]) {
-        ctx.fillStyle = v(rising ? "--up" : "--down");
-        ctx.beginPath();
-        for (let i = Math.max(0, g.i0); i <= g.i1; i++) {
-          const val = sar.value[i];
-          if (val == null || sar.up[i] !== rising) continue;
-          ctx.moveTo(g.x(i) + 1.5, g.y(val));
-          ctx.arc(g.x(i), g.y(val), 1.5, 0, Math.PI * 2);
+    for (const { inst, r, htf } of overlayStudies) {
+      const name = studyLegend(inst);
+      const line = (values: Series, col: string) => { ctx.strokeStyle = v(col); plot(ctx, g, values, g.y, htf); };
+      ctx.lineWidth = 1.2;
+      if (inst.study === "ichimoku") {
+        ctx.globalAlpha = 0.1;
+        for (const rising of [true, false]) {
+          ctx.beginPath();
+          for (let i = Math.max(1, g.i0); i <= Math.min(r.spanA.length - 1, g.j1 + 1); i++) {
+            const a0 = r.spanA[i - 1], a1 = r.spanA[i], b0 = r.spanB[i - 1], b1 = r.spanB[i];
+            if (a0 == null || a1 == null || b0 == null || b1 == null || a1 >= b1 !== rising) continue;
+            ctx.moveTo(g.x(i - 1), g.y(a0));
+            ctx.lineTo(g.x(i), g.y(a1));
+            ctx.lineTo(g.x(i), g.y(b1));
+            ctx.lineTo(g.x(i - 1), g.y(b0));
+            ctx.closePath();
+          }
+          ctx.fillStyle = v(rising ? "--up" : "--down");
+          ctx.fill();
         }
-        ctx.fill();
+        ctx.globalAlpha = 1;
+        for (const [values, col] of [[r.tenkan, "--ma-1"], [r.kijun, "--ma-2"], [r.spanA, "--up"], [r.spanB, "--down"], [r.chikou, "--muted"]] as const) line(values, col);
+        legend(legendText(name, [r.tenkan[at], r.kijun[at], r.spanA[at], r.spanB[at]]), v("--ma-1"));
+      } else if (inst.study === "supertrend") {
+        line(r.up, "--up");
+        line(r.down, "--down");
+        legend(legendText(name, [r.value[at]]), v(r.up[at] != null ? "--up" : "--down"));
+      } else if (inst.study === "keltner" || inst.study === "donchian" || inst.study === "linreg") {
+        ctx.lineWidth = 1;
+        const [edge, mid, low] = inst.study === "keltner" ? ["--ma-2", "--ma-1", "--ma-2"] : inst.study === "donchian" ? ["--up", "--muted", "--down"] : ["--down", "--muted", "--up"];
+        line(r.upper, edge);
+        line(r.mid, mid);
+        line(r.lower, low);
+        legend(legendText(name, [r.upper[at], r.mid[at], r.lower[at]]), v(inst.study === "keltner" ? edge : mid));
+      } else if (inst.study === "psar") {
+        for (const rising of [true, false]) {
+          const dots = rising ? r.up : r.down;
+          ctx.fillStyle = v(rising ? "--up" : "--down");
+          ctx.beginPath();
+          for (let i = Math.max(0, g.i0); i <= g.i1; i++) {
+            const val = dots[i];
+            if (val == null) continue;
+            ctx.moveTo(g.x(i) + 1.5, g.y(val));
+            ctx.arc(g.x(i), g.y(val), 1.5, 0, Math.PI * 2);
+          }
+          ctx.fill();
+        }
+        legend(legendText(name, [r.value[at]]), v(r.up[at] != null ? "--up" : "--down"));
+      } else if (inst.study === "zigzag") {
+        ctx.strokeStyle = v("--accent");
+        ctx.beginPath();
+        let started = false;
+        r.value.forEach((val, i) => {
+          if (val == null) return;
+          if (started) ctx.lineTo(g.x(i), g.y(val));
+          else ctx.moveTo(g.x(i), g.y(val));
+          started = true;
+        });
+        ctx.stroke();
+        legend(`${name}%`, v("--accent"));
+      } else {
+        const col = tint(inst, inst.study === "wma" ? 0 : inst.study === "hma" ? 1 : 2);
+        line(r.value, col);
+        legend(legendText(name, [r.value[at]]), v(col));
       }
-      legend(legendText(`SAR ${ss.psar.step} ${ss.psar.max}`, [sar.value[at]]), v(sar.up[at] ? "--up" : "--down"));
-    }
-    for (const [line, col, name] of [[weightedMa, "--ma-1", `WMA ${ss.wma.length}`], [hullMa, "--ma-2", `HMA ${ss.hma.length}`], [volumeMa, "--accent", `VWMA ${ss.vwma.length}`]] as const) {
-      if (!line) continue;
-      ctx.strokeStyle = v(col);
-      plot(ctx, g, line, g.y);
-      legend(legendText(name, [line[at]]), v(col));
-    }
-    if (zig) {
-      ctx.strokeStyle = v("--accent");
-      ctx.beginPath();
-      let started = false;
-      zig.forEach((val, i) => {
-        if (val == null) return;
-        if (started) ctx.lineTo(g.x(i), g.y(val));
-        else ctx.moveTo(g.x(i), g.y(val));
-        started = true;
-      });
-      ctx.stroke();
-      legend(`ZigZag ${ss.zigzag.percent}%`, v("--accent"));
-    }
-    if (regression) {
-      ctx.lineWidth = 1;
-      for (const [line, col] of [[regression.upper, "--down"], [regression.mid, "--muted"], [regression.lower, "--up"]] as const) {
-        ctx.strokeStyle = v(col);
-        plot(ctx, g, line, g.y);
-      }
-      legend(legendText(`LinReg ${ss.linreg.length} ${ss.linreg.deviations}`, [regression.upper[at], regression.mid[at], regression.lower[at]]), v("--muted"));
     }
     ctx.restore();
     if (lx > PAD.l + 4) legendY += 12;
@@ -1295,19 +1264,20 @@
       const span = hi - lo || 1;
       return { y: (val) => top + h * (0.92 - ((val - lo) / span) * 0.84), ticks: [[hi, volume(hi)], [lo, volume(lo)]] };
     }
-    if (id === "cci" && commodity) {
+    const x = byKey.get(id);
+    const study = x?.inst.study;
+    if (x && study === "cci") {
       let lo = -100, hi = 100;
-      for (let i = g.i0; i <= g.i1; i++) { lo = Math.min(lo, commodity[i] ?? lo); hi = Math.max(hi, commodity[i] ?? hi); }
+      for (let i = g.i0; i <= g.i1; i++) { lo = Math.min(lo, x.r.value[i] ?? lo); hi = Math.max(hi, x.r.value[i] ?? hi); }
       return { y: (val) => top + h * (0.92 - ((val - lo) / (hi - lo)) * 0.84), ticks: [[100, "100"], [0, "0"], [-100, "-100"]] };
     }
-    if ((id === "roc" && rateOfChange) || (id === "cmf" && chaikin)) {
-      const s = id === "roc" ? rateOfChange! : chaikin!;
+    if (x && (study === "roc" || study === "cmf" || study === "macd_study")) {
       let extent = 1e-9;
-      for (let i = g.i0; i <= g.i1; i++) extent = Math.max(extent, Math.abs(s[i] ?? 0));
+      for (const s of Object.values(x.r)) for (let i = g.i0; i <= g.i1; i++) extent = Math.max(extent, Math.abs(s[i] ?? 0));
       return { y: (val) => top + h * (0.5 - val / (extent * 2.4)), ticks: [[0, "0"]] };
     }
-    if (id === "willr") return { y: (val) => top + (-val / 100) * h, ticks: [[-20, "-20"], [-80, "-80"]] };
-    return { y: (val) => top + (1 - val / 100) * h, ticks: (id === "rsi" ? [30, 50, 70] : [20, 80]).map((t) => [t, String(t)]) };
+    if (study === "willr") return { y: (val) => top + (-val / 100) * h, ticks: [[-20, "-20"], [-80, "-80"]] };
+    return { y: (val) => top + (1 - val / 100) * h, ticks: (id === "rsi" || study === "rsi_study" ? [30, 50, 70] : [20, 80]).map((t) => [t, String(t)]) };
   }
 
   function drawPane(ctx: CanvasRenderingContext2D, g: Geo, v: (name: string) => string, id: PaneId, top: number, h: number, ly: number, axis: "right" | "left" | null) {
@@ -1315,6 +1285,8 @@
     const at = hover != null && candles[hover] ? hover : g.i1;
     const right = width - PAD.r;
     const { y, ticks } = paneScale(id, g, top, h);
+    const x = byKey.get(id);
+    const study = x?.inst.study;
     ctx.font = `10px ${v("--font")}`;
     ctx.lineWidth = 1;
     ctx.setLineDash([]);
@@ -1330,7 +1302,7 @@
     ctx.clip();
     if (axis === "right" && id !== "obv") {
       for (const [t] of ticks) {
-        const solid = id === "macd" || id === "roc" || id === "cmf" || t === 50 || (id === "cci" && t === 0);
+        const solid = id === "macd" || study === "roc" || study === "cmf" || study === "macd_study" || t === 50 || (study === "cci" && t === 0);
         ctx.strokeStyle = v(solid ? "--grid" : "--muted");
         ctx.setLineDash(solid ? [] : [2, 3]);
         ctx.beginPath();
@@ -1368,50 +1340,40 @@
       ctx.strokeStyle = signal.color || v("--ma-2");
       strokeLine(ctx, signal, y, g);
       legend = legendText(line.label, a.series.macd.map((l) => valueAt(l, at)), 2);
-    } else if (id === "stoch" && stoch) {
-      ctx.strokeStyle = col;
-      plot(ctx, g, stoch.k, y);
-      ctx.strokeStyle = v("--ma-2");
-      plot(ctx, g, stoch.d, y);
-      legend = legendText("Stoch 14 3 3", [stoch.k[at], stoch.d[at]], 1);
-    } else if (id === "cci" && commodity) {
-      col = v("--ma-1");
-      ctx.strokeStyle = col;
-      plot(ctx, g, commodity, y);
-      legend = legendText(`CCI ${ss.cci.length}`, [commodity[at]], 1);
-    } else if (id === "willr" && williams) {
-      col = v("--ma-2");
-      ctx.strokeStyle = col;
-      plot(ctx, g, williams, y);
-      legend = legendText(`%R ${ss.willr.length}`, [williams[at]], 1);
-    } else if (id === "mfi" && moneyFlow) {
-      col = v("--accent");
-      ctx.strokeStyle = col;
-      plot(ctx, g, moneyFlow, y);
-      legend = legendText(`MFI ${ss.mfi.length}`, [moneyFlow[at]], 1);
-    } else if (id === "stochrsi" && stochStrength) {
-      ctx.strokeStyle = col;
-      plot(ctx, g, stochStrength.k, y);
-      ctx.strokeStyle = v("--ma-2");
-      plot(ctx, g, stochStrength.d, y);
-      legend = legendText(`Stoch RSI ${ss.stochrsi.rsi} ${ss.stochrsi.stoch} ${ss.stochrsi.k} ${ss.stochrsi.d}`, [stochStrength.k[at], stochStrength.d[at]], 1);
-    } else if (id === "aroon" && aroonLines) {
-      col = v("--up");
-      ctx.strokeStyle = col;
-      plot(ctx, g, aroonLines.up, y);
-      ctx.strokeStyle = v("--down");
-      plot(ctx, g, aroonLines.down, y);
-      legend = legendText(`Aroon ${ss.aroon.length}`, [aroonLines.up[at], aroonLines.down[at]], 1);
-    } else if (id === "cmf" && chaikin) {
-      col = v("--accent");
-      ctx.strokeStyle = col;
-      plot(ctx, g, chaikin, y);
-      legend = legendText(`CMF ${ss.cmf.length}`, [chaikin[at]], 3);
-    } else if (id === "roc" && rateOfChange) {
-      col = v("--ma-1");
-      ctx.strokeStyle = col;
-      plot(ctx, g, rateOfChange, y);
-      legend = legendText(`ROC ${ss.roc.length}`, [rateOfChange[at]], 2);
+    } else if (x) {
+      const { inst, r, htf } = x;
+      const name = studyLegend(inst);
+      const line = (values: Series, c: string) => { ctx.strokeStyle = c; plot(ctx, g, values, y, htf); };
+      if (inst.study === "stoch" || inst.study === "stochrsi") {
+        line(r.k, col);
+        line(r.d, v("--ma-2"));
+        legend = legendText(name, [r.k[at], r.d[at]], 1);
+      } else if (inst.study === "aroon") {
+        col = v("--up");
+        line(r.up, col);
+        line(r.down, v("--down"));
+        legend = legendText(name, [r.up[at], r.down[at]], 1);
+      } else if (inst.study === "macd_study") {
+        ctx.globalAlpha = 0.5;
+        for (const rising of [true, false]) {
+          ctx.beginPath();
+          for (let i = g.i0; i <= g.i1; i++) {
+            const value = r.hist[i];
+            if (value == null || value >= 0 !== rising) continue;
+            ctx.rect(g.x(i) - g.step * 0.3, Math.min(y(value), y(0)), Math.max(1, g.step * 0.6), Math.abs(y(value) - y(0)));
+          }
+          ctx.fillStyle = v(rising ? "--up" : "--down");
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        line(r.line, col);
+        line(r.signal, v("--ma-2"));
+        legend = legendText(name, [r.line[at], r.signal[at], r.hist[at]], 2);
+      } else {
+        col = v(inst.study === "cci" || inst.study === "roc" ? "--ma-1" : inst.study === "willr" ? "--ma-2" : inst.study === "rsi_study" ? "--rsi" : "--accent");
+        line(r.value, col);
+        legend = legendText(name, [r.value[at]], inst.study === "cmf" ? 3 : inst.study === "roc" ? 2 : 1);
+      }
     } else if (id === "obv" && onBalance) {
       col = v("--accent");
       ctx.strokeStyle = col;
@@ -1446,11 +1408,11 @@
   }
 
   function layoutPanes(next: typeof panes) {
-    if (next !== panes) setPanes(next);
+    if (next !== layout) setPanes(next);
   }
 
   function cycleLeft() {
-    layoutPanes({ ...panes, left: LEFT_SCALES[(LEFT_SCALES.indexOf(panes.left) + 1) % LEFT_SCALES.length] });
+    layoutPanes({ ...layout, left: LEFT_SCALES[(LEFT_SCALES.indexOf(panes.left) + 1) % LEFT_SCALES.length] });
   }
 
   const LEFT_LABELS = { off: "Off", same: "Same as right", percent: "Percent from the first visible bar" };
@@ -1462,7 +1424,7 @@
 
   $effect(() => {
     // Redraw when any of these change.
-    void [rr.reward, stoch, ichi, trendLine, onBalance, keltnerBands, donchianBands, sar, commodity, williams, moneyFlow, weightedMa, hullMa, volumeMa, zig, regression, stochStrength, aroonLines, chaikin, rateOfChange, pivotLevels, sessionKeys, redrawKey, list, preview, selected, tool, hideDrawings, orderLines, orderDrag, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt, fillMarks, highlight];
+    void [rr.reward, computed, onBalance, pivotLevels, sessionKeys, redrawKey, list, preview, selected, tool, hideDrawings, orderLines, orderDrag, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt, fillMarks, highlight];
     draw();
   });
 
@@ -2453,25 +2415,30 @@
   {#if candles.length}
     {#each paneTools as p, k (p.ids.join())}
       {@const id = p.ids[0]}
-      {@const name = p.ids.map((s) => PANE_NAMES[s]).join(" + ")}
+      {@const name = p.ids.map((s) => paneName(s)).join(" + ")}
       {@const maxed = maxPane != null && p.ids.includes(maxPane)}
       <div class="pane-tools" class:maxed role="toolbar" aria-label="{name} pane" style:top="{p.top + 2}px" style:right="{PAD.r + 4}px">
         {#if id !== "price" && !geo.hidePrice}
-          <button title="Move {name} up" aria-label="Move {name} pane up" disabled={k <= 1} onclick={() => layoutPanes(movePane(panes, id, -1, paneOn))}>
+          <button title="Move {name} up" aria-label="Move {name} pane up" disabled={k <= 1} onclick={() => layoutPanes(movePane(layout, id, -1, paneOn))}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6" /></svg>
           </button>
-          <button title="Move {name} down" aria-label="Move {name} pane down" disabled={k === paneTools.length - 1} onclick={() => layoutPanes(movePane(panes, id, 1, paneOn))}>
+          <button title="Move {name} down" aria-label="Move {name} pane down" disabled={k === paneTools.length - 1} onclick={() => layoutPanes(movePane(layout, id, 1, paneOn))}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
           </button>
           {#if p.ids.length === 1}
-            <button title="Merge {name} into the {k === 1 ? 'price pane' : 'pane above'} on its own scale" aria-label="Merge {name} pane into the {k === 1 ? 'price pane' : 'pane above'}" onclick={() => layoutPanes(mergeUp(panes, id, paneOn))}>
+            <button title="Merge {name} into the {k === 1 ? 'price pane' : 'pane above'} on its own scale" aria-label="Merge {name} pane into the {k === 1 ? 'price pane' : 'pane above'}" onclick={() => layoutPanes(mergeUp(layout, id, paneOn))}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16M12 20V9M8 13l4-4 4 4" /></svg>
             </button>
           {/if}
         {/if}
         {#if p.ids.length > 1}
-          <button title="Unmerge {name}" aria-label="Unmerge {name}" onclick={() => layoutPanes(unmerge(panes, id))}>
+          <button title="Unmerge {name}" aria-label="Unmerge {name}" onclick={() => layoutPanes(unmerge(layout, id))}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M12 3v5M9 6l3 3 3-3M12 21v-5M9 18l3-3 3 3" /></svg>
+          </button>
+        {/if}
+        {#if p.ids.length === 1 && byKey.has(id)}
+          <button title="Remove {name}" aria-label="Remove {name} study" onclick={() => removeInstance(id)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         {/if}
         <button title={maxed ? "Restore panes (Escape)" : `Maximize ${name} (double-click a lower pane's header)`} aria-label={maxed ? "Restore panes" : `Maximize ${name} pane`} aria-pressed={maxed} onclick={() => (maxPane = maxed ? null : id)}>
