@@ -13,6 +13,7 @@ describe("backup local state", () => {
     const src = fake({
       "tickr.custom": JSON.stringify({ main: "#ff0000", sub: "", font: "serif", mono: "", colors: {} }),
       "tickr.studies": JSON.stringify({ ichimoku: true }),
+      "tickr.studySettings": JSON.stringify({ ichimoku: { displacement: 30 } }),
       "tickr.chartAlerts": JSON.stringify([alert]),
       "tickr.magnet": "1",
       "tickr.hideDrawings": "1",
@@ -30,7 +31,9 @@ describe("backup local state", () => {
     expect(dst.getItem("tickr.hideDrawings")).toBe("1");
     expect(dst.getItem("tickr.rr")).toBe("3.5");
     expect(dst.getItem("tickr.technicalsSettingsOpen")).toBe("1");
-    expect(JSON.parse(dst.getItem("tickr.panes")!)).toEqual({ groups: [["price"], ["macd", "rsi"], ["stoch"], ["obv"]], left: "percent" });
+    expect(JSON.parse(dst.getItem("tickr.panes")!)).toEqual({ groups: [["price"], ["macd", "rsi"], ["stoch"], ["obv"], ["cci"], ["willr"], ["mfi"]], left: "percent" });
+    expect(JSON.parse(dst.getItem("tickr.studySettings")!).ichimoku.displacement).toBe(30);
+    expect(JSON.parse(dst.getItem("tickr.studySettings")!).stoch.k).toBe(14);
   });
 
   it("an old backup leaves existing local state alone", () => {

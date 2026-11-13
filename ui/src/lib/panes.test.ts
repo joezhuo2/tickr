@@ -10,14 +10,14 @@ describe("cleanPanes", () => {
     expect(cleanPanes(null)).toEqual(defaultPanes());
     expect(cleanPanes({ groups: 5, left: "nope" })).toEqual(defaultPanes());
     expect(cleanPanes({ groups: [["macd", "bogus", 3], [], "x"], left: "percent" })).toEqual({
-      groups: [["price"], ["macd"], ["rsi"], ["stoch"], ["obv"]],
+      groups: [["price"], ["macd"], ["rsi"], ["stoch"], ["obv"], ["cci"], ["willr"], ["mfi"]],
       left: "percent",
     });
   });
 
   it("keeps price first, drops duplicates and keeps merged groups", () => {
     expect(cleanPanes({ groups: [["obv"], ["stoch", "price", "obv"], ["rsi", "macd"]], left: "same" })).toEqual({
-      groups: [["price", "stoch"], ["obv"], ["rsi", "macd"]],
+      groups: [["price", "stoch"], ["obv"], ["rsi", "macd"], ["cci"], ["willr"], ["mfi"]],
       left: "same",
     });
   });
@@ -26,15 +26,15 @@ describe("cleanPanes", () => {
 describe("pane operations", () => {
   it("moves a pane past hidden panes and stops at the ends", () => {
     const s = defaultPanes();
-    expect(movePane(s, "stoch", -1, only("rsi", "stoch")).groups).toEqual([["price"], ["stoch"], ["macd"], ["rsi"], ["obv"]]);
+    expect(movePane(s, "stoch", -1, only("rsi", "stoch")).groups).toEqual([["price"], ["stoch"], ["macd"], ["rsi"], ["obv"], ["cci"], ["willr"], ["mfi"]]);
     expect(movePane(s, "rsi", -1, all)).toBe(s);
-    expect(movePane(s, "obv", 1, all)).toBe(s);
+    expect(movePane(s, "mfi", 1, all)).toBe(s);
   });
 
   it("merges into the visible pane above, including the price pane, and unmerges", () => {
     const s = mergeUp(defaultPanes(), "stoch", only("rsi", "stoch"));
-    expect(s.groups).toEqual([["price"], ["rsi", "stoch"], ["macd"], ["obv"]]);
-    expect(unmerge(s, "stoch").groups).toEqual([["price"], ["rsi"], ["stoch"], ["macd"], ["obv"]]);
+    expect(s.groups).toEqual([["price"], ["rsi", "stoch"], ["macd"], ["obv"], ["cci"], ["willr"], ["mfi"]]);
+    expect(unmerge(s, "stoch").groups).toEqual([["price"], ["rsi"], ["stoch"], ["macd"], ["obv"], ["cci"], ["willr"], ["mfi"]]);
     const p = mergeUp(defaultPanes(), "rsi", all);
     expect(p.groups[0]).toEqual(["price", "rsi"]);
     expect(unmerge(p, "price").groups).toEqual(defaultPanes().groups);

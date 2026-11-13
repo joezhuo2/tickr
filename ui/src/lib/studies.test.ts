@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ichimoku, obv, pivotPeriod, pivots, stochastic, supertrend } from "./studies";
+import { cci, donchian, ichimoku, keltner, mfi, obv, parabolicSar, pivotPeriod, pivots, stochastic, supertrend, williamsR } from "./studies";
 import type { Candle } from "./types";
 
 const k = (t: number, h: number, l: number, c: number, v = 10): Candle => ({ t, o: c, h, l, c, v });
@@ -54,5 +54,70 @@ describe("studies", () => {
     expect(p[3]!.p).toBeCloseTo((20 + 15 + 16) / 3);
     expect(pivotPeriod("1d", 0)(0)).toBe(1970 * 12);
     expect(pivotPeriod("1wk", 0)(0)).toBe(1970);
+  });
+
+  it("decouples the Ichimoku displacement from the base period", () => {
+    const c = ramp(12);
+    const i = ichimoku(c, 2, 3, 4, 1);
+    expect(i.spanA).toHaveLength(13);
+    expect(i.chikou[0]).toBe(c[1].c);
+    expect(i.spanB[4]).toBe((c[3].h + c[0].l) / 2);
+  });
+
+  it("derives fibonacci, camarilla and woodie pivots", () => {
+    const day = 86400;
+    const c = [k(0, 12, 8, 10), k(100, 14, 9, 12), k(day, 20, 15, 16)];
+    const at = (t: "fibonacci" | "camarilla" | "woodie") => pivots(c, pivotPeriod("5m", 0), t)[2]!;
+    const p = 34 / 3;
+    expect(at("fibonacci").r1).toBeCloseTo(p + 0.382 * 6);
+    expect(at("fibonacci").s2).toBeCloseTo(p - 0.618 * 6);
+    expect(at("camarilla").r2).toBeCloseTo(13.1);
+    expect(at("camarilla").s1).toBeCloseTo(11.45);
+    expect(at("woodie")).toEqual({ p: 11.5, r1: 15, s1: 9, r2: 17.5, s2: 5.5 });
+  });
+
+  it("builds Keltner channels from an EMA and Wilder ATR", () => {
+    const c = [k(0, 11, 9, 10), k(1, 12, 10, 11), k(2, 13, 11, 12), k(3, 14, 12, 13)];
+    const { upper, mid, lower } = keltner(c, 2, 2, 2);
+    expect(mid[0]).toBeNull();
+    expect(mid[1]).toBe(10.5);
+    expect(mid[2]).toBeCloseTo(11.5);
+    expect(upper[1]).toBe(14.5);
+    expect(lower[3]).toBeCloseTo(mid[3]! - 4);
+  });
+
+  it("tracks the highest high and lowest low for Donchian", () => {
+    const d = donchian(ramp(5), 3);
+    expect(d.upper[1]).toBeNull();
+    expect(d.upper[2]).toBe(13);
+    expect(d.lower[4]).toBe(11);
+    expect(d.mid[4]).toBe(13);
+  });
+
+  it("computes CCI, Williams %R and MFI by hand", () => {
+    const c = [k(0, 12, 8, 10), k(1, 13, 9, 11), k(2, 17, 11, 14)];
+    const x = cci(c, 3);
+    expect(x[1]).toBeNull();
+    expect(x[2]).toBeCloseTo(100, 6);
+    expect(cci([k(0, 5, 5, 5), k(1, 5, 5, 5)], 2)[1]).toBe(0);
+    expect(williamsR(c, 3)[2]).toBeCloseTo(-100 / 3);
+    expect(williamsR([k(0, 5, 5, 5)], 1)[0]).toBe(-50);
+    const m = [k(0, 10, 10, 10, 5), k(1, 12, 12, 12, 2), k(2, 11, 11, 11, 4), k(3, 11, 11, 11, 9)];
+    expect(mfi(m, 2)[1]).toBeNull();
+    expect(mfi(m, 2)[2]).toBeCloseTo(100 - 100 / (1 + 24 / 44));
+    expect(mfi(m, 2)[3]).toBe(0);
+    expect(mfi(ramp(4), 2)[3]).toBe(100);
+  });
+
+  it("steps and flips the Parabolic SAR", () => {
+    const up = parabolicSar(ramp(5));
+    expect(up.value[0]).toBeNull();
+    expect(up.value[1]).toBe(9);
+    expect(up.value[2]).toBe(9);
+    expect(up.value[3]).toBeCloseTo(9.16, 6);
+    expect(up.value[4]).toBeCloseTo(9.4504, 6);
+    const flip = parabolicSar([k(0, 11, 9, 10), k(1, 12, 10, 11), k(2, 9, 5, 6)]);
+    expect(flip.value[2]).toBe(12);
+    expect(flip.up[2]).toBe(false);
   });
 });

@@ -13,8 +13,8 @@
   import { untrack } from "svelte";
   import { axisRange } from "./lib/scrollback";
   import { clamp } from "./lib/viewport";
-  import { ichimoku, obv, pivotPeriod, pivots, stochastic, supertrend } from "./lib/studies";
-  import { studies } from "./lib/studyStore.svelte";
+  import { cci, donchian, ichimoku, keltner, mfi, obv, parabolicSar, pivotPeriod, pivots, stochastic, supertrend, williamsR } from "./lib/studies";
+  import { studies, studySettings as ss } from "./lib/studyStore.svelte";
   import { displayCandles, isOhlc } from "./lib/charttypes";
   import { fadeIn } from "./lib/motion";
   import { patternInfo } from "./lib/patternInfo";
@@ -117,15 +117,21 @@
 
   // Analysis overlays: only when there is an analysis and a toggle set.
   const show = $derived(analysis && overlays ? overlays : null);
-  const stoch = $derived(studies.stoch ? stochastic(candles) : null);
-  const ichi = $derived(studies.ichimoku ? ichimoku(candles) : null);
-  const trendLine = $derived(studies.supertrend ? supertrend(candles) : null);
+  const stoch = $derived(studies.stoch ? stochastic(candles, ss.stoch.k, ss.stoch.smooth, ss.stoch.d) : null);
+  const ichi = $derived(studies.ichimoku ? ichimoku(candles, ss.ichimoku.conversion, ss.ichimoku.base, ss.ichimoku.spanB, ss.ichimoku.displacement) : null);
+  const trendLine = $derived(studies.supertrend ? supertrend(candles, ss.supertrend.length, ss.supertrend.multiplier) : null);
   const trendSides = $derived(trendLine && {
     up: trendLine.value.map((val, i) => (trendLine.up[i] ? val : null)),
     down: trendLine.value.map((val, i) => (trendLine.up[i] ? null : val)),
   });
   const onBalance = $derived(studies.obv ? obv(candles) : null);
-  const pivotLevels = $derived(studies.pivots && chart ? pivots(candles, pivotPeriod(chart.interval, chart.meta.gmtoffset ?? 0)) : null);
+  const pivotLevels = $derived(studies.pivots && chart ? pivots(candles, pivotPeriod(chart.interval, chart.meta.gmtoffset ?? 0), ss.pivotType) : null);
+  const keltnerBands = $derived(studies.keltner ? keltner(candles, ss.keltner.ema, ss.keltner.atr, ss.keltner.multiplier) : null);
+  const donchianBands = $derived(studies.donchian ? donchian(candles, ss.donchian.length) : null);
+  const sar = $derived(studies.psar ? parabolicSar(candles, ss.psar.step, ss.psar.max) : null);
+  const commodity = $derived(studies.cci ? cci(candles, ss.cci.length) : null);
+  const williams = $derived(studies.willr ? williamsR(candles, ss.willr.length) : null);
+  const moneyFlow = $derived(studies.mfi ? mfi(candles, ss.mfi.length) : null);
   const sessionKeys = $derived.by(() => {
     if (!studies.svp || !chart) return null;
     const period = pivotPeriod(chart.interval, chart.meta.gmtoffset ?? 0);
@@ -173,7 +179,7 @@
   }
   const rsiOn = $derived(!!show?.rsi);
   const macdOn = $derived(!!show?.macd);
-  const paneOn = (id: PaneId) => (id === "rsi" ? rsiOn : id === "macd" ? macdOn : id === "stoch" ? !!stoch : !!onBalance);
+  const paneOn = (id: PaneId) => (id === "rsi" ? rsiOn : id === "macd" ? macdOn : id === "stoch" ? !!stoch : id === "cci" ? !!commodity : id === "willr" ? !!williams : id === "mfi" ? !!moneyFlow : !!onBalance);
   const shownPanes = $derived(visibleGroups(panes.groups, paneOn));
   const leftAxis = $derived(panes.left !== "off" || shownPanes.some((g) => g.length > 1));
   let maxPane = $state<Slot | null>(null);
@@ -1057,7 +1063,7 @@
   }
 
   function drawStudies(ctx: CanvasRenderingContext2D, g: Geo, v: (name: string) => string) {
-    if (g.n === 0 || !(stoch || ichi || trendLine || onBalance || pivotLevels || sessionKeys)) return;
+    if (g.n === 0 || !(stoch || ichi || trendLine || onBalance || pivotLevels || sessionKeys || keltnerBands || donchianBands || sar)) return;
     const at = hover != null && candles[hover] ? hover : g.i1;
     const right = width - PAD.r;
     ctx.save();
@@ -1107,14 +1113,14 @@
         ctx.strokeStyle = v(col);
         plot(ctx, g, line, g.y);
       }
-      legend(legendText("Ichimoku 9 26 52", [ichi.tenkan[at], ichi.kijun[at], ichi.spanA[at], ichi.spanB[at]]), v("--ma-1"));
+      legend(legendText(`Ichimoku ${ss.ichimoku.conversion} ${ss.ichimoku.base} ${ss.ichimoku.spanB} ${ss.ichimoku.displacement}`, [ichi.tenkan[at], ichi.kijun[at], ichi.spanA[at], ichi.spanB[at]]), v("--ma-1"));
     }
     if (trendLine) {
       for (const rising of [true, false]) {
         ctx.strokeStyle = v(rising ? "--up" : "--down");
         plot(ctx, g, rising ? trendSides!.up : trendSides!.down, g.y);
       }
-      legend(legendText("Supertrend 10 3", [trendLine.value[at]]), v(trendLine.up[at] ? "--up" : "--down"));
+      legend(legendText(`Supertrend ${ss.supertrend.length} ${ss.supertrend.multiplier}`, [trendLine.value[at]]), v(trendLine.up[at] ? "--up" : "--down"));
     }
     if (pivotLevels) {
       const names = ["p", "r1", "r2", "s1", "s2"] as const;
@@ -1140,7 +1146,37 @@
           ctx.textBaseline = "top";
         }
       }
-      legend("Pivots", v("--muted"));
+      legend(`Pivots ${ss.pivotType}`, v("--muted"));
+    }
+    if (keltnerBands) {
+      ctx.lineWidth = 1;
+      for (const [line, col] of [[keltnerBands.upper, "--ma-2"], [keltnerBands.mid, "--ma-1"], [keltnerBands.lower, "--ma-2"]] as const) {
+        ctx.strokeStyle = v(col);
+        plot(ctx, g, line, g.y);
+      }
+      legend(legendText(`Keltner ${ss.keltner.ema} ${ss.keltner.atr} ${ss.keltner.multiplier}`, [keltnerBands.upper[at], keltnerBands.mid[at], keltnerBands.lower[at]]), v("--ma-2"));
+    }
+    if (donchianBands) {
+      ctx.lineWidth = 1;
+      for (const [line, col] of [[donchianBands.upper, "--up"], [donchianBands.mid, "--muted"], [donchianBands.lower, "--down"]] as const) {
+        ctx.strokeStyle = v(col);
+        plot(ctx, g, line, g.y);
+      }
+      legend(legendText(`Donchian ${ss.donchian.length}`, [donchianBands.upper[at], donchianBands.mid[at], donchianBands.lower[at]]), v("--muted"));
+    }
+    if (sar) {
+      for (const rising of [true, false]) {
+        ctx.fillStyle = v(rising ? "--up" : "--down");
+        ctx.beginPath();
+        for (let i = Math.max(0, g.i0); i <= g.i1; i++) {
+          const val = sar.value[i];
+          if (val == null || sar.up[i] !== rising) continue;
+          ctx.moveTo(g.x(i) + 1.5, g.y(val));
+          ctx.arc(g.x(i), g.y(val), 1.5, 0, Math.PI * 2);
+        }
+        ctx.fill();
+      }
+      legend(legendText(`SAR ${ss.psar.step} ${ss.psar.max}`, [sar.value[at]]), v(sar.up[at] ? "--up" : "--down"));
     }
     ctx.restore();
     if (lx > PAD.l + 4) legendY += 12;
@@ -1165,6 +1201,12 @@
       const span = hi - lo || 1;
       return { y: (val) => top + h * (0.92 - ((val - lo) / span) * 0.84), ticks: [[hi, volume(hi)], [lo, volume(lo)]] };
     }
+    if (id === "cci" && commodity) {
+      let lo = -100, hi = 100;
+      for (let i = g.i0; i <= g.i1; i++) { lo = Math.min(lo, commodity[i] ?? lo); hi = Math.max(hi, commodity[i] ?? hi); }
+      return { y: (val) => top + h * (0.92 - ((val - lo) / (hi - lo)) * 0.84), ticks: [[100, "100"], [0, "0"], [-100, "-100"]] };
+    }
+    if (id === "willr") return { y: (val) => top + (-val / 100) * h, ticks: [[-20, "-20"], [-80, "-80"]] };
     return { y: (val) => top + (1 - val / 100) * h, ticks: (id === "rsi" ? [30, 50, 70] : [20, 80]).map((t) => [t, String(t)]) };
   }
 
@@ -1188,7 +1230,7 @@
     ctx.clip();
     if (axis === "right" && id !== "obv") {
       for (const [t] of ticks) {
-        const solid = id === "macd" || t === 50;
+        const solid = id === "macd" || t === 50 || (id === "cci" && t === 0);
         ctx.strokeStyle = v(solid ? "--grid" : "--muted");
         ctx.setLineDash(solid ? [] : [2, 3]);
         ctx.beginPath();
@@ -1232,6 +1274,21 @@
       ctx.strokeStyle = v("--ma-2");
       plot(ctx, g, stoch.d, y);
       legend = legendText("Stoch 14 3 3", [stoch.k[at], stoch.d[at]], 1);
+    } else if (id === "cci" && commodity) {
+      col = v("--ma-1");
+      ctx.strokeStyle = col;
+      plot(ctx, g, commodity, y);
+      legend = legendText(`CCI ${ss.cci.length}`, [commodity[at]], 1);
+    } else if (id === "willr" && williams) {
+      col = v("--ma-2");
+      ctx.strokeStyle = col;
+      plot(ctx, g, williams, y);
+      legend = legendText(`%R ${ss.willr.length}`, [williams[at]], 1);
+    } else if (id === "mfi" && moneyFlow) {
+      col = v("--accent");
+      ctx.strokeStyle = col;
+      plot(ctx, g, moneyFlow, y);
+      legend = legendText(`MFI ${ss.mfi.length}`, [moneyFlow[at]], 1);
     } else if (id === "obv" && onBalance) {
       col = v("--accent");
       ctx.strokeStyle = col;
@@ -1282,7 +1339,7 @@
 
   $effect(() => {
     // Redraw when any of these change.
-    void [rr.reward, stoch, ichi, trendLine, onBalance, pivotLevels, sessionKeys, redrawKey, list, preview, selected, tool, hideDrawings, orderLines, orderDrag, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt, fillMarks, highlight];
+    void [rr.reward, stoch, ichi, trendLine, onBalance, keltnerBands, donchianBands, sar, commodity, williams, moneyFlow, pivotLevels, sessionKeys, redrawKey, list, preview, selected, tool, hideDrawings, orderLines, orderDrag, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt, fillMarks, highlight];
     draw();
   });
 
