@@ -6,6 +6,15 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.69] - 2026-11-12
+
+### Added
+- **Study settings and new indicators:** Ichimoku, Supertrend, Stochastic and
+  pivot points have configurable parameters under Indicator settings, with a
+  pivot type (classic, Fibonacci, Camarilla or Woodie), saved with Backup. New
+  studies: Keltner channels, Donchian channels and Parabolic SAR over the
+  price, and CCI, Williams %R and MFI in their own panes.
+
 ## [0.11.68] - 2026-11-12
 
 ### Added
