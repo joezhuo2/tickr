@@ -141,7 +141,18 @@ taskbar to keep it visible.
   close on 1D, or the first bar on screen otherwise. Heikin Ashi and Renko show
   smoothed prices, so the tooltip values are not traded prices. Renko bricks
   are one 14-bar average true range tall, are built from closes, and are not
-  evenly spaced in time.
+  evenly spaced in time. Range bars, Line break, Kagi and Point & Figure work
+  the same way: they are rebuilt from the candles on screen (so replay and
+  practice never see future data), drawn evenly spaced by index, and studies
+  compute on the transformed series. Tick data is not available, so a range bar
+  walks each candle as open, low, high, close (or open, high, low, close on a
+  down candle) and splits it into several bars when it covers more than one
+  range; the real intrabar order is unknown. Next to the menu, a box takes the
+  range size (0 uses the 14-bar ATR), the Line break count (2 to 5, default 3),
+  the Kagi reversal (0 uses ATR, in price or percent), or the Point & Figure
+  box size (0 uses ATR) and reversal boxes (default 3). Kagi and Point &
+  Figure use closes only. These settings are kept in local storage and included
+  in settings backups.
 - **Price scales:** linear, logarithmic, or percentage change rebased to the
   first visible candle as you pan and zoom. Press L to cycle scales. The
   **Left price scale** button at the top right adds a second scale on the left:
