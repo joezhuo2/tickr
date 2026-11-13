@@ -1,17 +1,22 @@
 <script lang="ts">
   import { num, price, signed } from "./lib/format";
-  import { buildCondition, check, type Condition, type Operand } from "./lib/strategy";
-  import type { ExitReason, Report, Rules } from "./lib/backtest";
+  import { buildCondition, check, DEFAULT_CLOCK, type Condition, type Operand, type SessionClock } from "./lib/strategy";
+  import { grid, MAX_RUNS, parameters, sweepRow, withParam, type ExitReason, type Param, type Range, type Report, type Rules, type SweepRow } from "./lib/backtest";
+  import type { Candle } from "./lib/types";
 
   let {
     report,
     bars,
+    candles,
+    clock = DEFAULT_CLOCK,
     currency,
     when,
     onrun,
   }: {
     report: Report | null;
     bars: number;
+    candles: readonly Candle[];
+    clock?: SessionClock;
     currency: string;
     when: (t: number) => string;
     onrun: (rules: Rules) => void;
@@ -93,7 +98,14 @@
     e.preventDefault();
     formError = entryError ? `Entry: ${entryError}` : stopError ? `Entry stop price: ${stopError}` : exitError ? `Exit: ${exitError}` : !pctOk(stop) ? "Stop-loss must be between 0 and 100%" : !pctOk(target) ? "Take-profit must be between 0 and 100%" : null;
     if (formError) return;
-    const rules: Rules = { entry: entry.trim(), entry_stop: entryStop.trim(), exit: exit.trim(), stop_pct: stop ?? null, target_pct: target ?? null };
+    commit(current());
+  }
+
+  function current(): Rules {
+    return { entry: entry.trim(), entry_stop: entryStop.trim(), exit: exit.trim(), stop_pct: stop ?? null, target_pct: target ?? null };
+  }
+
+  function commit(rules: Rules) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(rules));
     } catch {}
@@ -102,6 +114,132 @@
 
   function tone(v: number): string {
     return v > 0 ? "up" : v < 0 ? "down" : "";
+  }
+
+  const W = 600;
+  const EH = 110;
+  const DH = 36;
+  let hover = $state<number | null>(null);
+  const curve = $derived(report?.curve ?? []);
+  const shape = $derived.by(() => {
+    const n = curve.length;
+    if (n < 2) return null;
+    const lo = Math.min(1, ...curve.map((p) => p.equity));
+    const hi = Math.max(1, ...curve.map((p) => p.equity));
+    const maxDd = Math.max(...curve.map((p) => p.drawdown), 1e-9);
+    const x = (i: number) => (i / (n - 1)) * W;
+    const y = (e: number) => 4 + (1 - (e - lo) / (hi - lo || 1)) * (EH - 8);
+    const line = curve.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(p.equity).toFixed(1)}`).join("");
+    const area = `M0 0${curve.map((p, i) => `L${x(i).toFixed(1)} ${((p.drawdown / maxDd) * DH).toFixed(1)}`).join("")}L${W} 0Z`;
+    return { x, line, area, base: y(1) };
+  });
+  const point = $derived(curve[hover ?? curve.length - 1]);
+
+  function track(e: PointerEvent) {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    hover = Math.min(curve.length - 1, Math.max(0, Math.round(((e.clientX - r.left) / r.width) * (curve.length - 1))));
+  }
+
+  const METRICS = [
+    { key: "total_return", label: "Total return" },
+    { key: "profit_factor", label: "Profit factor" },
+    { key: "sharpe", label: "Sharpe" },
+    { key: "max_drawdown", label: "Drawdown" },
+    { key: "win_rate", label: "Win rate" },
+    { key: "count", label: "Trades" },
+  ] as const;
+  type Metric = (typeof METRICS)[number]["key"];
+
+  const params = $derived(parameters(current()));
+  let pickA = $state("");
+  let pickB = $state("");
+  let rangeA = $state<Range>({ from: 0, to: 0, step: 1 });
+  let rangeB = $state<Range>({ from: 0, to: 0, step: 1 });
+  let swept = $state<{ params: Param[]; rows: SweepRow[]; skipped: number } | null>(null);
+  let sweeping = $state(false);
+  let sortKey = $state<Metric>("total_return");
+  let sortDesc = $state(true);
+
+  const chosen = $derived([pickA, pickB].filter((id, i, all) => id && all.indexOf(id) === i && params.some((p) => p.id === id)));
+  const plan = $derived(grid(chosen.map((id) => (id === pickA ? rangeA : rangeB))));
+  const sorted = $derived.by(() => {
+    const rows = swept?.rows ?? [];
+    const rank = (v: number | null) => (v == null ? null : Number.isNaN(v) ? null : v);
+    return [...rows].sort((a, b) => {
+      const x = rank(a[sortKey]);
+      const y = rank(b[sortKey]);
+      return x == null || y == null ? (x == null ? 1 : 0) - (y == null ? 1 : 0) : sortDesc ? y - x : x - y;
+    });
+  });
+  const heat = $derived.by(() => {
+    if (!swept || swept.params.length !== 2) return null;
+    const finite = swept.rows.map((r) => r[sortKey]).filter((v): v is number => v != null && Number.isFinite(v));
+    const lo = Math.min(...finite);
+    const hi = Math.max(...finite);
+    const key = (v: number[]) => `${v[0]}|${v[1]}`;
+    const cells = new Map(swept.rows.map((r) => [key(r.values), r]));
+    const ys = [...new Set(swept.rows.map((r) => r.values[0]))];
+    const xs = [...new Set(swept.rows.map((r) => r.values[1]))];
+    const shade = (v: number | null) => {
+      if (v == null) return "";
+      const t = hi === lo ? 0.5 : (Math.min(v, hi) - lo) / (hi - lo);
+      const good = sortKey === "max_drawdown" ? 1 - t : t;
+      return `background: color-mix(in srgb, var(${good >= 0.5 ? "--up" : "--down"}) ${Math.round(Math.abs(good - 0.5) * 140)}%, transparent)`;
+    };
+    return { xs, ys, rows: ys.map((y) => xs.map((x) => cells.get(key([y, x])))), shade };
+  });
+
+  function pickParam(which: "A" | "B", id: string) {
+    const v = params.find((p) => p.id === id)?.value ?? 0;
+    const range = { from: v, to: v * 2, step: Math.max(1, Math.round(v / 5)) };
+    if (which === "A") (pickA = id), (rangeA = range);
+    else (pickB = id), (rangeB = range);
+  }
+
+  async function sweep() {
+    const base = current();
+    const ids = chosen;
+    const used = params.filter((p) => ids.includes(p.id));
+    const ordered = ids.map((id) => used.find((p) => p.id === id)!);
+    sweeping = true;
+    swept = { params: ordered, rows: [], skipped: 0 };
+    const rows: SweepRow[] = [];
+    let skipped = 0;
+    for (const [i, values] of plan.points.entries()) {
+      try {
+        rows.push(sweepRow(candles, base, ids, values, clock));
+      } catch {
+        skipped++;
+      }
+      if (i % 10 === 9) await new Promise((r) => setTimeout(r));
+    }
+    swept = { params: ordered, rows, skipped };
+    sweeping = false;
+  }
+
+  function sortBy(key: Metric) {
+    if (key === sortKey) sortDesc = !sortDesc;
+    else (sortKey = key), (sortDesc = true);
+  }
+
+  function applyRow(row: SweepRow) {
+    if (!swept) return;
+    const rules = swept.params.reduce((acc, p, i) => withParam(acc, p.id, row.values[i]), current());
+    entry = rules.entry;
+    entryStop = rules.entry_stop ?? "";
+    exit = rules.exit;
+    stop = rules.stop_pct;
+    target = rules.target_pct;
+    commit(rules);
+  }
+
+  function show(key: Metric, v: number | null | undefined): string {
+    if (v == null || Number.isNaN(v)) return "–";
+    if (v === Infinity) return "∞";
+    if (key === "total_return") return `${signed(v)}%`;
+    if (key === "max_drawdown") return `${v > 0 ? "−" : ""}${num(v, 2)}%`;
+    if (key === "win_rate") return `${num(v, 1)}%`;
+    return num(v, key === "count" ? 0 : 2);
   }
 </script>
 
@@ -150,8 +288,83 @@
       <div><span>Win rate</span><strong>{report.win_rate != null ? `${num(report.win_rate, 1)}%` : "—"}</strong></div>
       <div><span>Average trade</span><strong class={tone(report.avg_trade ?? 0)}>{report.avg_trade != null ? `${signed(report.avg_trade)}%` : "—"}</strong></div>
       <div><span>Max drawdown</span><strong class={report.max_drawdown > 0 ? "down" : ""}>{report.max_drawdown > 0 ? "−" : ""}{num(report.max_drawdown, 2)}%</strong></div>
+      <div><span>Profit factor</span><strong>{show("profit_factor", report.profit_factor)}</strong></div>
+      <div><span title="Mean over standard deviation of per-bar equity returns, annualized by the chart's bars per calendar year; no risk-free rate">Sharpe (per-bar, annualized)</span><strong>{show("sharpe", report.sharpe)}</strong></div>
     </div>
-    <p class="note">Returns compound each trade at full size. Buy and hold runs from the first close to the last close.</p>
+    <p class="note">Returns compound each trade at full size. Buy and hold runs from the first close to the last close. Sharpe uses per-bar returns of the marked-to-market equity curve, annualized from the bars per year on the chart, with no risk-free rate.</p>
+    {#if shape && point}
+      <section aria-label="Equity curve">
+        <h3>Equity curve</h3>
+        <p class="readout">
+          {when(point.t)} · Equity <strong class={tone(point.equity - 1)}>{signed((point.equity - 1) * 100)}%</strong> · Drawdown <strong class={point.drawdown > 0 ? "down" : ""}>{point.drawdown > 0 ? "−" : ""}{num(point.drawdown * 100, 2)}%</strong>
+        </p>
+        <div class="curve" role="presentation" onpointermove={track} onpointerleave={() => (hover = null)}>
+          <svg viewBox="0 0 {W} {EH}" preserveAspectRatio="none" role="img" aria-label="Equity curve, starting at 100%">
+            <line class="base" x1="0" x2={W} y1={shape.base} y2={shape.base} />
+            <path class="eq" d={shape.line} />
+            {#if hover != null}<line class="cursor" x1={shape.x(hover)} x2={shape.x(hover)} y1="0" y2={EH} />{/if}
+          </svg>
+          <svg class="dd" viewBox="0 0 {W} {DH}" preserveAspectRatio="none" role="img" aria-label="Drawdown from the equity peak">
+            <path class="under" d={shape.area} />
+            {#if hover != null}<line class="cursor" x1={shape.x(hover)} x2={shape.x(hover)} y1="0" y2={DH} />{/if}
+          </svg>
+        </div>
+      </section>
+    {/if}
+    <section aria-label="Parameter sweep">
+      <h3>Parameter sweep</h3>
+      {#if params.length}
+        <div class="sweep">
+          {@render picker("A", pickA, rangeA, (r) => (rangeA = r))}
+          {@render picker("B", pickB, rangeB, (r) => (rangeB = r))}
+          <button type="button" disabled={sweeping || !plan.points.length || !bars} onclick={sweep}>{sweeping ? "Sweeping…" : `Run sweep${plan.points.length ? ` (${plan.points.length})` : ""}`}</button>
+        </div>
+        {#if plan.capped}<p class="error" role="alert">That grid is {num(plan.total, 0)} runs; the limit is {MAX_RUNS}. Narrow a range or raise a step.</p>{/if}
+        {#if swept && !sweeping}
+          {#if swept.skipped}<p class="note">{swept.skipped} of {swept.rows.length + swept.skipped} runs were skipped because the rules failed with those values.</p>{/if}
+          {#if heat}
+            <p class="note">Heatmap of {METRICS.find((m) => m.key === sortKey)?.label}: rows {swept.params[0].label}, columns {swept.params[1].label}. Click a cell to apply it.</p>
+            <table class="heat" aria-label="Sweep heatmap">
+              <thead><tr><th></th>{#each heat.xs as x (x)}<th>{x}</th>{/each}</tr></thead>
+              <tbody>
+                {#each heat.rows as cells, i (i)}
+                  <tr>
+                    <th>{heat.ys[i]}</th>
+                    {#each cells as c, j (j)}
+                      <td style={heat.shade(c?.[sortKey] ?? null)}>
+                        {#if c}<button type="button" class="cell" title="Apply {heat.ys[i]}, {heat.xs[j]}" onclick={() => applyRow(c)}>{show(sortKey, c[sortKey])}</button>{:else}–{/if}
+                      </td>
+                    {/each}
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          {/if}
+          <table aria-label="Sweep results">
+            <thead>
+              <tr>
+                {#each swept.params as p (p.id)}<th>{p.label}</th>{/each}
+                {#each METRICS as m (m.key)}
+                  <th aria-sort={sortKey === m.key ? (sortDesc ? "descending" : "ascending") : "none"}>
+                    <button type="button" class="link" onclick={() => sortBy(m.key)}>{m.label}{sortKey === m.key ? (sortDesc ? " ↓" : " ↑") : ""}</button>
+                  </th>
+                {/each}
+              </tr>
+            </thead>
+            <tbody>
+              {#each sorted as row, i (i)}
+                <tr class="pick" tabindex="0" title="Apply these parameters" onclick={() => applyRow(row)} onkeydown={(e) => e.key === "Enter" && applyRow(row)}>
+                  {#each row.values as v, j (j)}<td>{v}</td>{/each}
+                  {#each METRICS as m (m.key)}<td class={m.key === "total_return" ? tone(row.total_return) : ""}>{show(m.key, row[m.key])}</td>{/each}
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        {/if}
+      {:else}
+        <p class="muted">The rules contain no numbers to sweep.</p>
+      {/if}
+    </section>
     <section aria-label="Backtest trades">
       <h3>Trades</h3>
       {#if report.trades.length}
@@ -176,6 +389,20 @@
     </section>
   {/if}
 </div>
+
+{#snippet picker(name: "A" | "B", id: string, range: Range, set: (r: Range) => void)}
+  <div class="pickrow">
+    <select aria-label={`Sweep parameter ${name}`} value={id} onchange={(e) => pickParam(name, e.currentTarget.value)}>
+      <option value="">{name === "A" ? "Parameter A" : "Parameter B (optional)"}</option>
+      {#each params as p (p.id)}<option value={p.id}>{p.label}</option>{/each}
+    </select>
+    {#if id}
+      <label>From <input class="n" type="number" step="any" value={range.from} oninput={(e) => set({ ...range, from: e.currentTarget.valueAsNumber })} /></label>
+      <label>To <input class="n" type="number" step="any" value={range.to} oninput={(e) => set({ ...range, to: e.currentTarget.valueAsNumber })} /></label>
+      <label>Step <input class="n" type="number" step="any" min="0" value={range.step} oninput={(e) => set({ ...range, step: e.currentTarget.valueAsNumber })} /></label>
+    {/if}
+  </div>
+{/snippet}
 
 {#snippet operand(o: Operand, set: (o: Operand) => void, name: string)}
   <select aria-label={`${name} operand`} value={o.kind} onchange={(e) => set(pick(o, e.currentTarget.value as Operand["kind"]))}>
@@ -335,5 +562,94 @@
   }
   td {
     border-bottom: 1px solid var(--grid);
+  }
+  .readout {
+    color: var(--muted);
+  }
+  .readout strong {
+    color: inherit;
+  }
+  .readout .up,
+  .readout .down {
+    color: var(--up);
+  }
+  .readout .down {
+    color: var(--down);
+  }
+  .curve {
+    cursor: crosshair;
+    touch-action: none;
+  }
+  svg {
+    display: block;
+    width: 100%;
+    height: 110px;
+    overflow: visible;
+  }
+  svg.dd {
+    height: 36px;
+    margin-top: 2px;
+  }
+  svg path,
+  svg line {
+    vector-effect: non-scaling-stroke;
+  }
+  .base,
+  .cursor {
+    stroke: var(--faint);
+    stroke-width: 1;
+  }
+  .cursor {
+    stroke: var(--muted);
+  }
+  .eq {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+  }
+  .under {
+    fill: var(--down);
+    fill-opacity: 0.35;
+  }
+  .sweep,
+  .pickrow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+  }
+  .sweep {
+    margin: 4px 0;
+  }
+  .pick {
+    cursor: pointer;
+  }
+  .pick:hover,
+  .pick:focus-visible {
+    background: var(--grid);
+  }
+  th .link {
+    color: var(--muted);
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .heat {
+    width: auto;
+    margin: 4px 0 8px;
+  }
+  .heat th {
+    padding-right: 10px;
+  }
+  .heat td {
+    padding: 0;
+    text-align: center;
+  }
+  .cell {
+    width: 100%;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    padding: 3px 8px;
   }
 </style>
