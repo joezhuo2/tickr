@@ -85,7 +85,8 @@
   import { clockFor } from "./lib/strategy";
   import * as Backtest from "./lib/backtest";
   import { fullTime } from "./lib/format";
-  import { overlayVisibility, shouldAnalyze, toggleOverlay } from "./lib/indicators";
+  import { chartPatternKinds, overlayVisibility, shouldAnalyze, toggleOverlay } from "./lib/indicators";
+  import { detectChartPatterns } from "./lib/chartPatterns";
   import { applyDisplay } from "./lib/display";
   import type { Theme, TextSize, Palette } from "./lib/types";
   import { refreshOutcome, type RefreshView } from "./lib/refresh";
@@ -795,6 +796,15 @@
           continue;
         }
         if (mine !== practiceSeq) return;
+        if (practiceMode === "chart") {
+          const built = Quiz.buildChart(detectChartPatterns(c.candles), c.candles, w.from, rng);
+          if (!built) {
+            misses.push(`${pick}: no chart patterns found`);
+            continue;
+          }
+          beginQuiz(setup, pick, c, built);
+          return;
+        }
         if (practiceMode !== "trade") {
           let found: Pattern[];
           try {
@@ -1210,7 +1220,13 @@
 
   const activeAnalysis = $derived(analysis && analysisKey === cacheKey() ? analysis : null);
   const shownAnalysis = $derived(replay ? shownReplayAnalysis : activeAnalysis);
-  const techAnalysis = $derived(shownAnalysis && quiz?.mode === "name" && quizGuess == null ? { ...shownAnalysis, patterns: [] } : shownAnalysis);
+  const techAnalysis = $derived(shownAnalysis && quiz && quiz.mode !== "move" && quizGuess == null ? { ...shownAnalysis, patterns: [] } : shownAnalysis);
+  const chartPatterns = $derived.by(() => {
+    const a = techAnalysis;
+    if (!a || !indicators || (quiz && quiz.mode !== "move" && quizGuess == null)) return [];
+    return detectChartPatterns(mainChart?.candles.filter((c) => c.t <= a.as_of) ?? [], chartPatternKinds(indicators));
+  });
+  let patternFocus = $state<{ from: number; to: number } | null>(null);
   const mainChart = $derived(replay ? replayChart : chart);
   const split = $derived(layout.split && !replay);
   const analysisOffset = $derived(
@@ -1266,6 +1282,7 @@
     analysisKey = "";
     analyzing = false;
     analysisError = null;
+    patternFocus = null;
   }
 
   async function saveIndicators(config: IndicatorConfig) {
@@ -2189,7 +2206,8 @@
                     onwindow={showSecond && layout.sync_range ? (w) => (syncWindow = { source: "main", w }) : undefined}
                     replay={!!replay}
                     fills={chartFills}
-                    highlight={quizHighlight}
+                    highlight={quizHighlight ?? patternFocus}
+                    {chartPatterns}
                     orderLines={paperLines}
                     onmoveorder={paperMove}
                     onolder={loadOlder}
@@ -2272,6 +2290,8 @@
                 onsavepreset={savePreset}
                 ondeletepreset={deletePreset}
                 onanalyze={() => runAnalysis()}
+                {chartPatterns}
+                onpattern={(p) => (patternFocus = { from: p.points[0].t, to: p.lines[0][1].t })}
                 onalert={replay ? undefined : async (l) => {
                   alerts = await invoke<PriceAlert[]>("add_alert", { symbol, kind: "price", direction: l.direction, level: l.level, recurring: false, cooldownMins: 15, regularOnly: true });
                 }}
@@ -2341,7 +2361,7 @@
       </div>
     {/if}
     {#if settingsOpen}
-      <Settings bind:custom bind:theme bind:textSize bind:palette bind:refreshMode extended={chartExtended} shade={shadeSessions} timeZone={chartTimeZone} onextended={saveChartExtended} onshade={saveShadeSessions} ontimezone={saveChartTimeZone} bind:hotkey bind:error={hotkeyError} {defaultHotkey} bind:keybinds bind:dots onclose={() => (settingsOpen = false)} />
+      <Settings bind:custom bind:theme bind:textSize bind:palette bind:refreshMode extended={chartExtended} shade={shadeSessions} timeZone={chartTimeZone} onextended={saveChartExtended} onshade={saveShadeSessions} ontimezone={saveChartTimeZone} bind:hotkey bind:error={hotkeyError} {defaultHotkey} bind:keybinds bind:dots {indicators} onindicators={saveIndicators} onclose={() => (settingsOpen = false)} />
     {/if}
   </div>
 {/if}

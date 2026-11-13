@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { alertLevels, clampPanel, legendText, overlayVisibility, paneLayout, volumeProfile, shouldAnalyze, toggleOverlay } from "./indicators";
+import { alertLevels, chartPatternKinds, clampPanel, legendText, overlayVisibility, paneLayout, volumeProfile, shouldAnalyze, toggleChartPattern, toggleOverlay } from "./indicators";
+import { CHART_PATTERN_KINDS } from "./patternInfo";
 import type { IndicatorConfig, Overlays } from "./types";
 
 const config = (): IndicatorConfig => ({
@@ -8,7 +9,7 @@ const config = (): IndicatorConfig => ({
   bollinger: { length: 20, k: 2, color: "", visible: true },
   vwap: { color: "", visible: true }, vwap_bands: 0, volume_profile: false, opening_range: { minutes: 15, extension: 1, color: "", visible: false }, levels: { color: "", visible: false }, volume_ma: { length: 20, color: "", visible: true }, rsi: { length: 14, color: "", visible: true },
   macd: { fast: 12, slow: 26, signal: 9, color: "", signal_color: "", visible: false },
-  fib: true, targets: true, patterns: true, keep_analysis: false,
+  fib: true, targets: true, patterns: true, keep_analysis: false, chart_patterns: true, chart_patterns_off: [],
 });
 
 it("toggles all moving averages without changing lengths, colors or the saved input", () => {
@@ -24,12 +25,23 @@ it("toggles all moving averages without changing lengths, colors or the saved in
 });
 
 it("persists each group toggle without changing the other settings", () => {
-  for (const key of ["bollinger", "vwap", "opening_range", "levels", "volume_ma", "rsi", "macd", "fib", "targets", "patterns", "volume_profile"] as (keyof Overlays)[]) {
+  for (const key of ["bollinger", "vwap", "opening_range", "levels", "volume_ma", "rsi", "macd", "fib", "targets", "patterns", "chart_patterns", "volume_profile"] as (keyof Overlays)[]) {
     const saved = config();
     const next = toggleOverlay(saved, key, !overlayVisibility(saved)[key]);
     expect(overlayVisibility(next)).toEqual({ ...overlayVisibility(saved), [key]: !overlayVisibility(saved)[key] });
     expect(next.sma).toEqual(saved.sma);
   }
+});
+
+it("turns single chart patterns off and back on", () => {
+  const saved = config();
+  expect(chartPatternKinds(saved)).toEqual([...CHART_PATTERN_KINDS]);
+  const off = toggleChartPattern(toggleChartPattern(saved, "bull_flag", false), "bull_flag", false);
+  expect(off.chart_patterns_off).toEqual(["bull_flag"]);
+  expect(chartPatternKinds(off)).toHaveLength(CHART_PATTERN_KINDS.length - 1);
+  expect(chartPatternKinds(off)).not.toContain("bull_flag");
+  expect(toggleChartPattern(off, "bull_flag", true).chart_patterns_off).toEqual([]);
+  expect(saved.chart_patterns_off).toEqual([]);
 });
 
 it("spreads each candle's volume over the price bins it touches", () => {

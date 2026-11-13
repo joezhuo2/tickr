@@ -1,18 +1,44 @@
 import { num } from "./format";
+import { CHART_PATTERN_KINDS, type ChartPatternKind } from "./patternInfo";
 import type { Analysis, Candle, IndicatorConfig, Overlays } from "./types";
 
 export function overlayVisibility(c: IndicatorConfig): Overlays {
   return {
     mas: [...c.sma, ...c.ema].some((l) => l.visible),
     bollinger: c.bollinger.visible, vwap: c.vwap.visible, opening_range: c.opening_range.visible, levels: c.levels.visible, volume_ma: c.volume_ma.visible, rsi: c.rsi.visible, macd: c.macd.visible,
-    fib: c.fib, targets: c.targets, patterns: c.patterns, volume_profile: c.volume_profile,
+    fib: c.fib, targets: c.targets, patterns: c.patterns, chart_patterns: c.chart_patterns, volume_profile: c.volume_profile,
   };
 }
 
 export function toggleOverlay(c: IndicatorConfig, key: keyof Overlays, visible: boolean): IndicatorConfig {
   if (key === "mas") return { ...c, sma: c.sma.map((l) => ({ ...l, visible })), ema: c.ema.map((l) => ({ ...l, visible })) };
-  if (key === "fib" || key === "targets" || key === "patterns" || key === "volume_profile") return { ...c, [key]: visible };
+  if (key === "fib" || key === "targets" || key === "patterns" || key === "chart_patterns" || key === "volume_profile") return { ...c, [key]: visible };
   return { ...c, [key]: { ...c[key], visible } };
+}
+
+export const OVERLAY_TOGGLES: { key: keyof Overlays; label: string }[] = [
+  { key: "mas", label: "Moving averages" },
+  { key: "bollinger", label: "Bollinger bands" },
+  { key: "vwap", label: "VWAP" },
+  { key: "opening_range", label: "Opening range" },
+  { key: "levels", label: "Key levels" },
+  { key: "volume_ma", label: "Volume average" },
+  { key: "volume_profile", label: "Volume profile" },
+  { key: "fib", label: "Fibonacci" },
+  { key: "targets", label: "Targets" },
+  { key: "patterns", label: "Patterns" },
+  { key: "chart_patterns", label: "Chart patterns" },
+  { key: "rsi", label: "RSI pane" },
+  { key: "macd", label: "MACD pane" },
+];
+
+export function chartPatternKinds(c: IndicatorConfig): ChartPatternKind[] {
+  return CHART_PATTERN_KINDS.filter((k) => !c.chart_patterns_off.includes(k));
+}
+
+export function toggleChartPattern(c: IndicatorConfig, kind: ChartPatternKind, on: boolean): IndicatorConfig {
+  const off = c.chart_patterns_off.filter((k) => k !== kind);
+  return { ...c, chart_patterns_off: on ? off : [...off, kind] };
 }
 
 export function shouldAnalyze(shown: boolean, keep: boolean): boolean {

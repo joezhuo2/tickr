@@ -515,7 +515,14 @@ pub struct IndicatorConfig {
     pub targets: bool,
     pub patterns: bool,
     pub keep_analysis: bool,
+    pub chart_patterns: bool,
+    pub chart_patterns_off: Vec<String>,
 }
+
+pub const CHART_PATTERN_KINDS: [&str; 13] = [
+    "head_and_shoulders", "inverse_head_and_shoulders", "double_top", "double_bottom", "triple_top", "triple_bottom",
+    "ascending_triangle", "descending_triangle", "symmetrical_triangle", "bull_flag", "bear_flag", "rising_wedge", "falling_wedge",
+];
 
 impl Default for IndicatorConfig {
     fn default() -> Self {
@@ -533,6 +540,7 @@ impl Default for IndicatorConfig {
             rsi: line(14),
             macd: MacdConfig { fast: 12, slow: 26, signal: 9, color: String::new(), signal_color: String::new(), visible: false },
             fib: true, targets: true, patterns: true, keep_analysis: false,
+            chart_patterns: true, chart_patterns_off: Vec::new(),
         }
     }
 }
@@ -556,6 +564,7 @@ pub fn validate_indicators(config: &IndicatorConfig, presets: &[IndicatorPreset]
         if !c.vwap_bands.is_finite() || !(0.0..=5.0).contains(&c.vwap_bands) { return Err("VWAP bands must be from 0 to 5 deviations".into()); }
         if !(1..=240).contains(&c.opening_range.minutes) { return Err("Opening range must be from 1 to 240 minutes".into()); }
         if !c.opening_range.extension.is_finite() || !(0.0..=5.0).contains(&c.opening_range.extension) { return Err("Opening range extension must be from 0 to 5".into()); }
+        if c.chart_patterns_off.len() > CHART_PATTERN_KINDS.len() || c.chart_patterns_off.iter().any(|k| !CHART_PATTERN_KINDS.contains(&k.as_str())) { return Err("Unknown chart pattern".into()); }
         for color in c.sma.iter().chain(&c.ema).map(|l| l.color.as_str())
             .chain([c.bollinger.color.as_str(), &c.vwap.color, &c.opening_range.color, &c.levels.color, &c.volume_ma.color, &c.rsi.color, &c.macd.color, &c.macd.signal_color]) {
             if !color.is_empty() && !(color.len() == 7 && color.starts_with('#') && color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)) {
@@ -801,6 +810,8 @@ mod tests {
             |c| c.vwap_bands = -1.0, |c| c.vwap_bands = 5.5,
             |c| c.opening_range.minutes = 0, |c| c.opening_range.minutes = 241,
             |c| c.opening_range.extension = -0.1, |c| c.opening_range.extension = f64::NAN,
+            |c| c.chart_patterns_off = vec!["cup_and_handle".into()],
+            |c| c.chart_patterns_off = vec!["double_top".into(); 14],
         ];
         for edit in invalid {
             let mut c = defaults.clone(); edit(&mut c);
@@ -821,6 +832,8 @@ mod tests {
         c.ema.clear(); c.rsi.length = 1; c.bollinger.k = 0.5;
         assert!(validate_indicators(&c, &[]).is_ok());
         c.bollinger.k = 5.0;
+        assert!(validate_indicators(&c, &[]).is_ok());
+        c.chart_patterns_off = CHART_PATTERN_KINDS.iter().map(|k| k.to_string()).collect();
         assert!(validate_indicators(&c, &[]).is_ok());
     }
 

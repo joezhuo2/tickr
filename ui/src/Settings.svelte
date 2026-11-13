@@ -12,6 +12,9 @@
   import { matchSettings, type SettingEntry } from "./lib/settingsSearch";
   import { chartAlerts } from "./lib/chartAlertStore.svelte";
   import { rr, setReward } from "./lib/rrStore.svelte";
+  import { OVERLAY_TOGGLES, overlayVisibility, toggleChartPattern, toggleOverlay } from "./lib/indicators";
+  import { CHART_PATTERN_INFO, CHART_PATTERN_KINDS } from "./lib/patternInfo";
+  import type { IndicatorConfig } from "./lib/types";
   import type { ChartTimeZone, ConnectionsReport, ServiceStatus, AiConfig, AiTestResult, DataProvider, Dots, Keybinds, RefreshMode, Theme, TextSize, Palette } from "./lib/types";
 
   let {
@@ -31,8 +34,12 @@
     onextended,
     onshade,
     ontimezone,
+    indicators,
+    onindicators,
     onclose,
   }: {
+    indicators?: IndicatorConfig;
+    onindicators: (config: IndicatorConfig) => Promise<void>;
     custom: Custom;
     theme: Theme;
     textSize: TextSize;
@@ -102,6 +109,20 @@
   function toggleDot(id: keyof Dots) {
     dots = { ...dots, [id]: !dots[id] };
     invoke("set_dots", { dots }).catch(console.warn);
+  }
+
+  let analysisBusy = $state(false);
+  let analysisError = $state<string | null>(null);
+  async function saveAnalysis(next: IndicatorConfig) {
+    analysisBusy = true;
+    analysisError = null;
+    try {
+      await onindicators(next);
+    } catch (e) {
+      analysisError = String(e);
+    } finally {
+      analysisBusy = false;
+    }
   }
 
   let ai = $state<AiConfig>({ enabled: true, base_url: "", model: "", news_model: "", events_model: "", api_key: "", has_key: false });
@@ -657,6 +678,30 @@
       <input type="checkbox" checked={chartAlerts.background} onchange={(e) => { chartAlerts.background = e.currentTarget.checked; invoke("set_background_chart_alerts", { enabled: chartAlerts.background }).catch(console.warn); }} />
     </label>
     <p class="hint">Downloads candles for each symbol and interval with an armed alert about once per bar (at most every 15 minutes) while tickr runs, and keeps the window loaded in memory when it is minimized or closed to the tray.</p>
+
+    {#if indicators}
+      {@const config = indicators}
+      <h3>Technical analysis</h3>
+      <label class="row">
+        <span>Auto analyze</span>
+        <input type="checkbox" checked={config.keep_analysis} disabled={analysisBusy} onchange={(e) => saveAnalysis({ ...config, keep_analysis: e.currentTarget.checked })} />
+      </label>
+      <p class="hint">Runs the local technical analysis whenever a symbol, range or interval loads, on refresh and when new candles arrive, so you don't need to press Analyze. It never calls the AI. The items below are what the chart shows afterwards.</p>
+      {#each OVERLAY_TOGGLES as o (o.key)}
+        <label class="row">
+          <span>{o.label}</span>
+          <input type="checkbox" checked={overlayVisibility(config)[o.key]} disabled={analysisBusy} onchange={(e) => saveAnalysis(toggleOverlay(config, o.key, e.currentTarget.checked))} />
+        </label>
+      {/each}
+      <h3>Chart patterns to detect</h3>
+      {#each CHART_PATTERN_KINDS as k (k)}
+        <label class="row">
+          <span>{CHART_PATTERN_INFO[k].name}</span>
+          <input type="checkbox" checked={!config.chart_patterns_off.includes(k)} disabled={analysisBusy} onchange={(e) => saveAnalysis(toggleChartPattern(config, k, e.currentTarget.checked))} />
+        </label>
+      {/each}
+      {#if analysisError}<p class="error">{analysisError}</p>{/if}
+    {/if}
 
     {/if}
     {#if tab === "data"}
