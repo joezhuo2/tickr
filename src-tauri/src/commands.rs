@@ -13,6 +13,7 @@ use crate::analysis::Analysis;
 use crate::analyst::Consensus;
 use crate::earnings::Earnings;
 use crate::financials::Financials;
+use crate::fundamentals::Fundamentals;
 use crate::grades::RatingChange;
 use crate::market::Market;
 use crate::sp500::HeatQuote;
@@ -65,6 +66,7 @@ pub struct Init {
     watchlist_view: WatchlistView,
     watchlist_columns: WatchlistColumns,
     screens: Vec<SavedScreen>,
+    screen_columns: Vec<String>,
     event_filter: EventFilter,
     keybinds: Keybinds,
     dots: Dots,
@@ -121,6 +123,7 @@ pub fn init_payload(shared: &Shared) -> Init {
         watchlist_view: s.watchlist_view,
         watchlist_columns: s.watchlist_columns,
         screens: s.screens,
+        screen_columns: s.screen_columns,
         event_filter: s.event_filter,
         keybinds: s.keybinds,
         dots: s.dots,
@@ -872,6 +875,49 @@ pub async fn get_screener_data(shared: State<'_, Arc<Shared>>, symbols: Vec<Stri
     Ok(out)
 }
 
+async fn fundamentals_for(shared: &Shared, symbol: String) -> Fundamentals {
+    if let Some(f) = shared.screener.cached_fundamentals(&symbol, now_secs()) {
+        return f;
+    }
+    let Ok(_permit) = shared.screener.limit().acquire_owned().await else {
+        return Fundamentals { symbol, error: Some("Screener unavailable".into()), ..Fundamentals::default() };
+    };
+    if let Some(f) = shared.screener.cached_fundamentals(&symbol, now_secs()) {
+        return f;
+    }
+    match crate::fundamentals::fetch(&shared.analysts, &symbol).await {
+        Ok(f) => {
+            shared.screener.store_fundamentals(&f, now_secs());
+            f
+        }
+        Err(e) => Fundamentals { symbol, error: Some(e), ..Fundamentals::default() },
+    }
+}
+
+#[tauri::command]
+pub async fn get_screener_fundamentals(shared: State<'_, Arc<Shared>>, symbols: Vec<String>) -> Result<Vec<Fundamentals>, String> {
+    let starred = lock(&shared.settings).watchlist.clone();
+    let symbols: Vec<String> = clean_symbols(symbols).into_iter().filter(|s| starred.contains(s)).collect();
+    let shared: Arc<Shared> = shared.inner().clone();
+    let tasks: Vec<_> = symbols
+        .into_iter()
+        .map(|symbol| {
+            let shared = shared.clone();
+            tauri::async_runtime::spawn(async move { fundamentals_for(&shared, symbol).await })
+        })
+        .collect();
+    let mut out = Vec::with_capacity(tasks.len());
+    for t in tasks {
+        out.push(t.await.map_err(|e| e.to_string())?);
+    }
+    Ok(out)
+}
+
+#[tauri::command]
+pub fn set_screen_columns(shared: State<'_, Arc<Shared>>, columns: Vec<String>) {
+    shared.update_settings(|s| s.screen_columns = columns.into_iter().filter(|c| !c.is_empty() && c.len() <= 32).take(40).collect());
+}
+
 #[tauri::command]
 pub async fn get_iv_ranks(shared: State<'_, Arc<Shared>>, symbols: Vec<String>) -> Result<Vec<IvRank>, String> {
     let starred = lock(&shared.settings).watchlist.clone();
@@ -1032,10 +1078,10 @@ mod tests {
 
     #[test]
     fn screen_edits_persist_and_rejections_leave_settings_unchanged() {
-        use crate::settings::{ScreenKind, ScreenOp};
+        use crate::settings::ScreenOp;
         let dir = tempfile::tempdir().unwrap();
         let shared = Shared::new(dir.path().join("settings.json"), Default::default());
-        let rules = vec![ScreenRule { kind: ScreenKind::Rsi, op: ScreenOp::Below, value: 30.0 }];
+        let rules = vec![ScreenRule { kind: "rsi".into(), op: ScreenOp::Below, value: 30.0, value2: None, values: Vec::new() }];
         let saved = edit_screens(&shared, |s| s.save_screen("Oversold", rules.clone())).unwrap();
         assert_eq!(saved, [SavedScreen { name: "Oversold".into(), rules: rules.clone() }]);
         assert_eq!(Settings::load(&shared.settings_path).screens, saved);
