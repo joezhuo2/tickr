@@ -29,6 +29,17 @@ pub enum PatternKind {
     EveningStar,
     ThreeWhiteSoldiers,
     ThreeBlackCrows,
+    BullishMarubozu,
+    BearishMarubozu,
+    TweezerTop,
+    TweezerBottom,
+    SpinningTop,
+    ThreeInsideUp,
+    ThreeInsideDown,
+    BullishKicker,
+    BearishKicker,
+    BullishAbandonedBaby,
+    BearishAbandonedBaby,
 }
 
 impl PatternKind {
@@ -49,6 +60,17 @@ impl PatternKind {
             Self::EveningStar => "Evening star",
             Self::ThreeWhiteSoldiers => "Three white soldiers",
             Self::ThreeBlackCrows => "Three black crows",
+            Self::BullishMarubozu => "Bullish marubozu",
+            Self::BearishMarubozu => "Bearish marubozu",
+            Self::TweezerTop => "Tweezer top",
+            Self::TweezerBottom => "Tweezer bottom",
+            Self::SpinningTop => "Spinning top",
+            Self::ThreeInsideUp => "Three inside up",
+            Self::ThreeInsideDown => "Three inside down",
+            Self::BullishKicker => "Bullish kicker",
+            Self::BearishKicker => "Bearish kicker",
+            Self::BullishAbandonedBaby => "Bullish abandoned baby",
+            Self::BearishAbandonedBaby => "Bearish abandoned baby",
         }
     }
 
@@ -56,6 +78,12 @@ impl PatternKind {
     pub fn strength(self) -> f64 {
         match self {
             Self::Doji => 0.3,
+            Self::SpinningTop => 0.2,
+            Self::BullishMarubozu | Self::BearishMarubozu => 0.4,
+            Self::TweezerTop | Self::TweezerBottom => 0.5,
+            Self::ThreeInsideUp | Self::ThreeInsideDown => 0.7,
+            Self::BullishKicker | Self::BearishKicker => 0.9,
+            Self::BullishAbandonedBaby | Self::BearishAbandonedBaby => 1.0,
             Self::Hammer | Self::ShootingStar => 0.6,
             Self::InvertedHammer | Self::HangingMan => 0.5,
             Self::BullishHarami | Self::BearishHarami => 0.5,
@@ -67,14 +95,19 @@ impl PatternKind {
 
     fn direction(self) -> Direction {
         match self {
-            Self::Doji => Direction::Neutral,
+            Self::Doji | Self::SpinningTop => Direction::Neutral,
             Self::Hammer
             | Self::InvertedHammer
             | Self::BullishEngulfing
             | Self::BullishHarami
             | Self::PiercingLine
             | Self::MorningStar
-            | Self::ThreeWhiteSoldiers => Direction::Bullish,
+            | Self::ThreeWhiteSoldiers
+            | Self::BullishMarubozu
+            | Self::TweezerBottom
+            | Self::ThreeInsideUp
+            | Self::BullishKicker
+            | Self::BullishAbandonedBaby => Direction::Bullish,
             _ => Direction::Bearish,
         }
     }
@@ -159,6 +192,16 @@ impl Shape {
             && self.upper >= 2.0 * self.body
             && self.upper >= 0.6 * self.range
             && self.lower <= 0.15 * self.range
+    }
+    fn marubozu(&self, atr: f64) -> bool {
+        self.range > 0.0 && self.body >= LONG_BODY_ATR * atr && self.body >= 0.9 * self.range
+    }
+    fn spinning_top(&self, atr: f64) -> bool {
+        self.range >= 0.5 * atr
+            && self.body > 0.1 * self.range
+            && self.body <= 0.3 * self.range
+            && self.upper >= self.body
+            && self.lower >= self.body
     }
     fn doji(&self, atr: f64) -> bool {
         // Same minimum size as the hammer family, so quiet bars are not dojis.
@@ -256,6 +299,20 @@ pub fn detect(c: &[Candle], atr: &[f64]) -> Vec<Pattern> {
             {
                 push(PatternKind::ThreeBlackCrows, i - 2, i, trend, limited);
             }
+            let inside = y.top() <= x.top() && y.bottom() >= x.bottom() && y.body <= 0.6 * x.body;
+            if x.bear() && long_x && y.bull() && inside && cur.bull() && cur.c > x.o {
+                push(PatternKind::ThreeInsideUp, i - 2, i, trend, limited);
+            }
+            if x.bull() && long_x && y.bear() && inside && cur.bear() && cur.c < x.o {
+                push(PatternKind::ThreeInsideDown, i - 2, i, trend, limited);
+            }
+            let baby = y.range > 0.0 && y.body <= 0.1 * y.range;
+            if x.bear() && long_x && baby && c[i - 1].h < c[i - 2].l && cur.bull() && c[i].l > c[i - 1].h && cur.c > x.mid() {
+                push(PatternKind::BullishAbandonedBaby, i - 2, i, trend, limited);
+            }
+            if x.bull() && long_x && baby && c[i - 1].l > c[i - 2].h && cur.bear() && c[i].h < c[i - 1].l && cur.c < x.mid() {
+                push(PatternKind::BearishAbandonedBaby, i - 2, i, trend, limited);
+            }
         }
 
         // Two-candle patterns.
@@ -282,10 +339,31 @@ pub fn detect(c: &[Candle], atr: &[f64]) -> Vec<Pattern> {
             if p.bull() && long_p && cur.bear() && cur.o > p.c && cur.c < p.mid() && cur.c > p.o {
                 push(PatternKind::DarkCloudCover, i - 1, i, trend, limited);
             }
+            let solid = p.body >= 0.3 * a && cur.body >= 0.3 * a;
+            if p.bull() && cur.bear() && solid && (c[i - 1].h - c[i].h).abs() <= 0.1 * a {
+                push(PatternKind::TweezerTop, i - 1, i, trend, limited);
+            }
+            if p.bear() && cur.bull() && solid && (c[i - 1].l - c[i].l).abs() <= 0.1 * a {
+                push(PatternKind::TweezerBottom, i - 1, i, trend, limited);
+            }
+            let long_cur = cur.body >= LONG_BODY_ATR * a;
+            if p.bear() && long_p && cur.bull() && long_cur && cur.o > p.o {
+                push(PatternKind::BullishKicker, i - 1, i, trend, limited);
+            }
+            if p.bull() && long_p && cur.bear() && long_cur && cur.o < p.o {
+                push(PatternKind::BearishKicker, i - 1, i, trend, limited);
+            }
+        }
+
+        let (trend, limited) = prior_trend(c, atr, i);
+        if cur.marubozu(a) {
+            push(if cur.bull() { PatternKind::BullishMarubozu } else { PatternKind::BearishMarubozu }, i, i, trend, limited);
+        }
+        if cur.spinning_top(a) {
+            push(PatternKind::SpinningTop, i, i, trend, limited);
         }
 
         // Single-candle patterns, named by the prior trend.
-        let (trend, limited) = prior_trend(c, atr, i);
         if trend == Trend::Flat {
             continue;
         }
@@ -419,6 +497,69 @@ mod tests {
             candle(98.0, 98.2, 94.8, 95.0),
         ]);
         assert!(has(&c, PatternKind::ThreeBlackCrows));
+    }
+
+    #[test]
+    fn marubozu() {
+        assert!(has(&after_down(&[candle(98.0, 101.0, 98.0, 101.0)]), PatternKind::BullishMarubozu));
+        assert!(has(&after_up(&[candle(102.0, 102.0, 99.0, 99.0)]), PatternKind::BearishMarubozu));
+    }
+
+    #[test]
+    fn spinning_top_is_neutral() {
+        let c = after_up(&[candle(102.0, 104.0, 100.0, 102.5)]);
+        assert!(kinds_at_end(&c).contains(&(PatternKind::SpinningTop, false)));
+        let a = atr_of(&c, 14);
+        let p = detect(&c, &a).into_iter().find(|p| p.kind == PatternKind::SpinningTop).unwrap();
+        assert_eq!(p.direction, Direction::Neutral);
+    }
+
+    #[test]
+    fn tweezers() {
+        let c = after_up(&[candle(102.0, 105.0, 101.8, 104.8), candle(104.5, 105.0, 101.0, 101.5)]);
+        assert!(has(&c, PatternKind::TweezerTop));
+        let c = after_down(&[candle(98.0, 98.2, 95.0, 95.2), candle(95.5, 99.0, 95.0, 98.5)]);
+        assert!(has(&c, PatternKind::TweezerBottom));
+    }
+
+    #[test]
+    fn three_inside_up_and_down() {
+        let c = after_down(&[
+            candle(99.0, 99.5, 93.5, 94.0),
+            candle(95.0, 96.5, 94.5, 96.0),
+            candle(96.0, 99.8, 95.8, 99.5),
+        ]);
+        assert!(has(&c, PatternKind::ThreeInsideUp));
+        let c = after_up(&[
+            candle(101.0, 106.5, 100.5, 106.0),
+            candle(105.0, 105.5, 103.5, 104.0),
+            candle(104.0, 104.2, 100.2, 100.5),
+        ]);
+        assert!(has(&c, PatternKind::ThreeInsideDown));
+    }
+
+    #[test]
+    fn kickers() {
+        let c = after_down(&[candle(99.0, 99.5, 94.0, 94.5), candle(100.0, 105.0, 99.8, 104.5)]);
+        assert!(has(&c, PatternKind::BullishKicker));
+        let c = after_up(&[candle(101.0, 106.5, 100.5, 106.0), candle(100.0, 100.2, 95.0, 95.5)]);
+        assert!(has(&c, PatternKind::BearishKicker));
+    }
+
+    #[test]
+    fn abandoned_baby() {
+        let c = after_down(&[
+            candle(99.0, 99.5, 93.5, 94.0),
+            candle(92.0, 93.0, 91.0, 92.1),
+            candle(94.0, 98.0, 93.5, 97.5),
+        ]);
+        assert!(has(&c, PatternKind::BullishAbandonedBaby));
+        let c = after_up(&[
+            candle(101.0, 106.5, 100.5, 106.0),
+            candle(108.0, 109.0, 107.0, 108.1),
+            candle(106.5, 106.8, 102.0, 102.5),
+        ]);
+        assert!(has(&c, PatternKind::BearishAbandonedBaby));
     }
 
     #[test]
