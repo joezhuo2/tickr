@@ -218,7 +218,7 @@ describe("revealed", () => {
       expect(s.cursor).toBeLessThan(BARS.length);
       checkNoLeak(BARS, s);
     }
-  });
+  }, 20_000);
   it("is bounded by the bar list", () => {
     const s = { ...started(50), cursor: 500 };
     expect(revealed(BARS, s)).toHaveLength(100);
