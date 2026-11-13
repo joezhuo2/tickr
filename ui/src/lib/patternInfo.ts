@@ -65,10 +65,48 @@ export const PATTERN_INFO: Record<PatternKind, PatternInfo> = {
   bearish_abandoned_baby: { name: "Bearish abandoned baby", bias: "bearish", text: "A doji gapped fully above an up candle and below the next down candle, isolated by gaps. A rare, strong top signal." },
 };
 
+export const CHART_PATTERN_KINDS = [
+  "head_and_shoulders",
+  "inverse_head_and_shoulders",
+  "double_top",
+  "double_bottom",
+  "triple_top",
+  "triple_bottom",
+  "ascending_triangle",
+  "descending_triangle",
+  "symmetrical_triangle",
+  "bull_flag",
+  "bear_flag",
+  "rising_wedge",
+  "falling_wedge",
+] as const;
+
+export type ChartPatternKind = (typeof CHART_PATTERN_KINDS)[number];
+
+export const CHART_PATTERN_INFO: Record<ChartPatternKind, PatternInfo> = {
+  head_and_shoulders: { name: "Head and shoulders", bias: "bearish", text: "Three peaks with the middle one highest, resting on a neckline through the two troughs. A close below the neckline completes a top." },
+  inverse_head_and_shoulders: { name: "Inverse head and shoulders", bias: "bullish", text: "Three troughs with the middle one lowest, under a neckline through the two peaks. A close above the neckline completes a bottom." },
+  double_top: { name: "Double top", bias: "bearish", text: "Two peaks at about the same price with a trough between. Buyers failed twice; a close below the trough confirms the top." },
+  double_bottom: { name: "Double bottom", bias: "bullish", text: "Two troughs at about the same price with a peak between. Sellers failed twice; a close above the peak confirms the bottom." },
+  triple_top: { name: "Triple top", bias: "bearish", text: "Three peaks at about the same price. Resistance held three times; a close below the troughs between them confirms the top." },
+  triple_bottom: { name: "Triple bottom", bias: "bullish", text: "Three troughs at about the same price. Support held three times; a close above the peaks between them confirms the bottom." },
+  ascending_triangle: { name: "Ascending triangle", bias: "bullish", text: "Flat highs and rising lows squeeze price against resistance. Buyers are getting more eager; a close above the highs is the usual breakout." },
+  descending_triangle: { name: "Descending triangle", bias: "bearish", text: "Flat lows and falling highs squeeze price against support. Sellers are getting more eager; a close below the lows is the usual breakdown." },
+  symmetrical_triangle: { name: "Symmetrical triangle", bias: "neutral", text: "Falling highs and rising lows converge as the range tightens. Neither side leads; the breakout direction sets the next move." },
+  bull_flag: { name: "Bull flag", bias: "bullish", text: "A sharp rise (the pole) followed by a small, flat or downward-sloping channel. A close above the channel suggests the rise resumes." },
+  bear_flag: { name: "Bear flag", bias: "bearish", text: "A sharp drop (the pole) followed by a small, flat or upward-sloping channel. A close below the channel suggests the drop resumes." },
+  rising_wedge: { name: "Rising wedge", bias: "bearish", text: "Highs and lows both rise but the lows rise faster, so the range narrows. Buying is losing steam; it usually breaks down." },
+  falling_wedge: { name: "Falling wedge", bias: "bullish", text: "Highs and lows both fall but the highs fall faster, so the range narrows. Selling is losing steam; it usually breaks up." },
+};
+
 export function isPatternKind(kind: string): kind is PatternKind {
   return (PATTERN_KINDS as readonly string[]).includes(kind);
 }
 
+export function isChartPatternKind(kind: string): kind is ChartPatternKind {
+  return (CHART_PATTERN_KINDS as readonly string[]).includes(kind);
+}
+
 export function patternInfo(kind: string): PatternInfo | null {
-  return isPatternKind(kind) ? PATTERN_INFO[kind] : null;
+  return isPatternKind(kind) ? PATTERN_INFO[kind] : isChartPatternKind(kind) ? CHART_PATTERN_INFO[kind] : null;
 }
