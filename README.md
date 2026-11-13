@@ -334,8 +334,15 @@ taskbar to keep it visible.
   above); the entry condition then only arms the order. The **ORB example**
   link fills in a 15-minute opening range breakout. A stop-loss can trigger on
   the entry bar, since the order of prices inside one candle is unknown. The report lists
-  each trade with win rate, total return, max drawdown, average trade and a
-  buy-and-hold comparison, and marks trades on the chart.
+  each trade with win rate, total return, max drawdown, average trade, profit
+  factor, an annualized Sharpe ratio (per-bar equity returns, no risk-free
+  rate) and a buy-and-hold comparison, draws an equity curve with a drawdown
+  strip and a hover readout, and marks trades on the chart. The **Parameter
+  sweep** runs the rules across a from/to/step grid of one or two numbers in
+  the rules (indicator periods, thresholds, stop-loss, take-profit), up to 400
+  runs, into a table you can sort by return, profit factor, Sharpe, drawdown,
+  win rate or trades, plus a heatmap for two parameters; click a row or cell to
+  apply those values.
 
 ### Views
 
