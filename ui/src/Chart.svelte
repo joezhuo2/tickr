@@ -17,6 +17,7 @@
   import { studies } from "./lib/studyStore.svelte";
   import { displayCandles, isOhlc } from "./lib/charttypes";
   import { fadeIn } from "./lib/motion";
+  import { patternInfo } from "./lib/patternInfo";
   import ColorPicker from "./ColorPicker.svelte";
   import { MAIN_PRESETS } from "./lib/display";
   import { NOTE_MAX, noteBar, noteTitle, snapNoteTime } from "./lib/notes";
@@ -45,6 +46,7 @@
     onwindow,
     replay = false,
     fills = [],
+    highlight = null,
     orderLines = [],
     onmoveorder,
     onolder,
@@ -73,6 +75,7 @@
     onwindow?: (w: TimeWindow) => void;
     replay?: boolean;
     fills?: { t: number; side: "buy" | "sell"; price: number }[];
+    highlight?: { from: number; to: number } | null;
     orderLines?: { id: string; price: number; side: "buy" | "sell"; label: string }[];
     onmoveorder?: (id: string, price: number) => void;
   } = $props();
@@ -353,6 +356,19 @@
     const g = geo;
     const bottom = height - PAD.b;
     ctx.font = `11px ${v("--font")}`;
+
+    if (highlight) {
+      const i = indexOf.get(highlight.from);
+      const j = indexOf.get(highlight.to);
+      if (i != null && j != null) {
+        clipPlot(ctx);
+        ctx.globalAlpha = 0.14;
+        ctx.fillStyle = v("--accent");
+        ctx.fillRect(g.x(i) - g.step / 2, PAD.t, g.step * (j - i + 1), bottom - PAD.t);
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+    }
 
     // Extended-hours shading.
     if (shadeSessions && hasExtended) {
@@ -1231,7 +1247,7 @@
 
   $effect(() => {
     // Redraw when any of these change.
-    void [rr.reward, stoch, ichi, trendLine, onBalance, pivotLevels, sessionKeys, redrawKey, list, preview, selected, tool, hideDrawings, orderLines, orderDrag, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt, fillMarks];
+    void [rr.reward, stoch, ichi, trendLine, onBalance, pivotLevels, sessionKeys, redrawKey, list, preview, selected, tool, hideDrawings, orderLines, orderDrag, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt, fillMarks, highlight];
     draw();
   });
 
@@ -2212,6 +2228,8 @@
       {#if tip.split}<div class="split">● Split {tip.split}</div>{/if}
       {#each tip.pats as p (p.kind)}
         <div class="pat {p.direction === 'bullish' ? 'up' : 'down'}">{p.direction === "bullish" ? "▲" : "▼"} {p.name}</div>
+        {@const info = patternInfo(p.kind)}
+        {#if info}<div class="pat-info">{info.bias} · {info.text}</div>{/if}
       {/each}
     </div>
   {/if}
@@ -2477,6 +2495,11 @@
   .pat {
     margin-top: 3px;
     font-weight: 600;
+  }
+  .pat-info {
+    max-width: 260px;
+    white-space: normal;
+    color: var(--muted);
   }
   .earn {
     margin-top: 3px;
