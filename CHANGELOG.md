@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.73] - 2026-11-13
+
+### Added
+- **More studies:** WMA, Hull MA, VWMA, ZigZag and a linear regression channel
+  over the price, and Stoch RSI, Aroon, CMF and ROC in their own panes. Their
+  parameters are under Indicator settings and they are saved and included in
+  Backup like the other studies.
+
 ## [0.11.72] - 2026-11-12
 
 ### Added
