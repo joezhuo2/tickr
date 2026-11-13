@@ -297,7 +297,12 @@ taskbar to keep it visible.
   your watchlist or a group, using the candle interval and date range you pick.
   Choose **Long**, **Short** or **Skip** with future candles hidden. Close at a
   revealed candle's close to see your return, bars held and how you did against
-  skipping the trade.
+  skipping the trade. Saved runs feed a **Practice stats** section with trades,
+  win rate, average R, expectancy, profit factor and win/loss streaks, broken
+  down by symbol and by tag, plus a filterable trade history where you can add
+  tags (such as a setup name) and a note to each trade. R is the trade's return
+  divided by the 14-bar ATR at the decision candle, since practice trades have
+  no stop.
 - **Strategy backtesting** (`.`) runs entry and exit rules over the loaded
   chart. Build conditions from menus or type expressions such as
   `crosses_above(sma(20), sma(50)) and rsi(14) < 70`, using price fields,

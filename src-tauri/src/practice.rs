@@ -8,6 +8,9 @@ use crate::settings::{validate_drawing_list, Drawing};
 
 pub const MAX_RUNS: usize = 200;
 pub const MAX_CANDLES: usize = 500;
+pub const MAX_NOTE: usize = 2000;
+pub const MAX_TAGS: usize = 8;
+pub const MAX_TAG_LEN: usize = 32;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PracticeTrade {
@@ -41,6 +44,10 @@ pub struct PracticeRun {
     pub candles: Vec<Candle>,
     #[serde(default)]
     pub drawings: Vec<Drawing>,
+    #[serde(default)]
+    pub note: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -81,6 +88,12 @@ impl PracticeRun {
         }
         if !self.return_pct.is_finite() || self.market_pct.is_some_and(|v| !v.is_finite()) {
             return Err("Invalid practice result".into());
+        }
+        if self.note.chars().count() > MAX_NOTE || self.note.chars().any(|c| c.is_control() && c != '\n') {
+            return Err("Invalid practice note".into());
+        }
+        if self.tags.len() > MAX_TAGS || self.tags.iter().any(|t| t.trim().is_empty() || !short(t, MAX_TAG_LEN)) {
+            return Err("Invalid practice tags".into());
         }
         validate_drawing_list(&self.drawings)
     }
@@ -162,6 +175,8 @@ mod tests {
             market_pct: None,
             candles: (0..3).map(|i| Candle { t: 100 + i, o: 10.0, h: 11.0, l: 9.0, c: 10.5, v: 1000.0 }).collect(),
             drawings: Vec::new(),
+            note: String::new(),
+            tags: Vec::new(),
         }
     }
 
@@ -198,6 +213,11 @@ mod tests {
             |r| r.candles[1].t = 99,
             |r| r.candles.truncate(1),
             |r| r.candles = vec![r.candles[0]; MAX_CANDLES + 1],
+            |r| r.note = "x".repeat(MAX_NOTE + 1),
+            |r| r.note = "a\u{7}b".into(),
+            |r| r.tags = vec![" ".into()],
+            |r| r.tags = vec!["t".into(); MAX_TAGS + 1],
+            |r| r.tags = vec!["x".repeat(MAX_TAG_LEN + 1)],
         ];
         for edit in invalid {
             let mut r = sample();
