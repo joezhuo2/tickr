@@ -8,8 +8,9 @@
   import Search from "./Search.svelte";
   import { aggregateChart } from "./lib/aggregate";
   import { secondaryDefaults, type TimeWindow } from "./lib/chartsync";
+  import { chartAt } from "./lib/replay";
   import { isIntraday } from "./lib/session";
-  import { RANGES, baseFor, validInterval, type Chart, type ChartLayout, type ChartMode, type ChartScale, type ChartTimeZone, type Drawing, type RefreshMode } from "./lib/types";
+  import { RANGES, baseFor, validInterval, type Candle, type Chart, type ChartLayout, type ChartMode, type ChartScale, type ChartTimeZone, type Drawing, type RefreshMode } from "./lib/types";
 
   let {
     layout,
@@ -28,6 +29,8 @@
     drawings,
     drawingBusy,
     saveDrawings,
+    replayAt = null,
+    finer = [],
     linkedTime = null,
     onhovertime,
     linkedWindow = null,
@@ -50,6 +53,8 @@
     drawings: Record<string, Drawing[]>;
     drawingBusy: boolean;
     saveDrawings: (symbol: string, drawings: Drawing[]) => Promise<boolean>;
+    replayAt?: number | null;
+    finer?: Candle[];
     linkedTime?: number | null;
     onhovertime?: (t: number | null) => void;
     linkedWindow?: TimeWindow | null;
@@ -65,6 +70,7 @@
   const key = $derived(`${symbol}|${range}|${interval}|${extended && range === "1d"}`);
 
   let chart = $state<Chart | null>(null);
+  const shown = $derived(chart && replayAt != null ? chartAt(chart, replayAt, layout.symbol ? [] : finer) : chart);
   let error = $state<string | null>(null);
   let loading = $state(false);
   let at = 0;
@@ -160,8 +166,10 @@
     <IntervalPicker label="Second chart interval" value={interval} recent={recentIntervals} onchange={chooseInterval} />
     {#if loading}<span class="spin" aria-label="Loading"></span>{/if}
   </div>
-  {#if chart}
-    <ChartView {redrawKey} {chart} {mode} {scale} {shadeSessions} {timeZone} {drawings} {drawingBusy} {saveDrawings} {linkedTime} {onhovertime} {linkedWindow} {onwindow} />
+  {#if shown}
+    <ChartView {redrawKey} chart={shown} {mode} {scale} {shadeSessions} {timeZone} {drawings} {drawingBusy} {saveDrawings} {linkedTime} {onhovertime} {linkedWindow} {onwindow} replay={replayAt != null} />
+  {:else if chart}
+    <div class="msg">No {symbol} candles at the replay moment</div>
   {:else if error}
     <div class="msg">
       {error}

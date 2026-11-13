@@ -8,6 +8,7 @@
     min,
     max,
     when,
+    note = null,
     onstart,
     ontoggle,
     onstep,
@@ -22,6 +23,7 @@
     min: string;
     max: string;
     when: string;
+    note?: string | null;
     onstart: (value: string) => void;
     ontoggle: () => void;
     onstep: () => void;
@@ -80,7 +82,7 @@
       <option value={s}>{s}x</option>
     {/each}
   </select>
-  <span class="when" role="status">{when}{#if end} · end of data{/if}</span>
+  <span class="when" role="status">{when}{#if end} · end of data{/if}{#if note} · {note}{/if}</span>
   <span class="count">{state.cursor - state.start + 1} / {state.total - state.start}</span>
   <button class="exit" title={practice ? "Exit practice (Esc)" : "Exit replay (Esc)"} onclick={onexit}>Exit</button>
 </div>

@@ -138,8 +138,8 @@ describe("chart_replay", () => {
     expect(bindKey(down("Escape"))).toBeNull();
   });
   it("blocks panels and the second chart during replay but allows drawing", () => {
-    for (const id of ["chart_replay", "chart_mode", "chart_scale", "technicals", "paper", "analyze", "settings", "draw_level", "draw_pen", "draw_note", "draw_avwap"] as const) expect(replayAllows(id)).toBe(true);
-    for (const id of ["news", "earnings", "analysts", "options", "market", "events", "alerts", "toggle_watchlist", "chart_split"] as const) expect(replayAllows(id)).toBe(false);
+    for (const id of ["chart_replay", "chart_mode", "chart_scale", "technicals", "paper", "analyze", "settings", "draw_level", "draw_pen", "draw_note", "draw_avwap", "chart_split"] as const) expect(replayAllows(id)).toBe(true);
+    for (const id of ["news", "earnings", "analysts", "options", "market", "events", "alerts", "toggle_watchlist"] as const) expect(replayAllows(id)).toBe(false);
   });
 });
 

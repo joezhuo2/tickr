@@ -4,6 +4,7 @@ import {
   MIN_CONTEXT,
   SPEEDS,
   canReplay,
+  chartAt,
   cutoff,
   isAtEnd,
   known,
@@ -11,7 +12,10 @@ import {
   pause,
   play,
   revealed,
+  revealedAt,
+  seekTime,
   setSpeed,
+  settled,
   startAt,
   startIndex,
   step,
@@ -232,5 +236,111 @@ describe("cutoff and known", () => {
     const events = [{ t: at(10) }, { t: at(50) + 3600 }, { t: at(51) }, { t: at(80) }];
     expect(known(events, (e) => e.t, cutoff(BARS, s))).toEqual(events.slice(0, 2));
     expect(known(events, (e) => e.t, cutoff(BARS, step(s)))).toEqual(events.slice(0, 3));
+  });
+});
+
+const HOUR = 3600;
+const OPEN = 1_700_000_000 + 9.5 * HOUR;
+const HOURLY = Array.from({ length: 30 * 7 }, (_, i) => {
+  const p = 100 + Math.sin(i) * 5 + i * 0.1;
+  return { t: OPEN + Math.floor(i / 7) * DAY + (i % 7) * HOUR, o: p, h: p + 1 + (i % 3), l: p - 1 - (i % 2), c: p + 0.5, v: 10 + i };
+});
+const merge = (list: typeof HOURLY, t: number) => list.slice(1).reduce((b, f) => ({ ...b, h: Math.max(b.h, f.h), l: Math.min(b.l, f.l), c: f.c, v: b.v + f.v }), { ...list[0], t });
+const DAILY = Array.from({ length: 30 }, (_, d) => merge(HOURLY.slice(d * 7, d * 7 + 7), OPEN + d * DAY));
+
+describe("seekTime", () => {
+  it("maps the replay moment to the last bar before it", () => {
+    expect(seekTime(DAILY, DAILY[10].t)).toEqual({ total: 30, start: 9, cursor: 9, playing: false, speed: 1, elapsed: 0 });
+    expect(seekTime(HOURLY, DAILY[10].t, 5, true)).toEqual({ total: HOURLY.length, start: 69, cursor: 69, playing: true, speed: 5, elapsed: 0 });
+  });
+  it("marks a higher-timeframe bar still forming at the moment", () => {
+    const s = seekTime(DAILY, HOURLY[73].t)!;
+    expect(s.cursor).toBe(10);
+    expect(s.forming).toBe(HOURLY[73].t);
+    expect(cutoff(DAILY, s)).toBe(HOURLY[73].t);
+    expect(isAtEnd(s)).toBe(false);
+    expect(settled(s)).toBe(9);
+  });
+  it("lands at the end for an unbounded moment and refuses data that starts after it", () => {
+    const end = seekTime(DAILY, Infinity, 1, true)!;
+    expect(end.cursor).toBe(29);
+    expect(isAtEnd(end)).toBe(true);
+    expect(end.playing).toBe(false);
+    expect(seekTime(DAILY, DAILY[1].t)).toBeNull();
+    expect(seekTime(DAILY, DAILY[0].t)).toBeNull();
+    expect(seekTime(DAILY, NaN)).toBeNull();
+  });
+  it("finishes the forming bar on the first step, then moves bar by bar", () => {
+    const s = seekTime(DAILY, HOURLY[73].t)!;
+    const done = step(s);
+    expect(done.cursor).toBe(10);
+    expect(done.forming).toBeUndefined();
+    expect(cutoff(DAILY, done)).toBe(DAILY[11].t);
+    expect(step(done).cursor).toBe(11);
+    expect(tick(play(s), 1000).cursor).toBe(10);
+    expect(tick(play(s), 2000).cursor).toBe(11);
+  });
+  it("never steps back into the forming bar's close", () => {
+    const s = seekTime(DAILY, HOURLY[73].t)!;
+    expect(stepBack(s).forming).toBe(s.forming);
+    expect(stepBack(s).cursor).toBe(10);
+    const later = { ...s, start: 5 };
+    expect(stepBack(later)).toMatchObject({ cursor: 9, forming: undefined });
+  });
+});
+
+describe("revealedAt", () => {
+  it("shows whole bars up to an aligned moment", () => {
+    expect(revealedAt(DAILY, DAILY[10].t, HOURLY)).toEqual(DAILY.slice(0, 10));
+    expect(revealedAt(DAILY, Infinity)).toEqual(DAILY);
+    expect(revealedAt(DAILY, DAILY[0].t)).toEqual([]);
+  });
+  it("builds a forming bar from the finer bars before the moment", () => {
+    const shown = revealedAt(DAILY, HOURLY[73].t, HOURLY);
+    expect(shown).toHaveLength(11);
+    expect(shown[10]).toEqual(merge(HOURLY.slice(70, 73), DAILY[10].t));
+    expect(shown[10].c).toBe(HOURLY[72].c);
+    expect(shown[10].c).not.toBe(DAILY[10].c);
+  });
+  it("drops a forming bar it cannot build", () => {
+    expect(revealedAt(DAILY, HOURLY[73].t)).toEqual(DAILY.slice(0, 10));
+    expect(revealedAt(DAILY, HOURLY[73].t, HOURLY.slice(71))).toEqual(DAILY.slice(0, 10));
+    expect(revealedAt(HOURLY, DAILY[10].t + 1, DAILY)).toEqual(HOURLY.slice(0, 70));
+  });
+  it("never leaks data from after the moment on either timeframe", () => {
+    let seed = 11;
+    const rand = () => (seed = (seed * 1_103_515_245 + 12_345) % 2 ** 31) / 2 ** 31;
+    for (let k = 0; k < 500; k++) {
+      const at = OPEN + Math.floor(rand() * 31 * DAY) - DAY / 2;
+      const fine = revealedAt(HOURLY, at);
+      for (const f of fine) expect(f.t + HOUR).toBeLessThanOrEqual(at);
+      const coarse = revealedAt(DAILY, at, fine);
+      for (const bar of coarse) {
+        const day = fine.filter((f) => f.t >= bar.t && f.t < bar.t + DAY);
+        expect(day.length).toBeGreaterThan(0);
+        expect(bar).toEqual(merge(day, bar.t));
+      }
+    }
+  });
+});
+
+describe("chartAt", () => {
+  it("cuts candles, dividends and splits at the moment and prices at the last shown bar", () => {
+    const base = {
+      source: "test",
+      meta: { symbol: "T", name: "T", exchange: "X", currency: "USD", price: 999, prev_close: null, gmtoffset: 0 },
+      range: "1mo",
+      interval: "1d",
+      candles: DAILY,
+      dividends: [{ t: DAILY[5].t, amount: 1 }, { t: DAILY[20].t, amount: 1 }],
+      splits: [{ t: HOURLY[74].t, ratio: "2:1" }],
+    } as unknown as import("./types").Chart;
+    const c = chartAt(base, HOURLY[73].t, HOURLY)!;
+    expect(c.candles).toHaveLength(11);
+    expect(c.meta.price).toBe(HOURLY[72].c);
+    expect(c.last_bar_time).toBe(DAILY[10].t);
+    expect(c.dividends).toHaveLength(1);
+    expect(c.splits).toHaveLength(0);
+    expect(chartAt(base, DAILY[0].t)).toBeNull();
   });
 });
