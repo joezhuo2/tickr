@@ -427,6 +427,13 @@ export interface EarningsReport {
   eps_estimate: number | null;
   surprise_pct: number | null;
   revenue: number | null;
+  period_end: string | null;
+}
+
+export interface EarningsOlder {
+  date: string;
+  eps_actual: number;
+  revenue: number | null;
 }
 
 export interface Earnings {
@@ -441,6 +448,7 @@ export interface Earnings {
     revenue_estimate: number | null;
   } | null;
   history: EarningsReport[];
+  older: EarningsOlder[];
 }
 
 export interface FinancialPeriod {
@@ -450,6 +458,7 @@ export interface FinancialPeriod {
   gross_profit: number | null;
   operating_income: number | null;
   free_cash_flow: number | null;
+  items: Record<string, number>;
 }
 
 export interface Financials {

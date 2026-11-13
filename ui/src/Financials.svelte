@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { barLayout, hasData, lineLayout, marginSeries, money, percent, periodLabel, tableRows, volumeSeries, type Frequency } from "./lib/financials";
+  import { barLayout, hasData, lineLayout, marginSeries, money, percent, periodLabel, statementRows, STATEMENTS, volumeSeries, type Frequency, type Statement } from "./lib/financials";
   import type { Financials } from "./lib/types";
 
   let {
@@ -21,10 +21,11 @@
   };
 
   let chosen = $state<Frequency | null>(null);
+  let statement = $state<Statement>("overview");
   const frequency = $derived<Frequency>(chosen ?? (financials && !hasData(financials.annual) && hasData(financials.quarterly) ? "quarterly" : "annual"));
   const periods = $derived(financials ? financials[frequency] : []);
   const labels = $derived(periods.map((p) => periodLabel(p.date, frequency)));
-  const rows = $derived(tableRows(periods));
+  const rows = $derived(statementRows(periods, statement));
   const flows = $derived(volumeSeries(periods).filter((s) => s.values.some((v) => v != null)));
   const margins = $derived(marginSeries(periods));
   const bars = $derived(barLayout(flows.map((s) => s.values), W, H));
@@ -53,6 +54,11 @@
 {:else}
   <div class="panel">
     <div class="head">
+      <div class="seg" role="group" aria-label="Statement">
+        {#each STATEMENTS as s (s.key)}
+          <button class:on={statement === s.key} aria-pressed={statement === s.key} onclick={() => (statement = s.key)}>{s.label}</button>
+        {/each}
+      </div>
       <div class="seg" role="group" aria-label="Period">
         <button class:on={frequency === "annual"} aria-pressed={frequency === "annual"} onclick={() => (chosen = "annual")}>Annual</button>
         <button class:on={frequency === "quarterly"} aria-pressed={frequency === "quarterly"} onclick={() => (chosen = "quarterly")}>Quarterly</button>
@@ -63,6 +69,7 @@
       <div class="none">No {frequency} data for {symbol}</div>
     {:else}
       {#key frequency}
+      {#if statement === "overview"}
       <div class="charts">
         <figure>
           <figcaption>
@@ -99,6 +106,7 @@
           </figure>
         {/if}
       </div>
+      {/if}
       <div class="scroll">
         <table>
           <thead>
@@ -292,6 +300,9 @@
   thead th:first-child,
   tbody th {
     padding-left: 0;
+    position: sticky;
+    left: 0;
+    background: var(--bg);
   }
   .down {
     color: var(--down);

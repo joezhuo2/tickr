@@ -544,15 +544,18 @@ it is instant.
   hours; ETFs, indices and crypto have no coverage.
 - **Earnings:** the next report date (confirmed or estimated) with EPS and
   revenue estimates, and the last four quarters with estimate, actual and
-  surprise % (green beat, red miss).
+  surprise % (green beat, red miss). Older quarters follow, up to 12 in all,
+  with the reported EPS and revenue only (estimate and surprise show as —).
 - **Stats:** key statistics in Valuation, Trading, Dividends & splits, Shares
   & short interest, Profitability and Financials. ETFs get a Fund section and
   crypto a Crypto section. Changes, growth and returns are green or red.
 - **Financials** (below the statistics in Stats): revenue, net income, free cash flow and gross, operating and
   net margins over the reported periods, with an Annual / Quarterly toggle, two
-  small trend charts and a table. Margins are computed from revenue, and
-  figures Yahoo does not report show as —. Cached for 12 hours; ETFs, indices
-  and crypto have no statements.
+  small trend charts and a table. Switch from Overview to the full Income,
+  Balance sheet or Cash flow statement: line items as rows, periods as columns,
+  scrolling sideways when narrow. Margins are computed from revenue, and
+  figures Yahoo does not report show as — (lines with no data are hidden).
+  Cached for 12 hours; ETFs, indices and crypto have no statements.
 - **News feed:** choose Watchlist or a named group in News to combine headlines,
   deduplicate stories and filter by ticker, publisher and topic.
 - **News:** the 20 latest headlines, newest first, with publisher, time and a
@@ -882,8 +885,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.80
-git push origin v0.11.80
+git tag v0.11.81
+git push origin v0.11.81
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
@@ -979,7 +982,7 @@ src-tauri/src/
   calendar.rs   Yahoo quoteSummary calendarEvents: earnings and ex-dividend dates per watchlist symbol, 6 h cache
   grades.rs     Yahoo quoteSummary: analyst upgrades, downgrades and initiations
   stats.rs      Yahoo quoteSummary: key statistics in labeled sections
-  financials.rs Yahoo fundamentals-timeseries: annual and quarterly revenue, net income, gross and operating profit, free cash flow, 12 h cache
+  financials.rs Yahoo fundamentals-timeseries: annual and quarterly income statement, balance sheet and cash flow line items, 12 h cache
   market.rs     Yahoo batch quotes and screeners: indices, macro, sectors, top movers
   news.rs       Yahoo search news: 20 latest headlines, newest first, web links only
   sentiment.rs  headline tone (positive, negative, neutral) from a financial keyword list
