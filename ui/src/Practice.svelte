@@ -2,6 +2,7 @@
   import { direction, newsDate, price, signed } from "./lib/format";
   import { localOffset } from "./lib/freshness";
   import { INTERVALS, INTERVAL_LABELS, RANGES, isInterval, rangesFor, scopes, validSetup, type Decision, type Exercise, type Result, type SavedRun, type Setup, type Summary } from "./lib/practice";
+  import { breakdown, computeStats, filterRows, parseTags, tradeRows, type TradeRow } from "./lib/practiceStats";
   import type { Group } from "./lib/types";
 
   let {
@@ -31,6 +32,7 @@
     onsave,
     onopen,
     ondelete,
+    onannotate,
   }: {
     setup: Setup;
     groups: Group[];
@@ -58,9 +60,35 @@
     onsave: () => void;
     onopen: (run: SavedRun) => void;
     ondelete: (id: number) => void;
+    onannotate: (id: number, note: string, tags: string[]) => void;
   } = $props();
 
   let confirming = $state<number | null>(null);
+  let editing = $state<number | null>(null);
+  let noteDraft = $state("");
+  let tagDraft = $state("");
+  let symbolFilter = $state("");
+  let tagFilter = $state("");
+
+  const rows = $derived(tradeRows(runs));
+  const stats = $derived(computeStats(rows));
+  const symbolGroups = $derived(breakdown(rows, "symbol"));
+  const tagGroups = $derived(breakdown(rows, "tag"));
+  const shown = $derived(filterRows(rows, symbolFilter, tagFilter).reverse());
+  const ratio = (v: number | null) => (v == null ? "—" : v === Infinity ? "∞" : v.toFixed(2));
+  const rText = (v: number | null) => (v == null ? "—" : `${signed(v, 2)}R`);
+  const rate = (v: number | null) => (v == null ? "—" : `${(v * 100).toFixed(0)}%`);
+
+  function edit(row: TradeRow) {
+    editing = row.id;
+    noteDraft = row.note;
+    tagDraft = row.tags.join(", ");
+  }
+
+  function commit(id: number) {
+    onannotate(id, noteDraft.trim(), parseTags(tagDraft));
+    editing = null;
+  }
 
   const LABELS: Record<Decision, string> = { long: "Long", short: "Short", skip: "Skip" };
   const rangeLabel = (id: string) => RANGES.find((r) => r.id === id)?.label ?? id;
@@ -136,6 +164,90 @@
             {/if}
           </div>
         {/each}
+      </div>
+    {/if}
+    {#if rows.length}
+      <div class="card runs stats" role="region" aria-label="Practice stats">
+        <span class="tag sim">Practice stats</span>
+        <dl class="totals">
+          <dt>Trades</dt>
+          <dd>{stats.trades}</dd>
+          <dt>Win rate</dt>
+          <dd>{rate(stats.winRate)}</dd>
+          <dt>Average R</dt>
+          <dd class={direction(stats.avgR)}>{rText(stats.avgR)}</dd>
+          <dt>Expectancy</dt>
+          <dd class={direction(stats.expectancy)}>{rText(stats.expectancy)}</dd>
+          <dt>Profit factor</dt>
+          <dd>{ratio(stats.profitFactor)}</dd>
+          <dt>Longest win streak</dt>
+          <dd>{stats.longestWin}</dd>
+          <dt>Longest loss streak</dt>
+          <dd>{stats.longestLoss}</dd>
+          <dt>Current streak</dt>
+          <dd>{stats.current ? `${stats.current.length} ${stats.current.outcome === "win" ? "won" : stats.current.outcome === "loss" ? "lost" : "even"}` : "—"}</dd>
+        </dl>
+        <span class="muted">R is the return divided by the 14-bar ATR at the decision candle.</span>
+        {#each [{ label: "By symbol", list: symbolGroups }, { label: "By setup / tag", list: tagGroups }] as g (g.label)}
+          {#if g.list.length}
+            <table aria-label={g.label}>
+              <thead><tr><th>{g.label}</th><th>Trades</th><th>Win</th><th>Avg R</th><th>Exp R</th></tr></thead>
+              <tbody>
+                {#each g.list as row (row.key)}
+                  <tr><td>{row.key}</td><td>{row.trades}</td><td>{rate(row.winRate)}</td><td>{rText(row.avgR)}</td><td>{rText(row.expectancy)}</td></tr>
+                {/each}
+              </tbody>
+            </table>
+          {/if}
+        {/each}
+        <div class="head">
+          <span class="tag sim">Trade history</span>
+          <select aria-label="Filter by symbol" bind:value={symbolFilter}>
+            <option value="">All symbols</option>
+            {#each symbolGroups as g (g.key)}<option value={g.key}>{g.key}</option>{/each}
+          </select>
+          <select aria-label="Filter by tag" bind:value={tagFilter}>
+            <option value="">All tags</option>
+            {#each tagGroups as g (g.key)}<option value={g.key}>{g.key}</option>{/each}
+          </select>
+        </div>
+        <table aria-label="Trade history">
+          <thead><tr><th>Symbol</th><th>Date</th><th>Dir</th><th>Entry</th><th>Exit</th><th>R</th><th>Result</th><th>Tags</th><th>Note</th><th></th></tr></thead>
+          <tbody>
+            {#each shown as t (t.id)}
+              <tr>
+                <td>{t.symbol}</td>
+                <td>{newsDate(t.saved, localOffset(t.saved))}</td>
+                <td>{LABELS[t.decision]}</td>
+                <td>{price(t.entry, t.currency)}</td>
+                <td>{price(t.exit, t.currency)}</td>
+                <td class={direction(t.r)}>{rText(t.r)}</td>
+                <td class={direction(t.pct)}>{pct(t.pct)}</td>
+                <td>{t.tags.join(", ")}</td>
+                <td class="note">{t.note}</td>
+                <td><button type="button" onclick={() => (editing === t.id ? (editing = null) : edit(t))}>{editing === t.id ? "Close" : "Edit"}</button></td>
+              </tr>
+              {#if editing === t.id}
+                <tr>
+                  <td colspan="10">
+                    <form
+                      class="head"
+                      onsubmit={(e) => {
+                        e.preventDefault();
+                        commit(t.id);
+                      }}
+                    >
+                      <input aria-label="Tags (comma separated, e.g. a setup name)" placeholder="Tags, e.g. breakout" maxlength="300" bind:value={tagDraft} />
+                      <textarea aria-label="Note" placeholder="Note" rows="2" maxlength="2000" bind:value={noteDraft}></textarea>
+                      <button class="primary" type="submit">Save</button>
+                    </form>
+                  </td>
+                </tr>
+              {/if}
+            {/each}
+          </tbody>
+        </table>
+        {#if !shown.length}<span class="muted">No trades match.</span>{/if}
       </div>
     {/if}
   {:else if !exercise.ended}
@@ -305,6 +417,45 @@
   }
   .down {
     color: var(--down);
+  }
+  .stats {
+    max-height: 360px;
+    overflow-x: auto;
+  }
+  .totals {
+    grid-template-columns: max-content max-content max-content max-content;
+  }
+  table {
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+  th,
+  td {
+    padding: 1px 8px 1px 0;
+    text-align: left;
+    white-space: nowrap;
+  }
+  th {
+    color: var(--muted);
+    font-weight: 400;
+  }
+  td.note {
+    white-space: normal;
+    max-width: 200px;
+  }
+  input,
+  textarea {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--faint);
+    border-radius: 6px;
+    padding: 2px 6px;
+    font: inherit;
+  }
+  textarea {
+    flex: 1;
+    min-width: 160px;
+    resize: vertical;
   }
   dl {
     display: grid;
