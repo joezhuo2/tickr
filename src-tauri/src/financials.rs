@@ -8,7 +8,50 @@ use crate::analyst::Analysts;
 use crate::state::lock;
 
 const URL: &str = "https://query1.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries";
-const METRICS: [&str; 5] = ["TotalRevenue", "NetIncome", "GrossProfit", "OperatingIncome", "FreeCashFlow"];
+const METRICS: &[&str] = &[
+    "TotalRevenue",
+    "CostOfRevenue",
+    "GrossProfit",
+    "ResearchAndDevelopment",
+    "SellingGeneralAndAdministration",
+    "OperatingExpense",
+    "OperatingIncome",
+    "InterestExpense",
+    "PretaxIncome",
+    "TaxProvision",
+    "NetIncome",
+    "EBITDA",
+    "BasicEPS",
+    "DilutedEPS",
+    "DilutedAverageShares",
+    "CashAndCashEquivalents",
+    "CashCashEquivalentsAndShortTermInvestments",
+    "AccountsReceivable",
+    "Inventory",
+    "CurrentAssets",
+    "NetPPE",
+    "Goodwill",
+    "TotalAssets",
+    "AccountsPayable",
+    "CurrentLiabilities",
+    "CurrentDebt",
+    "LongTermDebt",
+    "TotalDebt",
+    "TotalLiabilitiesNetMinorityInterest",
+    "StockholdersEquity",
+    "RetainedEarnings",
+    "WorkingCapital",
+    "OperatingCashFlow",
+    "CapitalExpenditure",
+    "FreeCashFlow",
+    "InvestingCashFlow",
+    "FinancingCashFlow",
+    "RepurchaseOfCapitalStock",
+    "CashDividendsPaid",
+    "StockBasedCompensation",
+    "DepreciationAndAmortization",
+    "EndCashPosition",
+];
 const DAY: i64 = 86400;
 const LOOKBACK: i64 = 10 * 365 * DAY;
 const TTL: i64 = 12 * 3600;
@@ -21,6 +64,7 @@ pub struct Period {
     pub gross_profit: Option<f64>,
     pub operating_income: Option<f64>,
     pub free_cash_flow: Option<f64>,
+    pub items: BTreeMap<String, f64>,
 }
 
 impl Period {
@@ -32,6 +76,7 @@ impl Period {
             gross_profit: None,
             operating_income: None,
             free_cash_flow: None,
+            items: BTreeMap::new(),
         }
     }
 
@@ -47,7 +92,7 @@ impl Period {
     }
 
     fn has_data(&self) -> bool {
-        [self.revenue, self.net_income, self.gross_profit, self.operating_income, self.free_cash_flow].iter().any(Option::is_some)
+        [self.revenue, self.net_income, self.gross_profit, self.operating_income, self.free_cash_flow].iter().any(Option::is_some) || !self.items.is_empty()
     }
 }
 
@@ -97,7 +142,11 @@ pub fn parse(body: &[u8], symbol: &str) -> Result<Option<Financials>, String> {
                 currency = point["currencyCode"].as_str().filter(|c| !c.is_empty()).map(str::to_string);
             }
             let value = point["reportedValue"]["raw"].as_f64().filter(|x| x.is_finite());
-            if let Some(slot) = periods.entry(date.to_string()).or_insert_with(|| Period::new(date)).slot(metric) {
+            let period = periods.entry(date.to_string()).or_insert_with(|| Period::new(date));
+            if let Some(v) = value {
+                period.items.insert(metric.to_string(), v);
+            }
+            if let Some(slot) = period.slot(metric) {
                 *slot = value.or(*slot);
             }
         }
@@ -238,10 +287,31 @@ mod tests {
     fn requests_all_metrics_for_both_frequencies() {
         let t = types();
         let all: Vec<&str> = t.split(',').collect();
-        assert_eq!(all.len(), 10);
+        assert_eq!(all.len(), METRICS.len() * 2);
         assert!(all.contains(&"annualTotalRevenue") && all.contains(&"quarterlyFreeCashFlow"));
         assert!(all.contains(&"annualGrossProfit") && all.contains(&"quarterlyOperatingIncome"));
         assert!(all.contains(&"annualNetIncome") && all.contains(&"quarterlyNetIncome"));
+        assert!(all.contains(&"annualTotalAssets") && all.contains(&"quarterlyDilutedEPS") && all.contains(&"annualEBITDA"));
+        assert!(all.contains(&"quarterlyStockholdersEquity") && all.contains(&"annualOperatingCashFlow"));
+    }
+
+    #[test]
+    fn collects_statement_items_per_period() {
+        let body = br#"{"timeseries":{"result":[
+            {"meta":{"type":["annualTotalAssets"]},"annualTotalAssets":[{"asOfDate":"2025-12-31","currencyCode":"USD","reportedValue":{"raw":900.0}}]},
+            {"meta":{"type":["annualDilutedEPS"]},"annualDilutedEPS":[{"asOfDate":"2025-12-31","reportedValue":{"raw":1.5}},{"asOfDate":"2024-12-31","reportedValue":{"raw":"n/a"}}]},
+            {"meta":{"type":["quarterlyTotalRevenue"]},"quarterlyTotalRevenue":[{"asOfDate":"2025-12-31","reportedValue":{"raw":70.0}}]},
+            {"meta":{"type":["annualBogus"]},"annualBogus":[{"asOfDate":"2025-12-31","reportedValue":{"raw":1.0}}]}
+        ],"error":null}}"#;
+        let f = parse(body, "X").unwrap().expect("financials");
+        assert_eq!(f.annual.len(), 1);
+        let y = &f.annual[0];
+        assert_eq!(y.items.get("TotalAssets"), Some(&900.0));
+        assert_eq!(y.items.get("DilutedEPS"), Some(&1.5));
+        assert_eq!(y.items.len(), 2);
+        assert_eq!(y.revenue, None);
+        assert_eq!(f.quarterly[0].items.get("TotalRevenue"), Some(&70.0));
+        assert_eq!(f.quarterly[0].revenue, Some(70.0));
     }
 
     #[test]
