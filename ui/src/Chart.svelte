@@ -20,7 +20,7 @@
   import { LEFT_SCALES, mergeUp, movePane, paneName, paneRects, unmerge, visibleGroups, withPanes, type PaneId, type Slot } from "./lib/panes";
   import { panes, setPanes } from "./lib/paneStore.svelte";
   import { untrack } from "svelte";
-  import { axisRange } from "./lib/scrollback";
+  import { axisRange, type GotoResult } from "./lib/scrollback";
   import { clamp } from "./lib/viewport";
   import { PANE_STUDIES, instanceOutput, obv, pivotPeriod, pivots, studyTimeframe, type Series } from "./lib/studies";
   import { removeInstance, studies, studySettings as ss } from "./lib/studyStore.svelte";
@@ -63,9 +63,11 @@
     orderLines = [],
     onmoveorder,
     onolder,
+    loadTo,
     loadingOlder = false,
   }: {
     onolder?: () => void;
+    loadTo?: (t: number, alive: () => boolean) => Promise<GotoResult>;
     loadingOlder?: boolean;
     chart: Chart | null;
     redrawKey?: number;
@@ -156,13 +158,39 @@
     return new Date((t + dateOffset()) * 1000).toISOString().slice(0, isIntraday(chart.interval) ? 16 : 10);
   }
 
-  function goToDate(value: string) {
+  let gotoSeq = 0;
+  let gotoBusy = $state(false);
+  let gotoNote = $state("");
+
+  $effect(() => {
+    if (!gotoOpen) {
+      gotoSeq++;
+      gotoBusy = false;
+      gotoNote = "";
+    }
+  });
+
+  async function goToDate(value: string) {
     const t = Date.parse(`${value}${value.length === 10 ? "T00:00" : ""}Z`) / 1000 - dateOffset();
     if (!Number.isFinite(t) || !candles.length) return;
+    const mine = ++gotoSeq;
+    const id = () => `${chart?.meta.symbol}|${chart?.range}|${chart?.interval}`;
+    const start = id();
+    let short = false;
+    gotoNote = "";
+    if (loadTo && t < times[0]) {
+      gotoBusy = true;
+      const result = await loadTo(t, () => mine === gotoSeq && gotoOpen && id() === start);
+      if (mine !== gotoSeq) return;
+      gotoBusy = false;
+      if (result === "cancelled") return;
+      short = result === "exhausted" && t < times[0];
+      if (short) gotoNote = `History starts ${dateValue(times[0]).replace("T", " ")}`;
+    }
     const i = firstAtOrAfter(times, t);
     view = center(view, candles.length, i);
     hover = i;
-    gotoOpen = false;
+    if (!short) gotoOpen = false;
     emitWindow();
     wrap?.focus();
   }
@@ -2700,12 +2728,15 @@
       class="goto"
       type={isIntraday(chart.interval) ? "datetime-local" : "date"}
       aria-label="Go to date"
-      min={dateValue(candles[0].t)}
+      min={loadTo ? undefined : dateValue(candles[0].t)}
       max={dateValue(candles[candles.length - 1].t)}
       onchange={(e) => goToDate(e.currentTarget.value)}
       onkeydown={(e) => { e.stopPropagation(); if (e.key === "Escape") gotoOpen = false; }}
       use:focusInput
     />
+    {#if gotoBusy || gotoNote}
+      <div class="older-note goto-note" role="status">{gotoBusy ? "Loading history…" : gotoNote}</div>
+    {/if}
   {/if}
   {#if tip && chart}
     <div
@@ -2876,6 +2907,7 @@
     font-variant-numeric: tabular-nums;
     pointer-events: none;
   }
+  .older-note.goto-note { left: auto; right: 8px; top: 62px; }
   .older-note {
     position: absolute;
     left: 8px;
