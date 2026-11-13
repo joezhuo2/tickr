@@ -262,8 +262,9 @@ taskbar to keep it visible.
   same interval. Intraday candles you load are also saved on this computer, so
   scrolling back reaches past Yahoo's limit over time (see [Files](#files)).
   Scrolling stops at 20,000 candles; daily and longer go back to the first
-  listing. Analysis overlays cover the range's own candles, not the older
-  ones. The second chart does not scroll back.
+  listing. Analysis overlays and indicator panes are drawn over the older
+  candles too, while the score, signals, targets and patterns stay computed
+  from the range's own candles. The second chart does not scroll back.
 - **Candle countdown:** on a live intraday chart, the bottom right corner shows
   the time left until the forming candle closes.
 - **Tooltip:** hover the chart, or use ← and →, for time, open, high, low,
@@ -282,9 +283,13 @@ taskbar to keep it visible.
   and closed hours like the real bars (holidays are not skipped).
 - **Go to date:** the calendar button at the top right of the chart opens a
   date box (date and time on intraday charts). Picking a date centers the
-  first candle at or after it and puts the crosshair there. It moves within
-  the candles already loaded for the range, so the box only accepts dates
-  inside it.
+  first candle at or after it and puts the crosshair there. On the main chart
+  a date before the first loaded candle loads older candles at the same
+  interval until the date is covered, showing "Loading history..." beside the
+  box; closing the box or changing symbol, range or interval cancels it. If
+  history runs out first (or at 20,000 candles) it goes to the earliest candle
+  and says where history starts. Dates after the last candle are not accepted.
+  Other charts, and bar replay, only move within the candles already loaded.
 - **Price axis:** drag the price axis up or down to stretch or compress the
   price scale. While it is set by hand the scale stays locked as you pan and
   zoom, and dragging the chart also moves it vertically. Double-click the axis,
@@ -872,8 +877,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.78
-git push origin v0.11.78
+git tag v0.11.79
+git push origin v0.11.79
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

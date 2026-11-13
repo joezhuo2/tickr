@@ -6,6 +6,18 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.79] - 2026-11-13
+
+### Added
+- **Go to date loads history:** a date before the first loaded candle loads
+  older candles until it is reached, and says where history starts when it runs
+  out.
+
+### Changed
+- **Analysis after scrolling back:** indicator lines cover the older candles,
+  while the score, signals, targets and patterns stay computed from the
+  range's own candles.
+
 ## [0.11.78] - 2026-11-13
 
 ### Added
