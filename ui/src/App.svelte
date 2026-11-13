@@ -474,40 +474,62 @@
   let olderBusy = $state(false);
   const olderDone = new Set<string>();
   const olderKept = new Map<string, Candle[]>();
+  const olderOwn = new Map<string, number>();
 
   function withOlder(key: string, c: Chart): Chart {
     const candles = Scrollback.mergeOlder(olderKept.get(key) ?? [], c.candles);
     return candles === c.candles ? c : { ...c, candles };
   }
 
-  async function loadOlder() {
+  let olderPending: Promise<boolean> | null = null;
+  let olderTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function loadOlder(): Promise<boolean> {
+    olderPending ??= fetchOlder().finally(() => (olderPending = null));
+    return olderPending;
+  }
+
+  function analyzeLater() {
+    clearTimeout(olderTimer);
+    olderTimer = setTimeout(() => {
+      if (chart && shouldAnalyze(!!analysis, indicators?.keep_analysis ?? false)) void runAnalysis(true);
+    }, 400);
+  }
+
+  async function fetchOlder(): Promise<boolean> {
     const c = chart;
     const key = cacheKey();
     const base = cache.get(key)?.chart;
-    if (!c || !base || replay || olderBusy || olderDone.has(key) || !base.candles.length) return;
+    if (!c || !base || replay || olderDone.has(key) || !base.candles.length) return false;
     const first = base.candles[0].t;
     const w = base.candles.length < Scrollback.MAX_CANDLES ? Scrollback.olderWindow(base.interval, first, base.candles[base.candles.length - 1].t) : null;
-    if (!w) return;
+    if (!w) return false;
     olderBusy = true;
     try {
       const older = await invoke<Candle[]>("get_older", { symbol: base.meta.symbol, interval: base.interval, start: w.start, end: w.end, extended: base.extended ?? false });
       const add = older.filter((k) => k.t < first);
-      if (!add.length) olderDone.add(key);
-      else {
-        olderKept.set(key, [...add, ...(olderKept.get(key) ?? [])]);
-        if (chart === c && cacheKey() === key) {
-          const merged = withOlder(key, cache.get(key)?.chart ?? base);
-          cache.set(key, { chart: merged, at: cache.get(key)?.at ?? Date.now() });
-          chart = aggregateChart(merged, interval);
-          if (shouldAnalyze(!!analysis, indicators?.keep_analysis ?? false)) void runAnalysis(true);
-        }
+      if (!add.length) {
+        olderDone.add(key);
+        return false;
       }
+      if (!olderKept.has(key)) olderOwn.set(key, first);
+      olderKept.set(key, [...add, ...(olderKept.get(key) ?? [])]);
+      if (chart === c && cacheKey() === key) {
+        const merged = withOlder(key, cache.get(key)?.chart ?? base);
+        cache.set(key, { chart: merged, at: cache.get(key)?.at ?? Date.now() });
+        chart = aggregateChart(merged, interval);
+        analyzeLater();
+      }
+      return true;
     } catch {
       olderDone.add(key);
+      return false;
     } finally {
       olderBusy = false;
     }
   }
+
+  const gotoOlder = (t: number, alive: () => boolean) => Scrollback.loadUntil(t, () => chart?.candles[0]?.t ?? null, loadOlder, alive);
 
   /** Shows the cached chart (or a skeleton) at once, then fetches if stale. */
   async function loadChart(force = false, manual = false, retime = false) {
@@ -1290,7 +1312,13 @@
     analyzing = !background;
     analysisError = null;
     try {
-      const a = await invoke<Analysis>("analyze", analyzeArgs(chart));
+      const args = analyzeArgs(chart);
+      const own = args.candles && olderOwn.has(key) ? Scrollback.ownCandles(args.candles, olderOwn.get(key)) : null;
+      let a = await invoke<Analysis>("analyze", own ? { ...args, candles: own } : args);
+      if (own) {
+        const full = await invoke<Analysis>("analyze", args).catch(() => null);
+        if (full) a = Scrollback.withSeries(a, full);
+      }
       if (mine !== analysisSeq || key !== cacheKey()) return;
       analysis = { ...a, interval: chart?.interval ?? a.interval };
       analysisKey = key;
@@ -1913,6 +1941,7 @@
       exitReplay();
       cache.clear();
       olderKept.clear();
+      olderOwn.clear();
       olderDone.clear();
       clearAnalysis();
       void loadChart(true);
@@ -2257,7 +2286,8 @@
                     {chartPatterns}
                     orderLines={paperLines}
                     onmoveorder={paperMove}
-                    onolder={loadOlder}
+                    onolder={() => void loadOlder()}
+                    loadTo={replay ? undefined : gotoOlder}
                     loadingOlder={olderBusy}
                   />
                 {:else if chartError}
