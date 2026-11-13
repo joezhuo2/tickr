@@ -20,6 +20,7 @@ describe("backup local state", () => {
       "tickr.technicalsSettingsOpen": "1",
       "tickr.panes": JSON.stringify({ groups: [["price"], ["macd", "rsi"]], left: "percent" }),
       "tickr.rr": "3.5",
+      "tickr.drawingStyles": JSON.stringify({ defaults: { trend: { color: "#ff0000", width: 2, dashed: true } }, templates: [{ name: "Red", color: "#ff0000", width: 3, dashed: false }] }),
     });
     const text = withLocal('{"app":"tickr","settings":{}}', src);
     const dst = fake();
@@ -30,6 +31,7 @@ describe("backup local state", () => {
     expect(dst.getItem("tickr.magnet")).toBe("1");
     expect(dst.getItem("tickr.hideDrawings")).toBe("1");
     expect(dst.getItem("tickr.rr")).toBe("3.5");
+    expect(JSON.parse(dst.getItem("tickr.drawingStyles")!)).toEqual({ defaults: { trend: { color: "#ff0000", width: 2, dashed: true } }, templates: [{ name: "Red", color: "#ff0000", width: 3, dashed: false }] });
     expect(dst.getItem("tickr.technicalsSettingsOpen")).toBe("1");
     expect(JSON.parse(dst.getItem("tickr.panes")!)).toEqual({ groups: [["price"], ["macd", "rsi"], ["stoch"], ["obv"], ["cci"], ["willr"], ["mfi"]], left: "percent" });
     expect(JSON.parse(dst.getItem("tickr.studySettings")!).ichimoku.displacement).toBe(30);

@@ -181,7 +181,25 @@ taskbar to keep it visible.
   arrow, price range, date range, trend-based Fibonacci extension and
   pitchfork. Channel, Fibonacci extension and pitchfork take three clicks: the
   first two set the base move and the third sets the channel width, the
-  projection start, or the second pitchfork tine. These tools have no hotkeys.
+  projection start, or the second pitchfork tine. It also has arrow up and
+  arrow down markers (one click), a **Callout** (click the anchor, then where
+  the text box goes, then type; double-click it or use **Edit** to change the
+  text), **Elliott impulse** (six clicks, labelled 0 to 5) and **Elliott
+  correction** (four clicks, 0, A, B, C), an **XABCD harmonic** (five clicks;
+  it shades the XAB and BCD triangles and prints the AB/XA, BC/AB, CD/BC and
+  AD/XA ratios on the dashed XB, AC, BD and XD lines) and **Head and
+  shoulders** (five clicks: left shoulder, first neckline point, head, second
+  neckline point, right shoulder; the neckline is extended across the
+  pattern). These tools have no hotkeys.
+  **Objects** opens the object tree: every drawing on the chart, newest first,
+  with its price or text. Click a row to select it and scroll it into view
+  (a note opens its popover), and each row can be hidden, locked, deleted or,
+  for text and callouts, renamed. Hide all / Show all, Lock all / Unlock all
+  and Delete all… (unlocked drawings only, after a confirm) act on the whole
+  chart. A locked drawing ignores clicks on the chart, so it cannot be moved,
+  resized or deleted there; select it from the list to unlock it. Hidden and
+  locked states are saved with the drawing, and replay and practice runs keep
+  their own lists.
   The **Note** tool (`` ` ``) pins a multi-line note to a candle: it shows as a
   small marker, hovering shows the text, and clicking opens a popover to edit it,
   pick a color or delete it. Notes stay on their candle when you change the candle
@@ -190,7 +208,10 @@ taskbar to keep it visible.
   clicking one scrolls the chart to it.
   Select a drawing to style it: a row under the toolbar sets its color, line
   width (1 to 3 px), a dashed line, and **Lock**, which stops it being moved or
-  deleted until unlocked. **Magnet** snaps new points and dragged endpoints to
+  deleted until unlocked. **Default** saves the style as the starting style
+  for new drawings of that tool, and **Templates** lists named styles: type a
+  name and **Save style** to keep the current one, click a template to apply
+  it, or × to delete it (up to 20). **Magnet** snaps new points and dragged endpoints to
   the open, high, low or close of the candle under the cursor when within 12
   pixels, and **Hide** hides every drawing until you click it again. Drawings,
   Magnet, Hide, the study toggles and the Technicals panel (height and whether
@@ -652,7 +673,7 @@ typing in a text field.
 
 **Backup** exports your settings, watchlists, groups, drawings, alerts, saved
 screens, keybinds, indicator presets, indicator alerts, study toggles, theme
-colors and fonts, and the magnet, hide-drawings and Indicator settings toggles to a JSON file, and **Import** restores
+colors and fonts, drawing default styles and templates, and the magnet, hide-drawings and Indicator settings toggles to a JSON file, and **Import** restores
 one after checking it (older backups without those parts leave them as they are). API keys stay in `.env` and are never exported; the data
 provider, window position and start-at-login setting are kept on import.
 
@@ -790,8 +811,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.71
-git push origin v0.11.71
+git tag v0.11.72
+git push origin v0.11.72
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
