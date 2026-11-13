@@ -448,6 +448,7 @@ export interface FinancialPeriod {
   gross_profit: number | null;
   operating_income: number | null;
   free_cash_flow: number | null;
+  items: Record<string, number>;
 }
 
 export interface Financials {
