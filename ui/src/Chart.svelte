@@ -5,6 +5,9 @@
   import { fitScale, forward, inverse, scaleLabel, scaleTicks, shiftRange, stretchRange } from "./lib/scale";
   import type { Drawing, DrawingPoint } from "./lib/types";
   import { DRAWING_COLORS, POINT_COUNT, arrowHead, channelLines, fibExtLevels, pitchforkLines, snapPrice, anchoredVwap, fibLevels, hitBox, positionLevels, rayEnd, timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
+  import { MAX_TEMPLATES, SHAPE_LABELS, calloutGeometry, harmonicRatios, hitCallout, inBounds, markerPath, necklineEnds, pointLabel, saveTemplate, shapeSegments, type DrawingStyle } from "./lib/drawing";
+  import { drawingStyles, setDrawingStyles } from "./lib/drawingStyleStore.svelte";
+  import DrawingTree from "./DrawingTree.svelte";
   import { rr } from "./lib/rrStore.svelte";
   import { legendText, volumeProfile } from "./lib/indicators";
   import { columnPen, columns, type Sink } from "./lib/decimate";
@@ -1537,6 +1540,13 @@
     { tool: "fibext", label: "Fib extension" },
     { tool: "pitchfork", label: "Pitchfork" },
     { tool: "vprofile", label: "Volume profile (range)" },
+    { tool: "arrowup", label: "Arrow up marker" },
+    { tool: "arrowdown", label: "Arrow down marker" },
+    { tool: "callout", label: "Callout" },
+    { tool: "impulse", label: "Elliott impulse (1-5)" },
+    { tool: "corrective", label: "Elliott correction (A-B-C)" },
+    { tool: "xabcd", label: "XABCD harmonic" },
+    { tool: "headshoulders", label: "Head and shoulders" },
   ];
   const multi = (kind: string) => (POINT_COUNT[kind as Drawing["kind"]] ?? 0) >= 2;
   let placed = 0;
@@ -1565,8 +1575,11 @@
   }
   let history = $state<History>({ past: [], present: [], future: [] });
   let preview = $state<Drawing | null>(null);
-  let editing = $state<{ point: DrawingPoint; x: number; y: number } | null>(null);
+  let editing = $state<{ point: DrawingPoint; x: number; y: number; points?: DrawingPoint[]; id?: number } | null>(null);
   let inputText = $state("");
+  let treeOpen = $state(false);
+  let stylesOpen = $state(false);
+  let templateName = $state("");
   let noteEdit = $state<{ id: number | null; point: DrawingPoint; text: string; color: string; x: number; y: number } | null>(null);
   let notePicking = $state(false);
 
@@ -1607,7 +1620,7 @@
   const times = $derived(candles.map((c) => c.t));
   const axisTimes = $derived([...times, ...futureTimes(times, chart?.interval ?? "", clock, MAX_FUTURE)]);
   const noteMarks = $derived(hideDrawings ? [] : list.flatMap((d) => {
-    const i = d.kind === "note" ? noteBar(axisTimes, d.points[0].t) : null;
+    const i = d.kind === "note" && !d.hidden ? noteBar(axisTimes, d.points[0].t) : null;
     if (i == null) return [];
     const at = { x: geo.x(i), y: geo.y(d.points[0].price) };
     return inPlot(at) ? [{ d, ...at }] : [];
@@ -1685,8 +1698,55 @@
     const ids = new Set(list.map((d) => d.id));
     let id = 0;
     while (ids.has(id)) id++;
-    void changeDrawings([...list, { ...d, id }]);
+    const s = drawingStyles.defaults[d.kind];
+    void changeDrawings([...list, { ...d, ...(s && { color: d.color || s.color, width: s.width, dashed: s.dashed }), id }]);
     cancelDrawing();
+  }
+
+  function finishShape(d: Drawing) {
+    if (d.kind !== "callout") { addDrawing(d); return; }
+    const at = screen(d.points[1]);
+    preview = null;
+    placed = 0;
+    tool = "cursor";
+    editing = { point: d.points[0], points: d.points, x: Math.min(at.x, Math.max(PAD.l, width - 220)), y: at.y - 10 };
+    inputText = "";
+  }
+
+  function editText(d: Drawing) {
+    const at = screen(d.points[d.kind === "callout" ? 1 : 0]);
+    cancelDrawing();
+    editing = { point: d.points[0], id: d.id, x: Math.min(at.x, Math.max(PAD.l, width - 220)), y: at.y - (d.kind === "callout" ? 10 : 16) };
+    inputText = d.text;
+  }
+
+  function commitText(text: string) {
+    const e = editing;
+    if (!e) return;
+    if (e.id == null) { addDrawing({ id: 0, kind: e.points ? "callout" : "text", points: e.points ?? [e.point], text }); return; }
+    void changeDrawings(list.map((d) => (d.id === e.id ? { ...d, text } : d)));
+    cancelDrawing();
+  }
+
+  function selectDrawing(id: number) {
+    const d = list.find((x) => x.id === id);
+    if (!d) return;
+    cancelDrawing();
+    showNote(id);
+    if (d.kind !== "note") selected = id;
+    else { const at = screen(d.points[0]); openNote(d, at.x, at.y); }
+  }
+
+  function treeChange(next: Drawing[]) {
+    if (!next.some((d) => d.id === selected)) selected = null;
+    void changeDrawings(next);
+  }
+
+  const styleOf = (d: Drawing): DrawingStyle => ({ color: d.color ?? "", width: d.width || 1, dashed: !!d.dashed });
+
+  function addTemplate(d: Drawing) {
+    setDrawingStyles({ ...drawingStyles, templates: saveTemplate(drawingStyles.templates, templateName, styleOf(d)) });
+    templateName = "";
   }
 
   function pixel(e: MouseEvent): Pixel {
@@ -1733,6 +1793,7 @@
     const ctx = canvas?.getContext("2d");
     if (ctx) ctx.font = `11px ${getComputedStyle(canvas!).getPropertyValue("--font")}`;
     for (const d of [...list].reverse()) {
+      if (d.hidden || d.locked) continue;
       if (d.kind === "pen") {
         if (hitPolyline(p, d.points.map(screen))) return { drawing: d, endpoint: -1 };
         continue;
@@ -1743,6 +1804,7 @@
       if (d.kind === "avwap" && hitPolyline(p, avwapPath(d))) return { drawing: d, endpoint: -1 };
       if (d.kind === "vline" && Math.abs(p.x - a.x) <= 6) return { drawing: d, endpoint: -1 };
       if (d.kind === "hray" && p.x >= a.x - 6 && Math.abs(p.y - a.y) <= 6) return { drawing: d, endpoint: -1 };
+      if ((d.kind === "arrowup" || d.kind === "arrowdown") && inBounds(p, pathBounds(markerPath(a, d.kind === "arrowup")), 3)) return { drawing: d, endpoint: -1 };
       if (multi(d.kind)) {
         const pts = d.points.map(screen);
         const b = pts[1];
@@ -1758,6 +1820,8 @@
           : d.kind === "channel" ? channelLines(a, b, c).some(([s, e]) => hitTest(p, s, e))
           : d.kind === "pitchfork" ? pitchforkLines(a, b, c, PAD.l, right).some(([s, e]) => hitTest(p, s, e))
           : d.kind === "fibext" ? p.x >= c.x - 6 && fibExtLevels(d.points[0].price, d.points[1].price, d.points[2].price).some((l) => Math.abs(p.y - geo.y(l.price)) <= 6)
+          : SHAPE_LABELS[d.kind] ? shapeSegments(d.kind, pts).some(([s, e]) => hitTest(p, s, e))
+          : d.kind === "callout" ? hitCallout(p, a, b, ctx?.measureText(d.text).width ?? 0)
           : d.kind === "ray" ? hitTest(p, a, rayEnd(a, b, PAD.l, right))
           : d.kind === "rect" ? hitBox(p, a, b)
           : d.kind === "fib" ? p.x >= left - 6 && fibLevels(d.points[0].price, d.points[1].price).some((l) => Math.abs(p.y - geo.y(l.price)) <= 6)
@@ -1800,7 +1864,7 @@
       gesture = { start: p, original: null, endpoint: -1, moved: false, second: false };
       return;
     }
-    if (tool === "hline" || tool === "avwap" || tool === "vline" || tool === "hray") { addDrawing({ id: 0, kind: tool, points: [point], text: "" }); return; }
+    if (tool === "hline" || tool === "avwap" || tool === "vline" || tool === "hray" || tool === "arrowup" || tool === "arrowdown") { addDrawing({ id: 0, kind: tool, points: [point], text: "" }); return; }
     if (tool === "note") {
       tool = "cursor";
       noteEdit = { id: null, point: { ...point, t: snapNoteTime(axisTimes, point.t) }, text: "", color: "", x: p.x, y: p.y };
@@ -1887,7 +1951,7 @@
         preview = null;
       } else if (tool === "pen") finishStroke();
       else if (tool === "ruler") cancelDrawing();
-      else if (preview && (gesture.second || (gesture.moved && preview.points.length === 2))) addDrawing(preview);
+      else if (preview && (gesture.second || (gesture.moved && preview.points.length === 2))) finishShape(preview);
       else if (preview && gesture.moved) placed = Math.max(placed, 2);
       gesture = null;
     }
@@ -1902,14 +1966,14 @@
     if (e.key !== "Enter" && e.key !== "Escape") return;
     e.preventDefault();
     e.stopPropagation();
-    if (e.key === "Enter" && editing && inputText.trim() && Array.from(inputText).length <= 200) addDrawing({ id: 0, kind: "text", points: [editing.point], text: inputText });
+    if (e.key === "Enter" && editing && inputText.trim() && Array.from(inputText).length <= 200) commitText(inputText);
     else if (e.key === "Escape") cancelDrawing();
     if (!editing) wrap?.focus();
   }
 
   function drawDrawings(ctx: CanvasRenderingContext2D, v: (name: string) => string) {
     ctx.font = `11px ${v("--font")}`;
-    const items = [...(hideDrawings ? [] : list.filter((d) => d.kind !== "note" && (!preview || !gesture?.original || d.id !== preview.id))), ...(preview ? [preview] : [])];
+    const items = [...(hideDrawings ? [] : list.filter((d) => d.kind !== "note" && !d.hidden && (!preview || !gesture?.original || d.id !== preview.id))), ...(preview ? [preview] : [])];
     for (const d of items) {
       const a = screen(d.points[0]);
       const two = multi(d.kind);
@@ -2054,6 +2118,63 @@
           ctx.stroke();
           ctx.fillText(`${l.ratio} ${num(l.price)}`, c.x + 3, y - 1);
         }
+      } else if (SHAPE_LABELS[d.kind]) {
+        if (d.kind === "xabcd") {
+          ctx.globalAlpha = 0.1;
+          for (const tri of [pts.slice(0, 3), pts.slice(2, 5)]) {
+            ctx.beginPath();
+            tri.forEach((p, k) => (k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+            ctx.fill();
+          }
+          ctx.globalAlpha = 1;
+        }
+        ctx.beginPath();
+        pts.forEach((p, k) => (k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        if (d.kind === "headshoulders") {
+          const [s, e] = necklineEnds(pts);
+          ctx.moveTo(s.x, s.y);
+          ctx.lineTo(e.x, e.y);
+        }
+        ctx.stroke();
+        ctx.textAlign = "center";
+        const ratios = d.kind === "xabcd" ? harmonicRatios(d.points.map((q) => q.price)) : [];
+        if (ratios.length) {
+          ctx.save();
+          ctx.setLineDash([4, 3]);
+          ctx.beginPath();
+          for (const r of ratios) { ctx.moveTo(pts[r.from].x, pts[r.from].y); ctx.lineTo(pts[r.to].x, pts[r.to].y); }
+          ctx.stroke();
+          ctx.restore();
+        }
+        for (const r of ratios) ctx.fillText(num(r.ratio, 3), (pts[r.from].x + pts[r.to].x) / 2, (pts[r.from].y + pts[r.to].y) / 2 - 2);
+        SHAPE_LABELS[d.kind]!.forEach((label, k) => {
+          const at = pointLabel(pts, k);
+          ctx.textBaseline = at.above ? "bottom" : "top";
+          if (label) ctx.fillText(label, at.x, at.y);
+        });
+      } else if (d.kind === "callout") {
+        const { box, tail } = calloutGeometry(a, b, ctx.measureText(d.text).width);
+        const fill = ctx.fillStyle;
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(tail.x, tail.y);
+        ctx.stroke();
+        ctx.fillStyle = v("--bg");
+        ctx.fillRect(box.minX, box.minY, box.maxX - box.minX, box.maxY - box.minY);
+        ctx.strokeRect(box.minX, box.minY, box.maxX - box.minX, box.maxY - box.minY);
+        ctx.fillStyle = fill;
+        ctx.textBaseline = "middle";
+        ctx.fillText(d.text, box.minX + 6, b.y);
+      } else if (d.kind === "arrowup" || d.kind === "arrowdown") {
+        ctx.fillStyle = d.color || v(d.kind === "arrowup" ? "--up" : "--down");
+        ctx.beginPath();
+        markerPath(a, d.kind === "arrowup").forEach((p, k) => (k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        ctx.closePath();
+        ctx.fill();
+        if (d.id === selected) ctx.stroke();
       } else {
         if (d.kind === "arrow") {
           const [l, r] = arrowHead(a, b);
@@ -2205,6 +2326,7 @@
     const head = paneHead(pixel(e));
     if (head) maxPane = maxPane && head.ids.includes(maxPane as PaneId) ? null : head.ids[0];
     else if (onAxis(pixel(e))) manual = null;
+    else if (tool === "cursor" && (selectedDrawing?.kind === "text" || selectedDrawing?.kind === "callout")) editText(selectedDrawing);
     else if (tool === "cursor" && selected == null) resetView();
   }}
   onkeydown={onKey}
@@ -2224,9 +2346,11 @@
       <button aria-label="Delete" aria-pressed={false} title="Delete (Delete / Backspace)" disabled={selected == null || drawingBusy || !!selectedDrawing?.locked} onclick={removeDrawing}>Delete</button>
       <button aria-label="Magnet" aria-pressed={magnet} title="Magnet: snap new points and dragged endpoints to the open, high, low or close" onclick={toggleMagnet}>Magnet</button>
       <button aria-label="Hide drawings" aria-pressed={hideDrawings} title="Hide all drawings" onclick={toggleHideDrawings}>Hide</button>
+      <button aria-label="Object tree" aria-pressed={treeOpen} title="List, select, show, hide, lock and delete this chart's drawings" onclick={() => (treeOpen = !treeOpen)}>Objects</button>
     </div>
     {#if selectedDrawing}
       {@const d = selectedDrawing}
+      {@const def = drawingStyles.defaults[d.kind]}
       <div class="drawing-tools drawing-style" role="toolbar" aria-label="Drawing style">
         {#each DRAWING_COLORS as color}
           <button class="swatch" aria-label={color ? `Color ${color}` : "Default color"} aria-pressed={(d.color ?? "") === color} disabled={drawingBusy} style:--swatch={color || "var(--muted)"} onclick={() => restyle({ color })}></button>
@@ -2236,7 +2360,25 @@
         {/each}
         <button aria-label="Dashed" aria-pressed={!!d.dashed} disabled={drawingBusy} onclick={() => restyle({ dashed: !d.dashed })}>Dash</button>
         <button aria-label="Lock" aria-pressed={!!d.locked} title="Locked drawings cannot be moved or deleted" disabled={drawingBusy} onclick={() => restyle({ locked: !d.locked })}>Lock</button>
+        {#if d.kind === "text" || d.kind === "callout"}
+          <button aria-label="Edit text" title="Edit text (double-click)" disabled={drawingBusy} onclick={() => editText(d)}>Edit</button>
+        {/if}
+        <button aria-label="Save as default for this tool" aria-pressed={!!def && def.color === (d.color ?? "") && def.width === (d.width || 1) && def.dashed === !!d.dashed} title="New drawings of this tool start with this style" onclick={() => setDrawingStyles({ ...drawingStyles, defaults: { ...drawingStyles.defaults, [d.kind]: styleOf(d) } })}>Default</button>
+        <button aria-label="Style templates" aria-pressed={stylesOpen} aria-expanded={stylesOpen} onclick={() => (stylesOpen = !stylesOpen)}>Templates</button>
       </div>
+      {#if stylesOpen}
+        <div class="drawing-tools drawing-style" role="group" aria-label="Style templates">
+          {#each drawingStyles.templates as t (t.name)}
+            <button class="template" aria-label="Apply template {t.name}" disabled={drawingBusy} style:--swatch={t.color || "var(--muted)"} onclick={() => restyle({ color: t.color, width: t.width, dashed: t.dashed })}>{t.name}</button>
+            <button aria-label="Delete template {t.name}" title="Delete template" onclick={() => setDrawingStyles({ ...drawingStyles, templates: drawingStyles.templates.filter((x) => x.name !== t.name) })}>×</button>
+          {/each}
+          <input aria-label="Template name" placeholder="Template name" maxlength="40" bind:value={templateName} onkeydown={(e) => { if (e.key === "Enter") addTemplate(d); }} />
+          <button disabled={!templateName.trim() || (drawingStyles.templates.length >= MAX_TEMPLATES && !drawingStyles.templates.some((x) => x.name === templateName.trim()))} title="Save the current style under this name" onclick={() => addTemplate(d)}>Save style</button>
+        </div>
+      {/if}
+    {/if}
+    {#if treeOpen}
+      <DrawingTree {list} {selected} busy={drawingBusy} onselect={selectDrawing} onchange={treeChange} onclose={() => { treeOpen = false; wrap?.focus(); }} />
     {/if}
     </div>
   {/if}
@@ -2479,6 +2621,8 @@
   .drawing-style { align-items: center; }
   .drawing-style .swatch { width: 14px; height: 14px; padding: 0; background: var(--swatch); }
   .drawing-style .swatch[aria-pressed="true"] { background: var(--swatch); box-shadow: 0 0 0 2px var(--text); }
+  .drawing-style .template { border-left: 3px solid var(--swatch); color: var(--text); }
+  .drawing-style input { width: 110px; font-size: 10px; padding: 1px 4px; }
   .drawing-input { position: absolute; width: 200px; z-index: 2; }
   .note-marker {
     position: absolute;
