@@ -1,9 +1,23 @@
 <script lang="ts">
   import { tick } from "svelte";
   import { change, direction, num, volume } from "./lib/format";
+  import { greeks, yearsTo } from "./lib/greeks";
   import { addLeg, entryPrice, makeLeg, type Leg, type LegSide, type PriceMode, type SavedStrategy } from "./lib/payoff";
   import Strategy from "./Strategy.svelte";
   import type { OptionContract, Options } from "./lib/types";
+
+  const STACK_BELOW = 520;
+  const ESTIMATE = "Estimates: Black-Scholes from Yahoo's implied volatility, European-style, 4% risk-free rate, no dividends. Theta is per day, vega per 1 vol point.";
+  const SPLIT_MIN = 0.2;
+  const SPLIT_MAX = 0.8;
+
+  function stored(key: string): string | null {
+    try { return localStorage.getItem(key); } catch { return null; }
+  }
+
+  function store(key: string, value: string) {
+    try { localStorage.setItem(key, value); } catch { /* storage unavailable */ }
+  }
 
   let {
     options,
@@ -16,13 +30,16 @@
     error: string | null;
     onretry: () => void;
     onexpiry: (date: number) => void;
-    side?: "calls" | "puts";
+    side?: "calls" | "puts" | "both";
   } = $props();
 
   let tab = $state<"chain" | "strategy">("chain");
   let text = $state("");
-  let wrap = $state<HTMLDivElement>();
-  let mid = $state<HTMLElement>();
+  let chainEl = $state<HTMLDivElement>();
+  let width = $state(0);
+  let showGreeks = $state(stored("tickr.optionsGreeks") === "1");
+  let split = $state(Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, Number(stored("tickr.optionsSplit")) || 0.5)));
+  let drag: { p: number; size: number; split: number } | null = null;
   let legs = $state<Leg[]>([]);
   let saved = $state<SavedStrategy[]>([]);
   let mode = $state<PriceMode>("mid");
@@ -31,9 +48,57 @@
   const iso = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
   const dates = $derived(new Map((options?.expirations ?? []).map((t) => [iso(t), t])));
   const price = $derived(options?.price ?? null);
-  const rows = $derived([...(options?.[side] ?? [])].sort((a, b) => b.strike - a.strike));
-  const above = $derived(rows.filter((c) => price == null || c.strike > price));
-  const below = $derived(rows.filter((c) => price != null && c.strike <= price));
+  const kinds = $derived<("calls" | "puts")[]>(side === "both" ? ["calls", "puts"] : [side]);
+  const stacked = $derived(side === "both" && width > 0 && width < STACK_BELOW);
+  const years = $derived(yearsTo(options?.expiry ?? null));
+  const cols = $derived(9 + (showGreeks ? 4 : 0));
+
+  function sorted(kind: "calls" | "puts") {
+    return [...(options?.[kind] ?? [])].sort((a, b) => b.strike - a.strike);
+  }
+
+  function setSplit(v: number) {
+    split = Math.round(Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, v)) * 1000) / 1000;
+    store("tickr.optionsSplit", String(split));
+  }
+
+  function pickSide(v: "calls" | "puts" | "both") {
+    side = v;
+  }
+
+  function toggleGreeks() {
+    showGreeks = !showGreeks;
+    store("tickr.optionsGreeks", showGreeks ? "1" : "0");
+  }
+
+  function wraps() {
+    return [...(chainEl?.querySelectorAll<HTMLElement>(".wrap") ?? [])];
+  }
+
+  function syncScroll(e: Event) {
+    if (stacked) return;
+    const src = e.currentTarget as HTMLElement;
+    for (const w of wraps()) if (w !== src && w.scrollTop !== src.scrollTop) w.scrollTop = src.scrollTop;
+  }
+
+  function gripDown(e: PointerEvent) {
+    const box = (e.currentTarget as HTMLElement).parentElement!.getBoundingClientRect();
+    const size = stacked ? box.height : box.width;
+    drag = { p: stacked ? e.clientY : e.clientX, size, split };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
+
+  function gripMove(e: PointerEvent) {
+    if (drag) setSplit(drag.split + ((stacked ? e.clientY : e.clientX) - drag.p) / drag.size);
+  }
+
+  function gripKey(e: KeyboardEvent) {
+    const keys = stacked ? ["ArrowUp", "ArrowDown"] : ["ArrowLeft", "ArrowRight"];
+    if (!keys.includes(e.key)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setSplit(split + (e.key === keys[1] ? 0.04 : -0.04));
+  }
 
   $effect(() => {
     if (options?.expiry != null) text = iso(options.expiry);
@@ -47,20 +112,23 @@
     saved = [];
   });
 
-  function add(c: OptionContract, action: LegSide) {
-    const kind = side === "calls" ? "call" : "put";
+  function add(c: OptionContract, action: LegSide, kind: "call" | "put") {
     const price = entryPrice(c, action, mode) ?? 0;
     legs = addLeg(legs, makeLeg({ kind, side: action, strike: c.strike, quantity: 1, price }));
   }
 
   $effect(() => {
-    if (!options || !wrap) return;
+    if (!options || !chainEl) return;
     side;
+    stacked;
     tick().then(() => {
-      if (!wrap || !mid) return;
-      const w = wrap.getBoundingClientRect();
-      const m = mid.getBoundingClientRect();
-      wrap.scrollTop += m.top - w.top - (w.height - m.height) / 2;
+      for (const wrap of wraps()) {
+        const mid = wrap.querySelector<HTMLElement>(".mid");
+        if (!mid) continue;
+        const w = wrap.getBoundingClientRect();
+        const m = mid.getBoundingClientRect();
+        wrap.scrollTop += m.top - w.top - (w.height - m.height) / 2;
+      }
     });
   });
 
@@ -76,7 +144,7 @@
   }
 </script>
 
-{#snippet row(c: OptionContract)}
+{#snippet row(c: OptionContract, kind: "call" | "put")}
   <tr class:itm={c.itm}>
     <th scope="row">{num(c.strike)}{#if c.itm}<span class="badge">ITM</span>{/if}</th>
     <td>{c.last == null ? "—" : num(c.last)}</td>
@@ -85,12 +153,63 @@
     <td>{volume(c.volume)}</td>
     <td>{volume(c.open_interest)}</td>
     <td>{c.iv == null ? "—" : `${(c.iv * 100).toFixed(1)}%`}</td>
+    {#if showGreeks}
+      {@const g = greeks(kind, price, c.strike, years, c.iv)}
+      <td>{g ? g.delta.toFixed(3) : "—"}</td>
+      <td>{g ? g.gamma.toFixed(4) : "—"}</td>
+      <td>{g ? g.theta.toFixed(3) : "—"}</td>
+      <td>{g ? g.vega.toFixed(3) : "—"}</td>
+    {/if}
     <td class="when">{traded(c.last_trade)}</td>
     <td class="add">
-      <button onclick={() => add(c, "long")} aria-label="Buy {side === 'calls' ? 'call' : 'put'} at strike {num(c.strike)}">Buy</button>
-      <button onclick={() => add(c, "short")} aria-label="Sell {side === 'calls' ? 'call' : 'put'} at strike {num(c.strike)}">Sell</button>
+      <button onclick={() => add(c, "long", kind)} aria-label="Buy {kind} at strike {num(c.strike)}">Buy</button>
+      <button onclick={() => add(c, "short", kind)} aria-label="Sell {kind} at strike {num(c.strike)}">Sell</button>
     </td>
   </tr>
+{/snippet}
+
+{#snippet pane(kind: "calls" | "puts", grow: number)}
+  {@const list = sorted(kind)}
+  {@const one = kind === "calls" ? "call" : "put"}
+  {@const above = list.filter((c) => price == null || c.strike > price)}
+  {@const below = list.filter((c) => price != null && c.strike <= price)}
+  <div class="pane" style:flex="{grow} 1 0">
+    {#if side === "both"}<div class="label">{kind === "calls" ? "Calls" : "Puts"}</div>{/if}
+    {#if list.length === 0}
+      <div class="msg">No {kind} for this expiry.</div>
+    {:else}
+      <div class="wrap" onscroll={syncScroll}>
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Strike</th>
+              <th scope="col">Last</th>
+              <th scope="col">Bid / Ask</th>
+              <th scope="col">Change</th>
+              <th scope="col">Volume</th>
+              <th scope="col">Open int.</th>
+              <th scope="col">IV</th>
+              {#if showGreeks}
+                <th scope="col" title={ESTIMATE}>Delta</th>
+                <th scope="col" title={ESTIMATE}>Gamma</th>
+                <th scope="col" title={ESTIMATE}>Theta /day</th>
+                <th scope="col" title={ESTIMATE}>Vega /vol pt</th>
+              {/if}
+              <th scope="col">Last trade</th>
+              <th scope="col">Strategy</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each above as c (c.symbol)}{@render row(c, one)}{/each}
+            <tr class="mid">
+              <td colspan={cols}>{price == null ? "—" : num(price)}</td>
+            </tr>
+            {#each below as c (c.symbol)}{@render row(c, one)}{/each}
+          </tbody>
+        </table>
+      </div>
+    {/if}
+  </div>
 {/snippet}
 
 {#if options === undefined && error}
@@ -111,10 +230,14 @@
       <button role="tab" class:on={tab === "strategy"} aria-selected={tab === "strategy"} onclick={() => (tab = "strategy")}>Strategy</button>
     </div>
     {#if tab === "chain"}
-      <select bind:value={side} aria-label="Contract type">
-        <option value="calls">Calls</option>
-        <option value="puts">Puts</option>
-      </select>
+      <div class="seg" role="group" aria-label="Contract type">
+        {#each ["calls", "puts", "both"] as v (v)}
+          <button class:on={side === v} aria-pressed={side === v} onclick={() => pickSide(v as "calls" | "puts" | "both")}>{v === "calls" ? "Calls" : v === "puts" ? "Puts" : "Both"}</button>
+        {/each}
+      </div>
+      <div class="seg" role="group" aria-label="Greeks">
+        <button class:on={showGreeks} aria-pressed={showGreeks} title={ESTIMATE} onclick={toggleGreeks}>Greeks</button>
+      </div>
     {/if}
     <input
       type="text"
@@ -132,34 +255,25 @@
   </div>
   <div class="body">
     {#if tab === "chain"}
-    <div class="chain">
-      {#if rows.length === 0}
-        <div class="msg">No {side} for this expiry.</div>
-      {:else}
-        <div class="wrap" bind:this={wrap}>
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Strike</th>
-                <th scope="col">Last</th>
-                <th scope="col">Bid / Ask</th>
-                <th scope="col">Change</th>
-                <th scope="col">Volume</th>
-                <th scope="col">Open int.</th>
-                <th scope="col">IV</th>
-                <th scope="col">Last trade</th>
-                <th scope="col">Strategy</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each above as c (c.symbol)}{@render row(c)}{/each}
-              <tr class="mid" bind:this={mid}>
-                <td colspan="9">{price == null ? "—" : num(price)}</td>
-              </tr>
-              {#each below as c (c.symbol)}{@render row(c)}{/each}
-            </tbody>
-          </table>
-        </div>
+    <div class="chain" class:stacked bind:this={chainEl} bind:clientWidth={width}>
+      {@render pane(kinds[0], side === "both" ? split : 1)}
+      {#if side === "both"}
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+        <div
+          class="grip"
+          role="separator"
+          aria-orientation={stacked ? "horizontal" : "vertical"}
+          aria-label="Resize calls and puts"
+          aria-valuenow={Math.round(split * 100)}
+          tabindex="0"
+          onpointerdown={gripDown}
+          onpointermove={gripMove}
+          onpointerup={() => (drag = null)}
+          onpointercancel={() => (drag = null)}
+          ondblclick={() => setSplit(0.5)}
+          onkeydown={gripKey}
+        ></div>
+        {@render pane("puts", 1 - split)}
       {/if}
     </div>
     {:else}
@@ -176,7 +290,6 @@
     align-items: center;
     padding: 8px 4px;
   }
-  select,
   input {
     border: 1px solid var(--faint);
     background: var(--surface);
@@ -200,7 +313,42 @@
     min-width: 0;
     min-height: 0;
     display: flex;
+  }
+  .chain.stacked {
     flex-direction: column;
+  }
+  .pane {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .label {
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--muted);
+  }
+  .grip {
+    flex: none;
+    width: 7px;
+    margin: 0 2px;
+    border-left: 1px solid var(--faint);
+    cursor: col-resize;
+    touch-action: none;
+  }
+  .stacked .grip {
+    width: auto;
+    height: 7px;
+    margin: 2px 0;
+    border-left: 0;
+    border-top: 1px solid var(--faint);
+    cursor: row-resize;
+  }
+  .grip:hover,
+  .grip:focus-visible {
+    border-color: var(--accent);
+    outline: none;
   }
   .seg {
     display: flex;

@@ -205,7 +205,9 @@
   let optionsError = $state<string | null>(null);
   let optionsLoading = $state(false);
   let optionsSeq = 0;
-  let optionsSide = $state<"calls" | "puts">("calls");
+  let optionsSide = $state<"calls" | "puts" | "both">(((v) => (v === "puts" || v === "both" ? v : "calls"))(stored("tickr.optionsSide")));
+
+  $effect(() => store("tickr.optionsSide", optionsSide));
   let view = $state<RefreshView>("chart");
   let analysis = $state<Analysis | null>(null);
   /** cacheKey() the analysis belongs to. */
@@ -1852,7 +1854,7 @@
         if (!e.repeat) toggleOptions();
         break;
       case "options_side":
-        if (!e.repeat && view === "options" && options) optionsSide = optionsSide === "calls" ? "puts" : "calls";
+        if (!e.repeat && view === "options" && options) optionsSide = optionsSide === "calls" ? "puts" : optionsSide === "puts" ? "both" : "calls";
         break;
       case "options_expiry":
         if (view === "options" && options?.expiry != null && options.expirations.length) {

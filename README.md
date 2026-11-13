@@ -508,11 +508,16 @@ it is instant.
   yield, crude oil, gold, the dollar index and Bitcoin; the 11 S&P sector ETFs
   by day change; and hotlists of up to 25 names (gainers, losers, most active, gap up, gap down, 52-week highs and lows; the gap and 52-week lists rank within Yahoo's top gainers, losers and most-active names); a Heatmap switch shows S&P 500 stocks as tiles grouped by sector, sized by market cap and colored by day change. Click a row or tile to chart
   it.
-- **Options:** the option chain for the current symbol, calls or puts one
-  side at a time, for any expiry (type a YYYY-MM-DD date or pick from the
-  list). Strikes sit above or below the current price, in-the-money rows are
-  tagged, and each row shows last, bid/ask, change, volume, open interest,
-  implied volatility and last trade time.
+- **Options:** the option chain for the current symbol, for any expiry (type a
+  YYYY-MM-DD date or pick from the list). Switch between Calls, Puts and Both;
+  Both shows calls on the left and puts on the right (stacked when the panel
+  is narrow), scrolling together, with a draggable divider (arrow keys move it,
+  double-click resets it to 50/50). Strikes sit above or below the current
+  price, in-the-money rows are tagged, and each row shows last, bid/ask,
+  change, volume, open interest, implied volatility and last trade time. The
+  Greeks toggle adds Delta, Gamma, Theta (per day) and Vega (per vol point),
+  estimated with Black-Scholes from Yahoo's implied volatility (European-style,
+  4% risk-free rate, no dividends).
   Add legs from the chain to build a strategy (presets include spreads,
   straddles and iron condors) and see its expiration payoff, break-evens and
   max profit and loss.
@@ -664,7 +669,7 @@ typing in a text field.
 | | `N` | Open News |
 | | `O` | Open Options |
 | | `.` | Open Strategy backtest |
-| Options | `U` | Switch calls / puts |
+| Options | `U` | Cycle calls / puts / both |
 | | `D` | Next expiry date (wraps around) |
 | Watchlist | `W` | Toggle Watchlist |
 | | `X` | Next watchlist stock |
