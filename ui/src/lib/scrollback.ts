@@ -34,6 +34,31 @@ export function mergeOlder(older: readonly Candle[], candles: Candle[]): Candle[
   return add.length ? [...add, ...candles] : candles;
 }
 
+export type GotoResult = "reached" | "exhausted" | "cancelled";
+
+export async function loadUntil(
+  target: number,
+  first: () => number | null,
+  step: () => Promise<boolean>,
+  alive: () => boolean,
+): Promise<GotoResult> {
+  while (alive()) {
+    const at = first();
+    if (at == null) return "exhausted";
+    if (at <= target) return "reached";
+    if (!(await step())) return alive() ? "exhausted" : "cancelled";
+  }
+  return "cancelled";
+}
+
+export function ownCandles(candles: Candle[], from: number | undefined): Candle[] {
+  return from == null ? candles : candles.filter((c) => c.t >= from);
+}
+
+export function withSeries<T extends { series: unknown }>(own: T, full: T): T {
+  return { ...own, series: full.series };
+}
+
 export function axisRange(range: string, interval: string, seconds: number): string {
   const days = seconds / DAY;
   if (days <= (NOMINAL_DAYS[range] ?? Infinity) * 1.5) return range;
