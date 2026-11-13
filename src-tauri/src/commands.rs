@@ -610,7 +610,13 @@ pub async fn get_analyst(shared: State<'_, Arc<Shared>>, symbol: String, force: 
 
 #[tauri::command]
 pub async fn get_earnings(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<Option<Earnings>, String> {
-    crate::earnings::fetch(&shared.analysts, &shared.calendar, &symbol).await.inspect_err(|e| log::warn!("earnings {symbol}: {e}"))
+    let mut earnings = crate::earnings::fetch(&shared.analysts, &shared.calendar, &symbol).await.inspect_err(|e| log::warn!("earnings {symbol}: {e}"))?;
+    if let Some(e) = earnings.as_mut() {
+        if let Ok(Some(f)) = crate::financials::get(&shared.analysts, &shared.financials, &symbol, now_secs(), false).await {
+            e.add_older(&f.quarterly);
+        }
+    }
+    Ok(earnings)
 }
 
 #[tauri::command]

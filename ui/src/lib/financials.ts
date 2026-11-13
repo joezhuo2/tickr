@@ -3,6 +3,10 @@ import type { FinancialPeriod } from "./types";
 
 export type Frequency = "annual" | "quarterly";
 
+export type Statement = "overview" | "income" | "balance" | "cashflow";
+
+type Kind = "money" | "eps";
+
 export interface Series {
   key: string;
   label: string;
@@ -66,6 +70,79 @@ export function marginSeries(periods: FinancialPeriod[]): Series[] {
     { key: "operating_margin", label: "Operating margin", values: col(periods, (p) => margin(p.operating_income, p.revenue)) },
     { key: "net_margin", label: "Net margin", values: col(periods, (p) => margin(p.net_income, p.revenue)) },
   ].filter((s) => s.values.some((v) => v != null));
+}
+
+export const STATEMENTS: { key: Statement; label: string }[] = [
+  { key: "overview", label: "Overview" },
+  { key: "income", label: "Income" },
+  { key: "balance", label: "Balance sheet" },
+  { key: "cashflow", label: "Cash flow" },
+];
+
+const LINES: Record<Exclude<Statement, "overview">, [string, string, Kind?][]> = {
+  income: [
+    ["TotalRevenue", "Revenue"],
+    ["CostOfRevenue", "Cost of revenue"],
+    ["GrossProfit", "Gross profit"],
+    ["ResearchAndDevelopment", "R&D"],
+    ["SellingGeneralAndAdministration", "SG&A"],
+    ["OperatingExpense", "Operating expenses"],
+    ["OperatingIncome", "Operating income"],
+    ["InterestExpense", "Interest expense"],
+    ["PretaxIncome", "Pretax income"],
+    ["TaxProvision", "Income tax"],
+    ["NetIncome", "Net income"],
+    ["EBITDA", "EBITDA"],
+    ["BasicEPS", "Basic EPS", "eps"],
+    ["DilutedEPS", "Diluted EPS", "eps"],
+    ["DilutedAverageShares", "Diluted shares"],
+  ],
+  balance: [
+    ["CashAndCashEquivalents", "Cash"],
+    ["CashCashEquivalentsAndShortTermInvestments", "Cash and short-term investments"],
+    ["AccountsReceivable", "Receivables"],
+    ["Inventory", "Inventory"],
+    ["CurrentAssets", "Current assets"],
+    ["NetPPE", "Net PP&E"],
+    ["Goodwill", "Goodwill"],
+    ["TotalAssets", "Total assets"],
+    ["AccountsPayable", "Accounts payable"],
+    ["CurrentLiabilities", "Current liabilities"],
+    ["CurrentDebt", "Current debt"],
+    ["LongTermDebt", "Long-term debt"],
+    ["TotalDebt", "Total debt"],
+    ["TotalLiabilitiesNetMinorityInterest", "Total liabilities"],
+    ["StockholdersEquity", "Shareholders' equity"],
+    ["RetainedEarnings", "Retained earnings"],
+    ["WorkingCapital", "Working capital"],
+  ],
+  cashflow: [
+    ["OperatingCashFlow", "Operating cash flow"],
+    ["CapitalExpenditure", "Capital expenditure"],
+    ["FreeCashFlow", "Free cash flow"],
+    ["InvestingCashFlow", "Investing cash flow"],
+    ["FinancingCashFlow", "Financing cash flow"],
+    ["RepurchaseOfCapitalStock", "Share repurchases"],
+    ["CashDividendsPaid", "Dividends paid"],
+    ["StockBasedCompensation", "Stock-based compensation"],
+    ["DepreciationAndAmortization", "Depreciation and amortization"],
+    ["EndCashPosition", "Ending cash"],
+  ],
+};
+
+export function eps(v: number | null | undefined): string {
+  if (v == null) return "—";
+  return `${v < 0 ? "−" : ""}${num(Math.abs(v), 2)}`;
+}
+
+export function statementRows(periods: FinancialPeriod[], statement: Statement): Row[] {
+  if (statement === "overview") return tableRows(periods);
+  return LINES[statement]
+    .map(([key, label, kind]) => {
+      const values = periods.map((p) => p.items?.[key] ?? null);
+      return { key, label, values, cells: values.map(kind === "eps" ? eps : money) };
+    })
+    .filter((r) => r.values.some((v) => v != null));
 }
 
 export function tableRows(periods: FinancialPeriod[]): Row[] {

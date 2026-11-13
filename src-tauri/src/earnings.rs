@@ -4,9 +4,11 @@ use serde_json::Value;
 
 use crate::analyst::Analysts;
 use crate::calendar::Cache;
+use crate::financials::Period;
 use crate::state::now_secs;
 
 const MODULES: &str = "earnings,calendarEvents";
+const CAP: usize = 12;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Report {
@@ -15,6 +17,14 @@ pub struct Report {
     pub eps_actual: Option<f64>,
     pub eps_estimate: Option<f64>,
     pub surprise_pct: Option<f64>,
+    pub revenue: Option<f64>,
+    pub period_end: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Older {
+    pub date: String,
+    pub eps_actual: f64,
     pub revenue: Option<f64>,
 }
 
@@ -34,6 +44,24 @@ pub struct Earnings {
     pub currency: Option<String>,
     pub upcoming: Option<Upcoming>,
     pub history: Vec<Report>,
+    pub older: Vec<Older>,
+}
+
+impl Earnings {
+    pub fn add_older(&mut self, quarterly: &[Period]) {
+        let Some(oldest) = self.history.iter().filter_map(|r| r.period_end.clone()).min() else { return };
+        let room = CAP.saturating_sub(self.history.len());
+        self.older = quarterly
+            .iter()
+            .rev()
+            .filter(|p| p.date < oldest)
+            .filter_map(|p| {
+                let eps = p.items.get("DilutedEPS").or_else(|| p.items.get("BasicEPS"))?;
+                Some(Older { date: p.date.clone(), eps_actual: *eps, revenue: p.revenue })
+            })
+            .take(room)
+            .collect();
+    }
 }
 
 fn raw(v: &Value) -> Option<f64> {
@@ -65,6 +93,7 @@ pub fn parse(body: &[u8], symbol: &str) -> Result<Option<Earnings>, String> {
                 eps_estimate: raw(&q["estimate"]),
                 surprise_pct: q["surprisePct"].as_str().and_then(|s| s.parse().ok()),
                 revenue,
+                period_end: q["periodEndDate"]["fmt"].as_str().map(str::to_string),
             })
         })
         .collect();
@@ -86,6 +115,7 @@ pub fn parse(body: &[u8], symbol: &str) -> Result<Option<Earnings>, String> {
         currency: r["earnings"]["financialCurrency"].as_str().map(str::to_string),
         upcoming,
         history,
+        older: Vec::new(),
     }))
 }
 
@@ -120,6 +150,46 @@ mod tests {
         assert!(!u.estimated);
         assert_eq!((u.eps_low, u.eps_high), (Some(1.93), Some(2.06)));
         assert_eq!(u.revenue_estimate, Some(113357085200.0));
+    }
+
+    #[test]
+    fn adds_older_quarters_with_actual_eps_only() {
+        let body = br#"{"timeseries":{"result":[
+            {"meta":{"type":["quarterlyDilutedEPS"]},"quarterlyDilutedEPS":[
+                {"asOfDate":"2025-03-31","reportedValue":{"raw":1.65}},
+                {"asOfDate":"2025-06-30","reportedValue":{"raw":1.57}},
+                {"asOfDate":"2025-09-30","reportedValue":{"raw":1.85}}
+            ]},
+            {"meta":{"type":["quarterlyBasicEPS"]},"quarterlyBasicEPS":[
+                {"asOfDate":"2024-12-31","reportedValue":{"raw":2.41}}
+            ]},
+            {"meta":{"type":["quarterlyTotalRevenue"]},"quarterlyTotalRevenue":[
+                {"asOfDate":"2025-06-30","reportedValue":{"raw":94036.0}},
+                {"asOfDate":"2024-09-30","reportedValue":{"raw":1.0}}
+            ]}
+        ],"error":null}}"#;
+        let f = crate::financials::parse(body, "AAPL").unwrap().expect("financials");
+        let mut e = parse(AAPL, "AAPL").unwrap().expect("earnings");
+        assert_eq!(e.history[3].period_end.as_deref(), Some("2025-09-30"));
+        e.add_older(&f.quarterly);
+        let dates: Vec<&str> = e.older.iter().map(|o| o.date.as_str()).collect();
+        assert_eq!(dates, ["2025-06-30", "2025-03-31", "2024-12-31"]);
+        assert_eq!(e.older[0].eps_actual, 1.57);
+        assert_eq!(e.older[0].revenue, Some(94036.0));
+        assert_eq!(e.older[2].eps_actual, 2.41);
+        assert_eq!(e.history.len(), 4);
+    }
+
+    #[test]
+    fn older_quarters_fill_up_to_twelve() {
+        let mut e = parse(AAPL, "AAPL").unwrap().expect("earnings");
+        let points: Vec<String> = (0..20).map(|i| format!(r#"{{"asOfDate":"20{i:02}-03-31","reportedValue":{{"raw":1.0}}}}"#)).collect();
+        let body = format!(r#"{{"timeseries":{{"result":[{{"meta":{{"type":["quarterlyDilutedEPS"]}},"quarterlyDilutedEPS":[{}]}}],"error":null}}}}"#, points.join(","));
+        let f = crate::financials::parse(body.as_bytes(), "X").unwrap().expect("financials");
+        e.add_older(&f.quarterly);
+        assert_eq!(e.older.len(), 8);
+        assert_eq!(e.older[0].date, "2019-03-31");
+        assert_eq!(e.older[7].date, "2012-03-31");
     }
 
     #[test]

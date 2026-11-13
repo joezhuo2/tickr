@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { barLayout, hasData, lineLayout, margin, marginSeries, money, percent, periodLabel, tableRows, volumeSeries } from "./financials";
+import { barLayout, eps, statementRows, STATEMENTS, hasData, lineLayout, margin, marginSeries, money, percent, periodLabel, tableRows, volumeSeries } from "./financials";
 import type { FinancialPeriod } from "./types";
 
 const period = (date: string, p: Partial<FinancialPeriod> = {}): FinancialPeriod => ({
@@ -9,6 +9,7 @@ const period = (date: string, p: Partial<FinancialPeriod> = {}): FinancialPeriod
   gross_profit: null,
   operating_income: null,
   free_cash_flow: null,
+  items: {},
   ...p,
 });
 
@@ -153,5 +154,43 @@ describe("lineLayout", () => {
     const { paths, baseline } = lineLayout([[20, -10]], 100, 60, 0);
     expect(baseline).toBeCloseTo(40, 6);
     expect(paths[0]).toBe("M25.0 0.0 L75.0 60.0");
+  });
+});
+
+describe("eps", () => {
+  it("shows two decimals with a true minus and a dash for missing", () => {
+    expect(eps(1.5)).toBe("1.50");
+    expect(eps(-0.256)).toBe("−0.26");
+    expect(eps(null)).toBe("—");
+  });
+});
+
+describe("statementRows", () => {
+  const periods = [
+    period("2024-12-31", { items: { TotalRevenue: 100e9, DilutedEPS: 1.5, TotalAssets: 5e11 } }),
+    period("2025-12-31", { items: { TotalRevenue: 120e9, DilutedEPS: -0.25, NetIncome: -2e9 } }),
+  ];
+
+  it("lists income lines in order, hides rows without data and formats per kind", () => {
+    const rows = statementRows(periods, "income");
+    expect(rows.map((r) => r.key)).toEqual(["TotalRevenue", "NetIncome", "DilutedEPS"]);
+    expect(rows[0].cells).toEqual(["100B", "120B"]);
+    expect(rows[1].cells).toEqual(["—", "−2.0B"]);
+    expect(rows[2].cells).toEqual(["1.50", "−0.25"]);
+  });
+
+  it("keeps statements apart", () => {
+    expect(statementRows(periods, "balance").map((r) => r.label)).toEqual(["Total assets"]);
+    expect(statementRows(periods, "cashflow")).toEqual([]);
+  });
+
+  it("falls back to the overview table and tolerates periods without items", () => {
+    expect(statementRows(periods, "overview")).toEqual(tableRows(periods));
+    const old = [{ ...period("2025-12-31"), items: undefined }] as unknown as FinancialPeriod[];
+    expect(statementRows(old, "income")).toEqual([]);
+  });
+
+  it("offers the four views", () => {
+    expect(STATEMENTS.map((s) => s.label)).toEqual(["Overview", "Income", "Balance sheet", "Cash flow"]);
   });
 });
