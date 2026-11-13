@@ -8,6 +8,10 @@ describe("study settings", () => {
     expect(d.ichimoku).toEqual({ conversion: 9, base: 26, spanB: 52, displacement: 26 });
     expect(d.supertrend).toEqual({ length: 10, multiplier: 3 });
     expect(d.pivotType).toBe("classic");
+    expect(d.zigzag).toEqual({ percent: 5 });
+    expect(d.linreg).toEqual({ length: 100, deviations: 2 });
+    expect(d.stochrsi).toEqual({ rsi: 14, stoch: 14, k: 3, d: 3 });
+    expect([d.aroon.length, d.cmf.length, d.roc.length]).toEqual([25, 20, 9]);
   });
 
   it("clamps, rounds and rejects bad values", () => {

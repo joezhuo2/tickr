@@ -14,6 +14,15 @@ export const SETTING_FIELDS = {
   cci: { length: len(20) },
   willr: { length: len(14) },
   mfi: { length: len(14) },
+  wma: { length: len(20) },
+  hma: { length: len(20) },
+  vwma: { length: len(20) },
+  zigzag: { percent: { label: "Reversal %", def: 5, min: 0.1, max: 50, step: 0.1 } },
+  linreg: { length: { label: "Length", def: 100, min: 2, max: 500, step: 1 }, deviations: { label: "Deviations", def: 2, min: 0.5, max: 5, step: 0.1 } },
+  stochrsi: { rsi: len(14, "RSI length"), stoch: len(14, "Stoch length"), k: len(3, "%K"), d: len(3, "%D") },
+  aroon: { length: len(25) },
+  cmf: { length: len(20) },
+  roc: { length: len(9) },
   psar: { step: { label: "Step", def: 0.02, min: 0.001, max: 1, step: 0.001 }, max: { label: "Max", def: 0.2, min: 0.01, max: 1, step: 0.01 } },
 } as const;
 
@@ -32,6 +41,15 @@ export const SETTING_LABELS: Record<SettingGroup, string> = {
   cci: "CCI",
   willr: "Williams %R",
   mfi: "MFI",
+  wma: "WMA",
+  hma: "Hull MA",
+  vwma: "VWMA",
+  zigzag: "ZigZag",
+  linreg: "Linear regression",
+  stochrsi: "Stoch RSI",
+  aroon: "Aroon",
+  cmf: "CMF",
+  roc: "ROC",
   psar: "Parabolic SAR",
 };
 

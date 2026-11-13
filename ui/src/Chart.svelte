@@ -16,7 +16,7 @@
   import { untrack } from "svelte";
   import { axisRange } from "./lib/scrollback";
   import { clamp } from "./lib/viewport";
-  import { cci, donchian, ichimoku, keltner, mfi, obv, parabolicSar, pivotPeriod, pivots, stochastic, supertrend, williamsR } from "./lib/studies";
+  import { aroon, cci, cmf, donchian, hma, ichimoku, keltner, linearRegression, mfi, obv, parabolicSar, pivotPeriod, pivots, roc, stochRsi, stochastic, supertrend, vwma, williamsR, wma, zigzag } from "./lib/studies";
   import { studies, studySettings as ss } from "./lib/studyStore.svelte";
   import { displayCandles, isOhlc, isReshaped, type Brick } from "./lib/charttypes";
   import { typeSettings } from "./lib/typeStore.svelte";
@@ -136,6 +136,15 @@
   const commodity = $derived(studies.cci ? cci(candles, ss.cci.length) : null);
   const williams = $derived(studies.willr ? williamsR(candles, ss.willr.length) : null);
   const moneyFlow = $derived(studies.mfi ? mfi(candles, ss.mfi.length) : null);
+  const weightedMa = $derived(studies.wma ? wma(candles, ss.wma.length) : null);
+  const hullMa = $derived(studies.hma ? hma(candles, ss.hma.length) : null);
+  const volumeMa = $derived(studies.vwma ? vwma(candles, ss.vwma.length) : null);
+  const zig = $derived(studies.zigzag ? zigzag(candles, ss.zigzag.percent) : null);
+  const regression = $derived(studies.linreg ? linearRegression(candles, ss.linreg.length, ss.linreg.deviations) : null);
+  const stochStrength = $derived(studies.stochrsi ? stochRsi(candles, ss.stochrsi.rsi, ss.stochrsi.stoch, ss.stochrsi.k, ss.stochrsi.d) : null);
+  const aroonLines = $derived(studies.aroon ? aroon(candles, ss.aroon.length) : null);
+  const chaikin = $derived(studies.cmf ? cmf(candles, ss.cmf.length) : null);
+  const rateOfChange = $derived(studies.roc ? roc(candles, ss.roc.length) : null);
   const sessionKeys = $derived.by(() => {
     if (!studies.svp || !chart) return null;
     const period = pivotPeriod(chart.interval, chart.meta.gmtoffset ?? 0);
@@ -183,7 +192,7 @@
   }
   const rsiOn = $derived(!!show?.rsi);
   const macdOn = $derived(!!show?.macd);
-  const paneOn = (id: PaneId) => (id === "rsi" ? rsiOn : id === "macd" ? macdOn : id === "stoch" ? !!stoch : id === "cci" ? !!commodity : id === "willr" ? !!williams : id === "mfi" ? !!moneyFlow : !!onBalance);
+  const paneOn = (id: PaneId) => (id === "rsi" ? rsiOn : id === "macd" ? macdOn : id === "stoch" ? !!stoch : id === "cci" ? !!commodity : id === "willr" ? !!williams : id === "mfi" ? !!moneyFlow : id === "stochrsi" ? !!stochStrength : id === "aroon" ? !!aroonLines : id === "cmf" ? !!chaikin : id === "roc" ? !!rateOfChange : !!onBalance);
   const shownPanes = $derived(visibleGroups(panes.groups, paneOn));
   const leftAxis = $derived(panes.left !== "off" || shownPanes.some((g) => g.length > 1));
   let maxPane = $state<Slot | null>(null);
@@ -1121,7 +1130,7 @@
   }
 
   function drawStudies(ctx: CanvasRenderingContext2D, g: Geo, v: (name: string) => string) {
-    if (g.n === 0 || !(stoch || ichi || trendLine || onBalance || pivotLevels || sessionKeys || keltnerBands || donchianBands || sar)) return;
+    if (g.n === 0 || !(stoch || ichi || trendLine || onBalance || pivotLevels || sessionKeys || keltnerBands || donchianBands || sar || weightedMa || hullMa || volumeMa || zig || regression)) return;
     const at = hover != null && candles[hover] ? hover : g.i1;
     const right = width - PAD.r;
     ctx.save();
@@ -1236,6 +1245,33 @@
       }
       legend(legendText(`SAR ${ss.psar.step} ${ss.psar.max}`, [sar.value[at]]), v(sar.up[at] ? "--up" : "--down"));
     }
+    for (const [line, col, name] of [[weightedMa, "--ma-1", `WMA ${ss.wma.length}`], [hullMa, "--ma-2", `HMA ${ss.hma.length}`], [volumeMa, "--accent", `VWMA ${ss.vwma.length}`]] as const) {
+      if (!line) continue;
+      ctx.strokeStyle = v(col);
+      plot(ctx, g, line, g.y);
+      legend(legendText(name, [line[at]]), v(col));
+    }
+    if (zig) {
+      ctx.strokeStyle = v("--accent");
+      ctx.beginPath();
+      let started = false;
+      zig.forEach((val, i) => {
+        if (val == null) return;
+        if (started) ctx.lineTo(g.x(i), g.y(val));
+        else ctx.moveTo(g.x(i), g.y(val));
+        started = true;
+      });
+      ctx.stroke();
+      legend(`ZigZag ${ss.zigzag.percent}%`, v("--accent"));
+    }
+    if (regression) {
+      ctx.lineWidth = 1;
+      for (const [line, col] of [[regression.upper, "--down"], [regression.mid, "--muted"], [regression.lower, "--up"]] as const) {
+        ctx.strokeStyle = v(col);
+        plot(ctx, g, line, g.y);
+      }
+      legend(legendText(`LinReg ${ss.linreg.length} ${ss.linreg.deviations}`, [regression.upper[at], regression.mid[at], regression.lower[at]]), v("--muted"));
+    }
     ctx.restore();
     if (lx > PAD.l + 4) legendY += 12;
     ctx.font = `11px ${v("--font")}`;
@@ -1264,6 +1300,12 @@
       for (let i = g.i0; i <= g.i1; i++) { lo = Math.min(lo, commodity[i] ?? lo); hi = Math.max(hi, commodity[i] ?? hi); }
       return { y: (val) => top + h * (0.92 - ((val - lo) / (hi - lo)) * 0.84), ticks: [[100, "100"], [0, "0"], [-100, "-100"]] };
     }
+    if ((id === "roc" && rateOfChange) || (id === "cmf" && chaikin)) {
+      const s = id === "roc" ? rateOfChange! : chaikin!;
+      let extent = 1e-9;
+      for (let i = g.i0; i <= g.i1; i++) extent = Math.max(extent, Math.abs(s[i] ?? 0));
+      return { y: (val) => top + h * (0.5 - val / (extent * 2.4)), ticks: [[0, "0"]] };
+    }
     if (id === "willr") return { y: (val) => top + (-val / 100) * h, ticks: [[-20, "-20"], [-80, "-80"]] };
     return { y: (val) => top + (1 - val / 100) * h, ticks: (id === "rsi" ? [30, 50, 70] : [20, 80]).map((t) => [t, String(t)]) };
   }
@@ -1288,7 +1330,7 @@
     ctx.clip();
     if (axis === "right" && id !== "obv") {
       for (const [t] of ticks) {
-        const solid = id === "macd" || t === 50 || (id === "cci" && t === 0);
+        const solid = id === "macd" || id === "roc" || id === "cmf" || t === 50 || (id === "cci" && t === 0);
         ctx.strokeStyle = v(solid ? "--grid" : "--muted");
         ctx.setLineDash(solid ? [] : [2, 3]);
         ctx.beginPath();
@@ -1347,6 +1389,29 @@
       ctx.strokeStyle = col;
       plot(ctx, g, moneyFlow, y);
       legend = legendText(`MFI ${ss.mfi.length}`, [moneyFlow[at]], 1);
+    } else if (id === "stochrsi" && stochStrength) {
+      ctx.strokeStyle = col;
+      plot(ctx, g, stochStrength.k, y);
+      ctx.strokeStyle = v("--ma-2");
+      plot(ctx, g, stochStrength.d, y);
+      legend = legendText(`Stoch RSI ${ss.stochrsi.rsi} ${ss.stochrsi.stoch} ${ss.stochrsi.k} ${ss.stochrsi.d}`, [stochStrength.k[at], stochStrength.d[at]], 1);
+    } else if (id === "aroon" && aroonLines) {
+      col = v("--up");
+      ctx.strokeStyle = col;
+      plot(ctx, g, aroonLines.up, y);
+      ctx.strokeStyle = v("--down");
+      plot(ctx, g, aroonLines.down, y);
+      legend = legendText(`Aroon ${ss.aroon.length}`, [aroonLines.up[at], aroonLines.down[at]], 1);
+    } else if (id === "cmf" && chaikin) {
+      col = v("--accent");
+      ctx.strokeStyle = col;
+      plot(ctx, g, chaikin, y);
+      legend = legendText(`CMF ${ss.cmf.length}`, [chaikin[at]], 3);
+    } else if (id === "roc" && rateOfChange) {
+      col = v("--ma-1");
+      ctx.strokeStyle = col;
+      plot(ctx, g, rateOfChange, y);
+      legend = legendText(`ROC ${ss.roc.length}`, [rateOfChange[at]], 2);
     } else if (id === "obv" && onBalance) {
       col = v("--accent");
       ctx.strokeStyle = col;
@@ -1397,7 +1462,7 @@
 
   $effect(() => {
     // Redraw when any of these change.
-    void [rr.reward, stoch, ichi, trendLine, onBalance, keltnerBands, donchianBands, sar, commodity, williams, moneyFlow, pivotLevels, sessionKeys, redrawKey, list, preview, selected, tool, hideDrawings, orderLines, orderDrag, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt, fillMarks, highlight];
+    void [rr.reward, stoch, ichi, trendLine, onBalance, keltnerBands, donchianBands, sar, commodity, williams, moneyFlow, weightedMa, hullMa, volumeMa, zig, regression, stochStrength, aroonLines, chaikin, rateOfChange, pivotLevels, sessionKeys, redrawKey, list, preview, selected, tool, hideDrawings, orderLines, orderDrag, candles, mode, width, height, hover, linkedIndex, geo, sessions, shadeSessions, timeZone, analysis, show && { ...show }, earningsAt, ratingsAt, newsAt, dividendsAt, splitsAt, fillMarks, highlight];
     draw();
   });
 
