@@ -1,5 +1,6 @@
 <script lang="ts">
   import { direction, fullTime, price, quarterLabel, signed, volume } from "./lib/format";
+  import { periodLabel } from "./lib/financials";
   import type { Earnings } from "./lib/types";
 
   let { symbol, earnings }: { symbol: string; earnings: Earnings | null | undefined } = $props();
@@ -55,7 +56,7 @@
     </div>
     <div class="col">
       <h2>Past reports</h2>
-      {#if earnings.history.length}
+      {#if earnings.history.length || earnings.older.length}
         <div class="scroll"><table>
           <thead>
             <tr><th>Quarter</th><th>Reported</th><th>Estimate</th><th>Actual</th><th>Surprise</th><th>Revenue</th></tr>
@@ -69,6 +70,16 @@
                 <td>{price(r.eps_actual, currency)}</td>
                 <td class={direction(r.surprise_pct)}>{r.surprise_pct == null ? "—" : `${signed(r.surprise_pct)}%`}</td>
                 <td>{volume(r.revenue)}</td>
+              </tr>
+            {/each}
+            {#each earnings.older as o (o.date)}
+              <tr>
+                <td>{periodLabel(o.date, "quarterly")}</td>
+                <td>—</td>
+                <td>—</td>
+                <td>{price(o.eps_actual, currency)}</td>
+                <td>—</td>
+                <td>{volume(o.revenue)}</td>
               </tr>
             {/each}
           </tbody>
