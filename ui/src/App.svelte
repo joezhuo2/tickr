@@ -32,6 +32,7 @@
     RANGES,
     baseFor,
     isCustom,
+    intervalLabel,
     intervalsFor,
     nextInterval,
     validInterval,
@@ -503,8 +504,8 @@
   }
 
   /** Shows the cached chart (or a skeleton) at once, then fetches if stale. */
-  async function loadChart(force = false, manual = false) {
-    if (replay) return;
+  async function loadChart(force = false, manual = false, retime = false) {
+    if (replay && !retime) return;
     const mine = ++chartSeq;
     const key = cacheKey();
     const hit = cache.get(key);
@@ -522,11 +523,13 @@
       const merged = withOlder(key, c);
       cache.set(key, { chart: merged, at: Date.now() });
       chart = aggregateChart(merged, interval);
+      if (retime) retimeReplay(chart);
       chartAt = Date.now();
       loading = false;
       if (shouldAnalyze(!!analysis, indicators?.keep_analysis ?? false)) void runAnalysis(true);
     } catch (e) {
       if ((!manual || !chart) && mine === chartSeq) chartError = String(e);
+      if (retime && mine === chartSeq && replay) replayNote = `Could not load ${intervalLabel(interval)} candles: ${e}`;
       return String(e);
     } finally {
       if (mine === chartSeq) loading = false;
@@ -643,25 +646,13 @@
   let replayAnalysisBusy = false;
   let replayAnalysisAgain = false;
   let replayIndicatorsChanged = false;
+  let replayFiner = $state.raw<Candle[]>([]);
+  let replayNote = $state<string | null>(null);
   const replayCursor = $derived(replay?.cursor ?? -1);
+  const replaySettled = $derived(replay ? Replay.settled(replay) : -1);
   const replayPlaying = $derived(replay?.playing ?? false);
   const replayCutoff = $derived(replay ? Replay.cutoff(replayBars, replay) : Infinity);
-  const replayChart = $derived.by<Chart | null>(() => {
-    const base = replayBase;
-    const cursor = replayCursor;
-    const cut = replayCutoff;
-    if (!base || cursor < 0) return null;
-    const candles = Replay.revealed(replayBars, untrack(() => replay)!);
-    const last = candles[candles.length - 1];
-    return {
-      ...base,
-      meta: { ...base.meta, price: last.c, market_time: last.t },
-      candles,
-      dividends: Replay.known(base.dividends, (d) => d.t, cut),
-      splits: Replay.known(base.splits, (s) => s.t, cut),
-      last_bar_time: last.t,
-    };
-  });
+  const replayChart = $derived(replayBase && replayCursor >= 0 ? Replay.chartAt(replayBase, replayCutoff, replayFiner) : null);
   const replayLastTime = $derived(replayChart ? replayChart.candles[replayChart.candles.length - 1].t : -Infinity);
   const shownReplayAnalysis = $derived(replayAnalysis && replayAnalysis.as_of <= replayLastTime ? replayAnalysis : null);
   const replayIntraday = $derived(replayBase ? isIntraday(replayBase.interval) : false);
@@ -715,6 +706,8 @@
     replaySession++;
     replayBars = base.candles;
     replayBase = base;
+    replayFiner = [];
+    replayNote = null;
     replayAnalysis = null;
     replayAnalysisError = null;
     replayAnalyzing = false;
@@ -903,6 +896,8 @@
     practiceRunId = null;
     replayBars = [];
     replayBase = null;
+    replayFiner = [];
+    replayNote = null;
     replayAnalysis = null;
     replayAnalysisError = null;
     replayAnalyzing = false;
@@ -925,18 +920,39 @@
     const next = Replay.startAt(replayBars.map((b) => ({ t: b.t + replayOffset(b.t) })), wall, Replay.MIN_CONTEXT, replay.speed);
     if (next) {
       replay = next;
+      replayNote = null;
       openPaperBook();
     }
   }
 
+  function retimeReplay(base: Chart) {
+    const s = replay;
+    if (!s || practice) return;
+    const next = Replay.seekTime(base.candles, Replay.cutoff(replayBars, s), s.speed, s.playing);
+    if (!next) {
+      replayNote = `No ${intervalLabel(base.interval)} candles reach the replay moment`;
+      return;
+    }
+    replayFiner = s.forming != null && replayFiner.length ? replayFiner : (replayChart?.candles ?? []);
+    replaySession++;
+    replayBars = base.candles;
+    replayBase = base;
+    replayAnalysis = null;
+    replayAnalysisError = null;
+    replayNote = null;
+    replay = next;
+    openPaperBook(paperBook ? Paper.bookAccount(paperBook) : undefined);
+    if (replayAnalyzeOn || indicators?.keep_analysis) void runReplayAnalysis(true);
+  }
+
   function openPaperBook(account = Paper.newAccount(paper.starting_cash, paper.costs)) {
-    paperBook = replay ? Paper.openBook(account, replay.cursor) : null;
+    paperBook = replay ? Paper.openBook(account, Replay.settled(replay)) : null;
     paperError = null;
     paperNotice = null;
   }
 
   $effect(() => {
-    const cursor = replayCursor;
+    const cursor = replaySettled;
     if (cursor < 0) return;
     untrack(() => {
       if (!paperBook || !replay) return;
@@ -999,7 +1015,7 @@
         return;
       }
       const bar = replayBars[replay.cursor];
-      r = Paper.placeOrder(account, req, bar.t, bar.c);
+      r = Paper.placeOrder(account, req, bar.t, paperMark ?? bar.c);
     } else if (req.kind === "market") {
       if (liveBlock || !quote) {
         paperError = liveBlock ?? "No live quote yet";
@@ -1114,7 +1130,7 @@
   });
 
   $effect(() => {
-    if (replayCursor < 0) return;
+    if (replaySettled < 0) return;
     untrack(() => {
       if (replayAnalyzeOn || indicators?.keep_analysis) void runReplayAnalysis(true);
     });
@@ -1141,18 +1157,18 @@
       do {
         replayAnalysisAgain = false;
         if (!replay || session !== replaySession) return;
-        until = replayBars[replay.cursor].t;
+        until = replayBars[Replay.settled(replay)].t;
         try {
           const a = await invoke<Analysis>("analyze", { ...req, until });
           if (!replay || session !== replaySession) return;
-          if (a.as_of <= replayBars[replay.cursor].t) {
+          if (a.as_of <= replayBars[Replay.settled(replay)].t) {
             replayAnalysis = { ...a, interval: replayBase?.interval ?? a.interval };
             replayAnalysisError = null;
           }
         } catch (e) {
           if (session === replaySession) replayAnalysisError = String(e);
         }
-      } while (replayAnalysisAgain || (replay && session === replaySession && replayBars[replay.cursor].t !== until));
+      } while (replayAnalysisAgain || (replay && session === replaySession && replayBars[Replay.settled(replay)].t !== until));
     } finally {
       replayAnalysisBusy = false;
       if (session === replaySession) replayAnalyzing = false;
@@ -1163,7 +1179,7 @@
   const activeAnalysis = $derived(analysis && analysisKey === cacheKey() ? analysis : null);
   const techAnalysis = $derived(replay ? shownReplayAnalysis : activeAnalysis);
   const mainChart = $derived(replay ? replayChart : chart);
-  const split = $derived(layout.split && !replay);
+  const split = $derived(layout.split && !practice);
   const analysisOffset = $derived(
     techAnalysis && mainChart
       ? displayOffset(techAnalysis.as_of, chartTimeZone, { timezone: mainChart.meta.timezone, gmtoffset: mainChart.meta.gmtoffset }, techAnalysis.interval)
@@ -1358,7 +1374,7 @@
 
   function changeInterval(next: string) {
     if (next === interval) return;
-    exitReplay();
+    if (practice) exitReplay();
     const r = Scrollback.rangeFor(range, next);
     const moved = r !== range;
     range = r;
@@ -1371,7 +1387,7 @@
         .then(() => (moved ? invoke<void>("set_range", { range: r }) : undefined))
         .then(() => invoke<void>("set_interval", { interval: saved }))
         .catch(console.warn);
-    loadChart(true);
+    loadChart(true, false, !!replay);
   }
 
   async function loadMarket(manual = false) {
@@ -1982,7 +1998,7 @@
           <div class="seg" role="group" aria-label="Chart layout">
             {#each [{ id: "single", label: "1", title: "One chart" }, { id: "side", label: "Side", title: "Two charts side by side" }, { id: "stacked", label: "Stack", title: "Two charts stacked" }] as l (l.id)}
               {@const on = view === "chart" && (l.id === "single" ? !layout.split : layout.split && layout.orientation === l.id)}
-              <button class:on aria-pressed={on} title={l.title} aria-label={l.title} disabled={!!replay} onclick={() => saveLayout(l.id === "single" ? { split: false } : { split: true, orientation: l.id as ChartLayout["orientation"] })}>{l.label}</button>
+              <button class:on aria-pressed={on} title={l.title} aria-label={l.title} disabled={!!practice} onclick={() => saveLayout(l.id === "single" ? { split: false } : { split: true, orientation: l.id as ChartLayout["orientation"] })}>{l.label}</button>
             {/each}
             <button class="icon" title="Open {symbol} in a new window ({keyLabel(keybinds.new_window)})" aria-label="Open in new window" disabled={!!replay} onclick={openWindow}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-8 8M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" /></svg>
@@ -1990,7 +2006,7 @@
           </div>
           {#if layout.split}
             <div class="seg" role="group" aria-label="Chart sync">
-              <button class:on={layout.sync_range} aria-pressed={layout.sync_range} title="Pan and zoom both charts together" disabled={!!replay} onclick={() => saveLayout({ sync_range: !layout.sync_range })}>Sync</button>
+              <button class:on={layout.sync_range} aria-pressed={layout.sync_range} title="Pan and zoom both charts together" disabled={!!practice} onclick={() => saveLayout({ sync_range: !layout.sync_range })}>Sync</button>
             </div>
           {/if}
           <div class="seg" role="group" aria-label="Bar replay">
@@ -2018,6 +2034,7 @@
             min={replayInput(replayBars[Replay.MIN_CONTEXT].t)}
             max={replayInput(replayBars[replayBars.length - 1].t)}
             when={replayHeader?.when ?? ""}
+            note={replayNote}
             onstart={restartReplay}
             ontoggle={() => replayUpdate(Replay.toggle)}
             onstep={() => replayUpdate(Replay.step)}
@@ -2162,9 +2179,11 @@
                     {scale}
                     {shadeSessions}
                     timeZone={chartTimeZone}
-                    {drawings}
+                    drawings={replay ? tempDrawings : drawings}
                     {drawingBusy}
-                    {saveDrawings}
+                    saveDrawings={replay ? saveTempDrawings : saveDrawings}
+                    replayAt={replay ? replayCutoff : null}
+                    finer={replayChart?.candles ?? []}
                     linkedTime={syncHover?.source === "main" ? syncHover.t : null}
                     onhovertime={(t) => hoverFrom("second", t)}
                     linkedWindow={layout.sync_range && syncWindow?.source === "main" ? syncWindow.w : null}

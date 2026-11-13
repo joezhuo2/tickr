@@ -6,6 +6,15 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.64] - 2026-11-12
+
+### Added
+- **Multi-timeframe replay:** change the candle interval during bar replay to
+  zoom in or out on the same moment. A higher-timeframe candle that is still
+  forming is built from the finer candles revealed so far, never its final
+  close. The split layout stays on in replay, and the second chart follows the
+  same moment on its own interval.
+
 ## [0.11.63] - 2026-11-12
 
 ### Fixed
