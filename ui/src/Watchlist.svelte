@@ -17,6 +17,7 @@
     view,
     columns,
     screens,
+    screenColumns,
     tab = $bindable(),
     onopen,
     ongroups,
@@ -25,6 +26,7 @@
     oncolumns,
     onsavescreen,
     ondeletescreen,
+    onscreencolumns,
   }: {
     symbols: string[];
     refreshMode: RefreshMode;
@@ -35,6 +37,7 @@
     view: WatchlistView;
     columns: WatchlistColumns;
     screens: SavedScreen[];
+    screenColumns: string[];
     tab: string | null;
     onopen: (symbol: string) => void;
     ongroups: (groups: Group[]) => void;
@@ -43,6 +46,7 @@
     oncolumns: (columns: WatchlistColumns) => void;
     onsavescreen: (name: string, rules: ScreenRule[]) => Promise<string | undefined>;
     ondeletescreen: (name: string) => void;
+    onscreencolumns: (columns: string[]) => void;
   } = $props();
 
   let screening = $state(false);
@@ -269,7 +273,7 @@
       {/if}
     </div>
     {#if screening && !editing}
-      <Screener symbols={order} {screens} {onopen} onsave={onsavescreen} ondelete={ondeletescreen} />
+      <Screener symbols={order} {screens} columns={screenColumns} {onopen} onsave={onsavescreen} ondelete={ondeletescreen} oncolumns={onscreencolumns} />
     {:else if tableOn}
       <WatchTable symbols={order} {quotes} {moves} {current} {columns} {onopen} {oncolumns} />
     {:else if mapOn}

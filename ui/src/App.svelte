@@ -227,6 +227,7 @@
   let watchlistLayout = $state<WatchlistView>("cards");
   let watchlistColumns = $state<WatchlistColumns>(DEFAULT_WATCHLIST_COLUMNS);
   let screens = $state<SavedScreen[]>([]);
+  let screenColumns = $state<string[]>([]);
   let groupTab = $state<string | null>(null);
   let alerts = $state<PriceAlert[]>([]);
   let recent = $state<string[]>([]);
@@ -356,6 +357,7 @@
     watchlistLayout = init.watchlist_view ?? "cards";
     watchlistColumns = init.watchlist_columns ?? DEFAULT_WATCHLIST_COLUMNS;
     screens = init.screens ?? [];
+    screenColumns = init.screen_columns ?? [];
     eventFilter = savedEventFilter = init.event_filter ?? DEFAULT_EVENT_FILTER;
     alerts = init.alerts ?? [];
     recent = init.recent_symbols ?? [];
@@ -1320,6 +1322,11 @@
     invoke("set_watchlist_columns", { columns: next }).catch(console.warn);
   }
 
+  function saveScreenColumns(next: string[]) {
+    screenColumns = next;
+    invoke("set_screen_columns", { columns: next }).catch(console.warn);
+  }
+
   async function saveScreen(name: string, rules: ScreenRule[]): Promise<string | undefined> {
     try {
       screens = await invoke<SavedScreen[]>("save_screen", { name, rules });
@@ -2058,7 +2065,7 @@
         {/if}
             {#snippet panel()}
             {#if view === "watchlist"}
-              <Watchlist bind:this={watchlistView} {refreshMode} symbols={watchlist} {groups} current={symbol} sort={watchlistSort} view={watchlistLayout} columns={watchlistColumns} {screens} bind:tab={groupTab} onopen={openWatched} ongroups={saveGroups} onsort={saveSort} onview={saveWatchlistLayout} oncolumns={saveWatchlistColumns} onsavescreen={saveScreen} ondeletescreen={deleteScreen} />
+              <Watchlist bind:this={watchlistView} {refreshMode} symbols={watchlist} {groups} current={symbol} sort={watchlistSort} view={watchlistLayout} columns={watchlistColumns} {screens} {screenColumns} bind:tab={groupTab} onopen={openWatched} ongroups={saveGroups} onsort={saveSort} onview={saveWatchlistLayout} oncolumns={saveWatchlistColumns} onsavescreen={saveScreen} ondeletescreen={deleteScreen} onscreencolumns={saveScreenColumns} />
             {:else if view === "analysts"}
               <Analysts {symbol} {quote} {analyst} />
             {:else if view === "earnings"}
