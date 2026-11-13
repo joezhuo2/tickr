@@ -185,3 +185,8 @@ describe("opening range breakout", () => {
     expect(() => backtest(day, { entry: "close > 1", entry_stop: "close > 1", exit: "", stop_pct: null, target_pct: null })).toThrow();
   });
 });
+
+it("labels a sweep parameter by the call it sits in", () => {
+  const labels = parameters({ entry: "crosses_above(ema(20), sma(50)) and close > 5", exit: "rsi(14) > 70" } as Parameters<typeof parameters>[0]).map((p) => p.label);
+  expect(labels).toEqual(["Entry: ema(20)", "Entry: sma(50)", "Entry: 5", "Exit: rsi(14)", "Exit: 70"]);
+});

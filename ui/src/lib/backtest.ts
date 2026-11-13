@@ -157,7 +157,8 @@ export function parameters(rules: Rules): Param[] {
     const text = rules[f] ?? "";
     [...text.matchAll(NUMBER)].forEach((m, i) => {
       const at = m.index!;
-      out.push({ id: `${f}:${i}`, label: `${FIELD_LABEL[f]}: ${text.slice(Math.max(0, at - 8), at + m[0].length + 1).trim()}`, value: Number(m[0]) });
+      const fn = /([a-z_]+)\(\s*$/i.exec(text.slice(0, at))?.[1];
+      out.push({ id: `${f}:${i}`, label: `${FIELD_LABEL[f]}: ${fn ? `${fn}(${m[0]})` : m[0]}`, value: Number(m[0]) });
     });
   }
   if (rules.stop_pct != null) out.push({ id: "stop_pct", label: "Stop-loss %", value: rules.stop_pct });
