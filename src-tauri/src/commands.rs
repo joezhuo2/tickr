@@ -1111,7 +1111,7 @@ mod tests {
         use crate::settings::{Drawing, DrawingPoint};
         let dir = tempfile::tempdir().unwrap();
         let shared = Shared::new(dir.path().join("settings.json"), Default::default());
-        let d = Drawing { id: 1, kind: "hline".into(), points: vec![DrawingPoint { t: 100, price: 10.0 }], text: String::new(), color: "#ef4444".into(), width: 2, dashed: true, locked: true, hidden: true, created: 0, edited: 0 };
+        let d = Drawing { id: 1, kind: "hline".into(), points: vec![DrawingPoint { t: 100, price: 10.0 }], text: String::new(), color: "#ef4444".into(), width: 2, dashed: true, locked: true, hidden: true, created: 0, edited: 0, icon: String::new(), visible: Vec::new() };
         edit_drawings(&shared, "aapl".into(), vec![d.clone()]).unwrap();
         let saved = Settings::load(&shared.settings_path);
         assert_eq!(saved.drawings["AAPL"], vec![d.clone()]);
@@ -1139,7 +1139,7 @@ mod tests {
         for color in ["red", "#12345", "#12345g"] {
             let mut bad = d.clone(); bad.color = color.into(); invalid.push(vec![bad]);
         }
-        let mut bad = d.clone(); bad.width = 5; invalid.push(vec![bad]);
+        let mut bad = d.clone(); bad.width = 9; invalid.push(vec![bad]);
         invalid.push(vec![d.clone(), d.clone()]);
         invalid.push((0..201).map(|id| Drawing { id, ..d.clone() }).collect());
         for drawings in invalid {
