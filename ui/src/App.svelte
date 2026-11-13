@@ -4,6 +4,7 @@
   import * as ChartAlertRules from "./lib/chartAlerts";
   import { chartAlerts, fireChartAlerts, startBackgroundChartAlerts } from "./lib/chartAlertStore.svelte";
   import { CHART_MODES, nextMode } from "./lib/charttypes";
+  import { changeTypeSettings, typeSettings } from "./lib/typeStore.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -2007,6 +2008,20 @@
               <select aria-label="Chart type" value={mode} onchange={(event) => setMode(event.currentTarget.value as ChartMode)}>
                 {#each CHART_MODES as m}<option value={m.id}>{m.label}</option>{/each}
               </select>
+              {#if mode === "range"}
+                <input class="type-num" type="number" min="0" step="any" aria-label="Range bar size (0 for ATR)" title="Range size in price, 0 for ATR(14)" value={typeSettings.rangeSize} onchange={(e) => changeTypeSettings((s) => (s.rangeSize = e.currentTarget.valueAsNumber))} />
+              {:else if mode === "linebreak"}
+                <input class="type-num" type="number" min="2" max="5" step="1" aria-label="Line break count" title="Lines to break" value={typeSettings.lineBreak} onchange={(e) => changeTypeSettings((s) => (s.lineBreak = e.currentTarget.valueAsNumber))} />
+              {:else if mode === "kagi"}
+                <input class="type-num" type="number" min="0" step="any" aria-label="Kagi reversal (0 for ATR)" title="Reversal amount, 0 for ATR(14)" value={typeSettings.kagiAmount} onchange={(e) => changeTypeSettings((s) => (s.kagiAmount = e.currentTarget.valueAsNumber))} />
+                <select aria-label="Kagi reversal unit" value={typeSettings.kagiPercent ? "percent" : "price"} onchange={(e) => changeTypeSettings((s) => (s.kagiPercent = e.currentTarget.value === "percent"))}>
+                  <option value="price">Price</option>
+                  <option value="percent">%</option>
+                </select>
+              {:else if mode === "pointfigure"}
+                <input class="type-num" type="number" min="0" step="any" aria-label="Box size (0 for ATR)" title="Box size in price, 0 for ATR(14)" value={typeSettings.pfBox} onchange={(e) => changeTypeSettings((s) => (s.pfBox = e.currentTarget.valueAsNumber))} />
+                <input class="type-num" type="number" min="1" max="9" step="1" aria-label="Reversal boxes" title="Boxes to reverse" value={typeSettings.pfReversal} onchange={(e) => changeTypeSettings((s) => (s.pfReversal = e.currentTarget.valueAsNumber))} />
+              {/if}
             </div>
             <div class="seg" role="group" aria-label="Price scale">
               {#each ["linear", "log", "percent"] as s}
@@ -2574,6 +2589,12 @@
     border: 1px solid var(--faint);
     border-radius: 7px;
     padding: 2px;
+  }
+  .type-num {
+    width: 56px;
+    border: 0;
+    background: none;
+    color: var(--text);
   }
   .seg button {
     border: 0;

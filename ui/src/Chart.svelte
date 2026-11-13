@@ -15,7 +15,8 @@
   import { clamp } from "./lib/viewport";
   import { cci, donchian, ichimoku, keltner, mfi, obv, parabolicSar, pivotPeriod, pivots, stochastic, supertrend, williamsR } from "./lib/studies";
   import { studies, studySettings as ss } from "./lib/studyStore.svelte";
-  import { displayCandles, isOhlc } from "./lib/charttypes";
+  import { displayCandles, isOhlc, isReshaped, type Brick } from "./lib/charttypes";
+  import { typeSettings } from "./lib/typeStore.svelte";
   import { fadeIn } from "./lib/motion";
   import { patternInfo } from "./lib/patternInfo";
   import ColorPicker from "./ColorPicker.svelte";
@@ -104,7 +105,7 @@
     return () => clearInterval(tick);
   });
 
-  const candles = $derived(displayCandles(chart?.candles ?? [], mode));
+  const candles = $derived(displayCandles(chart?.candles ?? [], mode, typeSettings));
   const ohlc = $derived(isOhlc(mode));
   const isDay = $derived(chart?.range === "1d");
   const prevClose = $derived(isDay ? (chart?.meta.prev_close ?? null) : null);
@@ -494,6 +495,60 @@
           ctx.lineTo(c.x, Math.max(g.y(c.l), top + 1 / dpr));
         }
         ctx.strokeStyle = rising ? up : down;
+        ctx.stroke();
+      }
+      ctx.lineWidth = 1;
+    } else if (mode === "kagi") {
+      const stroke = (xa: number, ya: number, xb: number, yb: number, thick: boolean) => {
+        ctx.strokeStyle = thick ? up : down;
+        ctx.lineWidth = thick ? 3 : 1.2;
+        ctx.beginPath();
+        ctx.moveTo(xa, ya);
+        ctx.lineTo(xb, yb);
+        ctx.stroke();
+      };
+      for (let i = g.from; i <= g.to; i++) {
+        const b = candles[i] as Brick;
+        const x = g.x(i);
+        const y0 = g.y(b.o);
+        if (i > 0) stroke(g.x(i - 1), y0, x, y0, !!b.thick);
+        if (b.flip === undefined) stroke(x, y0, x, g.y(b.c), !!b.thick);
+        else {
+          stroke(x, y0, x, g.y(b.flip), !!b.thick);
+          stroke(x, g.y(b.flip), x, g.y(b.c), !b.thick);
+        }
+      }
+      ctx.lineWidth = 1;
+    } else if (mode === "pointfigure") {
+      ctx.lineWidth = 1.2;
+      for (let i = g.from; i <= g.to; i++) {
+        const b = candles[i] as Brick;
+        if (!b.box) continue;
+        const x = g.x(i);
+        const rising = b.c >= b.o;
+        const boxH = Math.abs(g.y(b.l + b.box) - g.y(b.l));
+        ctx.strokeStyle = rising ? up : down;
+        ctx.beginPath();
+        if (boxH < 4) {
+          ctx.moveTo(x, g.y(b.h));
+          ctx.lineTo(x, g.y(b.l));
+        } else {
+          const rx = Math.max(1, Math.min(bw / 2, boxH / 2) - 1);
+          const ry = boxH / 2 - 1;
+          for (let j = 0, n = Math.round((b.h - b.l) / b.box); j < n; j++) {
+            const cy = (g.y(b.l + j * b.box) + g.y(b.l + (j + 1) * b.box)) / 2;
+            if (cy < PAD.t - boxH || cy > PAD.t + g.priceH + boxH) continue;
+            if (rising) {
+              ctx.moveTo(x - rx, cy - ry);
+              ctx.lineTo(x + rx, cy + ry);
+              ctx.moveTo(x + rx, cy - ry);
+              ctx.lineTo(x - rx, cy + ry);
+            } else {
+              ctx.moveTo(x + rx, cy);
+              ctx.ellipse(x, cy, rx, ry, 0, 0, Math.PI * 2);
+            }
+          }
+        }
         ctx.stroke();
       }
       ctx.lineWidth = 1;
@@ -1341,7 +1396,7 @@
   let viewN = 0;
   let savedView: { key: string; view: View; n: number } | null = null;
   $effect(() => {
-    const base = chart ? `${chart.meta.symbol} ${chart.range} ${chart.interval}${mode === "renko" ? " renko" : ""}` : "";
+    const base = chart ? `${chart.meta.symbol} ${chart.range} ${chart.interval}${isReshaped(mode) ? ` ${mode}` : ""}` : "";
     const key = replay ? `${base} replay` : base;
     const n = candles.length;
     const current = untrack(() => view);
@@ -2258,10 +2313,19 @@
         {fullTime(tip.c.t, displayOffset(tip.c.t, timeZone, clock, chart.interval), chart.interval)}{#if timeZone === "local" && isIntraday(chart.interval)} {zoneLabel(tip.c.t, timeZone, clock, chart.interval)}{/if}{#if tip.ext}<span class="ext">ext</span>{/if}
       </div>
       <dl>
+        {#if mode === "kagi" || mode === "linebreak"}
+          <dt>From</dt><dd>{price(tip.c.o, chart.meta.currency)}</dd>
+          <dt>To</dt><dd class={tip.c.c >= tip.c.o ? "up" : "down"}>{tip.c.c > tip.c.o ? "↑" : "↓"} {price(tip.c.c, chart.meta.currency)}</dd>
+        {:else if mode === "pointfigure"}
+          <dt>Column</dt><dd class={tip.c.c >= tip.c.o ? "up" : "down"}>{tip.c.c >= tip.c.o ? "X" : "O"} × {Math.round((tip.c.h - tip.c.l) / ((tip.c as Brick).box || 1))}</dd>
+          <dt>Low</dt><dd>{price(tip.c.l, chart.meta.currency)}</dd>
+          <dt>High</dt><dd>{price(tip.c.h, chart.meta.currency)}</dd>
+        {:else}
         <dt>Open</dt><dd>{price(tip.c.o, chart.meta.currency)}</dd>
         <dt>High</dt><dd>{price(tip.c.h, chart.meta.currency)}</dd>
         <dt>Low</dt><dd>{price(tip.c.l, chart.meta.currency)}</dd>
         <dt>Close</dt><dd class={tip.c.c >= tip.c.o ? "up" : "down"}>{tip.c.c > tip.c.o ? "↑" : tip.c.c < tip.c.o ? "↓" : "→"} {price(tip.c.c, chart.meta.currency)}</dd>
+        {/if}
         <dt>Volume</dt><dd>{volume(tip.c.v)}</dd>
         {#if tip.rsi != null}<dt>RSI</dt><dd>{num(tip.rsi, 1)}</dd>{/if}
         {#each tip.macd as line}{#if line.value != null}<dt>{line.label}</dt><dd>{num(line.value, 2)}</dd>{/if}{/each}

@@ -23,6 +23,10 @@ pub enum ChartMode {
     Bars,
     Heikin,
     Renko,
+    Range,
+    Linebreak,
+    Kagi,
+    Pointfigure,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
