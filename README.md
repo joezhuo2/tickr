@@ -273,7 +273,12 @@ taskbar to keep it visible.
 - **Bar replay** (`Y`) starts at a historical date you choose. Play at an
   adjustable speed or step forward and back one candle at a time. Indicators
   use only the candles you've revealed. tickr hides live quotes and research
-  panels during the session.
+  panels during the session. Change the candle interval mid-replay to zoom
+  in or out on the same moment: a higher-timeframe candle that is still
+  forming is built from the finer candles revealed so far, never its final
+  close, and stepping back stops at the moment you switched. The split
+  layout stays on, and the second chart follows the same moment on its own
+  interval; each step advances one candle of the main chart.
 - **Paper trading** (`H`) simulates market, limit and stop orders for long and
   short positions. Set commission and slippage, track realized and unrealized
   P&L, and review fills on the chart. The account used with current quotes is
