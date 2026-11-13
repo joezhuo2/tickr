@@ -6,6 +6,20 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.82] - 2026-11-13
+
+### Added
+- **Search and commands:** the search box is now an overlay opened with the
+  Search button, `S` or Ctrl+K. Besides symbols it runs commands such as
+  `add alert nvda >= 170`, `nvda 5m`, `watch nvda`, `rsi on`, `type renko`,
+  `goto 2024-03-15`, `buy 10` and `settings hotkeys`, and shows what a command
+  will do before Enter runs it.
+- **Undo pill:** after a command that changes something, an Undo button appears
+  at the bottom right for four seconds; click it or press Ctrl+Z to revert.
+
+### Changed
+- **Header search box** is replaced by the Search button.
+
 ## [0.11.81] - 2026-11-13
 
 ### Added
