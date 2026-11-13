@@ -1,13 +1,26 @@
 import { paneLayout } from "./indicators";
 
-export const PANES = ["rsi", "macd", "stoch", "obv", "cci", "willr", "mfi", "stochrsi", "aroon", "cmf", "roc"] as const;
-export type PaneId = (typeof PANES)[number];
+export const PANES = ["rsi", "macd", "stoch", "obv", "cci", "willr", "mfi", "stochrsi", "aroon", "cmf", "roc", "rsi_study", "macd_study"] as const;
+export type PaneId = (typeof PANES)[number] | `${string}-${number}`;
 export type Slot = PaneId | "price";
 export const LEFT_SCALES = ["off", "same", "percent"] as const;
 export type LeftScale = (typeof LEFT_SCALES)[number];
 export interface PaneState { groups: Slot[][]; left: LeftScale }
 
-export const PANE_NAMES: Record<Slot, string> = { price: "Price", rsi: "RSI", macd: "MACD", stoch: "Stochastic", obv: "OBV", cci: "CCI", willr: "Williams %R", mfi: "MFI", stochrsi: "Stoch RSI", aroon: "Aroon", cmf: "CMF", roc: "ROC" };
+export const PANE_NAMES: Record<(typeof PANES)[number] | "price", string> = { price: "Price", rsi: "RSI", macd: "MACD", stoch: "Stochastic", obv: "OBV", cci: "CCI", willr: "Williams %R", mfi: "MFI", stochrsi: "Stoch RSI", aroon: "Aroon", cmf: "CMF", roc: "ROC", rsi_study: "RSI study", macd_study: "MACD study" };
+
+const extraPane = (id: string) => /^([a-z_]+)-(\d+)$/.exec(id);
+
+export function paneName(id: Slot): string {
+  const m = extraPane(id);
+  return m && (PANES as readonly string[]).includes(m[1]) ? `${PANE_NAMES[m[1] as (typeof PANES)[number]]} ${m[2]}` : (PANE_NAMES[id as (typeof PANES)[number]] ?? id);
+}
+
+export function withPanes(state: PaneState, ids: readonly PaneId[]): PaneState {
+  const seen = new Set(state.groups.flat());
+  const missing = ids.filter((id) => !seen.has(id));
+  return missing.length ? { ...state, groups: [...state.groups, ...missing.map((id) => [id])] } : state;
+}
 
 export function defaultPanes(): PaneState {
   return { groups: [["price"], ...PANES.map((id) => [id])], left: "off" };
@@ -20,7 +33,7 @@ export function cleanPanes(v: unknown): PaneState {
   const groups: Slot[][] = [];
   for (const g of Array.isArray(o.groups) ? o.groups : []) {
     if (!Array.isArray(g)) continue;
-    const ids = g.filter((id): id is Slot => typeof id === "string" && known.has(id) && !seen.has(id as Slot));
+    const ids = g.filter((id): id is Slot => typeof id === "string" && (known.has(id) || known.has(extraPane(id)?.[1] ?? "")) && !seen.has(id as Slot));
     ids.forEach((id) => seen.add(id));
     if (ids.length) groups.push(ids);
   }

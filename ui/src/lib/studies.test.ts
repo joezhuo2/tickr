@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { aroon, cci, cmf, donchian, hma, ichimoku, keltner, linearRegression, mfi, obv, parabolicSar, pivotPeriod, pivots, roc, stochRsi, stochastic, supertrend, vwma, williamsR, wma, zigzag } from "./studies";
+import { aggregate } from "./aggregate";
+import { aroon, cci, cmf, computeStudy, donchian, hma, ichimoku, instanceOutput, keltner, linearRegression, macd, mfi, obv, parabolicSar, pivotPeriod, pivots, roc, rsiSeries, stochRsi, stochastic, studyTimeframe, supertrend, vwma, williamsR, wma, zigzag } from "./studies";
 import type { Candle } from "./types";
 
 const k = (t: number, h: number, l: number, c: number, v = 10): Candle => ({ t, o: c, h, l, c, v });
@@ -169,5 +170,40 @@ describe("studies", () => {
     expect(cmf([k(0, 12, 8, 11, 10)], 1)).toEqual([0.5]);
     expect(cmf([k(0, 12, 8, 11, 10), k(1, 9, 9, 9, 30)], 2)[1]).toBeCloseTo(0.125);
     expect(roc(ramp(5), 2).slice(0, 3)).toEqual([null, null, 20]);
+  });
+});
+
+describe("study instances", () => {
+  const frame = { clock: { timezone: "UTC", gmtoffset: 0 }, periods: null };
+  const bars = [10, 12, 11, 13, 15, 14, 12, 11, 13, 16, 18, 17, 15, 14, 16, 19].map((p, i) => ({ t: i * 300, o: p - 0.5, h: p + 1, l: p - 1, c: p, v: 10 + i }));
+
+  it("computes RSI and MACD for their studies", () => {
+    expect(rsiSeries(ramp(4), 2)).toEqual([null, null, 100, 100]);
+    const m = macd(ramp(6), 2, 3, 2);
+    expect(m.line[1]).toBeNull();
+    expect(m.line[2]).toBeCloseTo(0.5);
+    expect(m.signal[3]).toBeCloseTo(0.5);
+    expect(m.hist[5]).toBeCloseTo(0);
+  });
+
+  it("maps a higher-timeframe study back to chart bars without lookahead", () => {
+    const inst = { key: "roc", study: "roc" as const, params: { length: 1 }, tf: "15m" };
+    const full = instanceOutput(inst, bars, "5m", frame);
+    for (let i = 0; i < bars.length; i++) expect(instanceOutput(inst, bars.slice(0, i + 1), "5m", frame).value[i]).toBe(full.value[i]);
+    const htf = computeStudy("roc", aggregate(bars, "15m", frame), { length: 1 });
+    expect([2, 5, 8, 11, 14].map((i) => full.value[i])).toEqual(htf.value.slice(0, 5));
+    expect(full.value[2]).toBeNull();
+    expect(full.value[3]).toBeCloseTo(((13 - 11) / 11) * 100);
+    expect(full.value[4]).toBeCloseTo(((15 - 11) / 11) * 100);
+  });
+
+  it("falls back to the chart's bars when the timeframe is not higher", () => {
+    expect(studyTimeframe("60m", "1d")).toBeNull();
+    expect(studyTimeframe("1d", "60m")).toBe("1d");
+    const inst = { key: "cci-2", study: "cci" as const, params: { length: 3 }, tf: "5m" };
+    expect(instanceOutput(inst, bars, "5m", frame).value).toEqual(cci(bars, 3));
+    const sides = computeStudy("supertrend", ramp(30), { length: 5, multiplier: 2 });
+    expect(sides.up[29]).toBe(sides.value[29]);
+    expect(sides.down[29]).toBeNull();
   });
 });

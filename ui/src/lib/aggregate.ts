@@ -91,6 +91,14 @@ export function aggregate(candles: readonly Candle[], interval: string, frame: F
   return out;
 }
 
+export function bucketIndex(candles: readonly Candle[], interval: string, frame: Frame): number[] {
+  const spec = intervalSpec(interval);
+  if (!spec) return candles.map((_, i) => i);
+  const keys = bucketsFor(candles, spec, frame);
+  let b = -1;
+  return keys.map((k, i) => (i > 0 && k === keys[i - 1] ? b : ++b));
+}
+
 export function aggregateChart(chart: Chart, interval: string): Chart {
   if (!isCustom(interval) || !intervalSpec(interval)?.bases.includes(chart.interval)) return chart;
   const frame = { clock: { timezone: chart.meta.timezone, gmtoffset: chart.meta.gmtoffset }, periods: chart.meta.periods, extended: chart.extended };
