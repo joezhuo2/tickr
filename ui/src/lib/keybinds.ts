@@ -59,7 +59,7 @@ export const ACTIONS: { id: Action; label: string; category: Category }[] = [
   { id: "add_watchlist", label: "Add stock to Watchlist", category: "watchlist" },
   { id: "next_group", label: "Next watchlist group", category: "watchlist" },
   { id: "side_panel", label: "Toggle stock overview", category: "general" },
-  { id: "search", label: "Focus search", category: "general" },
+  { id: "search", label: "Open search", category: "general" },
   { id: "previous_symbol", label: "Previous symbol", category: "general" },
   { id: "settings", label: "Toggle Settings", category: "general" },
 ];

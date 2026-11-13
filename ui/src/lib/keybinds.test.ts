@@ -87,6 +87,11 @@ describe("actionFor", () => {
     expect(actionFor(DEFAULTS, "0")).toBeNull();
     expect(actionFor({ ...DEFAULTS, search: "" }, "")).toBeNull();
   });
+
+  it("labels S as opening the search overlay", () => {
+    expect(actionFor(DEFAULTS, "s")).toBe("search");
+    expect(ACTIONS.find((a) => a.id === "search")?.label).toBe("Open search");
+  });
 });
 
 describe("rebind", () => {

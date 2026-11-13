@@ -28,6 +28,7 @@
   import { displayCandles, isOhlc, isReshaped, type Brick } from "./lib/charttypes";
   import { typeSettings } from "./lib/typeStore.svelte";
   import { fadeIn } from "./lib/motion";
+  import { MORE_TOOLS, TOOLS, type Tool } from "./lib/drawTools";
   import { patternInfo } from "./lib/patternInfo";
   import type { ChartPattern } from "./lib/chartPatterns";
   import ColorPicker from "./ColorPicker.svelte";
@@ -1621,46 +1622,6 @@
     if (w) onwindow(w);
   }
 
-  type Tool = "cursor" | "ruler" | Drawing["kind"];
-  const tools: { tool: Tool; label: string; icon: string }[] = [
-    { tool: "cursor", label: "Cursor", icon: "M5 3l14 8-6 2-2 6z" },
-    { tool: "hline", label: "Level", icon: "M3 12h18" },
-    { tool: "trend", label: "Trend", icon: "M4 19L20 5M4 19h.01M20 5h.01" },
-    { tool: "text", label: "Text", icon: "M6 6V4h12v2M12 4v16M9 20h6" },
-    { tool: "note", label: "Note", icon: "M5 4h14v12h-7l-4 4v-4H5z" },
-    { tool: "ruler", label: "Ruler", icon: "M3.5 15.5l12-12 5 5-12 12zM7 12l2 2M10 9l2 2M13 6l2 2" },
-    { tool: "pen", label: "Pen", icon: "M4 20l1-4L16 5l3 3L8 19zM14 7l3 3" },
-    { tool: "rect", label: "Box", icon: "M4 6h16v12H4z" },
-    { tool: "ray", label: "Ray", icon: "M5 18L20 7M15 6.5l5 .5-1 5M5 18h.01" },
-    { tool: "fib", label: "Fib", icon: "M3 4h18M3 9h18M3 15h18M3 20h18" },
-    { tool: "position", label: "R:R", icon: "M4 4h16v7H4zM4 11h16v9H4z" },
-    { tool: "avwap", label: "AVWAP", icon: "M4 6v14M4 18c5 0 6-8 11-8 2 0 3 1 5 1" },
-  ];
-  const moreTools: { tool: Drawing["kind"]; label: string }[] = [
-    { tool: "channel", label: "Channel" },
-    { tool: "vline", label: "Vertical line" },
-    { tool: "hray", label: "Horizontal ray" },
-    { tool: "arrow", label: "Arrow" },
-    { tool: "prange", label: "Price range" },
-    { tool: "drange", label: "Date range" },
-    { tool: "fibext", label: "Fib extension" },
-    { tool: "pitchfork", label: "Pitchfork" },
-    { tool: "vprofile", label: "Volume profile (range)" },
-    { tool: "arrowup", label: "Arrow up marker" },
-    { tool: "arrowdown", label: "Arrow down marker" },
-    { tool: "callout", label: "Callout" },
-    { tool: "impulse", label: "Elliott impulse (1-5)" },
-    { tool: "corrective", label: "Elliott correction (A-B-C)" },
-    { tool: "xabcd", label: "XABCD harmonic" },
-    { tool: "headshoulders", label: "Head and shoulders" },
-    { tool: "gannfan", label: "Gann fan" },
-    { tool: "fibfan", label: "Fib fan" },
-    { tool: "fibtime", label: "Fib time zones" },
-    { tool: "ellipse", label: "Ellipse" },
-    { tool: "polyline", label: "Polyline" },
-    { tool: "brush", label: "Brush" },
-    { tool: "icon", label: "Icon" },
-  ];
   const multi = (kind: string) => (POINT_COUNT[kind as Drawing["kind"]] ?? 0) >= 2;
   const handles = (kind: string) => multi(kind) || kind === "polyline";
   const stroked = (kind: string) => kind === "pen" || kind === "brush";
@@ -1782,6 +1743,18 @@
   export function drawTool(next: Tool) {
     if (!chart) return;
     chooseTool(tool === next ? "cursor" : next);
+  }
+
+  export function goTo(value: string) {
+    goToDate(value);
+  }
+
+  export function drawingsHidden() {
+    return hideDrawings;
+  }
+
+  export function setDrawingsHidden(on: boolean) {
+    if (hideDrawings !== on) toggleHideDrawings();
   }
 
   function chooseTool(next: Tool) {
@@ -2552,12 +2525,12 @@
   {#if chart}
     <div class="drawing-bar">
     <div class="drawing-tools" role="toolbar" aria-label="Drawing tools">
-      {#each tools as item}
+      {#each TOOLS as item}
         <button aria-label={item.label} aria-pressed={tool === item.tool} title={item.label} onclick={() => chooseTool(item.tool)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d={item.icon} /></svg></button>
       {/each}
-      <select aria-label="More drawing tools" value={moreTools.some((m) => m.tool === tool) ? tool : ""} onchange={(e) => chooseTool((e.currentTarget.value || "cursor") as Tool)}>
+      <select aria-label="More drawing tools" value={MORE_TOOLS.some((m) => m.tool === tool) ? tool : ""} onchange={(e) => chooseTool((e.currentTarget.value || "cursor") as Tool)}>
         <option value="">More</option>
-        {#each moreTools as item}<option value={item.tool}>{item.label}</option>{/each}
+        {#each MORE_TOOLS as item}<option value={item.tool}>{item.label}</option>{/each}
       </select>
       <button aria-label="Undo" aria-pressed={false} title="Undo (Ctrl+Z); redo (Ctrl+Shift+Z)" disabled={!history.past.length || drawingBusy} onclick={() => { cancelDrawing(); void changeDrawings("undo"); }}>Undo</button>
       <button aria-label="Delete" aria-pressed={false} title="Delete (Delete / Backspace)" disabled={selected == null || drawingBusy || !!selectedDrawing?.locked} onclick={removeDrawing}>Delete</button>
