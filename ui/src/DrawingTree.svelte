@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { DRAWING_NAMES, drawingSummary } from "./lib/drawing";
-  import type { Drawing } from "./lib/types";
+  import { DRAWING_NAMES, drawingSummary, visibleOn } from "./lib/drawing";
+  import type { Drawing, IntervalClass } from "./lib/types";
 
-  let { list, selected, busy, onselect, onchange, onclose }: {
+  let { list, selected, interval = null, busy, onselect, onchange, onclose }: {
     list: Drawing[];
     selected: number | null;
+    interval?: IntervalClass | null;
     busy: boolean;
     onselect: (id: number) => void;
     onchange: (next: Drawing[]) => void;
@@ -64,12 +65,13 @@
     <ul>
       {#each rows as d (d.id)}
         {@const name = `${DRAWING_NAMES[d.kind]} ${drawingSummary(d)}`}
-        <li class:off={d.hidden}>
+        {@const away = !visibleOn(d, interval)}
+        <li class:off={d.hidden || away}>
           {#if renaming?.id === d.id}
             <input aria-label="Text of {DRAWING_NAMES[d.kind]}" maxlength="200" bind:value={renaming.text} onblur={rename} onkeydown={(e) => { if (e.key === "Enter") rename(); else if (e.key === "Escape") { e.stopPropagation(); renaming = null; } }} use:focusInput />
           {:else}
             <button class="name" aria-pressed={d.id === selected} title="Select and scroll into view" onclick={() => onselect(d.id)}>
-              <span>{DRAWING_NAMES[d.kind]}</span> <span class="sub">{drawingSummary(d)}</span>
+              <span>{DRAWING_NAMES[d.kind]}</span> <span class="sub">{drawingSummary(d)}{away ? " · hidden on this interval" : ""}</span>
             </button>
           {/if}
           {#if d.kind === "text" || d.kind === "callout"}
