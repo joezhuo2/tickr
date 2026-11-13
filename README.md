@@ -474,8 +474,21 @@ Click the star next to the ticker to add or remove it. The star in the bottom
 bar shows starred stocks as cards with price and percent move for the current
 session, including pre-market or after-hours when available. Sort by change,
 price or volume, or switch to a heatmap whose tiles are colored by day change
-and sized by the magnitude of the move. Use the screener to filter by RSI,
-moving averages and daily change, and save filters you want to reuse.
+and sized by the magnitude of the move. Use the screener to filter the
+watchlist and save filters you want to reuse.
+
+**Screen** lets you add any number of conditions. Each picks a field, a
+condition (above, below or between a range) and a value; **Sector** uses
+**is** or **is any of**. Fields are price, volume, relative volume, gap and daily
+change; performance over 1W, 1M, 3M, 6M, YTD and 1Y, distance from the 52-week
+high and low, and ATR %; RSI, price versus SMA 20/50/200 and the MACD
+histogram; and market cap, P/E, EPS, dividend yield, revenue growth, profit
+margin, beta and sector. Technical and performance fields come from the daily
+bars of the past year. Fundamentals come from Yahoo and are fetched only while a
+fundamentals column or condition is in use, then cached for six hours. Rows with a
+missing value never match a condition. **Columns** chooses what the results show
+(kept between sessions), and clicking a header sorts by it, with missing values
+last.
 
 **Groups** split the watchlist into tabs such as "Tech" or "Crypto"; **All**
 always shows every starred stock. Click **+** and type a name to add a group.
