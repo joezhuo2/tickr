@@ -276,6 +276,8 @@ export interface SavedRun {
   market_pct: number | null;
   candles: Candle[];
   drawings: Drawing[];
+  note: string;
+  tags: string[];
 }
 
 export function savedRun(ex: Exercise, base: Chart, drawings: Drawing[], now: number): SavedRun | null {
@@ -300,6 +302,8 @@ export function savedRun(ex: Exercise, base: Chart, drawings: Drawing[], now: nu
     market_pct: s.market_pct,
     candles: base.candles,
     drawings,
+    note: "",
+    tags: [],
   };
 }
 
