@@ -6,6 +6,15 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.80] - 2026-11-13
+
+### Added
+- **Calls and puts side by side:** the Options chain has a Calls, Puts or Both
+  view. Both shows two panes with a divider you can drag, and stacks them when
+  the panel is narrow. `U` cycles the three views.
+- **Greeks:** a Greeks toggle adds delta, gamma, theta and vega columns,
+  estimated with Black-Scholes from the implied volatility.
+
 ## [0.11.79] - 2026-11-13
 
 ### Added
