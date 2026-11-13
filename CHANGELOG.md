@@ -6,6 +6,19 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.78] - 2026-11-13
+
+### Added
+- **Drawing copy, paste and clone:** Ctrl+C and Ctrl+V copy the selected
+  drawing, also onto another symbol, and Ctrl+D or the Clone button duplicates
+  it in place.
+- **Visible on intervals:** a drawing can be limited to minute, hour, day or
+  week and month charts.
+
+### Changed
+- **Line width** goes from 1 to 8 px.
+- **Undo and redo** also work with Cmd on macOS.
+
 ## [0.11.77] - 2026-11-13
 
 ### Added
