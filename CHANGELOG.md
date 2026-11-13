@@ -6,6 +6,20 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.75] - 2026-11-13
+
+### Added
+- **Strategy functions:** rules and indicator alerts can use `macd`,
+  `macd_signal`, `macd_hist`, `bb_upper`, `bb_mid`, `bb_lower`, `stoch_k`,
+  `stoch_d`, `wma`, `hma`, `vwma`, `stochrsi`, `aroon_up`, `aroon_down`, `cmf`,
+  `roc`, `cci`, `mfi`, `willr`, `adx`, `supertrend`, `donchian_high` and
+  `donchian_low`. Arguments left out use the study defaults.
+- **Short backtests:** a Direction choice runs the rules short, with the
+  stop-loss above the entry and the take-profit below.
+
+### Changed
+- **Parameter sweep** finds every number inside a function, not only the first.
+
 ## [0.11.74] - 2026-11-13
 
 ### Added
