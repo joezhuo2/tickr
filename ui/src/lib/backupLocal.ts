@@ -2,11 +2,13 @@ import { MAX_CHART_ALERTS, type ChartAlert } from "./chartAlerts";
 import { sanitizeCustom, type Custom } from "./display";
 import { clampReward } from "./drawing";
 import { STUDIES } from "./studies";
+import { cleanSettings, type StudySettings } from "./studySettings";
 import { cleanPanes, type PaneState } from "./panes";
 
 export interface LocalBackup {
   custom?: Custom;
   studies?: Record<string, boolean>;
+  study_settings?: StudySettings;
   chart_alerts?: ChartAlert[];
   magnet?: boolean;
   hide_drawings?: boolean;
@@ -17,7 +19,7 @@ export interface LocalBackup {
 
 type Store = Pick<Storage, "getItem" | "setItem">;
 
-const KEYS = { custom: "tickr.custom", studies: "tickr.studies", chart_alerts: "tickr.chartAlerts", magnet: "tickr.magnet", hide_drawings: "tickr.hideDrawings", technicals_settings_open: "tickr.technicalsSettingsOpen", panes: "tickr.panes", rr: "tickr.rr" };
+const KEYS = { custom: "tickr.custom", studies: "tickr.studies", study_settings: "tickr.studySettings", chart_alerts: "tickr.chartAlerts", magnet: "tickr.magnet", hide_drawings: "tickr.hideDrawings", technicals_settings_open: "tickr.technicalsSettingsOpen", panes: "tickr.panes", rr: "tickr.rr" };
 
 function read(store: Store, key: string): unknown {
   try { return JSON.parse(store.getItem(key) ?? "null"); } catch { return null; }
@@ -41,6 +43,8 @@ export function collectLocal(store: Store): LocalBackup {
   const panes = read(store, KEYS.panes);
   if (custom != null) out.custom = sanitizeCustom(custom);
   if (studies != null) out.studies = cleanStudies(studies);
+  const settings = read(store, KEYS.study_settings);
+  if (settings != null) out.study_settings = cleanSettings(settings);
   if (alerts != null) out.chart_alerts = cleanAlerts(alerts);
   if (panes != null) out.panes = cleanPanes(panes);
   const rr = store.getItem(KEYS.rr);
@@ -57,6 +61,7 @@ export function parseLocal(text: string): LocalBackup {
   const out: LocalBackup = {};
   if ("custom" in l) out.custom = sanitizeCustom(l.custom);
   if ("studies" in l) out.studies = cleanStudies(l.studies);
+  if ("study_settings" in l) out.study_settings = cleanSettings(l.study_settings);
   if ("chart_alerts" in l) out.chart_alerts = cleanAlerts(l.chart_alerts);
   if (typeof l.magnet === "boolean") out.magnet = l.magnet;
   if (typeof l.hide_drawings === "boolean") out.hide_drawings = l.hide_drawings;
@@ -70,6 +75,7 @@ export function applyLocal(store: Store, local: LocalBackup) {
   try {
     if (local.custom) store.setItem(KEYS.custom, JSON.stringify(local.custom));
     if (local.studies) store.setItem(KEYS.studies, JSON.stringify(local.studies));
+    if (local.study_settings) store.setItem(KEYS.study_settings, JSON.stringify(local.study_settings));
     if (local.chart_alerts) store.setItem(KEYS.chart_alerts, JSON.stringify(local.chart_alerts));
     if (local.panes) store.setItem(KEYS.panes, JSON.stringify(local.panes));
     if (local.rr !== undefined) store.setItem(KEYS.rr, String(local.rr));

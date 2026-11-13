@@ -391,15 +391,20 @@ it is instant.
   each session. **Volume profile (range)**, in the drawing toolbar's More
   menu, is a two-click drawing that profiles the candles between its two ends
   and is saved with the symbol like any other drawing.
-  **Studies** at the bottom of the Technicals tab add Stochastic (14, 3, 3) and
-  OBV in their own panes, and Ichimoku (9, 26, 52), Supertrend (10, 3) and
-  classic pivot points (P, R1, R2, S1, S2) over the price. They are drawn on
-  both charts without running Analyze, follow replay, do not feed the score,
-  and use fixed settings. Pivots come from the previous day on intraday charts,
-  the previous month on daily charts and the previous year on longer ones. The
-  Ichimoku cloud is projected 26 bars past the latest bar into the empty space
-  on the right, and the lagging line sits 26 bars back. Which studies are on is remembered on this computer and is in
-  Backup, but not in indicator presets.
+  **Studies** at the bottom of the Technicals tab add Stochastic, OBV, CCI,
+  Williams %R and MFI in their own panes, and Ichimoku, Supertrend, Keltner
+  channels, Donchian channels, Parabolic SAR (dots) and pivot points (P, R1,
+  R2, S1, S2) over the price. They are drawn on both charts without running
+  Analyze, follow replay, and do not feed the score. Their parameters (defaults:
+  Stochastic 14/3/3, Ichimoku 9/26/52 with a 26-bar displacement, Supertrend
+  10/3, Keltner 20/10/2, Donchian 20, CCI 20, Williams %R 14, MFI 14, SAR
+  0.02/0.2) and the pivot type (classic, Fibonacci, Camarilla or Woodie) are
+  set under Indicator settings. Pivots come from the previous day on intraday
+  charts, the previous month on daily charts and the previous year on longer
+  ones. The Ichimoku cloud is projected by the displacement past the latest bar
+  into the empty space on the right, and the lagging line sits that far back.
+  Which studies are on and their settings are remembered on this computer and
+  are in Backup, but not in indicator presets.
 
 - **Analysts:** the rating (Strong buy to Sell), average 12-month target and
   its upside also sit under the price on the left. The tab adds the target
