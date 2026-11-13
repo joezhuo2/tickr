@@ -206,8 +206,8 @@
     align-items: flex-start;
     padding-top: 12vh;
     background: color-mix(in srgb, var(--bg) 25%, transparent);
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
   }
   .panel {
     width: min(560px, 90vw);
