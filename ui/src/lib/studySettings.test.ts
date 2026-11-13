@@ -12,6 +12,9 @@ describe("study settings", () => {
     expect(d.linreg).toEqual({ length: 100, deviations: 2 });
     expect(d.stochrsi).toEqual({ rsi: 14, stoch: 14, k: 3, d: 3 });
     expect([d.aroon.length, d.cmf.length, d.roc.length]).toEqual([25, 20, 9]);
+    expect(d.vpArea).toBe(70);
+    expect(d.showPoc).toBe(true);
+    expect(cleanSettings({ vpArea: 99, showPoc: false })).toMatchObject({ vpArea: 95, showPoc: false });
   });
 
   it("clamps, rounds and rejects bad values", () => {

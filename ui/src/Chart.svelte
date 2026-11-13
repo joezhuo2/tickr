@@ -9,7 +9,7 @@
   import { drawingStyles, setDrawingStyles } from "./lib/drawingStyleStore.svelte";
   import DrawingTree from "./DrawingTree.svelte";
   import { rr } from "./lib/rrStore.svelte";
-  import { legendText, volumeProfile } from "./lib/indicators";
+  import { legendText, valueArea, volumeProfile } from "./lib/indicators";
   import { columnPen, columns, type Sink } from "./lib/decimate";
   import { LEFT_SCALES, mergeUp, movePane, paneName, paneRects, unmerge, visibleGroups, withPanes, type PaneId, type Slot } from "./lib/panes";
   import { panes, setPanes } from "./lib/paneStore.svelte";
@@ -161,21 +161,51 @@
     wrap?.focus();
   }
 
+  type Profile = NonNullable<ReturnType<typeof volumeProfile>>;
+  type Area = NonNullable<ReturnType<typeof valueArea>>;
+
+  function profileAlpha(k: number, vol: number, peak: number, va: Area | null) {
+    if (!va) return vol === peak ? 0.45 : 0.2;
+    return k < va.lo || k > va.hi ? 0.12 : k === va.poc ? 0.55 : 0.35;
+  }
+
+  function profileLevels(ctx: CanvasRenderingContext2D, g: Geo, profile: Profile, va: Area, xa: number, xb: number, v: (name: string) => string) {
+    const at = (k: number) => g.y(profile.lo + k * profile.step);
+    ctx.save();
+    ctx.strokeStyle = v("--muted");
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(xa, at(va.poc + 0.5));
+    ctx.lineTo(xb, at(va.poc + 0.5));
+    ctx.stroke();
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    for (const k of [va.lo, va.hi + 1]) {
+      ctx.moveTo(xa, at(k));
+      ctx.lineTo(xb, at(k));
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
   function drawProfile(ctx: CanvasRenderingContext2D, g: Geo, i0: number, i1: number, v: (name: string) => string, bins = 24) {
     const profile = volumeProfile(candles, i0, i1, bins);
     if (!profile) return;
     const peak = Math.max(...profile.volumes);
+    const va = ss.showPoc ? valueArea(profile.volumes, ss.vpArea) : null;
     const x0 = g.x(i0) - g.step / 2;
-    const maxW = (g.x(i1) + g.step / 2 - x0) * 0.6;
+    const x1 = g.x(i1) + g.step / 2;
+    const maxW = (x1 - x0) * 0.6;
     ctx.save();
     ctx.fillStyle = v("--muted");
     profile.volumes.forEach((vol, k) => {
       const top = g.y(profile.lo + (k + 1) * profile.step);
       const bottom = g.y(profile.lo + k * profile.step);
-      ctx.globalAlpha = vol === peak ? 0.45 : 0.2;
+      ctx.globalAlpha = profileAlpha(k, vol, peak, va);
       ctx.fillRect(x0, top, peak > 0 ? (vol / peak) * maxW : 0, Math.max(1, bottom - top - 1));
     });
     ctx.restore();
+    if (va) profileLevels(ctx, g, profile, va, x0, x1, v);
   }
   const rsiOn = $derived(!!show?.rsi);
   const macdOn = $derived(!!show?.macd);
@@ -879,8 +909,8 @@
     let lx = PAD.l + 4;
     let ly = PAD.t + 2;
     const at = hover != null && candles[hover] ? hover : g.i1;
-    const legend = (label: string, col: string, lines: Line[]) => {
-      const text = legendText(label, lines.map((l) => (l.visible ? valueAt(l, at) : null)));
+    const legend = (label: string, col: string, lines: Line[]) => legendRaw(legendText(label, lines.map((l) => (l.visible ? valueAt(l, at) : null))), col);
+    const legendRaw = (text: string, col: string) => {
       const w = ctx.measureText(text).width;
       if (lx + w > right && lx > PAD.l + 4) { lx = PAD.l + 4; ly += 12; }
       ctx.fillStyle = col;
@@ -977,15 +1007,30 @@
     const profile = s.volume_profile ? volumeProfile(candles, g.i0, g.i1) : null;
     if (profile) {
       const peak = Math.max(...profile.volumes);
+      const va = ss.showPoc ? valueArea(profile.volumes, ss.vpArea) : null;
       ctx.fillStyle = v("--muted");
       profile.volumes.forEach((vol, k) => {
         const top = g.y(profile.lo + (k + 1) * profile.step);
         const bottom = g.y(profile.lo + k * profile.step);
         const w = peak > 0 ? (vol / peak) * g.plotW * 0.25 : 0;
-        ctx.globalAlpha = vol === peak ? 0.45 : 0.2;
+        ctx.globalAlpha = profileAlpha(k, vol, peak, va);
         ctx.fillRect(right - w, top, w, Math.max(1, bottom - top - 1));
       });
       ctx.globalAlpha = 1;
+      if (va) {
+        profileLevels(ctx, g, profile, va, PAD.l, right, v);
+        const price = (k: number) => profile.lo + k * profile.step;
+        const [poc, vah, val] = [price(va.poc + 0.5), price(va.hi + 1), price(va.lo)];
+        ctx.save();
+        ctx.fillStyle = v("--muted");
+        ctx.textAlign = "right";
+        ctx.textBaseline = "bottom";
+        ctx.fillText(`POC ${num(poc)}`, right - 3, g.y(poc) - 1);
+        ctx.fillText(`VAH ${num(vah)}`, right - 3, g.y(vah) - 1);
+        ctx.fillText(`VAL ${num(val)}`, right - 3, g.y(val) - 1);
+        ctx.restore();
+        legendRaw(`Volume profile  POC ${num(poc)} / VAH ${num(vah)} / VAL ${num(val)}`, v("--muted"));
+      }
     }
     if (s.levels) {
       ctx.lineWidth = 1;

@@ -62,6 +62,23 @@ export function volumeProfile(candles: readonly Candle[], i0: number, i1: number
   return { lo, step, volumes };
 }
 
+export function valueArea(volumes: readonly number[], percent = 70): { poc: number; lo: number; hi: number } | null {
+  const total = volumes.reduce((a, b) => a + b, 0);
+  if (!(total > 0)) return null;
+  const target = (total * Math.min(95, Math.max(50, percent))) / 100;
+  let poc = 0;
+  volumes.forEach((x, k) => { if (x > volumes[poc]) poc = k; });
+  let [lo, hi] = [poc, poc];
+  let held = volumes[poc];
+  while (held < target && (lo > 0 || hi < volumes.length - 1)) {
+    const below = lo > 0 ? volumes[lo - 1] : -1;
+    const above = hi < volumes.length - 1 ? volumes[hi + 1] : -1;
+    if (above >= below) held += volumes[++hi];
+    else held += volumes[--lo];
+  }
+  return { poc, lo, hi };
+}
+
 export interface AlertLevel {
   label: string;
   level: number;
