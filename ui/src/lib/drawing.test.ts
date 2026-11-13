@@ -1,5 +1,5 @@
 ﻿import { describe, expect, it } from "vitest";
-import { DRAWING_NAMES, MAX_TEMPLATES, PEN_MAX_POINTS, POINT_COUNT, SHAPE_LABELS, calloutGeometry, cleanDrawingStyles, drawingSummary, harmonicRatios, inBounds, markerPath, necklineEnds, pointLabel, saveTemplate, shapeSegments, arrowHead, channelLines, fibExtLevels, pitchforkLines, snapPrice, hitPolyline, hitTest, indexToTime, pathBounds, polylineDistance, rulerMeasurement, segmentDistance, simplifyPath, timeToIndex, undoReducer, type History } from "./drawing";
+import { DRAWING_NAMES, MAX_TEMPLATES, PEN_MAX_POINTS, POINT_COUNT, SHAPE_LABELS, calloutGeometry, cleanDrawingStyles, drawingSummary, harmonicRatios, hitCallout, inBounds, markerPath, necklineEnds, pointLabel, saveTemplate, shapeSegments, arrowHead, channelLines, fibExtLevels, pitchforkLines, snapPrice, hitPolyline, hitTest, indexToTime, pathBounds, polylineDistance, rulerMeasurement, segmentDistance, simplifyPath, timeToIndex, undoReducer, type History } from "./drawing";
 import { forward, inverse, scaleLabel } from "./scale";
 import type { Drawing } from "./types";
 
@@ -232,6 +232,9 @@ describe("pattern and annotation tools", () => {
     const { box, tail } = calloutGeometry({ x: 0, y: 0 }, { x: 40, y: 50 }, 30);
     expect(box).toEqual({ minX: 40, maxX: 82, minY: 40, maxY: 60 });
     expect(tail).toEqual({ x: 40, y: 40 });
+    expect(hitCallout({ x: 80, y: 58 }, { x: 0, y: 0 }, { x: 40, y: 50 }, 30)).toBe(true);
+    expect(hitCallout({ x: 20, y: 20 }, { x: 0, y: 0 }, { x: 40, y: 50 }, 30)).toBe(true);
+    expect(hitCallout({ x: 20, y: 40 }, { x: 0, y: 0 }, { x: 40, y: 50 }, 30)).toBe(false);
   });
 
   it("names and summarizes every kind", () => {

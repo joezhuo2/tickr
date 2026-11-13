@@ -241,6 +241,11 @@ export function calloutGeometry(a: Pixel, b: Pixel, textWidth: number) {
   return { box, tail };
 }
 
+export function hitCallout(p: Pixel, a: Pixel, b: Pixel, textWidth: number): boolean {
+  const { box, tail } = calloutGeometry(a, b, textWidth);
+  return inBounds(p, box, 3) || hitTest(p, a, tail);
+}
+
 export const DRAWING_NAMES: Record<Drawing["kind"], string> = {
   hline: "Level", trend: "Trend line", text: "Text", pen: "Pen", rect: "Box", ray: "Ray", fib: "Fib retracement",
   position: "Long / short position", avwap: "Anchored VWAP", vline: "Vertical line", hray: "Horizontal ray", arrow: "Arrow",
