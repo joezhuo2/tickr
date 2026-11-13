@@ -6,6 +6,21 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.72] - 2026-11-12
+
+### Added
+- **Drawing management and new drawing tools:** an Objects list shows every
+  drawing on the chart and can select, scroll to, hide, lock, rename and
+  delete each one, with hide, lock and delete all. Hidden and locked states are
+  saved, also in replay and practice. A drawing's style can be saved as the
+  default for its tool or as a named template. New tools: Elliott impulse and
+  correction waves, XABCD harmonic patterns with their ratios, head and
+  shoulders with neckline, arrow up/down markers and text callouts.
+
+### Changed
+- **Locked drawings:** a locked drawing is no longer selected by clicking it on
+  the chart; select or unlock it from the Objects list.
+
 ## [0.11.71] - 2026-11-12
 
 ### Added
