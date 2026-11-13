@@ -115,10 +115,49 @@ taskbar to keep it visible.
 
 ### Chart
 
-- **Symbol and range:** search to change the symbol, pick a range from 1D to
-  Max and choose a chart type. Search filters by asset type and
-  exchange, and exact ticker matches come first. Press Enter on a typed ticker
-  to open it directly. 1D, 5D and 1M charts reload about once a minute.
+- **Symbol and range:** open search (the Search button in the header, S or
+  Ctrl+K) to change the symbol, pick a range from 1D to Max and choose a chart
+  type. Search filters by asset type and exchange, and exact ticker matches
+  come first. Press Enter on a typed ticker to open it directly. 1D, 5D and 1M
+  charts reload about once a minute.
+- **Search and commands:** the search window also runs short typed commands.
+  Each result shows what Enter will do before it runs, and an incomplete
+  command says what is missing (`alert nvda >= …` needs a price). Commands
+  ignore case and extra spaces, and a ticker left out means the current
+  symbol:
+  - Symbols: `nvda`, `nvda 5m`, `nvda 1y`, `nvda 1y 1d`; a bare `5m`, `1y` or
+    `max` changes the current chart. Ranges are 1d, 5d, 1mo, 6mo, ytd, 1y, 5y
+    and max; anything else like `1m`, `4h` or `1w` is a candle length.
+  - Alerts: `alert nvda >= 170` (also `>`, `<=`, `<`, `above`, `below`, or
+    `add alert …`), `alert >= 170`, `alert nvda +5%` / `-5%` (day move),
+    `alert nvda trail 3%`, and indicator alerts in the Strategy syntax on the
+    current candle length, such as `alert nvda crosses_above(rsi(14), 70)`.
+  - Panels: `news`, `options`, `earnings`, `analysts`, `stats`, `financials`,
+    `market`, `events`, `watchlist`, `technicals`, `paper`, `strategy`,
+    `screener`, `alerts`, `settings` or `settings theme` (jumps to and flashes
+    that setting), `second chart`, `new window`, `refresh`, `toggle overview`.
+  - Chart: `type candles` (any chart type, such as `type heikin ashi`),
+    `scale log|linear|percent`, `goto 2024-03-15`, `extended on|off`.
+  - Watchlist: `watch nvda` or `star nvda`, `unwatch nvda`,
+    `add nvda to Tech`, `remove nvda from Tech`, `group Tech`.
+  - Indicators and drawings: any study or overlay by name (`rsi`, `macd`,
+    `vwap on`, `bollinger off`, `ichimoku`, `supertrend`, `volume profile`,
+    `key levels`, ...), `analyze`, `draw trendline` (or `level`, `fib`, `box`,
+    `ray`, `text`, `note` and the other tools), `hide drawings`,
+    `show drawings`, `delete drawings` (unlocked ones on the current chart).
+  - Paper and modes: `buy 10`, `sell 5`, `buy 10 limit 180`,
+    `sell 5 stop 150`, `short 10`, `cover 10` on the current symbol (open
+    another symbol first to trade it), `replay`, `replay 2024-03-15`,
+    `practice`, `backtest`.
+
+  After a command that changes something (an alert, the watchlist, a paper
+  order, drawings, a study, the chart type, scale, range, candle length or
+  symbol), an **Undo** pill shows at the bottom right for 4 seconds while its
+  accent outline burns down. Click it or press Ctrl+Z to put things back:
+  the alert is removed, the watchlist and groups return to how they were, the
+  paper account returns to its state just before the order, deleted drawings
+  come back. Hovering pauses it. Opening panels, Settings, refresh, replay and
+  practice show no pill.
 - **Sessions and time zone:** extended-hours candles can be shown or hidden on
   the chart without changing the tray quote setting. Pre- and post-market
   sessions are shaded, and chart times can use the exchange or local time zone.
@@ -132,11 +171,12 @@ taskbar to keep it visible.
   as you like. Closing one just closes it; the main window keeps its saved
   size, position, symbol and layout. Chart windows refresh their quote every
   15 seconds; the Alpaca stream feeds only the main window's symbol.
-- **Recent symbols and history:** focus the empty search box to see the last
-  10 symbols you viewed. The Back and Forward buttons (or Alt+Left and
-  Alt+Right) step through this session's symbols, and B jumps to the previous
-  one, so pressing it again toggles between two. The list
-  under the search box slides open on focus and shut when you leave it.
+- **Recent symbols and history:** open search with nothing typed to see the
+  last 10 symbols you viewed and a few example commands. The Back and Forward
+  buttons (or Alt+Left and Alt+Right) step through this session's symbols, and
+  B jumps to the previous one, so pressing it again toggles between two. The
+  search window scales open over a lightly blurred view of the app; Escape or
+  a click outside closes it.
 - **Chart types:** Line, Area, Baseline, Candles, Hollow candles, Bars (OHLC),
   Heikin Ashi, Renko, Range bars, Line break, Kagi and Point & Figure, from the
   **Chart type** menu next to the price scale or by pressing C to cycle. Baseline colors the line green above and red below the previous
@@ -429,7 +469,7 @@ range, to close its panel. Zoom on the chart resets when a panel opens or
 closes. Technicals, Paper trading and Strategy keep their own layout with the
 chart on top.
 Views fade in, the watchlist slides up, Settings scales open and switching
-line / candles fades the chart. Text boxes across the app share the look of the symbol search box, and dropdowns share the look of the calendar's country menu. With the OS reduced-motion setting on, all of
+line / candles fades the chart. Text boxes across the app share one look, and dropdowns share the look of the calendar's country menu. With the OS reduced-motion setting on, all of
 it is instant.
 
 - **Technicals:** click **Analyze** to run RSI, moving averages, candlestick
@@ -733,11 +773,12 @@ typing in a text field.
 | | `X` | Next watchlist stock |
 | | `G` | Next watchlist group (opens the Watchlist) |
 | | `F` | Add stock to Watchlist |
-| General | `S` | Focus search |
+| General | `S` | Open search |
 | | `B` | Previous symbol (toggles between two) |
 | | `,` | Toggle Settings |
 | | `\` | Toggle stock overview |
-| Fixed | `Alt+←` | Back to the previous symbol in history |
+| Fixed | `Ctrl+K` (`Cmd+K` on macOS) | Open search |
+| | `Alt+←` | Back to the previous symbol in history |
 | | `Alt+→` | Forward in history |
 
 **Backup** exports your settings, watchlists, groups, drawings, alerts, saved
@@ -885,8 +926,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.81
-git push origin v0.11.81
+git tag v0.11.82
+git push origin v0.11.82
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
@@ -998,7 +1039,7 @@ src-tauri/src/
   updater.rs    background update checks, tray menu state, install and restart
 src-tauri/windows/hooks.nsh   NSIS uninstall hook: autostart entry and app data
 .github/workflows/  ci.yml (checks on push/PR), release.yml (installers, updater bundles and latest.json on tag push)
-ui/src/         App, Left (ticker and details), Chart (canvas, analysis overlays), Technicals, Analysts, Earnings, Stats, Market, Events, WatchCalendar, News, Watchlist, Search, Settings, Footer
+ui/src/         App, Left (ticker and details), Chart (canvas, analysis overlays), Technicals, Analysts, Earnings, Stats, Market, Events, WatchCalendar, News, Watchlist, CommandSearch (search and commands), UndoFuse (Undo pill), Search (second chart symbol box), Settings, Footer
 ```
 
 ### Memory (Windows 11, release build)

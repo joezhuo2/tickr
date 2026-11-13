@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { PRESETS, addError, type ChartAlert, type LineSpec } from "./lib/chartAlerts";
-  import { chartAlerts, setChartAlerts } from "./lib/chartAlertStore.svelte";
+  import { PRESETS, type ChartAlert, type LineSpec } from "./lib/chartAlerts";
+  import { addChartAlert, chartAlerts, setChartAlerts } from "./lib/chartAlertStore.svelte";
   import { inBackground } from "./lib/chartAlertSchedule";
   import { fireTime } from "./lib/alerts";
   import { num } from "./lib/format";
@@ -16,11 +16,8 @@
   const lines = $derived(drawings.filter((d) => d.kind === "trend" || d.kind === "ray"));
 
   function add(label: string, condition: string | null, line: LineSpec | null) {
-    error = !interval ? "Load a chart first" : addError(chartAlerts.list, condition);
-    if (error) return;
-    const id = chartAlerts.list.reduce((m, a) => Math.max(m, a.id), 0) + 1;
-    const next: ChartAlert = { id, symbol: symbol.toUpperCase(), interval, label, expr: condition, line, enabled: true, fired_at: null };
-    setChartAlerts([...chartAlerts.list, next]);
+    const r = addChartAlert(symbol, interval, label, condition, line);
+    error = "error" in r ? r.error : null;
   }
 
   function addLine() {
