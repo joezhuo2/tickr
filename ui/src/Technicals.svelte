@@ -1,6 +1,7 @@
 <script lang="ts">
   import { STUDIES } from "./lib/studies";
-  import { studies, toggleStudy } from "./lib/studyStore.svelte";
+  import { changeSettings, studies, studySettings, toggleStudy } from "./lib/studyStore.svelte";
+  import { PIVOT_TYPES, SETTING_FIELDS, SETTING_LABELS, type PivotType, type SettingGroup } from "./lib/studySettings";
   import { biasLabel, biasTone, direction, fullTime, num, price, signed, upside } from "./lib/format";
   import type { Analysis, Direction, Overlays, Target, IndicatorConfig, IndicatorPreset } from "./lib/types";
 
@@ -336,6 +337,19 @@
         <label>Color <input type="color" aria-label="Opening range color" value={config.opening_range.color || "#808080"} onchange={(e) => change((c) => c.opening_range.color = e.currentTarget.value)} /></label>
         <button aria-label="Reset opening range color to theme" onclick={() => change((c) => c.opening_range.color = "")}>Theme</button>
         <label><input type="checkbox" aria-label="Opening range visible" checked={config.opening_range.visible} onchange={(e) => change((c) => c.opening_range.visible = e.currentTarget.checked)} /> Visible</label>
+      </div>
+      {#each Object.keys(SETTING_FIELDS) as name}
+        {@const group = name as SettingGroup}
+        <div class="indicator-row">
+          <b>{SETTING_LABELS[group].toUpperCase()}</b>
+          {#each Object.entries(SETTING_FIELDS[group]) as [key, f]}
+            <label>{f.label} <input type="number" aria-label={`${SETTING_LABELS[group]} ${f.label}`} min={f.min} max={f.max} step={f.step} value={(studySettings[group] as Record<string, number>)[key]} onchange={(e) => changeSettings((s) => ((s[group] as Record<string, number>)[key] = e.currentTarget.valueAsNumber))} /></label>
+          {/each}
+        </div>
+      {/each}
+      <div class="indicator-row">
+        <b>PIVOT POINTS</b>
+        <label>Type <select aria-label="Pivot points type" value={studySettings.pivotType} onchange={(e) => changeSettings((s) => (s.pivotType = e.currentTarget.value as PivotType))}>{#each PIVOT_TYPES as t (t)}<option value={t}>{t}</option>{/each}</select></label>
       </div>
       <div class="indicator-row">
         <label>Preset <select bind:value={selectedPreset}><option value="">Select preset</option>{#each presets as p (p.name)}<option value={p.name}>{p.name}</option>{/each}</select></label>
