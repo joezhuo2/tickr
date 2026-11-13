@@ -177,7 +177,11 @@ taskbar to keep it visible.
   Drawings, notes, targets and Fibonacci extensions can be placed in the empty
   space right of the latest candle; a future point keeps its date and time, so it
   stays put as new bars arrive and when you switch intervals.
-  Ctrl+Z undoes, Ctrl+Shift+Z redoes, and Escape returns to Cursor. The ruler
+  Ctrl+Z undoes, Ctrl+Shift+Z redoes, and Escape returns to Cursor (Cmd on
+  macOS). Ctrl+C copies the selected drawing and Ctrl+V pastes it a few bars
+  right and a little lower, on this or any other symbol; Ctrl+D or **Clone**
+  in the style row copies it in place the same way. A pasted copy is
+  unlocked, selected and can be undone. The ruler
   measures price, percent, bars and elapsed time without saving.
   The **More** menu adds a parallel channel, vertical line, horizontal ray,
   arrow, price range, date range, trend-based Fibonacci extension and
@@ -219,8 +223,11 @@ taskbar to keep it visible.
   during bar replay, and are listed under Notes in the Alerts panel, where
   clicking one scrolls the chart to it.
   Select a drawing to style it: a row under the toolbar sets its color, line
-  width (1 to 3 px), a dashed line, and **Lock**, which stops it being moved or
-  deleted until unlocked. **Default** saves the style as the starting style
+  width (1 to 8 px), a dashed line, and **Lock**, which stops it being moved or
+  deleted until unlocked. **Intervals** sets which candle intervals it shows
+  on: All intervals, or any of Minutes, Hours, Days and Weeks/Months. On other
+  intervals it is not drawn and cannot be clicked, and **Objects** greys it
+  out as hidden on this interval. **Default** saves the style as the starting style
   for new drawings of that tool, and **Templates** lists named styles: type a
   name and **Save style** to keep the current one, click a template to apply
   it, or × to delete it (up to 20). **Magnet** snaps new points and dragged endpoints to
@@ -865,8 +872,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.77
-git push origin v0.11.77
+git tag v0.11.78
+git push origin v0.11.78
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

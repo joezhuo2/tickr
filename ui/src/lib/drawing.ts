@@ -1,5 +1,5 @@
 ﻿import { num } from "./format";
-import type { Candle, Drawing, DrawingIcon, DrawingPoint } from "./types";
+import { intervalSpec, type Candle, type Drawing, type DrawingIcon, type DrawingPoint, type IntervalClass } from "./types";
 
 function spacing(times: number[]): number {
   return times.length > 1 ? (times[times.length - 1] - times[0]) / (times.length - 1) || 1 : 1;
@@ -343,12 +343,53 @@ export interface DrawingStyle { color: string; width: number; dashed: boolean }
 export interface StyleTemplate extends DrawingStyle { name: string }
 export interface DrawingStyles { defaults: Partial<Record<Drawing["kind"], DrawingStyle>>; templates: StyleTemplate[] }
 export const MAX_TEMPLATES = 20;
+export const MAX_WIDTH = 8;
+export const WIDTHS = Array.from({ length: MAX_WIDTH }, (_, i) => i + 1);
+
+export function clampWidth(v: number): number {
+  return Number.isFinite(v) ? Math.min(MAX_WIDTH, Math.max(1, Math.round(v))) : 1;
+}
+
+export function nextDrawingId(list: readonly Drawing[]): number {
+  const ids = new Set(list.map((d) => d.id));
+  let id = 0;
+  while (ids.has(id)) id++;
+  return id;
+}
+
+export function copyDrawing(d: Drawing, list: readonly Drawing[], times: number[], bars = 3, priceShift = 0.01): Drawing {
+  const points = d.points.map((p) => ({ t: Math.round(indexToTime(times, timeToIndex(times, p.t) + bars)), price: p.price * (1 - priceShift) }));
+  return { ...d, id: nextDrawingId(list), points, locked: false, hidden: false };
+}
+
+export const INTERVAL_CLASSES: { cls: IntervalClass; label: string }[] = [
+  { cls: "minutes", label: "Minutes" },
+  { cls: "hours", label: "Hours" },
+  { cls: "days", label: "Days" },
+  { cls: "weeks", label: "Weeks/Months" },
+];
+
+export function intervalClass(interval: string): IntervalClass | null {
+  const s = intervalSpec(interval)?.seconds;
+  return s == null ? null : s < 3600 ? "minutes" : s < 86_400 ? "hours" : s < 604_800 ? "days" : "weeks";
+}
+
+export function visibleOn(d: Pick<Drawing, "visible">, cls: IntervalClass | null): boolean {
+  return !cls || !d.visible?.length || d.visible.includes(cls);
+}
+
+export function toggleVisible(visible: readonly IntervalClass[] | undefined, cls: IntervalClass): IntervalClass[] | undefined {
+  const has = new Set(visible);
+  if (has.has(cls)) has.delete(cls); else has.add(cls);
+  const next = INTERVAL_CLASSES.map((c) => c.cls).filter((c) => has.has(c));
+  return next.length && next.length < INTERVAL_CLASSES.length ? next : undefined;
+}
 
 export function cleanStyle(v: unknown): DrawingStyle {
   const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
   return {
     color: typeof o.color === "string" && /^#[0-9a-fA-F]{6}$/.test(o.color) ? o.color : "",
-    width: typeof o.width === "number" && Number.isInteger(o.width) && o.width >= 1 && o.width <= 4 ? o.width : 1,
+    width: typeof o.width === "number" && Number.isInteger(o.width) && o.width >= 1 && o.width <= MAX_WIDTH ? o.width : 1,
     dashed: o.dashed === true,
   };
 }
