@@ -302,9 +302,15 @@ pub struct Drawing {
     pub created: i64,
     #[serde(default)]
     pub edited: i64,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub icon: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub visible: Vec<String>,
 }
 
 const PEN_MAX_POINTS: usize = 500;
+const DRAWING_ICONS: [&str; 8] = ["check", "cross", "star", "flag", "question", "exclamation", "up", "down"];
+const DRAWING_INTERVALS: [&str; 4] = ["minutes", "hours", "days", "weeks"];
 
 pub fn validate_drawings(map: &HashMap<String, Vec<Drawing>>) -> Result<(), String> {
     if map.len() > 500 { return Err("At most 500 symbols can have drawings.".into()); }
@@ -320,13 +326,13 @@ pub fn validate_drawing_list(drawings: &[Drawing]) -> Result<(), String> {
     let mut ids = HashSet::new();
     for d in drawings {
         let valid = match d.kind.as_str() {
-            "hline" | "text" | "avwap" | "vline" | "hray" | "note" | "arrowup" | "arrowdown" => d.points.len() == 1,
-            "trend" | "rect" | "ray" | "fib" | "position" | "arrow" | "prange" | "drange" | "vprofile" | "callout" => d.points.len() == 2,
+            "hline" | "text" | "avwap" | "vline" | "hray" | "note" | "arrowup" | "arrowdown" | "icon" => d.points.len() == 1,
+            "trend" | "rect" | "ray" | "fib" | "position" | "arrow" | "prange" | "drange" | "vprofile" | "callout" | "gannfan" | "fibfan" | "fibtime" | "ellipse" => d.points.len() == 2,
             "channel" | "fibext" | "pitchfork" => d.points.len() == 3,
             "corrective" => d.points.len() == 4,
             "xabcd" | "headshoulders" => d.points.len() == 5,
             "impulse" => d.points.len() == 6,
-            "pen" => (2..=PEN_MAX_POINTS).contains(&d.points.len()),
+            "pen" | "polyline" | "brush" => (2..=PEN_MAX_POINTS).contains(&d.points.len()),
             _ => return Err("Unknown drawing kind.".into()),
         };
         if !valid { return Err("Invalid drawing points.".into()); }
@@ -335,7 +341,9 @@ pub fn validate_drawing_list(drawings: &[Drawing]) -> Result<(), String> {
         if d.text.chars().count() > max_text || (if d.kind == "text" || d.kind == "note" || d.kind == "callout" { d.text.trim().is_empty() } else { !d.text.is_empty() }) { return Err("Invalid drawing text.".into()); }
         if !ids.insert(d.id) { return Err("Duplicate drawing ID.".into()); }
         let hex = d.color.len() == 7 && d.color.starts_with('#') && d.color[1..].bytes().all(|b| b.is_ascii_hexdigit());
-        if !(d.color.is_empty() || hex) || d.width > 4 { return Err("Invalid drawing style.".into()); }
+        if !(d.color.is_empty() || hex) || d.width > 8 { return Err("Invalid drawing style.".into()); }
+        if (d.kind == "icon") != DRAWING_ICONS.contains(&d.icon.as_str()) { return Err("Invalid drawing icon.".into()); }
+        if d.visible.len() > DRAWING_INTERVALS.len() || d.visible.iter().enumerate().any(|(i, v)| !DRAWING_INTERVALS.contains(&v.as_str()) || d.visible[..i].contains(v)) { return Err("Invalid drawing visibility.".into()); }
     }
     Ok(())
 }
@@ -1245,7 +1253,7 @@ mod tests {
     #[test]
     fn pattern_drawings_validate_points_and_text() {
         let point = DrawingPoint { t: 100, price: 10.0 };
-        let make = |kind: &str, n: usize, text: &str| Drawing { id: 1, kind: kind.into(), points: vec![point.clone(); n], text: text.into(), color: String::new(), width: 0, dashed: false, locked: false, hidden: true, created: 0, edited: 0 };
+        let make = |kind: &str, n: usize, text: &str| Drawing { id: 1, kind: kind.into(), points: vec![point.clone(); n], text: text.into(), color: String::new(), width: 0, dashed: false, locked: false, hidden: true, created: 0, edited: 0, icon: String::new(), visible: Vec::new() };
         for (kind, n) in [("arrowup", 1), ("arrowdown", 1), ("corrective", 4), ("xabcd", 5), ("headshoulders", 5), ("impulse", 6)] {
             assert!(validate_drawing_list(&[make(kind, n, "")]).is_ok());
             assert!(validate_drawing_list(&[make(kind, n + 1, "")]).is_err());
@@ -1258,5 +1266,36 @@ mod tests {
         }
         let old: Drawing = serde_json::from_str(r#"{"id":1,"kind":"hline","points":[{"t":1,"price":2.0}],"text":""}"#).unwrap();
         assert!(!old.hidden && !old.locked);
+        assert!(old.icon.is_empty() && old.visible.is_empty());
+        assert!(!serde_json::to_string(&old).unwrap().contains("icon"));
+        assert!(!serde_json::to_string(&old).unwrap().contains("visible"));
+    }
+
+    #[test]
+    fn new_drawing_tools_validate_points_icon_width_and_visibility() {
+        let point = DrawingPoint { t: 100, price: 10.0 };
+        let make = |kind: &str, n: usize| Drawing { id: 1, kind: kind.into(), points: vec![point.clone(); n], text: String::new(), color: String::new(), width: 8, dashed: false, locked: false, hidden: false, created: 0, edited: 0, icon: String::new(), visible: Vec::new() };
+        for kind in ["gannfan", "fibfan", "fibtime", "ellipse"] {
+            assert!(validate_drawing_list(&[make(kind, 2)]).is_ok());
+            assert!(validate_drawing_list(&[make(kind, 3)]).is_err());
+        }
+        for kind in ["polyline", "brush"] {
+            assert!(validate_drawing_list(&[make(kind, 2)]).is_ok());
+            assert!(validate_drawing_list(&[make(kind, 500)]).is_ok());
+            assert!(validate_drawing_list(&[make(kind, 1)]).is_err());
+            assert!(validate_drawing_list(&[make(kind, 501)]).is_err());
+        }
+        let icon = Drawing { icon: "star".into(), ..make("icon", 1) };
+        assert!(validate_drawing_list(std::slice::from_ref(&icon)).is_ok());
+        assert!(validate_drawing_list(&[make("icon", 1)]).is_err());
+        assert!(validate_drawing_list(&[Drawing { icon: "smile".into(), ..icon.clone() }]).is_err());
+        assert!(validate_drawing_list(&[Drawing { icon: "star".into(), ..make("hline", 1) }]).is_err());
+        assert!(validate_drawing_list(&[Drawing { width: 9, ..make("hline", 1) }]).is_err());
+        let visible = |v: &[&str]| Drawing { visible: v.iter().map(|s| s.to_string()).collect(), ..make("hline", 1) };
+        assert!(validate_drawing_list(&[visible(&["minutes", "weeks"])]).is_ok());
+        assert!(validate_drawing_list(&[visible(&["days", "days"])]).is_err());
+        assert!(validate_drawing_list(&[visible(&["seconds"])]).is_err());
+        let saved: Drawing = serde_json::from_str(&serde_json::to_string(&icon).unwrap()).unwrap();
+        assert_eq!(saved, icon);
     }
 }

@@ -3,9 +3,10 @@
   import { candleCountdown, classifyBars, displayOffset, futureTimes, isExtendedSession, isIntraday, zoneLabel, type Clock } from "./lib/session";
   import type { Analysis, Article, Chart, ChartMode, ChartScale, ChartTimeZone, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
   import { fitScale, forward, inverse, scaleLabel, scaleTicks, shiftRange, stretchRange } from "./lib/scale";
-  import type { Drawing, DrawingPoint } from "./lib/types";
+  import type { Drawing, DrawingIcon, DrawingPoint } from "./lib/types";
   import { DRAWING_COLORS, POINT_COUNT, arrowHead, channelLines, fibExtLevels, pitchforkLines, snapPrice, anchoredVwap, fibLevels, hitBox, positionLevels, rayEnd, timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
   import { MAX_TEMPLATES, SHAPE_LABELS, calloutGeometry, harmonicRatios, hitCallout, inBounds, markerPath, necklineEnds, pointLabel, saveTemplate, shapeSegments, type DrawingStyle } from "./lib/drawing";
+  import { ICONS, PEN_MAX_POINTS, brushWidth, dropRepeats, fibFanRays, fibTimeZones, gannFanRays, hitBrush, hitEllipse, iconBounds, iconShape } from "./lib/drawing";
   import { drawingStyles, setDrawingStyles } from "./lib/drawingStyleStore.svelte";
   import DrawingTree from "./DrawingTree.svelte";
   import { rr } from "./lib/rrStore.svelte";
@@ -1619,8 +1620,18 @@
     { tool: "corrective", label: "Elliott correction (A-B-C)" },
     { tool: "xabcd", label: "XABCD harmonic" },
     { tool: "headshoulders", label: "Head and shoulders" },
+    { tool: "gannfan", label: "Gann fan" },
+    { tool: "fibfan", label: "Fib fan" },
+    { tool: "fibtime", label: "Fib time zones" },
+    { tool: "ellipse", label: "Ellipse" },
+    { tool: "polyline", label: "Polyline" },
+    { tool: "brush", label: "Brush" },
+    { tool: "icon", label: "Icon" },
   ];
   const multi = (kind: string) => (POINT_COUNT[kind as Drawing["kind"]] ?? 0) >= 2;
+  const handles = (kind: string) => multi(kind) || kind === "polyline";
+  const stroked = (kind: string) => kind === "pen" || kind === "brush";
+  let iconGlyph = $state<DrawingIcon>("check");
   let placed = 0;
   let tool = $state<Tool>("cursor");
   let selected = $state<number | null>(null);
@@ -1866,8 +1877,8 @@
     if (ctx) ctx.font = `11px ${getComputedStyle(canvas!).getPropertyValue("--font")}`;
     for (const d of [...list].reverse()) {
       if (d.hidden || d.locked) continue;
-      if (d.kind === "pen") {
-        if (hitPolyline(p, d.points.map(screen))) return { drawing: d, endpoint: -1 };
+      if (stroked(d.kind)) {
+        if (d.kind === "brush" ? hitBrush(p, d.points.map(screen), d.width) : hitPolyline(p, d.points.map(screen))) return { drawing: d, endpoint: -1 };
         continue;
       }
       const a = screen(d.points[0]);
@@ -1877,7 +1888,8 @@
       if (d.kind === "vline" && Math.abs(p.x - a.x) <= 6) return { drawing: d, endpoint: -1 };
       if (d.kind === "hray" && p.x >= a.x - 6 && Math.abs(p.y - a.y) <= 6) return { drawing: d, endpoint: -1 };
       if ((d.kind === "arrowup" || d.kind === "arrowdown") && inBounds(p, pathBounds(markerPath(a, d.kind === "arrowup")), 3)) return { drawing: d, endpoint: -1 };
-      if (multi(d.kind)) {
+      if (d.kind === "icon" && inBounds(p, iconBounds(a), 3)) return { drawing: d, endpoint: -1 };
+      if (handles(d.kind)) {
         const pts = d.points.map(screen);
         const b = pts[1];
         const c = pts[2] ?? b;
@@ -1896,6 +1908,11 @@
           : d.kind === "callout" ? hitCallout(p, a, b, ctx?.measureText(d.text).width ?? 0)
           : d.kind === "ray" ? hitTest(p, a, rayEnd(a, b, PAD.l, right))
           : d.kind === "rect" ? hitBox(p, a, b)
+          : d.kind === "gannfan" ? gannFanRays(a, b).some((r) => hitTest(p, a, rayEnd(a, r.through, PAD.l, right)))
+          : d.kind === "fibfan" ? fibFanRays(a, b).some((r) => hitTest(p, a, rayEnd(a, r.through, PAD.l, right)))
+          : d.kind === "fibtime" ? fibTimeZones(timeToIndex(axisTimes, d.points[0].t), timeToIndex(axisTimes, d.points[1].t)).some((z) => Math.abs(p.x - geo.x(z.index)) <= 6)
+          : d.kind === "ellipse" ? hitEllipse(p, a, b)
+          : d.kind === "polyline" ? hitPolyline(p, pts)
           : d.kind === "fib" ? p.x >= left - 6 && fibLevels(d.points[0].price, d.points[1].price).some((l) => Math.abs(p.y - geo.y(l.price)) <= 6)
           : p.x >= left - 6 && p.x <= positionRight(a, b) + 6 && p.y >= Math.min(b.y, positionTargetY(d)) - 6 && p.y <= Math.max(b.y, positionTargetY(d)) + 6;
         if (hit) return { drawing: d, endpoint: -1 };
@@ -1931,12 +1948,19 @@
     if (!Number.isFinite(point.price) || point.price <= 0) return;
     wrap!.setPointerCapture(e.pointerId);
     hover = null;
-    if (tool === "pen") {
-      preview = { id: 0, kind: "pen", points: [point], text: "" };
+    if (tool === "pen" || tool === "brush") {
+      preview = { id: 0, kind: tool, points: [point], text: "" };
       gesture = { start: p, original: null, endpoint: -1, moved: false, second: false };
       return;
     }
     if (tool === "hline" || tool === "avwap" || tool === "vline" || tool === "hray" || tool === "arrowup" || tool === "arrowdown") { addDrawing({ id: 0, kind: tool, points: [point], text: "" }); return; }
+    if (tool === "icon") { addDrawing({ id: 0, kind: "icon", points: [point], text: "", icon: iconGlyph }); return; }
+    if (tool === "polyline") {
+      preview = preview ? { ...preview, points: [...preview.points.slice(0, -1), point, point] } : { id: 0, kind: "polyline", points: [point, point], text: "" };
+      placed = preview.points.length - 1;
+      if (preview.points.length > PEN_MAX_POINTS) finishPolyline();
+      return;
+    }
     if (tool === "note") {
       tool = "cursor";
       noteEdit = { id: null, point: { ...point, t: snapNoteTime(axisTimes, point.t) }, text: "", color: "", x: p.x, y: p.y };
@@ -1982,13 +2006,20 @@
     const points = simplifyPath(stroke.points, screen);
     if (points.length < 2) return;
     addDrawing({ ...stroke, points });
-    tool = "pen";
+    tool = stroke.kind;
+  }
+
+  function finishPolyline() {
+    if (!preview || preview.kind !== "polyline") return;
+    const points = dropRepeats(preview.points.slice(0, -1), screen);
+    if (points.length >= 2) addDrawing({ ...preview, points });
+    else cancelDrawing();
   }
 
   function moveDrawing(e: MouseEvent): boolean {
     if (!gesture && !preview) return false;
     const p = pixel(e);
-    if (tool === "pen" && preview && !gesture?.original) {
+    if (stroked(tool) && preview && !gesture?.original) {
       extendStroke(p);
       hover = null;
       return true;
@@ -2021,7 +2052,7 @@
       if (gesture.original) {
         if (gesture.moved && preview) void changeDrawings(list.map((d) => d.id === preview!.id ? preview! : d));
         preview = null;
-      } else if (tool === "pen") finishStroke();
+      } else if (stroked(tool)) finishStroke();
       else if (tool === "ruler") cancelDrawing();
       else if (preview && (gesture.second || (gesture.moved && preview.points.length === 2))) finishShape(preview);
       else if (preview && gesture.moved) placed = Math.max(placed, 2);
@@ -2048,12 +2079,12 @@
     const items = [...(hideDrawings ? [] : list.filter((d) => d.kind !== "note" && !d.hidden && (!preview || !gesture?.original || d.id !== preview.id))), ...(preview ? [preview] : [])];
     for (const d of items) {
       const a = screen(d.points[0]);
-      const two = multi(d.kind);
+      const two = handles(d.kind);
       const pts = d.points.map(screen);
       const b = two ? pts[1] : a;
       const c = pts[2] ?? b;
-      const wide = d.kind !== "hline" && d.kind !== "trend" && d.kind !== "rect" && d.kind !== "text" && d.kind !== "pen" && d.kind !== "arrow";
-      const path = d.kind === "pen" ? d.points.map(screen) : null;
+      const wide = !["hline", "trend", "rect", "text", "pen", "arrow", "ellipse", "polyline", "brush"].includes(d.kind);
+      const path = stroked(d.kind) || d.kind === "polyline" ? pts : null;
       const box = path ? pathBounds(path) : { minX: Math.min(a.x, b.x), maxX: Math.max(a.x, b.x), minY: Math.min(a.y, b.y), maxY: Math.max(a.y, b.y) };
       const bottom = PAD.t + geo.priceH, right = width - PAD.r;
       if (!wide && (box.maxY < PAD.t || box.minY > bottom)) continue;
@@ -2071,7 +2102,17 @@
       if (d.kind === "text") {
         ctx.fillText(d.text, a.x, a.y);
         if (d.id === selected) ctx.strokeRect(a.x - 2, a.y - 13, ctx.measureText(d.text).width + 4, 16);
+      } else if (path && d.kind === "polyline") {
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        path.forEach((p, k) => (k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        ctx.stroke();
       } else if (path) {
+        if (d.kind === "brush") {
+          ctx.globalAlpha = d.id === selected ? 0.5 : 0.35;
+          ctx.strokeStyle = d.color || v("--accent");
+          ctx.lineWidth = brushWidth(d.width);
+        }
         ctx.lineJoin = "round";
         ctx.lineCap = "round";
         ctx.beginPath();
@@ -2091,6 +2132,61 @@
         ctx.fillRect(box.minX, box.minY, box.maxX - box.minX, box.maxY - box.minY);
         ctx.globalAlpha = 1;
         ctx.strokeRect(box.minX, box.minY, box.maxX - box.minX, box.maxY - box.minY);
+      } else if (d.kind === "ellipse") {
+        ctx.beginPath();
+        ctx.ellipse((a.x + b.x) / 2, (a.y + b.y) / 2, Math.abs(b.x - a.x) / 2, Math.abs(b.y - a.y) / 2, 0, 0, Math.PI * 2);
+        ctx.globalAlpha = 0.08;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.stroke();
+      } else if (d.kind === "gannfan" || d.kind === "fibfan") {
+        const rays = d.kind === "gannfan" ? gannFanRays(a, b) : fibFanRays(a, b).map((r) => ({ label: String(r.ratio), through: r.through }));
+        ctx.beginPath();
+        for (const r of rays) {
+          const end = rayEnd(a, r.through, PAD.l, right);
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(end.x, end.y);
+        }
+        ctx.stroke();
+        for (const r of rays) ctx.fillText(r.label, r.through.x + 3, r.through.y - 2);
+      } else if (d.kind === "fibtime") {
+        const zones = fibTimeZones(timeToIndex(axisTimes, d.points[0].t), timeToIndex(axisTimes, d.points[1].t));
+        ctx.beginPath();
+        for (const z of zones) {
+          const x = Math.round(geo.x(z.index)) + 0.5;
+          ctx.moveTo(x, PAD.t);
+          ctx.lineTo(x, bottom);
+        }
+        ctx.stroke();
+        for (const z of zones) ctx.fillText(String(z.step), geo.x(z.index) + 3, PAD.t + 14);
+      } else if (d.kind === "icon") {
+        const shape = iconShape(d.icon, a);
+        ctx.fillStyle = ctx.strokeStyle = d.color || v("--text");
+        ctx.lineWidth = Math.max(2, ctx.lineWidth);
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        for (const poly of shape.fill) {
+          ctx.beginPath();
+          poly.forEach((p, k) => (k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+          ctx.closePath();
+          ctx.fill();
+        }
+        for (const line of shape.stroke) {
+          ctx.beginPath();
+          line.forEach((p, k) => (k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+          ctx.stroke();
+        }
+        if (shape.text) {
+          ctx.font = `bold 15px ${v("--font")}`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(shape.text, a.x, a.y + 1);
+        }
+        if (d.id === selected) {
+          const box = iconBounds(a);
+          ctx.lineWidth = 1;
+          ctx.strokeRect(box.minX - 2, box.minY - 2, box.maxX - box.minX + 4, box.maxY - box.minY + 4);
+        }
       } else if (d.kind === "fib") {
         for (const l of fibLevels(d.points[0].price, d.points[1].price)) {
           const y = Math.round(geo.y(l.price)) + 0.5;
@@ -2318,6 +2414,7 @@
     let handled = true;
     if (e.ctrlKey && e.key.toLowerCase() === "z") { cancelDrawing(); void changeDrawings(e.shiftKey ? "redo" : "undo"); }
     else if ((e.key === "Delete" || e.key === "Backspace") && selected != null) removeDrawing();
+    else if (e.key === "Enter" && tool === "polyline" && preview) finishPolyline();
     else if (e.key === "Escape" && (tool !== "cursor" || selected != null)) { cancelDrawing(); selected = null; hover = null; }
     else if (e.key === "Escape" && maxPane) maxPane = null;
     else handled = false;
@@ -2395,6 +2492,7 @@
   onpointerleave={() => (hover = null)}
   ondblclick={(e) => {
     if ((e.target as Element).closest(".exports, .drawing-tools, .pane-tools, input")) return;
+    if (tool === "polyline" && preview) { finishPolyline(); return; }
     const head = paneHead(pixel(e));
     if (head) maxPane = maxPane && head.ids.includes(maxPane as PaneId) ? null : head.ids[0];
     else if (onAxis(pixel(e))) manual = null;
@@ -2420,6 +2518,13 @@
       <button aria-label="Hide drawings" aria-pressed={hideDrawings} title="Hide all drawings" onclick={toggleHideDrawings}>Hide</button>
       <button aria-label="Object tree" aria-pressed={treeOpen} title="List, select, show, hide, lock and delete this chart's drawings" onclick={() => (treeOpen = !treeOpen)}>Objects</button>
     </div>
+    {#if tool === "icon" || selectedDrawing?.kind === "icon"}
+      <div class="drawing-tools drawing-style" role="toolbar" aria-label="Icon">
+        {#each ICONS as item}
+          <button aria-label={item.label} title={item.label} aria-pressed={(tool === "icon" ? iconGlyph : selectedDrawing?.icon) === item.icon} disabled={tool !== "icon" && (drawingBusy || !!selectedDrawing?.locked)} onclick={() => { if (tool === "icon") iconGlyph = item.icon; else restyle({ icon: item.icon }); }}>{item.glyph}</button>
+        {/each}
+      </div>
+    {/if}
     {#if selectedDrawing}
       {@const d = selectedDrawing}
       {@const def = drawingStyles.defaults[d.kind]}
