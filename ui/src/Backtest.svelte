@@ -1,7 +1,7 @@
 <script lang="ts">
   import { num, price, signed } from "./lib/format";
   import { buildCondition, check, DEFAULT_CLOCK, type Condition, type Operand, type SessionClock } from "./lib/strategy";
-  import { grid, MAX_RUNS, parameters, sweepRow, withParam, type ExitReason, type Param, type Range, type Report, type Rules, type SweepRow } from "./lib/backtest";
+  import { grid, MAX_RUNS, parameters, sweepRow, withParam, type ExitReason, type Param, type Range, type Report, type Rules, type Side, type SweepRow } from "./lib/backtest";
   import type { Candle } from "./lib/types";
 
   let {
@@ -33,6 +33,29 @@
     { id: "ema", label: "EMA", period: 20 },
     { id: "rsi", label: "RSI", period: 14 },
     { id: "atr", label: "ATR", period: 14 },
+    { id: "wma", label: "WMA", period: 20 },
+    { id: "hma", label: "Hull MA", period: 20 },
+    { id: "vwma", label: "VWMA", period: 20 },
+    { id: "macd", label: "MACD (fast)", period: 12 },
+    { id: "macd_signal", label: "MACD signal (fast)", period: 12 },
+    { id: "macd_hist", label: "MACD histogram (fast)", period: 12 },
+    { id: "bb_upper", label: "Bollinger upper", period: 20 },
+    { id: "bb_mid", label: "Bollinger middle", period: 20 },
+    { id: "bb_lower", label: "Bollinger lower", period: 20 },
+    { id: "stoch_k", label: "Stochastic %K", period: 14 },
+    { id: "stoch_d", label: "Stochastic %D", period: 14 },
+    { id: "stochrsi", label: "Stoch RSI", period: 14 },
+    { id: "cci", label: "CCI", period: 20 },
+    { id: "mfi", label: "MFI", period: 14 },
+    { id: "willr", label: "Williams %R", period: 14 },
+    { id: "adx", label: "ADX", period: 14 },
+    { id: "aroon_up", label: "Aroon up", period: 25 },
+    { id: "aroon_down", label: "Aroon down", period: 25 },
+    { id: "cmf", label: "CMF", period: 20 },
+    { id: "roc", label: "ROC", period: 9 },
+    { id: "supertrend", label: "Supertrend (ATR period)", period: 10 },
+    { id: "donchian_high", label: "Donchian high", period: 20 },
+    { id: "donchian_low", label: "Donchian low", period: 20 },
     { id: "or_high", label: "Opening range high (min)", period: 15 },
     { id: "or_low", label: "Opening range low (min)", period: 15 },
     { id: "vwap", label: "VWAP" },
@@ -60,6 +83,7 @@
   let entryStop = $state(typeof saved.entry_stop === "string" ? saved.entry_stop : "");
   let stop = $state<number | null>(typeof saved.stop_pct === "number" ? saved.stop_pct : null);
   let target = $state<number | null>(typeof saved.target_pct === "number" ? saved.target_pct : null);
+  let side = $state<Side>(saved.side === "short" ? "short" : "long");
   let left = $state<Operand>({ kind: "close", n: 0 });
   let op = $state<Condition>(">");
   let right = $state<Operand>({ kind: "sma", n: 50 });
@@ -102,7 +126,7 @@
   }
 
   function current(): Rules {
-    return { entry: entry.trim(), entry_stop: entryStop.trim(), exit: exit.trim(), stop_pct: stop ?? null, target_pct: target ?? null };
+    return { entry: entry.trim(), entry_stop: entryStop.trim(), exit: exit.trim(), stop_pct: stop ?? null, target_pct: target ?? null, side };
   }
 
   function commit(rules: Rules) {
@@ -246,7 +270,7 @@
 <div class="backtest" aria-label="Strategy backtest">
   <div class="head">
     <h2>Strategy backtest</h2>
-    <span class="muted">Long only, on the {num(bars, 0)} candles on the chart. Signals fill at the next bar's open, or at the entry stop price when one is set; no costs.</span>
+    <span class="muted">Long or short, on the {num(bars, 0)} candles on the chart. Signals fill at the next bar's open, or at the entry stop price when one is set; no costs.</span>
   </div>
 
   <div class="builder" role="group" aria-label="Condition builder">
@@ -264,7 +288,8 @@
 
   <form onsubmit={run} aria-label="Strategy rules">
     <label class="expr">Entry <input class:bad={!!entryError} bind:value={entry} spellcheck="false" aria-invalid={!!entryError} /></label>
-    <label class="expr" title="Optional. While the entry condition holds, buy when the next bar trades up through this price, at that price or the open if it gaps above.">Entry stop price <input class:bad={!!stopError} bind:value={entryStop} spellcheck="false" placeholder="optional, e.g. or_high(15)" aria-invalid={!!stopError} /></label>
+    <label>Direction <select aria-label="Direction" bind:value={side}><option value="long">Long</option><option value="short">Short</option></select></label>
+    <label class="expr" title="Optional. While the entry condition holds, buy when the next bar trades up through this price, at that price or the open if it gaps above. Short: sell when it trades down through it.">Entry stop price <input class:bad={!!stopError} bind:value={entryStop} spellcheck="false" placeholder="optional, e.g. or_high(15)" aria-invalid={!!stopError} /></label>
     <label class="expr">Exit <input class:bad={!!exitError} bind:value={exit} spellcheck="false" placeholder="optional" aria-invalid={!!exitError} /></label>
     <label>Stop-loss % <input type="number" min="0" max="100" step="any" placeholder="none" bind:value={stop} /></label>
     <label>Take-profit % <input type="number" min="0" max="100" step="any" placeholder="none" bind:value={target} /></label>
@@ -277,7 +302,7 @@
     Opening range breakout:
     <button type="button" class="link" onclick={() => { entry = "time >= 945 and time < 1100"; entryStop = "or_high(15)"; exit = "close < or_low(15) or time >= 1555"; }}>use ORB example</button>
   </p>
-  <p class="note">Use close, open, high, low, volume, sma(n), ema(n), rsi(n), atr(n), vwap, time (exchange HHMM, 945 = 9:45), or_high(minutes), or_low(minutes), day_high, day_low, prev_high, prev_low, prev_close, crosses_above(a, b), crosses_below(a, b), + − * /, &gt; &lt; &gt;= &lt;= ==, and, or, not.</p>
+  <p class="note">Use close, open, high, low, volume, sma(n), ema(n), rsi(n), atr(n), wma(n), hma(n), vwma(n), macd(fast, slow, signal), macd_signal(…), macd_hist(…), bb_upper(n, k), bb_mid(n, k), bb_lower(n, k), stoch_k(n, smooth, d), stoch_d(…), stochrsi(rsi, stoch, k, d), cci(n), mfi(n), willr(n), adx(n), aroon_up(n), aroon_down(n), cmf(n), roc(n), supertrend(n, multiplier), donchian_high(n), donchian_low(n) (left-out numbers use the study defaults, so macd() is 12, 26, 9), vwap, time (exchange HHMM, 945 = 9:45), or_high(minutes), or_low(minutes), day_high, day_low, prev_high, prev_low, prev_close, crosses_above(a, b), crosses_below(a, b), + − * /, &gt; &lt; &gt;= &lt;= ==, and, or, not.</p>
   {#if formError}<p class="error" role="alert">{formError}</p>{/if}
 
   {#if report}
@@ -291,7 +316,7 @@
       <div><span>Profit factor</span><strong>{show("profit_factor", report.profit_factor)}</strong></div>
       <div><span title="Mean over standard deviation of per-bar equity returns, annualized by the chart's bars per calendar year; no risk-free rate">Sharpe (per-bar, annualized)</span><strong>{show("sharpe", report.sharpe)}</strong></div>
     </div>
-    <p class="note">Returns compound each trade at full size. Buy and hold runs from the first close to the last close. Sharpe uses per-bar returns of the marked-to-market equity curve, annualized from the bars per year on the chart, with no risk-free rate.</p>
+    <p class="note">{report.side === "short" ? "Short: entries sell and exits buy back, the stop-loss sits above the entry and the take-profit below, and a trade gains when the price falls. " : ""}Returns compound each trade at full size. Buy and hold runs from the first close to the last close. Sharpe uses per-bar returns of the marked-to-market equity curve, annualized from the bars per year on the chart, with no risk-free rate.</p>
     {#if shape && point}
       <section aria-label="Equity curve">
         <h3>Equity curve</h3>
@@ -369,7 +394,7 @@
       <h3>Trades</h3>
       {#if report.trades.length}
         <table>
-          <thead><tr><th>Entry</th><th>Price</th><th>Exit</th><th>Price</th><th>Return</th><th>Reason</th></tr></thead>
+          <thead><tr><th>{report.side === "short" ? "Sell" : "Entry"}</th><th>Price</th><th>{report.side === "short" ? "Buy back" : "Exit"}</th><th>Price</th><th>Return</th><th>Reason</th></tr></thead>
           <tbody>
             {#each report.trades as t, i (i)}
               <tr>

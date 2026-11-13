@@ -8,7 +8,10 @@ export interface Rules {
   exit: string;
   stop_pct: number | null;
   target_pct: number | null;
+  side?: Side;
 }
+
+export type Side = "long" | "short";
 
 export type ExitReason = "signal" | "stop" | "target" | "end";
 
@@ -22,6 +25,7 @@ export interface Trade {
 }
 
 export interface Report {
+  side: Side;
   trades: Trade[];
   count: number;
   win_rate: number | null;
@@ -71,8 +75,9 @@ export function backtest(candles: readonly Candle[], rules: Rules, clock: Sessio
   let drawdown = 0;
   const curve: CurvePoint[] = [];
 
+  const short = rules.side === "short";
   const close = (t: number, price: number, reason: ExitReason) => {
-    const r = price / pos!.price - 1;
+    const r = short ? 1 - price / pos!.price : price / pos!.price - 1;
     trades.push({ entry_time: pos!.t, entry_price: pos!.price, exit_time: t, exit_price: price, return_pct: r * 100, reason });
     equity *= 1 + r;
     pos = null;
@@ -83,17 +88,18 @@ export function backtest(candles: readonly Candle[], rules: Rules, clock: Sessio
     if (pending) {
       if (pos) close(c.t, c.o, "signal");
       else if (!level) pos = { t: c.t, price: c.o };
-      else if (c.h >= level[i - 1]) pos = { t: c.t, price: Math.max(c.o, level[i - 1]) };
+      else if (short ? c.l <= level[i - 1] : c.h >= level[i - 1]) pos = { t: c.t, price: short ? Math.min(c.o, level[i - 1]) : Math.max(c.o, level[i - 1]) };
       pending = false;
     }
     if (pos) {
-      const stop = rules.stop_pct != null ? pos.price * (1 - rules.stop_pct / 100) : null;
-      const target = rules.target_pct != null ? pos.price * (1 + rules.target_pct / 100) : null;
-      if (stop != null && c.l <= stop) close(c.t, Math.min(c.o, stop), "stop");
-      else if (target != null && c.h >= target) close(c.t, Math.max(c.o, target), "target");
+      const dir = short ? -1 : 1;
+      const stop = rules.stop_pct != null ? pos.price * (1 - (dir * rules.stop_pct) / 100) : null;
+      const target = rules.target_pct != null ? pos.price * (1 + (dir * rules.target_pct) / 100) : null;
+      if (stop != null && (short ? c.h >= stop : c.l <= stop)) close(c.t, short ? Math.max(c.o, stop) : Math.min(c.o, stop), "stop");
+      else if (target != null && (short ? c.l <= target : c.h >= target)) close(c.t, short ? Math.min(c.o, target) : Math.max(c.o, target), "target");
     }
     if (i < candles.length - 1) pending = pos ? exit[i] : entry[i];
-    const marked = pos ? equity * (c.c / pos.price) : equity;
+    const marked = pos ? equity * (short ? 2 - c.c / pos.price : c.c / pos.price) : equity;
     peak = Math.max(peak, marked);
     drawdown = Math.max(drawdown, 1 - marked / peak);
     curve.push({ t: c.t, equity: marked, drawdown: 1 - marked / peak });
@@ -103,6 +109,7 @@ export function backtest(candles: readonly Candle[], rules: Rules, clock: Sessio
   if (pos) close(last.t, last.c, "end");
   const returns = trades.map((t) => t.return_pct);
   return {
+    side: short ? "short" : "long",
     trades,
     count: trades.length,
     win_rate: trades.length ? (returns.filter((r) => r > 0).length / trades.length) * 100 : null,
@@ -117,9 +124,10 @@ export function backtest(candles: readonly Candle[], rules: Rules, clock: Sessio
 }
 
 export function markers(report: Report | null): { t: number; side: "buy" | "sell"; price: number }[] {
+  const [open, shut] = report?.side === "short" ? (["sell", "buy"] as const) : (["buy", "sell"] as const);
   return (report?.trades ?? []).flatMap((t) => [
-    { t: t.entry_time, side: "buy" as const, price: t.entry_price },
-    { t: t.exit_time, side: "sell" as const, price: t.exit_price },
+    { t: t.entry_time, side: open, price: t.entry_price },
+    { t: t.exit_time, side: shut, price: t.exit_price },
   ]);
 }
 
@@ -157,8 +165,9 @@ export function parameters(rules: Rules): Param[] {
     const text = rules[f] ?? "";
     [...text.matchAll(NUMBER)].forEach((m, i) => {
       const at = m.index!;
-      const fn = /([a-z_]+)\(\s*$/i.exec(text.slice(0, at))?.[1];
-      out.push({ id: `${f}:${i}`, label: `${FIELD_LABEL[f]}: ${fn ? `${fn}(${m[0]})` : m[0]}`, value: Number(m[0]) });
+      const call = /([a-z_]+)\(([^()]*,\s*)?$/i.exec(text.slice(0, at));
+      const fn = call ? `${call[1]}(${call[2] ? "…, " : ""}${m[0]})` : m[0];
+      out.push({ id: `${f}:${i}`, label: `${FIELD_LABEL[f]}: ${fn}`, value: Number(m[0]) });
     });
   }
   if (rules.stop_pct != null) out.push({ id: "stop_pct", label: "Stop-loss %", value: rules.stop_pct });

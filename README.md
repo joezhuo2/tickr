@@ -364,8 +364,19 @@ taskbar to keep it visible.
   `or_high(minutes)` and `or_low(minutes)` for the opening range once it is
   complete, `day_high` and `day_low` for the regular session before the current
   bar, and `prev_high`, `prev_low`, `prev_close` for the prior day on the chart.
+  The study functions `macd(fast, slow, signal)`, `macd_signal`, `macd_hist`,
+  `bb_upper(n, k)`, `bb_mid`, `bb_lower`, `stoch_k(n, smooth, d)`, `stoch_d`,
+  `stochrsi(rsi, stoch, k, d)`, `wma(n)`, `hma(n)`, `vwma(n)`, `aroon_up(n)`,
+  `aroon_down(n)`, `cmf(n)`, `roc(n)`, `cci(n)`, `mfi(n)`, `willr(n)`,
+  `adx(n)`, `supertrend(n, multiplier)`, `donchian_high(n)` and
+  `donchian_low(n)` are in the menus too; numbers left out take the study
+  defaults, so `macd()` is 12, 26, 9 and `bb_upper(20)` is 2 deviations. They
+  also work in indicator alerts.
   Entries and exits fill at the next candle's open, with an optional stop-loss
-  and take-profit. Set an **Entry stop price** such as `or_high(15)` to buy
+  and take-profit. **Direction** switches to short: entries sell at the next
+  open, the stop-loss sits above the entry and the take-profit below, a trade
+  gains when the price falls, and the chart marks and trade list show sells
+  then buys. Buy and hold stays long. Set an **Entry stop price** such as `or_high(15)` to buy
   where a bar trades up through that level instead (at the open if it gaps
   above); the entry condition then only arms the order. The **ORB example**
   link fills in a 15-minute opening range breakout. A stop-loss can trigger on

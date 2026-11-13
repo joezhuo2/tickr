@@ -1,9 +1,49 @@
+import { adx, aroon, cci, cmf, donchian, hma, macd, mfi, roc, stochRsi, stochastic, supertrend, vwma, williamsR, wma, type Series } from "./studies";
 import type { Candle } from "./types";
 
 export type Field = "close" | "open" | "high" | "low" | "volume";
 export type Indicator = "sma" | "ema" | "rsi" | "atr" | "or_high" | "or_low";
 export type Derived = "time" | "vwap" | "day_high" | "day_low" | "prev_high" | "prev_low" | "prev_close";
 export type Kind = "num" | "bool";
+
+const nums = (s: Series): number[] => s.map((x) => x ?? NaN);
+
+export function bollinger(closes: number[], n: number, k: number): { upper: number[]; mid: number[]; lower: number[] } {
+  const mid = sma(closes, n);
+  const dev = closes.map((_, i) => (i < n - 1 ? NaN : Math.sqrt(closes.slice(i - n + 1, i + 1).reduce((a, x) => a + (x - mid[i]) ** 2, 0) / n)));
+  return { upper: mid.map((m, i) => m + k * dev[i]), mid, lower: mid.map((m, i) => m - k * dev[i]) };
+}
+
+type Fn = { defs: number[]; whole: number; run: (c: readonly Candle[], a: number[]) => number[] };
+
+export const FUNCTIONS = {
+  macd: { defs: [12, 26, 9], whole: 3, run: (c, a) => nums(macd(c, a[0], a[1], a[2]).line) },
+  macd_signal: { defs: [12, 26, 9], whole: 3, run: (c, a) => nums(macd(c, a[0], a[1], a[2]).signal) },
+  macd_hist: { defs: [12, 26, 9], whole: 3, run: (c, a) => nums(macd(c, a[0], a[1], a[2]).hist) },
+  bb_upper: { defs: [20, 2], whole: 1, run: (c, a) => bollinger(c.map((x) => x.c), a[0], a[1]).upper },
+  bb_mid: { defs: [20, 2], whole: 1, run: (c, a) => bollinger(c.map((x) => x.c), a[0], a[1]).mid },
+  bb_lower: { defs: [20, 2], whole: 1, run: (c, a) => bollinger(c.map((x) => x.c), a[0], a[1]).lower },
+  stoch_k: { defs: [14, 3, 3], whole: 3, run: (c, a) => nums(stochastic(c, a[0], a[1], a[2]).k) },
+  stoch_d: { defs: [14, 3, 3], whole: 3, run: (c, a) => nums(stochastic(c, a[0], a[1], a[2]).d) },
+  wma: { defs: [20], whole: 1, run: (c, a) => nums(wma(c, a[0])) },
+  hma: { defs: [20], whole: 1, run: (c, a) => nums(hma(c, a[0])) },
+  vwma: { defs: [20], whole: 1, run: (c, a) => nums(vwma(c, a[0])) },
+  stochrsi: { defs: [14, 14, 3, 3], whole: 4, run: (c, a) => nums(stochRsi(c, a[0], a[1], a[2], a[3]).k) },
+  aroon_up: { defs: [25], whole: 1, run: (c, a) => nums(aroon(c, a[0]).up) },
+  aroon_down: { defs: [25], whole: 1, run: (c, a) => nums(aroon(c, a[0]).down) },
+  cmf: { defs: [20], whole: 1, run: (c, a) => nums(cmf(c, a[0])) },
+  roc: { defs: [9], whole: 1, run: (c, a) => nums(roc(c, a[0])) },
+  cci: { defs: [20], whole: 1, run: (c, a) => nums(cci(c, a[0])) },
+  mfi: { defs: [14], whole: 1, run: (c, a) => nums(mfi(c, a[0])) },
+  willr: { defs: [14], whole: 1, run: (c, a) => nums(williamsR(c, a[0])) },
+  adx: { defs: [14], whole: 1, run: (c, a) => nums(adx(c, a[0])) },
+  supertrend: { defs: [10, 3], whole: 1, run: (c, a) => nums(supertrend(c, a[0], a[1]).value) },
+  donchian_high: { defs: [20], whole: 1, run: (c, a) => nums(donchian(c, a[0]).upper) },
+  donchian_low: { defs: [20], whole: 1, run: (c, a) => nums(donchian(c, a[0]).lower) },
+} satisfies Record<string, Fn>;
+
+export type FnName = keyof typeof FUNCTIONS;
+const fnSpec = (name: string): Fn | undefined => (Object.hasOwn(FUNCTIONS, name) ? FUNCTIONS[name as FnName] : undefined);
 
 /** Exchange clock for session terms: UTC offset and regular hours, in seconds past local midnight. */
 export interface SessionClock {
@@ -29,6 +69,7 @@ export type Expr =
   | { k: "field"; name: Field }
   | { k: "derived"; name: Derived }
   | { k: "ind"; fn: Indicator; n: number }
+  | { k: "fn"; fn: FnName; args: number[] }
   | { k: "cross"; dir: "above" | "below"; a: Expr; b: Expr }
   | { k: "cmp"; op: ">" | "<" | ">=" | "<=" | "=="; a: Expr; b: Expr }
   | { k: "math"; op: "+" | "-" | "*" | "/"; a: Expr; b: Expr }
@@ -180,6 +221,26 @@ export function parse(src: string, kind: Kind = "bool"): Expr {
         p++;
         expect(")");
         return { e: { k: "ind", fn: tok.v as Indicator, n }, kind: "num", pos: tok.pos };
+      }
+      const spec = fnSpec(tok.v);
+      if (spec) {
+        const args: number[] = [];
+        if (peek().v === "(" && peek().t === "op") {
+          p++;
+          while (peek().v !== ")" || peek().t !== "op") {
+            if (args.length) expect(",");
+            const arg = peek();
+            const n = Number(arg.v);
+            const whole = args.length < spec.whole;
+            if (arg.t !== "num" || args.length >= spec.defs.length || (whole ? !Number.isInteger(n) || n < 1 || n > MAX_PERIOD : !(n > 0 && n <= 100))) {
+              throw new ParseError(`${tok.v}() takes up to ${spec.defs.length} number${spec.defs.length > 1 ? "s" : ""} (default ${spec.defs.join(", ")}); periods are whole numbers from 1 to ${MAX_PERIOD}`, arg.pos);
+            }
+            args.push(n);
+            p++;
+          }
+          p++;
+        }
+        return { e: { k: "fn", fn: tok.v as FnName, args: spec.defs.map((d, i) => args[i] ?? d) }, kind: "num", pos: tok.pos };
       }
       if (tok.v === "crosses_above" || tok.v === "crosses_below") {
         expect("(");
@@ -334,6 +395,15 @@ export function values(expr: Expr, candles: readonly Candle[], clock: SessionClo
         }
         return s;
       }
+      case "fn": {
+        const id = `${e.fn}:${e.args.join(",")}`;
+        let s = cache.get(id);
+        if (!s) {
+          s = FUNCTIONS[e.fn].run(candles, e.args);
+          cache.set(id, s);
+        }
+        return s;
+      }
       case "derived": {
         let s = cache.get(e.name);
         if (!s) {
@@ -380,12 +450,12 @@ const OPS: Record<string, (a: number, b: number) => number> = {
   or: (a, b) => +(a === 1 || b === 1),
 };
 
-export type Operand = { kind: Field | Indicator | Derived | "value"; n: number };
+export type Operand = { kind: Field | Indicator | Derived | FnName | "value"; n: number };
 export type Condition = ">" | "<" | ">=" | "<=" | "crosses_above" | "crosses_below";
 
 export function operandText(o: Operand): string {
   if (o.kind === "value") return String(o.n);
-  return (INDICATORS as string[]).includes(o.kind) ? `${o.kind}(${o.n})` : o.kind;
+  return (INDICATORS as string[]).includes(o.kind) || fnSpec(o.kind) ? `${o.kind}(${o.n})` : o.kind;
 }
 
 export function buildCondition(left: Operand, op: Condition, right: Operand): string {
