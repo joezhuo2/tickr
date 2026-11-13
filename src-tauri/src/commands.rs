@@ -1111,7 +1111,7 @@ mod tests {
         use crate::settings::{Drawing, DrawingPoint};
         let dir = tempfile::tempdir().unwrap();
         let shared = Shared::new(dir.path().join("settings.json"), Default::default());
-        let d = Drawing { id: 1, kind: "hline".into(), points: vec![DrawingPoint { t: 100, price: 10.0 }], text: String::new(), color: "#ef4444".into(), width: 2, dashed: true, locked: true, created: 0, edited: 0 };
+        let d = Drawing { id: 1, kind: "hline".into(), points: vec![DrawingPoint { t: 100, price: 10.0 }], text: String::new(), color: "#ef4444".into(), width: 2, dashed: true, locked: true, hidden: true, created: 0, edited: 0 };
         edit_drawings(&shared, "aapl".into(), vec![d.clone()]).unwrap();
         let saved = Settings::load(&shared.settings_path);
         assert_eq!(saved.drawings["AAPL"], vec![d.clone()]);

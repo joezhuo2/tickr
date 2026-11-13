@@ -293,6 +293,8 @@ pub struct Drawing {
     #[serde(default)]
     pub locked: bool,
     #[serde(default)]
+    pub hidden: bool,
+    #[serde(default)]
     pub created: i64,
     #[serde(default)]
     pub edited: i64,
@@ -314,16 +316,19 @@ pub fn validate_drawing_list(drawings: &[Drawing]) -> Result<(), String> {
     let mut ids = HashSet::new();
     for d in drawings {
         let valid = match d.kind.as_str() {
-            "hline" | "text" | "avwap" | "vline" | "hray" | "note" => d.points.len() == 1,
-            "trend" | "rect" | "ray" | "fib" | "position" | "arrow" | "prange" | "drange" | "vprofile" => d.points.len() == 2,
+            "hline" | "text" | "avwap" | "vline" | "hray" | "note" | "arrowup" | "arrowdown" => d.points.len() == 1,
+            "trend" | "rect" | "ray" | "fib" | "position" | "arrow" | "prange" | "drange" | "vprofile" | "callout" => d.points.len() == 2,
             "channel" | "fibext" | "pitchfork" => d.points.len() == 3,
+            "corrective" => d.points.len() == 4,
+            "xabcd" | "headshoulders" => d.points.len() == 5,
+            "impulse" => d.points.len() == 6,
             "pen" => (2..=PEN_MAX_POINTS).contains(&d.points.len()),
             _ => return Err("Unknown drawing kind.".into()),
         };
         if !valid { return Err("Invalid drawing points.".into()); }
         if d.points.iter().any(|p| !p.price.is_finite() || p.price <= 0.0) { return Err("Invalid drawing price.".into()); }
         let max_text = if d.kind == "note" { 2000 } else { 200 };
-        if d.text.chars().count() > max_text || (if d.kind == "text" || d.kind == "note" { d.text.trim().is_empty() } else { !d.text.is_empty() }) { return Err("Invalid drawing text.".into()); }
+        if d.text.chars().count() > max_text || (if d.kind == "text" || d.kind == "note" || d.kind == "callout" { d.text.trim().is_empty() } else { !d.text.is_empty() }) { return Err("Invalid drawing text.".into()); }
         if !ids.insert(d.id) { return Err("Duplicate drawing ID.".into()); }
         let hex = d.color.len() == 7 && d.color.starts_with('#') && d.color[1..].bytes().all(|b| b.is_ascii_hexdigit());
         if !(d.color.is_empty() || hex) || d.width > 4 { return Err("Invalid drawing style.".into()); }
@@ -1218,5 +1223,23 @@ mod tests {
         assert_eq!(s.alerts[0].triggered_price, None);
         assert_eq!(s.alerts[1].triggered_at, Some(1_700_000_000));
         assert_eq!(s.alerts[1].triggered_price, None);
+    }
+
+    #[test]
+    fn pattern_drawings_validate_points_and_text() {
+        let point = DrawingPoint { t: 100, price: 10.0 };
+        let make = |kind: &str, n: usize, text: &str| Drawing { id: 1, kind: kind.into(), points: vec![point.clone(); n], text: text.into(), color: String::new(), width: 0, dashed: false, locked: false, hidden: true, created: 0, edited: 0 };
+        for (kind, n) in [("arrowup", 1), ("arrowdown", 1), ("corrective", 4), ("xabcd", 5), ("headshoulders", 5), ("impulse", 6)] {
+            assert!(validate_drawing_list(&[make(kind, n, "")]).is_ok());
+            assert!(validate_drawing_list(&[make(kind, n + 1, "")]).is_err());
+            assert!(validate_drawing_list(&[make(kind, n, "x")]).is_err());
+        }
+        assert!(validate_drawing_list(&[make("callout", 2, "Breakout")]).is_ok());
+        let long = "x".repeat(201);
+        for (n, text) in [(2, " "), (2, long.as_str()), (1, "x")] {
+            assert!(validate_drawing_list(&[make("callout", n, text)]).is_err());
+        }
+        let old: Drawing = serde_json::from_str(r#"{"id":1,"kind":"hline","points":[{"t":1,"price":2.0}],"text":""}"#).unwrap();
+        assert!(!old.hidden && !old.locked);
     }
 }
