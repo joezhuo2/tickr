@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ParseError, buildCondition, check, ema, evaluate, parse, rsi, sma } from "./strategy";
+import { ParseError, buildCondition, check, ema, evaluate, parse, rsi, sma, values } from "./strategy";
+import { adx, aroon, cci, cmf, donchian, hma, macd, mfi, roc, stochRsi, stochastic, supertrend, vwma, williamsR, wma } from "./studies";
 import type { Candle } from "./types";
 
 const bars = (closes: number[]): Candle[] => closes.map((c, i) => ({ t: i * 60, o: c, h: c + 1, l: c - 1, c, v: 1000 + i }));
@@ -108,5 +109,68 @@ describe("buildCondition", () => {
     const c = buildCondition({ kind: "ema", n: 9 }, "crosses_above", { kind: "ema", n: 21 });
     expect([a, b, c]).toEqual(["close > sma(50)", "crosses_below(rsi(14), 30)", "crosses_above(ema(9), ema(21))"]);
     for (const s of [a, b, c]) expect(check(s)).toBeNull();
+  });
+});
+
+describe("study functions", () => {
+  const c = bars([10, 12, 11, 13, 15, 14, 16, 18, 17, 19, 21, 20, 22, 21, 23, 25, 24, 26, 28, 27, 29, 31, 30, 32, 34, 33, 35, 37, 36, 38, 40, 39, 41, 43, 42, 44, 46, 45]);
+  const nums = (s: (number | null)[]) => s.map((x) => x ?? NaN);
+  const num = (src: string) => values(parse(src, "num"), c);
+
+  it("fills left-out arguments with the study defaults", () => {
+    expect(parse("macd()", "num")).toEqual({ k: "fn", fn: "macd", args: [12, 26, 9] });
+    expect(parse("macd(8)", "num")).toEqual({ k: "fn", fn: "macd", args: [8, 26, 9] });
+    expect(parse("cci", "num")).toEqual({ k: "fn", fn: "cci", args: [20] });
+    expect(parse("bb_upper(10, 2.5)", "num")).toEqual({ k: "fn", fn: "bb_upper", args: [10, 2.5] });
+    expect(parse("stochrsi", "num")).toEqual({ k: "fn", fn: "stochrsi", args: [14, 14, 3, 3] });
+    expect(parse("supertrend(7)", "num")).toEqual({ k: "fn", fn: "supertrend", args: [7, 3] });
+  });
+
+  it("rejects bad arguments", () => {
+    for (const src of ["macd(1, 2, 3, 4) > 0", "macd(1.5) > 0", "bb_upper(20, 0) > 0", "cci(0) > 0", "roc(9 > 0", "wma(close) > 0"]) expect(check(src)).not.toBeNull();
+    expect(check("crosses_above(macd(), macd_signal()) and adx(14) > 25")).toBeNull();
+  });
+
+  it("reuses the study computations", () => {
+    const pairs: [string, (number | null)[]][] = [
+      ["macd(3, 6, 4)", macd(c, 3, 6, 4).line],
+      ["macd_signal(3, 6, 4)", macd(c, 3, 6, 4).signal],
+      ["macd_hist(3, 6, 4)", macd(c, 3, 6, 4).hist],
+      ["stoch_k(5, 2, 2)", stochastic(c, 5, 2, 2).k],
+      ["stoch_d(5, 2, 2)", stochastic(c, 5, 2, 2).d],
+      ["wma(4)", wma(c, 4)],
+      ["hma(4)", hma(c, 4)],
+      ["vwma(4)", vwma(c, 4)],
+      ["stochrsi(3, 3, 2, 2)", stochRsi(c, 3, 3, 2, 2).k],
+      ["aroon_up(5)", aroon(c, 5).up],
+      ["aroon_down(5)", aroon(c, 5).down],
+      ["cmf(5)", cmf(c, 5)],
+      ["roc(3)", roc(c, 3)],
+      ["cci(5)", cci(c, 5)],
+      ["mfi(5)", mfi(c, 5)],
+      ["willr(5)", williamsR(c, 5)],
+      ["adx(5)", adx(c, 5)],
+      ["supertrend(5, 2)", supertrend(c, 5, 2).value],
+      ["donchian_high(5)", donchian(c, 5).upper],
+      ["donchian_low(5)", donchian(c, 5).lower],
+    ];
+    for (const [src, want] of pairs) expect(num(src), src).toEqual(nums(want));
+    expect(num("macd_signal()").filter(Number.isFinite).length).toBe(c.length - 33);
+  });
+
+  it("computes known values", () => {
+    const three = bars([1, 2, 3]);
+    expect(values(parse("bb_mid(3, 2)", "num"), three)[2]).toBe(2);
+    expect(values(parse("bb_upper(3, 2)", "num"), three)[2]).toBeCloseTo(2 + 2 * Math.sqrt(2 / 3));
+    expect(values(parse("bb_lower(3, 1)", "num"), three)[2]).toBeCloseTo(2 - Math.sqrt(2 / 3));
+    expect(values(parse("wma(3)", "num"), three)[2]).toBeCloseTo(14 / 6);
+    expect(values(parse("roc(1)", "num"), bars([10, 11]))[1]).toBeCloseTo(10);
+    expect(values(parse("adx(3)", "num"), bars([1, 2, 3, 4, 5, 6, 7])).slice(4)).toEqual([NaN, 100, 100]);
+    expect(values(parse("donchian_high(2)", "num"), three)[2]).toBe(4);
+  });
+
+  it("builds conditions with the new functions", () => {
+    expect(buildCondition({ kind: "macd", n: 12 }, ">", { kind: "value", n: 0 })).toBe("macd(12) > 0");
+    expect(buildCondition({ kind: "close", n: 0 }, "crosses_below", { kind: "bb_lower", n: 20 })).toBe("crosses_below(close, bb_lower(20))");
   });
 });

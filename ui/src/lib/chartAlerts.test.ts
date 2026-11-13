@@ -6,6 +6,12 @@ const closes = (...values: number[]): Candle[] => values.map((c, i) => ({ t: i *
 const alert = (over: Partial<ChartAlert>): ChartAlert => ({ id: 1, symbol: "AAPL", interval: "5m", label: "x", expr: null, line: null, enabled: true, fired_at: null, ...over });
 
 describe("chart alerts", () => {
+  it("accepts the study functions in indicator alerts", () => {
+    expect(addError([], "crosses_above(roc(1), 5)")).toBeNull();
+    expect(holds({ expr: "crosses_above(roc(1), 5)", line: null }, closes(100, 101, 110))).toBe(true);
+    expect(holds({ expr: "willr(2) > -50", line: null }, closes(100, 90))).toBe(false);
+  });
+
   it("extends a line in bar space", () => {
     const times = [0, 60, 120, 180];
     const line = { a: { t: 0, price: 10 }, b: { t: 60, price: 12 } };

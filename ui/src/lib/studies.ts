@@ -305,6 +305,32 @@ export function linearRegression(candles: readonly Candle[], length = 100, devia
   return { upper, mid, lower };
 }
 
+export function adx(candles: readonly Candle[], length = 14): Series {
+  const out: Series = candles.map(() => null);
+  let tr = 0;
+  let plus = 0;
+  let minus = 0;
+  let avg: number | null = null;
+  let dxSum = 0;
+  for (let i = 1; i < candles.length; i++) {
+    const c = candles[i];
+    const p = candles[i - 1];
+    const up = c.h - p.h;
+    const down = p.l - c.l;
+    const t = Math.max(c.h - c.l, Math.abs(c.h - p.c), Math.abs(c.l - p.c));
+    const pdm = up > down && up > 0 ? up : 0;
+    const mdm = down > up && down > 0 ? down : 0;
+    if (i <= length) { tr += t; plus += pdm; minus += mdm; } else { tr += t - tr / length; plus += pdm - plus / length; minus += mdm - minus / length; }
+    if (i < length) continue;
+    const sum = plus + minus;
+    const dx = tr && sum ? (100 * Math.abs(plus - minus)) / sum : 0;
+    if (i < 2 * length - 1) { dxSum += dx; continue; }
+    avg = avg == null ? (dxSum + dx) / length : (avg * (length - 1) + dx) / length;
+    out[i] = avg;
+  }
+  return out;
+}
+
 export function rsiSeries(candles: readonly Candle[], length = 14): Series {
   return rsi(candles.map((c) => c.c), length).map((x) => (Number.isNaN(x) ? null : x));
 }
