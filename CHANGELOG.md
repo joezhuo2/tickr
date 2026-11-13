@@ -6,6 +6,21 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.67] - 2026-11-12
+
+### Added
+- **Chart pattern recognition:** technical analysis finds head and shoulders
+  (and inverse), double and triple tops and bottoms, ascending, descending and
+  symmetrical triangles, bull and bear flags, and rising and falling wedges.
+  They are drawn with necklines or trendlines, explained on hover and listed in
+  Technicals; click one to jump to it. Settings > Chart > Technical analysis
+  chooses which patterns to detect and what the chart shows. Practice adds a
+  "Name the chart pattern" quiz.
+
+### Changed
+- **Auto analyze:** "Keep analysis on" is now called Auto analyze and is also
+  in Settings. It runs the local analysis only, never the AI.
+
 ## [0.11.66] - 2026-11-12
 
 ### Added
