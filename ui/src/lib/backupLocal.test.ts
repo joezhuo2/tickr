@@ -33,9 +33,23 @@ describe("backup local state", () => {
     expect(dst.getItem("tickr.rr")).toBe("3.5");
     expect(JSON.parse(dst.getItem("tickr.drawingStyles")!)).toEqual({ defaults: { trend: { color: "#ff0000", width: 2, dashed: true } }, templates: [{ name: "Red", color: "#ff0000", width: 3, dashed: false }] });
     expect(dst.getItem("tickr.technicalsSettingsOpen")).toBe("1");
-    expect(JSON.parse(dst.getItem("tickr.panes")!)).toEqual({ groups: [["price"], ["macd", "rsi"], ["stoch"], ["obv"], ["cci"], ["willr"], ["mfi"], ["stochrsi"], ["aroon"], ["cmf"], ["roc"]], left: "percent" });
+    expect(JSON.parse(dst.getItem("tickr.panes")!)).toEqual({ groups: [["price"], ["macd", "rsi"], ["stoch"], ["obv"], ["cci"], ["willr"], ["mfi"], ["stochrsi"], ["aroon"], ["cmf"], ["roc"], ["rsi_study"], ["macd_study"]], left: "percent" });
     expect(JSON.parse(dst.getItem("tickr.studySettings")!).ichimoku.displacement).toBe(30);
     expect(JSON.parse(dst.getItem("tickr.studySettings")!).stoch.k).toBe(14);
+  });
+
+  it("round-trips extra study instances and still imports old study settings", () => {
+    const extras = [{ key: "rsi_study-2", study: "rsi_study", params: { length: 7 }, tf: "1d" }];
+    const src = fake({ "tickr.studySettings": JSON.stringify({ timeframes: { cci: "60m" }, extras }) });
+    const dst = fake();
+    applyLocal(dst, parseLocal(withLocal("{}", src)));
+    const saved = JSON.parse(dst.getItem("tickr.studySettings")!);
+    expect(saved.extras).toEqual(extras);
+    expect(saved.timeframes).toEqual({ cci: "60m" });
+    const old = parseLocal(JSON.stringify({ local: { studies: { cci: true }, study_settings: { cci: { length: 30 } } } }));
+    expect(old.studies!.cci).toBe(true);
+    expect(old.study_settings!.cci.length).toBe(30);
+    expect(old.study_settings!.extras).toEqual([]);
   });
 
   it("an old backup leaves existing local state alone", () => {

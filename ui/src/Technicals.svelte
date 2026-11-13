@@ -1,7 +1,7 @@
 <script lang="ts">
   import { STUDIES } from "./lib/studies";
-  import { changeSettings, studies, studySettings, toggleStudy } from "./lib/studyStore.svelte";
-  import { PIVOT_TYPES, SETTING_FIELDS, SETTING_LABELS, type PivotType, type SettingGroup } from "./lib/studySettings";
+  import { addInstance, changeSettings, removeInstance, studies, studySettings, toggleStudy } from "./lib/studyStore.svelte";
+  import { MAX_EXTRAS, NO_TIMEFRAME, PIVOT_TYPES, SETTING_FIELDS, SETTING_LABELS, STUDY_TIMEFRAMES, type PivotType, type SettingGroup } from "./lib/studySettings";
   import { biasLabel, biasTone, direction, fullTime, num, price, signed, upside } from "./lib/format";
   import type { Analysis, Direction, Overlays, Target, IndicatorConfig, IndicatorPreset } from "./lib/types";
 
@@ -345,12 +345,24 @@
       </div>
       {#each Object.keys(SETTING_FIELDS) as name}
         {@const group = name as SettingGroup}
-        <div class="indicator-row">
-          <b>{SETTING_LABELS[group].toUpperCase()}</b>
-          {#each Object.entries(SETTING_FIELDS[group]) as [key, f]}
-            <label>{f.label} <input type="number" aria-label={`${SETTING_LABELS[group]} ${f.label}`} min={f.min} max={f.max} step={f.step} value={(studySettings[group] as Record<string, number>)[key]} onchange={(e) => changeSettings((s) => ((s[group] as Record<string, number>)[key] = e.currentTarget.valueAsNumber))} /></label>
-          {/each}
-        </div>
+        {#each [{ key: group, label: SETTING_LABELS[group], params: studySettings[group] as Record<string, number>, tf: studySettings.timeframes[group] ?? "chart" }, ...studySettings.extras.filter((x) => x.study === group).map((x) => ({ ...x, label: `${SETTING_LABELS[group]} ${x.key.slice(group.length + 1)}` }))] as inst (inst.key)}
+          {@const edit = (f: (p: Record<string, number>) => void) => changeSettings((s) => f(inst.key === group ? (s[group] as Record<string, number>) : s.extras.find((x) => x.key === inst.key)!.params))}
+          <div class="indicator-row">
+            <b>{inst.label.toUpperCase()}</b>
+            {#each Object.entries(SETTING_FIELDS[group]) as [key, f]}
+              <label>{f.label} <input type="number" aria-label={`${inst.label} ${f.label}`} min={f.min} max={f.max} step={f.step} value={inst.params[key]} onchange={(e) => edit((p) => (p[key] = e.currentTarget.valueAsNumber))} /></label>
+            {/each}
+            {#if !NO_TIMEFRAME.includes(group)}
+              <label title="Compute on a higher timeframe built from the chart's bars">Timeframe <select aria-label={`${inst.label} timeframe`} value={inst.tf} onchange={(e) => { const tf = e.currentTarget.value; changeSettings((s) => { if (inst.key === group) s.timeframes[group] = tf; else s.extras.find((x) => x.key === inst.key)!.tf = tf; }); }}><option value="chart">Chart</option>{#each STUDY_TIMEFRAMES as t (t)}<option value={t}>{t}</option>{/each}</select></label>
+            {/if}
+            {#if inst.key !== group || studies[group]}
+              <button aria-label={`Remove ${inst.label}`} onclick={() => removeInstance(inst.key)}>Remove</button>
+            {/if}
+            {#if inst.key === group}
+              <button aria-label={`Add ${SETTING_LABELS[group]}`} disabled={studySettings.extras.length >= MAX_EXTRAS} onclick={() => addInstance(group)}>Add</button>
+            {/if}
+          </div>
+        {/each}
       {/each}
       <div class="indicator-row">
         <b>PIVOT POINTS</b>

@@ -482,7 +482,17 @@ it is instant.
   Fibonacci, Camarilla or Woodie) are set under Indicator settings. ZigZag
   joins swing highs and lows that reversed by at least the set percent; only
   its last leg moves as new bars arrive, so confirmed swings stay put in
-  replay. The regression channel covers the latest bars only. Pivots come from the previous day on intraday
+  replay. The regression channel covers the latest bars only.
+  RSI study and MACD study are RSI and MACD panes of their own, separate from
+  the Analyze panes. Under Indicator settings, **Add** next to a study puts
+  another copy of it on the chart (for example two RSIs with different
+  lengths), each with its own settings, pane or line, legend entry and
+  **Remove** button; a study pane can also be removed with the x in its
+  header. Each copy has a **Timeframe**: Chart, or a longer interval such as
+  60m, 1d or 1wk built from the chart's own bars and drawn as steps. A bar
+  only sees the longer bar formed up to and including it, so replay never
+  shows a value from later bars. ZigZag, the regression channel and Ichimoku
+  always use the chart's bars. Pivots come from the previous day on intraday
   charts, the previous month on daily charts and the previous year on longer
   ones. The Ichimoku cloud is projected by the displacement past the latest bar
   into the empty space on the right, and the lagging line sits that far back.
