@@ -3,8 +3,7 @@
   import { localOffset } from "./lib/freshness";
   import { INTERVALS, INTERVAL_LABELS, RANGES, isInterval, rangesFor, scopes, validSetup, type Decision, type Exercise, type Result, type SavedRun, type Setup, type Summary } from "./lib/practice";
   import { breakdown, computeStats, filterRows, parseTags, tradeRows, type TradeRow } from "./lib/practiceStats";
-  import { PATTERN_INFO } from "./lib/patternInfo";
-  import { MODE_LABELS, NEXT_BARS, type PracticeMode, type Question, type Score } from "./lib/quiz";
+  import { MODE_LABELS, NEXT_BARS, quizInfo, type PracticeMode, type Question, type Score } from "./lib/quiz";
   import type { Group } from "./lib/types";
 
   let {
@@ -111,7 +110,7 @@
   const pct = (v: number) => `${signed(v, 2)}%`;
   const MODES = Object.keys(MODE_LABELS) as PracticeMode[];
   const answered = $derived(quizGuess != null);
-  const right = $derived(!!quiz && quizGuess != null && (quiz.mode === "name" ? quizGuess === quiz.kind : quizOutcome?.move === quizGuess));
+  const right = $derived(!!quiz && quizGuess != null && (quiz.mode !== "move" ? quizGuess === quiz.kind : quizOutcome?.move === quizGuess));
 </script>
 
 <div class="practice" role="region" aria-label="Practice">
@@ -278,17 +277,17 @@
       </div>
     {/if}
   {:else if quiz}
-    {@const info = PATTERN_INFO[quiz.kind]}
+    {@const info = quizInfo(quiz.kind)}
     <div class="card" role="region" aria-label="Pattern quiz">
       <div class="head">
         <span class="tag sim">{MODE_LABELS[quiz.mode]}</span>
         <span class="muted">Score {quizScore.correct}/{quizScore.total} · streak {quizScore.streak}</span>
       </div>
-      {#if quiz.mode === "name"}
+      {#if quiz.mode !== "move"}
         <div id="quiz-question">Which pattern do the highlighted candles form?</div>
         <div class="decide" role="group" aria-labelledby="quiz-question">
           {#each quiz.choices as k (k)}
-            <button class:good={answered && k === quiz.kind} class:bad={answered && k === quizGuess && k !== quiz.kind} disabled={answered} onclick={() => onanswer(k)}>{PATTERN_INFO[k].name}</button>
+            <button class:good={answered && k === quiz.kind} class:bad={answered && k === quizGuess && k !== quiz.kind} disabled={answered} onclick={() => onanswer(k)}>{quizInfo(k).name}</button>
           {/each}
         </div>
       {:else}
@@ -302,7 +301,7 @@
       {#if answered}
         <div role="status">
           <strong class={right ? "up" : "down"}>{right ? "Correct" : "Not quite"}</strong>
-          {#if quiz.mode === "name"}
+          {#if quiz.mode !== "move"}
             · {info.name} <span class="muted">({info.bias})</span>. {info.text}
           {:else if quizOutcome}
             · the close moved <span class={direction(quizOutcome.pct)}>{pct(quizOutcome.pct)}</span> over {NEXT_BARS} candles.

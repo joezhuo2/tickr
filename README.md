@@ -313,6 +313,8 @@ taskbar to keep it visible.
   pattern** highlights the candles of a detected pattern with its label hidden
   and offers four choices, then explains the answer. **Next move** names the
   pattern and asks whether the close five candles later is higher or lower.
+  **Name the chart pattern** does the same with a confirmed chart pattern
+  (head and shoulders, double top, triangle, flag, wedge and so on).
   The session keeps your score and streak. Detected patterns: doji, spinning
   top, hammer, inverted hammer, hanging man, shooting star, bullish and bearish
   marubozu, bullish and bearish engulfing, bullish and bearish harami, piercing
@@ -362,15 +364,28 @@ it is instant.
   −100 to +100 with a bias and confidence, upside and downside targets for the
   next 10 bars, an invalidation level and the signals behind the score.
   Checkboxes toggle moving averages, Bollinger bands, VWAP, the opening range,
-  key levels, the volume average, the volume profile, Fibonacci levels, targets, pattern markers (hover one for what it means), RSI and MACD panes. Indicator settings let you edit
+  key levels, the volume average, the volume profile, Fibonacci levels, targets, pattern markers (hover one for what it means), chart patterns, RSI and MACD panes.
+  **Chart patterns** are found from swing highs and lows in the analyzed
+  candles: head and shoulders and its inverse, double and triple tops and
+  bottoms, ascending, descending and symmetrical triangles, bull and bear
+  flags, and rising and falling wedges. Each is drawn through its swing
+  points with its neckline or trendlines and a label (a `?` means the
+  breakout has not happened yet); hover it for what it means. The Technicals
+  panel lists them with a quality score; click one to bring it into view.
+  Indicator settings let you edit
   lengths, colors (or reset to the theme), and individual line visibility, with
   up to eight SMA and eight EMA lines. MACD defaults to 12/26/9 and starts hidden.
   Settings and up to 50 named presets persist across launches; saving an existing
   name replaces that preset. Display settings never change the score, signals,
   or targets, which retain their fixed indicator lengths.
-  Analysis refreshes when new candles arrive. Enable **Keep analysis on** to
-  also run it at startup and after symbol, range or interval changes; otherwise
-  those changes clear the results until you click Analyze again. Overlay
+  Analysis refreshes when new candles arrive. Enable **Auto analyze** (in
+  Indicator settings or Settings > Chart > Technical analysis) to also run it
+  at startup and after symbol, range or interval changes, without pressing
+  Analyze; otherwise those changes clear the results until you click Analyze
+  again. Auto analyze only runs the local analysis, never the AI, and in
+  replay and practice it sees only the revealed candles. The same Settings
+  section picks what the chart shows afterwards (the overlay checkboxes) and
+  which chart patterns to detect. Overlay
   visibility is preserved. VWAP resets each day on intraday charts and is
   anchored to the first candle on daily and longer intervals. Short histories
   show warm-up estimates and reduced confidence. Computed locally; not

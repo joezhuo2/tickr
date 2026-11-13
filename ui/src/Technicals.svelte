@@ -4,7 +4,9 @@
   import { biasLabel, biasTone, direction, fullTime, num, price, signed, upside } from "./lib/format";
   import type { Analysis, Direction, Overlays, Target, IndicatorConfig, IndicatorPreset } from "./lib/types";
 
-  import { alertLevels, clampPanel, toggleOverlay, type AlertLevel } from "./lib/indicators";
+  import { alertLevels, clampPanel, OVERLAY_TOGGLES, toggleOverlay, type AlertLevel } from "./lib/indicators";
+  import type { ChartPattern } from "./lib/chartPatterns";
+  import { patternInfo } from "./lib/patternInfo";
 
   let {
     analysis,
@@ -15,7 +17,11 @@
     overlays, config, presets, onsave, onsavepreset, ondeletepreset,
     onanalyze,
     onalert,
+    chartPatterns = [],
+    onpattern,
   }: {
+    chartPatterns?: ChartPattern[];
+    onpattern?: (p: ChartPattern) => void;
     analysis: Analysis | null;
     loading: boolean;
     error: string | null;
@@ -61,20 +67,6 @@
     return price(v, cur);
   }
 
-  const TOGGLES: { key: keyof Overlays; label: string }[] = [
-    { key: "mas", label: "Moving averages" },
-    { key: "bollinger", label: "Bollinger bands" },
-    { key: "vwap", label: "VWAP" },
-    { key: "opening_range", label: "Opening range" },
-    { key: "levels", label: "Key levels" },
-    { key: "volume_ma", label: "Volume average" },
-    { key: "volume_profile", label: "Volume profile" },
-    { key: "fib", label: "Fibonacci" },
-    { key: "targets", label: "Targets" },
-    { key: "patterns", label: "Patterns" },
-    { key: "rsi", label: "RSI pane" },
-    { key: "macd", label: "MACD pane" },
-  ];
   const HEIGHT_KEY = "tickr.technicalsHeight";
   let panel = $state<HTMLDivElement>();
   let height = $state<number | null>(savedHeight());
@@ -162,7 +154,7 @@
   {#if !analysis}
     <div class="start">
       <p>
-        Runs RSI, moving averages, candlestick patterns and volatility/Fibonacci targets on the {bars} candles in this chart.
+        Runs RSI, moving averages, candlestick and chart patterns and volatility/Fibonacci targets on the {bars} candles in this chart.
         Computed locally; refreshes with the chart once enabled.
       </p>
       <button class="primary" onclick={onanalyze} disabled={loading || bars === 0}>
@@ -257,6 +249,19 @@
             </li>
           {/each}
         </ul>
+        {#if chartPatterns.length}
+          <h3>Chart patterns</h3>
+          <ul>
+            {#each [...chartPatterns].reverse() as p, i (i)}
+              <li>
+                <button class="pat" title={patternInfo(p.kind)?.text} onclick={() => onpattern?.(p)}>
+                  <span class={tone(p.bias)} aria-label={p.bias}>{mark(p.bias)}</span>
+                  {p.name} <small>{p.confirmed ? "confirmed" : "forming"} · quality {Math.round(p.quality * 100)}%</small>
+                </button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
       </div>
     </div>
 
@@ -273,7 +278,7 @@
     <div class="foot">
       <fieldset>
         <legend class="sr">Chart overlays</legend>
-        {#each TOGGLES as o (o.key)}
+        {#each OVERLAY_TOGGLES as o (o.key)}
           <label><input type="checkbox" checked={overlays?.[o.key] ?? false} disabled={saving} onchange={(e) => edit(() => onsave(toggleOverlay(config, o.key, e.currentTarget.checked)))} /> {o.label}</label>
         {/each}
       </fieldset>
@@ -343,7 +348,7 @@
         <button disabled={!selectedPreset} onclick={() => edit(() => ondeletepreset(selectedPreset))}>Delete</button>
         <label>Preset name <input bind:value={presetName} /></label>
         <button onclick={() => edit(() => onsavepreset(presetName))}>Save</button>
-        <label><input type="checkbox" checked={config.keep_analysis} onchange={(e) => change((c) => c.keep_analysis = e.currentTarget.checked)} /> Keep analysis on</label>
+        <label><input type="checkbox" checked={config.keep_analysis} onchange={(e) => change((c) => c.keep_analysis = e.currentTarget.checked)} /> Auto analyze</label>
       </div>
     </fieldset>
     {#if settingsError}<p class="err" role="alert">{settingsError}</p>{/if}
@@ -570,6 +575,16 @@
   .lim {
     color: var(--warn-text);
     margin-left: 1px;
+  }
+  .pat {
+    border: 0;
+    background: none;
+    padding: 0;
+    color: inherit;
+    text-align: left;
+  }
+  .pat:hover {
+    text-decoration: underline;
   }
   .foot {
     display: flex;

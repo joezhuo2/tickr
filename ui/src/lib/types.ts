@@ -629,6 +629,7 @@ export interface Overlays {
   fib: boolean;
   targets: boolean;
   patterns: boolean;
+  chart_patterns: boolean;
   rsi: boolean;
   macd: boolean;
 }
@@ -790,6 +791,8 @@ export interface IndicatorConfig {
   targets: boolean;
   patterns: boolean;
   keep_analysis: boolean;
+  chart_patterns: boolean;
+  chart_patterns_off: string[];
 }
 export interface IndicatorPreset { name: string; config: IndicatorConfig }
 

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { PATTERN_INFO, PATTERN_KINDS } from "./patternInfo";
+import type { ChartPattern } from "./chartPatterns";
+import { CHART_PATTERN_KINDS, PATTERN_INFO, PATTERN_KINDS } from "./patternInfo";
 import { seeded } from "./practice";
-import { CHOICES, EMPTY_SCORE, NEXT_BARS, build, choices, grade, outcome, record } from "./quiz";
+import { CHOICES, EMPTY_SCORE, NEXT_BARS, build, buildChart, choices, grade, outcome, quizInfo, record } from "./quiz";
 import type { Candle, Pattern } from "./types";
 
 const bars = (closes: number[]): Candle[] => closes.map((c, i) => ({ t: 1000 + i, o: c, h: c, l: c, c, v: 1 }));
@@ -34,7 +35,16 @@ describe("quiz choices", () => {
     const list = choices("hammer", ["morning_star"], seeded(3));
     expect(list).not.toContain("morning_star");
     const others = list.filter((k) => k !== "hammer");
-    expect(others.every((k) => PATTERN_INFO[k].bias === "bullish")).toBe(true);
+    expect(others.every((k) => quizInfo(k).bias === "bullish")).toBe(true);
+  });
+
+  it("draws chart pattern distractors from the chart pattern kinds", () => {
+    for (let seed = 1; seed < 20; seed++) {
+      const list = choices("double_top", [], seeded(seed), CHOICES, CHART_PATTERN_KINDS);
+      expect(list).toHaveLength(CHOICES);
+      expect(list).toContain("double_top");
+      expect(list.every((k) => (CHART_PATTERN_KINDS as readonly string[]).includes(k))).toBe(true);
+    }
   });
 
   it("falls back to other biases when too few share the bias", () => {
@@ -72,6 +82,43 @@ describe("quiz build", () => {
   it("never offers another pattern that ends on the same candle", () => {
     const rivals = [pattern("hammer", 40), pattern("doji", 40, { context_ok: false })];
     for (let seed = 1; seed < 30; seed++) expect(build(rivals, candles, 0, "name", seeded(seed))!.question.choices).not.toContain("doji");
+  });
+});
+
+describe("chart pattern quiz", () => {
+  const candles = bars(Array.from({ length: 120 }, (_, i) => 100 + i));
+  const chartPattern = (kind: ChartPattern["kind"], start: number, end: number, confirmed = true): ChartPattern => ({
+    kind,
+    name: kind,
+    bias: "bearish",
+    start,
+    end,
+    points: [],
+    lines: [],
+    confirmed,
+    quality: 0.8,
+  });
+
+  it("asks a confirmed chart pattern and highlights its whole span", () => {
+    const built = buildChart([chartPattern("double_top", 30, 60)], candles, 0, seeded(2))!;
+    expect(built.question).toMatchObject({ mode: "chart", kind: "double_top", start: 30, end: 60 });
+    expect(built.bars).toHaveLength(60 + NEXT_BARS + 1);
+    expect(built.question.choices).toContain("double_top");
+    expect(built.question.choices.every((k) => (CHART_PATTERN_KINDS as readonly string[]).includes(k))).toBe(true);
+  });
+
+  it("skips forming, too early, too late and out-of-range patterns and overlapping rivals", () => {
+    const list = [chartPattern("head_and_shoulders", 30, 60, false), chartPattern("double_top", 2, 10), chartPattern("triple_top", 80, 118)];
+    expect(buildChart(list, candles, 0, seeded(1))).toBeNull();
+    const rivals = [chartPattern("double_top", 30, 60), chartPattern("triple_top", 40, 70, false)];
+    for (let seed = 1; seed < 20; seed++) expect(buildChart(rivals, candles, 0, seeded(seed))!.question.choices).not.toContain("triple_top");
+    expect(buildChart(rivals, candles, 1000 + 61, seeded(1))).toBeNull();
+  });
+
+  it("grades by name", () => {
+    const q = { mode: "chart" as const, kind: "double_top" as const, start: 0, end: 1, choices: [] };
+    expect(grade(q, "double_top", candles)).toBe(true);
+    expect(grade(q, "triple_top", candles)).toBe(false);
   });
 });
 
