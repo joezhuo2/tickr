@@ -533,7 +533,11 @@ it is instant.
   1 to 240 in Indicator settings. The lines grow while the range forms and then
   hold for the rest of the day. **Extension** adds target lines that many range
   heights above the high and below the low; 0 hides them. The area between
-  the high and low is shaded as a box.
+  the high and low is shaded as a box. After a bar closes beyond the high or
+  low, the chart marks a **failed breakout** (✕) if a bar closes back inside
+  within 3 bars, or a **held retest** (✓) if a later wick comes within 10% of
+  the range height of the level and the bar still closes beyond it. Each side
+  is marked once per day, and the tooltip names the mark.
   **Key levels** (off by default, intraday charts only) draws the prior day's
   regular-session high and low (PDH, PDL) and today's premarket high and low
   (PMH, PML), each labeled with its price. Premarket levels need extended
@@ -928,8 +932,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.82
-git push origin v0.11.82
+git tag v0.11.83
+git push origin v0.11.83
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a

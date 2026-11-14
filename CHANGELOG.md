@@ -6,6 +6,16 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.83] - 2026-11-13
+
+### Added
+- **Opening range signals:** with the Opening range overlay on, the chart
+  marks a failed breakout with ✕ and a held retest with ✓, and the tooltip
+  names each one. A breakout is a bar closing beyond the range high or low. It
+  fails when a bar closes back inside within 3 bars, and a retest holds when a
+  later bar's wick comes within 10% of the range height of the level and the
+  bar still closes beyond it. Each side is marked once per day.
+
 ## [0.11.82] - 2026-11-13
 
 ### Added
