@@ -15,7 +15,7 @@
   import { drawingStyles, setDrawingStyles } from "./lib/drawingStyleStore.svelte";
   import DrawingTree from "./DrawingTree.svelte";
   import { rr } from "./lib/rrStore.svelte";
-  import { legendText, valueArea, volumeProfile } from "./lib/indicators";
+  import { legendText, orSignals, valueArea, volumeProfile } from "./lib/indicators";
   import { columnPen, columns, type Sink } from "./lib/decimate";
   import { LEFT_SCALES, mergeUp, movePane, paneName, paneRects, unmerge, visibleGroups, withPanes, type PaneId, type Slot } from "./lib/panes";
   import { panes, setPanes } from "./lib/paneStore.svelte";
@@ -336,6 +336,12 @@
     const k = align[i];
     return k == null || k < 0 ? null : (line.values[k] ?? null);
   }
+
+  const orMarks = $derived.by(() => {
+    const [hi, lo] = show?.opening_range && analysis ? analysis.series.opening_range : [];
+    if (!hi || !lo) return [];
+    return orSignals(candles, candles.map((_, i) => valueAt(hi, i)), candles.map((_, i) => valueAt(lo, i)));
+  });
 
   // Geometry shared by drawing and hit-testing.
   const geo = $derived.by(() => {
@@ -1035,6 +1041,18 @@
       });
       ctx.globalAlpha = 1;
       legend(a.series.opening_range[0].label, col, [orHigh, orLow]);
+      ctx.save();
+      ctx.font = `bold 11px ${v("--font")}`;
+      ctx.textAlign = "center";
+      for (const m of orMarks) {
+        if (m.i < g.from || m.i > g.to) continue;
+        const c = candles[m.i];
+        const above = m.side === "up";
+        ctx.fillStyle = v((m.kind === "retest") === above ? "--up" : "--down");
+        ctx.textBaseline = above ? "bottom" : "top";
+        ctx.fillText(m.kind === "failed" ? "✕" : "✓", g.x(m.i), g.y(above ? (ohlc ? c.h : c.c) : (ohlc ? c.l : c.c)) + (above ? -12 : 12));
+      }
+      ctx.restore();
     }
 
     legendY = lx > PAD.l + 4 ? ly + 12 : ly;
@@ -2493,7 +2511,7 @@
     const macd = show?.macd && analysis ? analysis.series.macd.map((line) => ({ label: line.label, value: valueAt(line, hover!) })) : [];
     const pats = show?.patterns ? (patternsAt.get(hover) ?? []) : [];
     const chartPats = show?.chart_patterns ? chartPatterns.filter((p) => p.points[0].t <= c.t && c.t <= p.points[p.points.length - 1].t) : [];
-    return { c, x, left, ext: isExtendedSession(sessions[hover]), rsi, macd, pats, chartPats, earn: earningsAt.get(hover), grades: ratingsAt.get(hover) ?? [], heads: newsAt.get(hover) ?? [], div: dividendsAt.get(hover), split: splitsAt.get(hover) };
+    return { c, x, left, ext: isExtendedSession(sessions[hover]), rsi, macd, pats, chartPats, or: orMarks.filter((m) => m.i === hover), earn: earningsAt.get(hover), grades: ratingsAt.get(hover) ?? [], heads: newsAt.get(hover) ?? [], div: dividendsAt.get(hover), split: splitsAt.get(hover) };
   });
 </script>
 
@@ -2755,6 +2773,9 @@
       {/each}
       {#if tip.div != null}<div class="div">● Dividend {price(tip.div, chart.meta.currency)}</div>{/if}
       {#if tip.split}<div class="split">● Split {tip.split}</div>{/if}
+      {#each tip.or as m (m.side)}
+        <div class="pat {(m.kind === 'retest') === (m.side === 'up') ? 'up' : 'down'}">{m.kind === "failed" ? "✕ Failed breakout of" : "✓ Retest held at"} OR {m.side === "up" ? "high" : "low"}</div>
+      {/each}
       {#each tip.pats as p (p.kind)}
         <div class="pat {p.direction === 'bullish' ? 'up' : 'down'}">{p.direction === "bullish" ? "▲" : "▼"} {p.name}</div>
         {@const info = patternInfo(p.kind)}

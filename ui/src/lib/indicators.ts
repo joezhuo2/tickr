@@ -99,6 +99,48 @@ export function alertLevels(series: Pick<Analysis["series"], "opening_range" | "
   });
 }
 
+export interface OrSignal {
+  i: number;
+  kind: "failed" | "retest";
+  side: "up" | "down";
+}
+
+export const OR_FAIL_BARS = 3;
+export const OR_RETEST_TOLERANCE = 0.1;
+
+export function orSignals(candles: Pick<Candle, "h" | "l" | "c">[], high: (number | null)[], low: (number | null)[]): OrSignal[] {
+  const WAIT = -1;
+  const DONE = -2;
+  const out: OrSignal[] = [];
+  const state = { up: WAIT, down: WAIT };
+  candles.forEach((c, i) => {
+    const hi = high[i];
+    const lo = low[i];
+    if (hi == null || lo == null || hi !== high[i - 1] || lo !== low[i - 1]) {
+      state.up = state.down = WAIT;
+      return;
+    }
+    for (const side of ["up", "down"] as const) {
+      const sign = side === "up" ? 1 : -1;
+      const level = side === "up" ? hi : lo;
+      const beyond = (c.c - level) * sign > 0;
+      const broke = state[side];
+      if (broke === WAIT) {
+        if (beyond) state[side] = i;
+      } else if (broke !== DONE) {
+        if (!beyond) {
+          if (i - broke <= OR_FAIL_BARS) out.push({ i, kind: "failed", side });
+          state[side] = DONE;
+        } else if (((side === "up" ? c.l : c.h) - level) * sign <= OR_RETEST_TOLERANCE * (hi - lo)) {
+          out.push({ i, kind: "retest", side });
+          state[side] = DONE;
+        }
+      }
+    }
+  });
+  return out;
+}
+
 export const PANEL_MIN = 92;
 
 export function clampPanel(height: number, total: number): number {

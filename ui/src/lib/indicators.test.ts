@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alertLevels, chartPatternKinds, clampPanel, legendText, overlayVisibility, paneLayout, valueArea, volumeProfile, shouldAnalyze, toggleChartPattern, toggleOverlay } from "./indicators";
+import { alertLevels, chartPatternKinds, clampPanel, legendText, orSignals, overlayVisibility, paneLayout, valueArea, volumeProfile, shouldAnalyze, toggleChartPattern, toggleOverlay } from "./indicators";
 import { CHART_PATTERN_KINDS } from "./patternInfo";
 import type { IndicatorConfig, Overlays } from "./types";
 
@@ -10,6 +10,37 @@ const config = (): IndicatorConfig => ({
   vwap: { color: "", visible: true }, vwap_bands: 0, volume_profile: false, opening_range: { minutes: 15, extension: 1, color: "", visible: false }, levels: { color: "", visible: false }, volume_ma: { length: 20, color: "", visible: true }, rsi: { length: 14, color: "", visible: true },
   macd: { fast: 12, slow: 26, signal: 9, color: "", signal_color: "", visible: false },
   fib: true, targets: true, patterns: true, keep_analysis: false, chart_patterns: true, chart_patterns_off: [],
+});
+
+describe("opening range signals", () => {
+  const bar = (l: number, h: number, c: number) => ({ l, h, c });
+  const run = (bars: { l: number; h: number; c: number }[], nulls = 0) => {
+    const level = (v: number) => bars.map((_, i) => (i < nulls ? null : v));
+    return orSignals(bars, level(110), level(100));
+  };
+  const inside = bar(101, 109, 105);
+  const breakout = bar(108, 114, 113);
+  const away = bar(115, 120, 118);
+
+  it("flags a close back inside within three bars as a failed breakout", () => {
+    expect(run([inside, inside, breakout, away, away, bar(108, 116, 109)])).toEqual([{ i: 5, kind: "failed", side: "up" }]);
+    expect(run([inside, inside, bar(96, 102, 97), bar(98, 103, 102)])).toEqual([{ i: 3, kind: "failed", side: "down" }]);
+  });
+
+  it("ignores a close back inside after the window and ends the sequence", () => {
+    expect(run([inside, inside, breakout, away, away, away, bar(108, 116, 109), breakout, bar(110.5, 115, 114)])).toEqual([]);
+  });
+
+  it("flags a wick back to the level that closes beyond it as a held retest", () => {
+    expect(run([inside, inside, breakout, away, bar(110.9, 116, 115), bar(110, 116, 115)])).toEqual([{ i: 4, kind: "retest", side: "up" }]);
+    expect(run([inside, inside, bar(96, 102, 97), bar(92, 99.5, 94)])).toEqual([{ i: 3, kind: "retest", side: "down" }]);
+    expect(run([inside, inside, breakout, bar(111.1, 116, 115)])).toEqual([]);
+  });
+
+  it("starts over when the range changes and skips bars without a range", () => {
+    expect(run([breakout, inside, breakout, bar(108, 112, 109)], 1)).toEqual([{ i: 3, kind: "failed", side: "up" }]);
+    expect(orSignals([inside, breakout, bar(108, 112, 109)], [110, 110, 120], [100, 100, 100])).toEqual([]);
+  });
 });
 
 it("toggles all moving averages without changing lengths, colors or the saved input", () => {
