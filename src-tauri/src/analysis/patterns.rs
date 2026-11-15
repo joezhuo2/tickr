@@ -2,7 +2,8 @@
 //!
 //! Every pattern is reported, but a reversal only counts toward the score
 //! (`context_ok`) when the trend before it agrees: bullish reversals need a
-//! prior downtrend, bearish ones a prior uptrend. Hammer, hanging man,
+//! prior downtrend, bearish ones a prior uptrend; continuation patterns need
+//! the trend they continue. Hammer, hanging man,
 //! inverted hammer, shooting star and doji are named by that trend, so they
 //! are skipped when there is none.
 
@@ -40,6 +41,15 @@ pub enum PatternKind {
     BearishKicker,
     BullishAbandonedBaby,
     BearishAbandonedBaby,
+    InsideBar,
+    BullishOutsideBar,
+    BearishOutsideBar,
+    DragonflyDoji,
+    GravestoneDoji,
+    ThreeOutsideUp,
+    ThreeOutsideDown,
+    RisingThreeMethods,
+    FallingThreeMethods,
 }
 
 impl PatternKind {
@@ -71,6 +81,15 @@ impl PatternKind {
             Self::BearishKicker => "Bearish kicker",
             Self::BullishAbandonedBaby => "Bullish abandoned baby",
             Self::BearishAbandonedBaby => "Bearish abandoned baby",
+            Self::InsideBar => "Inside bar",
+            Self::BullishOutsideBar => "Bullish outside bar",
+            Self::BearishOutsideBar => "Bearish outside bar",
+            Self::DragonflyDoji => "Dragonfly doji",
+            Self::GravestoneDoji => "Gravestone doji",
+            Self::ThreeOutsideUp => "Three outside up",
+            Self::ThreeOutsideDown => "Three outside down",
+            Self::RisingThreeMethods => "Rising three methods",
+            Self::FallingThreeMethods => "Falling three methods",
         }
     }
 
@@ -78,7 +97,10 @@ impl PatternKind {
     pub fn strength(self) -> f64 {
         match self {
             Self::Doji => 0.3,
-            Self::SpinningTop => 0.2,
+            Self::SpinningTop | Self::InsideBar => 0.2,
+            Self::BullishOutsideBar | Self::BearishOutsideBar | Self::DragonflyDoji | Self::GravestoneDoji => 0.5,
+            Self::RisingThreeMethods | Self::FallingThreeMethods => 0.7,
+            Self::ThreeOutsideUp | Self::ThreeOutsideDown => 0.8,
             Self::BullishMarubozu | Self::BearishMarubozu => 0.4,
             Self::TweezerTop | Self::TweezerBottom => 0.5,
             Self::ThreeInsideUp | Self::ThreeInsideDown => 0.7,
@@ -95,7 +117,7 @@ impl PatternKind {
 
     fn direction(self) -> Direction {
         match self {
-            Self::Doji | Self::SpinningTop => Direction::Neutral,
+            Self::Doji | Self::SpinningTop | Self::InsideBar => Direction::Neutral,
             Self::Hammer
             | Self::InvertedHammer
             | Self::BullishEngulfing
@@ -107,9 +129,17 @@ impl PatternKind {
             | Self::TweezerBottom
             | Self::ThreeInsideUp
             | Self::BullishKicker
-            | Self::BullishAbandonedBaby => Direction::Bullish,
+            | Self::BullishAbandonedBaby
+            | Self::BullishOutsideBar
+            | Self::DragonflyDoji
+            | Self::ThreeOutsideUp
+            | Self::RisingThreeMethods => Direction::Bullish,
             _ => Direction::Bearish,
         }
+    }
+
+    fn continuation(self) -> bool {
+        matches!(self, Self::RisingThreeMethods | Self::FallingThreeMethods)
     }
 }
 
@@ -243,10 +273,10 @@ pub fn detect(c: &[Candle], atr: &[f64]) -> Vec<Pattern> {
             },
             k => k.direction(),
         };
-        let context_ok = match direction {
-            Direction::Bullish => trend == Trend::Down,
-            Direction::Bearish => trend == Trend::Up,
-            Direction::Neutral => false,
+        let context_ok = match (direction, kind.continuation()) {
+            (Direction::Bullish, false) | (Direction::Bearish, true) => trend == Trend::Down,
+            (Direction::Bearish, false) | (Direction::Bullish, true) => trend == Trend::Up,
+            (Direction::Neutral, _) => false,
         };
         out.push(Pattern {
             kind,
@@ -265,6 +295,21 @@ pub fn detect(c: &[Candle], atr: &[f64]) -> Vec<Pattern> {
     for i in 0..c.len() {
         let a = atr[i].max(f64::EPSILON);
         let cur = Shape::of(&c[i]);
+
+        if i >= 4 {
+            let first = Shape::of(&c[i - 4]);
+            let (trend, limited) = prior_trend(c, atr, i - 4);
+            let long = |s: &Shape, j: usize| s.body >= LONG_BODY_ATR * atr[j];
+            let held = (i - 3..i).all(|j| Shape::of(&c[j]).body <= 0.5 * first.body && c[j].h <= c[i - 4].h && c[j].l >= c[i - 4].l);
+            if held && long(&first, i - 4) && long(&cur, i) {
+                if first.bull() && cur.bull() && cur.c > first.c {
+                    push(PatternKind::RisingThreeMethods, i - 4, i, trend, limited);
+                }
+                if first.bear() && cur.bear() && cur.c < first.c {
+                    push(PatternKind::FallingThreeMethods, i - 4, i, trend, limited);
+                }
+            }
+        }
 
         // Three-candle patterns.
         if i >= 2 {
@@ -313,6 +358,13 @@ pub fn detect(c: &[Candle], atr: &[f64]) -> Vec<Pattern> {
             if x.bull() && long_x && baby && c[i - 1].l > c[i - 2].h && cur.bear() && c[i].h < c[i - 1].l && cur.c < x.mid() {
                 push(PatternKind::BearishAbandonedBaby, i - 2, i, trend, limited);
             }
+            let engulf = y.body > x.body && y.top() >= x.top() && y.bottom() <= x.bottom();
+            if x.bear() && y.bull() && engulf && cur.bull() && cur.c > y.c {
+                push(PatternKind::ThreeOutsideUp, i - 2, i, trend, limited);
+            }
+            if x.bull() && y.bear() && engulf && cur.bear() && cur.c < y.c {
+                push(PatternKind::ThreeOutsideDown, i - 2, i, trend, limited);
+            }
         }
 
         // Two-candle patterns.
@@ -353,6 +405,13 @@ pub fn detect(c: &[Candle], atr: &[f64]) -> Vec<Pattern> {
             if p.bull() && long_p && cur.bear() && long_cur && cur.o < p.o {
                 push(PatternKind::BearishKicker, i - 1, i, trend, limited);
             }
+            let (ph, pl) = (c[i - 1].h, c[i - 1].l);
+            if c[i].h < ph && c[i].l > pl {
+                push(PatternKind::InsideBar, i - 1, i, trend, limited);
+            }
+            if c[i].h > ph && c[i].l < pl && cur.body >= 0.3 * a {
+                push(if cur.bull() { PatternKind::BullishOutsideBar } else { PatternKind::BearishOutsideBar }, i - 1, i, trend, limited);
+            }
         }
 
         let (trend, limited) = prior_trend(c, atr, i);
@@ -368,7 +427,11 @@ pub fn detect(c: &[Candle], atr: &[f64]) -> Vec<Pattern> {
             continue;
         }
         let up = trend == Trend::Up;
-        if cur.hammer(a) {
+        if cur.doji(a) && !up && cur.upper <= 0.1 * cur.range && cur.lower >= 0.7 * cur.range {
+            push(PatternKind::DragonflyDoji, i, i, trend, limited);
+        } else if cur.doji(a) && up && cur.lower <= 0.1 * cur.range && cur.upper >= 0.7 * cur.range {
+            push(PatternKind::GravestoneDoji, i, i, trend, limited);
+        } else if cur.hammer(a) {
             push(if up { PatternKind::HangingMan } else { PatternKind::Hammer }, i, i, trend, limited);
         } else if cur.inverted(a) {
             push(if up { PatternKind::ShootingStar } else { PatternKind::InvertedHammer }, i, i, trend, limited);
@@ -422,7 +485,7 @@ mod tests {
 
     #[test]
     fn hammer_and_hanging_man() {
-        let shape = candle(97.0, 97.3, 92.0, 97.2);
+        let shape = candle(96.5, 97.3, 92.0, 97.2);
         assert!(has(&after_down(&[shape]), PatternKind::Hammer));
         let shape = candle(102.0, 102.3, 97.0, 102.2);
         assert!(has(&after_up(&[shape]), PatternKind::HangingMan));
@@ -431,7 +494,49 @@ mod tests {
     #[test]
     fn inverted_hammer_and_shooting_star() {
         assert!(has(&after_down(&[candle(97.0, 102.0, 96.9, 97.2)]), PatternKind::InvertedHammer));
-        assert!(has(&after_up(&[candle(102.0, 107.0, 101.7, 101.8)]), PatternKind::ShootingStar));
+        assert!(has(&after_up(&[candle(102.5, 107.0, 101.7, 101.8)]), PatternKind::ShootingStar));
+    }
+
+    #[test]
+    fn dragonfly_and_gravestone_doji() {
+        assert!(has(&after_down(&[candle(97.0, 97.05, 92.0, 97.0)]), PatternKind::DragonflyDoji));
+        assert!(has(&after_up(&[candle(102.0, 107.0, 101.95, 102.0)]), PatternKind::GravestoneDoji));
+    }
+
+    #[test]
+    fn inside_and_outside_bars() {
+        let c = after_up(&[candle(102.0, 105.0, 101.0, 104.5), candle(104.0, 104.5, 102.0, 103.0)]);
+        assert!(kinds_at_end(&c).contains(&(PatternKind::InsideBar, false)));
+        let c = after_down(&[candle(97.0, 98.0, 96.0, 96.5), candle(96.0, 99.0, 95.5, 98.5)]);
+        assert!(has(&c, PatternKind::BullishOutsideBar));
+    }
+
+    #[test]
+    fn three_outside_up_and_down() {
+        let c = after_down(&[candle(98.0, 98.5, 95.5, 96.0), candle(95.5, 99.5, 95.0, 99.0), candle(99.0, 101.5, 98.8, 101.0)]);
+        assert!(has(&c, PatternKind::ThreeOutsideUp));
+        let c = after_up(&[candle(102.0, 104.5, 101.5, 104.0), candle(104.5, 105.0, 100.5, 101.0), candle(101.0, 101.2, 98.5, 99.0)]);
+        assert!(has(&c, PatternKind::ThreeOutsideDown));
+    }
+
+    #[test]
+    fn three_methods_continue_the_trend() {
+        let c = after_up(&[
+            candle(102.0, 105.2, 101.8, 105.0),
+            candle(104.5, 104.8, 103.5, 104.0),
+            candle(104.0, 104.3, 103.0, 103.5),
+            candle(103.5, 103.8, 102.5, 103.0),
+            candle(103.2, 107.0, 103.0, 106.5),
+        ]);
+        assert!(has(&c, PatternKind::RisingThreeMethods));
+        let c = after_down(&[
+            candle(98.0, 98.2, 94.8, 95.0),
+            candle(95.5, 96.5, 95.2, 96.0),
+            candle(96.0, 97.0, 95.7, 96.5),
+            candle(96.5, 97.5, 96.2, 97.0),
+            candle(96.8, 97.0, 93.0, 93.5),
+        ]);
+        assert!(has(&c, PatternKind::FallingThreeMethods));
     }
 
     #[test]
