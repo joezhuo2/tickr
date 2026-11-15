@@ -71,12 +71,14 @@ export function build(patterns: readonly Pattern[], candles: readonly Candle[], 
   return ask({ kind: p.kind as PatternKind, start: p.start, end: p.end }, candles, mode, rivals, PATTERN_KINDS, rng);
 }
 
+export const CHART_QUIZ_KINDS = CHART_PATTERN_KINDS.filter((k) => !/fvg|sweep/.test(k));
+
 export function buildChart(patterns: readonly ChartPattern[], candles: readonly Candle[], from: number, rng: Rng): { bars: Candle[]; question: Question } | null {
-  const usable = patterns.filter((p) => p.confirmed && p.end >= MIN_CONTEXT && p.end + NEXT_BARS < candles.length && candles[p.end].t >= from);
+  const usable = patterns.filter((p) => p.confirmed && CHART_QUIZ_KINDS.includes(p.kind) && p.end >= MIN_CONTEXT && p.end + NEXT_BARS < candles.length && candles[p.end].t >= from);
   if (!usable.length) return null;
   const p = usable[randomInt(rng, usable.length)];
   const rivals = patterns.filter((x) => x.start <= p.end && x.end >= p.start).map((x) => x.kind);
-  return ask(p, candles, "chart", rivals, CHART_PATTERN_KINDS, rng);
+  return ask(p, candles, "chart", rivals, CHART_QUIZ_KINDS, rng);
 }
 
 export function outcome(bars: readonly Candle[], end: number, n = NEXT_BARS): { move: Move | "flat"; pct: number } | null {

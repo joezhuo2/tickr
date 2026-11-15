@@ -6,6 +6,22 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.84] - 2026-11-14
+
+### Added
+- **Candle patterns:** inside bar, bullish and bearish outside bar, dragonfly
+  and gravestone doji, three outside up and down, and rising and falling three
+  methods. The three methods patterns are continuations and count toward the
+  score only after a trend in the same direction; the inside bar is neutral
+  and never counts.
+- **Chart patterns:** bull and bear pennants, rectangles, rising and falling
+  channels, and cup and handle. Each can be turned off in Settings like the
+  existing ones and joins the Name the chart pattern quiz.
+- **Fair value gaps and liquidity sweeps:** fair value gaps are drawn as two
+  lines until price fills them, showing the three most recent unfilled gaps
+  per side. A liquidity sweep marks a wick past a swing high or low that closes
+  back inside. Both have their own Settings toggles and stay out of the quiz.
+
 ## [0.11.83] - 2026-11-13
 
 ### Added

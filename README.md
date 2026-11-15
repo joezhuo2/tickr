@@ -416,7 +416,11 @@ taskbar to keep it visible.
   marubozu, bullish and bearish engulfing, bullish and bearish harami, piercing
   line, dark cloud cover, tweezer top and bottom, morning star, evening star,
   three white soldiers, three black crows, three inside up and down, bullish and
-  bearish kicker, and bullish and bearish abandoned baby.
+  bearish kicker, bullish and bearish abandoned baby, inside bar, bullish and
+  bearish outside bar, dragonfly and gravestone doji, three outside up and
+  down, and rising and falling three methods. The three methods patterns are
+  continuations, so they count toward the score only when the trend before
+  them points the same way.
 - **Strategy backtesting** (`.`) runs entry and exit rules over the loaded
   chart. Build conditions from menus or type expressions such as
   `crosses_above(sma(20), sma(50)) and rsi(14) < 70`, using price fields,
@@ -482,7 +486,13 @@ it is instant.
   **Chart patterns** are found from swing highs and lows in the analyzed
   candles: head and shoulders and its inverse, double and triple tops and
   bottoms, ascending, descending and symmetrical triangles, bull and bear
-  flags, and rising and falling wedges. Each is drawn through its swing
+  flags and pennants, rising and falling wedges, rectangles, rising and
+  falling channels, and cup and handle. **Fair value gaps** (a gap of at least
+  half the average candle range between the first and third of three candles)
+  are drawn as two lines until price fills them; only the three most recent
+  unfilled gaps on each side are shown. A **liquidity sweep** is a wick past a
+  swing high or low that closes back inside; its line marks the swept level.
+  Fair value gaps and sweeps are left out of the quiz. Each is drawn through its swing
   points with its neckline or trendlines and a label (a `?` means the
   breakout has not happened yet); hover it for what it means. The Technicals
   panel lists them with a quality score; click one to bring it into view.
@@ -932,8 +942,8 @@ Releases are built by GitHub Actions. Bump the version in `package.json`,
 entry, then push a tag:
 
 ```bash
-git tag v0.11.83
-git push origin v0.11.83
+git tag v0.11.84
+git push origin v0.11.84
 ```
 
 `.github/workflows/release.yml` builds the Windows NSIS installer and a
