@@ -115,6 +115,11 @@ describe("chart pattern quiz", () => {
     expect(buildChart(rivals, candles, 1000 + 61, seeded(1))).toBeNull();
   });
 
+  it("never asks or offers fair value gaps and liquidity sweeps", () => {
+    expect(buildChart([chartPattern("bullish_fvg", 30, 60), chartPattern("bearish_sweep", 30, 60)], candles, 0, seeded(1))).toBeNull();
+    for (let seed = 1; seed < 20; seed++) expect(buildChart([chartPattern("double_top", 30, 60)], candles, 0, seeded(seed))!.question.choices.filter((k) => /fvg|sweep/.test(k))).toEqual([]);
+  });
+
   it("grades by name", () => {
     const q = { mode: "chart" as const, kind: "double_top" as const, start: 0, end: 1, choices: [] };
     expect(grade(q, "double_top", candles)).toBe(true);

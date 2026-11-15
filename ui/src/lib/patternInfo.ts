@@ -25,6 +25,15 @@ export const PATTERN_KINDS = [
   "bearish_kicker",
   "bullish_abandoned_baby",
   "bearish_abandoned_baby",
+  "inside_bar",
+  "bullish_outside_bar",
+  "bearish_outside_bar",
+  "dragonfly_doji",
+  "gravestone_doji",
+  "three_outside_up",
+  "three_outside_down",
+  "rising_three_methods",
+  "falling_three_methods",
 ] as const;
 
 export type PatternKind = (typeof PATTERN_KINDS)[number];
@@ -63,6 +72,15 @@ export const PATTERN_INFO: Record<PatternKind, PatternInfo> = {
   bearish_kicker: { name: "Bearish kicker", bias: "bearish", text: "A long up candle followed by a long down candle that opens below the prior open. An abrupt change in sentiment that suggests a sharp move down." },
   bullish_abandoned_baby: { name: "Bullish abandoned baby", bias: "bullish", text: "A doji gapped fully below a down candle and above the next up candle, isolated by gaps. A rare, strong bottom signal." },
   bearish_abandoned_baby: { name: "Bearish abandoned baby", bias: "bearish", text: "A doji gapped fully above an up candle and below the next down candle, isolated by gaps. A rare, strong top signal." },
+  inside_bar: { name: "Inside bar", bias: "neutral", text: "A candle whose high and low sit inside the prior candle's range. The market is pausing; a break of the prior candle's high or low often starts the next move." },
+  bullish_outside_bar: { name: "Bullish outside bar", bias: "bullish", text: "An up candle whose range covers the prior candle's high and low. Sellers were tested and buyers closed it strong, which hints at a turn up." },
+  bearish_outside_bar: { name: "Bearish outside bar", bias: "bearish", text: "A down candle whose range covers the prior candle's high and low. Buyers were tested and sellers closed it weak, which hints at a turn down." },
+  dragonfly_doji: { name: "Dragonfly doji", bias: "bullish", text: "Open, high and close at nearly the same price with a long lower shadow, after a decline. Sellers pushed down and buyers took it all back, hinting at a bottom." },
+  gravestone_doji: { name: "Gravestone doji", bias: "bearish", text: "Open, low and close at nearly the same price with a long upper shadow, after a rally. Buyers pushed up and sellers took it all back, hinting at a top." },
+  three_outside_up: { name: "Three outside up", bias: "bullish", text: "A bullish engulfing pair confirmed by a third up candle that closes higher still. Suggests the downtrend has turned." },
+  three_outside_down: { name: "Three outside down", bias: "bearish", text: "A bearish engulfing pair confirmed by a third down candle that closes lower still. Suggests the uptrend has turned." },
+  rising_three_methods: { name: "Rising three methods", bias: "bullish", text: "A long up candle, three small candles drifting down inside its range, then a long up candle closing at a new high. A pause in an uptrend that resumes." },
+  falling_three_methods: { name: "Falling three methods", bias: "bearish", text: "A long down candle, three small candles drifting up inside its range, then a long down candle closing at a new low. A pause in a downtrend that resumes." },
 };
 
 export const CHART_PATTERN_KINDS = [
@@ -79,6 +97,16 @@ export const CHART_PATTERN_KINDS = [
   "bear_flag",
   "rising_wedge",
   "falling_wedge",
+  "bull_pennant",
+  "bear_pennant",
+  "rectangle",
+  "rising_channel",
+  "falling_channel",
+  "cup_and_handle",
+  "bullish_fvg",
+  "bearish_fvg",
+  "bullish_sweep",
+  "bearish_sweep",
 ] as const;
 
 export type ChartPatternKind = (typeof CHART_PATTERN_KINDS)[number];
@@ -97,6 +125,16 @@ export const CHART_PATTERN_INFO: Record<ChartPatternKind, PatternInfo> = {
   bear_flag: { name: "Bear flag", bias: "bearish", text: "A sharp drop (the pole) followed by a small, flat or upward-sloping channel. A close below the channel suggests the drop resumes." },
   rising_wedge: { name: "Rising wedge", bias: "bearish", text: "Highs and lows both rise but the lows rise faster, so the range narrows. Buying is losing steam; it usually breaks down." },
   falling_wedge: { name: "Falling wedge", bias: "bullish", text: "Highs and lows both fall but the highs fall faster, so the range narrows. Selling is losing steam; it usually breaks up." },
+  bull_pennant: { name: "Bull pennant", bias: "bullish", text: "A sharp rise (the pole) followed by a small triangle of falling highs and rising lows. A close above the triangle suggests the rise resumes." },
+  bear_pennant: { name: "Bear pennant", bias: "bearish", text: "A sharp drop (the pole) followed by a small triangle of falling highs and rising lows. A close below the triangle suggests the drop resumes." },
+  rectangle: { name: "Rectangle", bias: "neutral", text: "Flat highs and flat lows box price into a range. Neither side leads; a close outside the box sets the next move." },
+  rising_channel: { name: "Rising channel", bias: "bullish", text: "Highs and lows rise along two parallel lines. Buyers are in control while price stays inside; a close below the channel warns the trend is fading." },
+  falling_channel: { name: "Falling channel", bias: "bearish", text: "Highs and lows fall along two parallel lines. Sellers are in control while price stays inside; a close above the channel warns the trend is fading." },
+  cup_and_handle: { name: "Cup and handle", bias: "bullish", text: "A rounded bottom between two similar highs, then a shallow pullback (the handle). A close above the rim confirms the breakout." },
+  bullish_fvg: { name: "Bullish fair value gap", bias: "bullish", text: "A fast rise leaves a gap between one candle's high and the low two candles later. Price often comes back to the gap, and buyers tend to defend it." },
+  bearish_fvg: { name: "Bearish fair value gap", bias: "bearish", text: "A fast drop leaves a gap between one candle's low and the high two candles later. Price often comes back to the gap, and sellers tend to defend it." },
+  bullish_sweep: { name: "Bullish liquidity sweep", bias: "bullish", text: "Price dips below a prior swing low, then closes back above it. Sellers who broke the low got trapped, which often fuels a move up." },
+  bearish_sweep: { name: "Bearish liquidity sweep", bias: "bearish", text: "Price pokes above a prior swing high, then closes back below it. Buyers who chased the breakout got trapped, which often fuels a move down." },
 };
 
 export function isPatternKind(kind: string): kind is PatternKind {

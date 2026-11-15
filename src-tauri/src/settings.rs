@@ -543,9 +543,11 @@ pub struct IndicatorConfig {
     pub chart_patterns_off: Vec<String>,
 }
 
-pub const CHART_PATTERN_KINDS: [&str; 13] = [
+pub const CHART_PATTERN_KINDS: [&str; 23] = [
     "head_and_shoulders", "inverse_head_and_shoulders", "double_top", "double_bottom", "triple_top", "triple_bottom",
     "ascending_triangle", "descending_triangle", "symmetrical_triangle", "bull_flag", "bear_flag", "rising_wedge", "falling_wedge",
+    "bull_pennant", "bear_pennant", "rectangle", "rising_channel", "falling_channel", "cup_and_handle",
+    "bullish_fvg", "bearish_fvg", "bullish_sweep", "bearish_sweep",
 ];
 
 impl Default for IndicatorConfig {
@@ -836,8 +838,8 @@ mod tests {
             |c| c.vwap_bands = -1.0, |c| c.vwap_bands = 5.5,
             |c| c.opening_range.minutes = 0, |c| c.opening_range.minutes = 241,
             |c| c.opening_range.extension = -0.1, |c| c.opening_range.extension = f64::NAN,
-            |c| c.chart_patterns_off = vec!["cup_and_handle".into()],
-            |c| c.chart_patterns_off = vec!["double_top".into(); 14],
+            |c| c.chart_patterns_off = vec!["diamond_top".into()],
+            |c| c.chart_patterns_off = vec!["double_top".into(); CHART_PATTERN_KINDS.len() + 1],
         ];
         for edit in invalid {
             let mut c = defaults.clone(); edit(&mut c);

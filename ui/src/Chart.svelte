@@ -1163,9 +1163,11 @@
         ctx.strokeStyle = col;
         ctx.fillStyle = col;
         ctx.lineWidth = 1.4;
-        ctx.beginPath();
-        p.points.forEach((q, k) => (k ? ctx.lineTo(g.x(xs[k]!), g.y(q.price)) : ctx.moveTo(g.x(xs[k]!), g.y(q.price))));
-        ctx.stroke();
+        if (!p.kind.endsWith("_fvg")) {
+          ctx.beginPath();
+          p.points.forEach((q, k) => (k ? ctx.lineTo(g.x(xs[k]!), g.y(q.price)) : ctx.moveTo(g.x(xs[k]!), g.y(q.price))));
+          ctx.stroke();
+        }
         ctx.lineWidth = 1;
         ctx.setLineDash([5, 3]);
         for (const [a, b] of p.lines) {
