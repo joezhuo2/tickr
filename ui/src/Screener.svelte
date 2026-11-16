@@ -30,7 +30,9 @@
     symbols,
     screens,
     columns,
+    starred,
     onopen,
+    onstar,
     onsave,
     ondelete,
     oncolumns,
@@ -38,7 +40,9 @@
     symbols: string[];
     screens: SavedScreen[];
     columns: string[];
+    starred: string[];
     onopen: (symbol: string) => void;
+    onstar: (symbol: string) => void;
     onsave: (name: string, rules: ScreenRule[]) => Promise<string | undefined>;
     ondelete: (name: string) => void;
     oncolumns: (columns: string[]) => void;
@@ -55,7 +59,25 @@
 
   const OP_LABEL: Record<ScreenOp, string> = { above: "above", below: "below", between: "between", is: "is", any: "is any of" };
 
+  const BATCH = 25;
+  const UNIVERSE_KEY = "tickr.screenUniverse";
+  type Universe = "watchlist" | "sp500";
+
+  function storedUniverse(): Universe {
+    try {
+      return localStorage.getItem(UNIVERSE_KEY) === "sp500" ? "sp500" : "watchlist";
+    } catch {
+      return "watchlist";
+    }
+  }
+
   let nextId = 0;
+  let universe = $state<Universe>(storedUniverse());
+  let sp500 = $state<string[]>([]);
+  let done = $state(0);
+  let fundDone = $state(0);
+  let fundTotal = $state(0);
+  let cancelled = $state(false);
   let drafts = $state<Draft[]>([]);
   let name = $state("");
   let saveError = $state<string | null>(null);
@@ -91,14 +113,15 @@
   );
   const cols = $derived(cleanColumns(columns).flatMap((k) => fieldOf(k) ?? []));
   const bySymbol = $derived(new Map(rows.map((r) => [r.symbol, r])));
-  const loaded = $derived(symbols.flatMap((s) => bySymbol.get(s) ?? []));
+  const pool = $derived(universe === "sp500" ? sp500 : symbols);
+  const loaded = $derived(pool.flatMap((s) => bySymbol.get(s) ?? []));
   const items = $derived(mergeItems(loaded, funds));
   const failed = $derived(loaded.filter((r) => r.error));
   const matches = $derived(screenRows(items, rules));
   const shown = $derived(sortItems(matches, sortKey, sortDir));
   const savable = $derived(canSave(name, rules));
   const wantsFunds = $derived(needsFundamentals(cleanColumns(columns), rules));
-  const fundFailed = $derived(symbols.filter((s) => funds.get(s)?.error).length);
+  const fundFailed = $derived(pool.filter((s) => funds.get(s)?.error).length);
 
   function add(kind: string) {
     if (!kind || drafts.length >= MAX_RULES) return;
@@ -158,18 +181,71 @@
     return def.signed && typeof v === "number" ? direction(v) : "";
   }
 
+  function setUniverse(next: Universe) {
+    if (next === universe) return;
+    universe = next;
+    rows = [];
+    try {
+      localStorage.setItem(UNIVERSE_KEY, next);
+    } catch {
+      /* storage unavailable */
+    }
+  }
+
+  function retry() {
+    funds = new Map([...funds].filter(([, f]) => !f.error));
+    load();
+    if (wantsFunds) loadFunds();
+  }
+
+  function cancel() {
+    seq++;
+    fundSeq++;
+    cancelled = true;
+    loading = false;
+    fundLoading = false;
+  }
+
+  async function batches<T>(list: string[], mine: () => boolean, fetch: (chunk: string[]) => Promise<T[]>, take: (got: T[], done: number) => void) {
+    for (let i = 0; i < list.length; i += BATCH) {
+      const got = await fetch(list.slice(i, i + BATCH));
+      if (!mine()) return;
+      take(got, Math.min(list.length, i + BATCH));
+    }
+  }
+
   async function load() {
     const mine = ++seq;
-    if (!symbols.length) {
+    cancelled = false;
+    if (universe === "sp500" && !sp500.length) {
+      try {
+        sp500 = await invoke<string[]>("get_sp500_symbols");
+      } catch (e) {
+        if (mine === seq) loadError = String(e);
+        return;
+      }
+      return;
+    }
+    const list = [...pool];
+    if (!list.length) {
       rows = [];
       loading = false;
       return;
     }
     loading = true;
     loadError = null;
+    done = 0;
     try {
-      const got = await invoke<ScreenRow[]>("get_screener_data", { symbols: [...symbols] });
-      if (mine === seq) rows = got;
+      await batches(
+        list,
+        () => mine === seq,
+        (chunk) => invoke<ScreenRow[]>("get_screener_data", { symbols: chunk, universe }),
+        (got, n) => {
+          const fresh = new Set(got.map((r) => r.symbol));
+          rows = [...got, ...rows.filter((r) => !fresh.has(r.symbol))];
+          done = n;
+        },
+      );
     } catch (e) {
       if (mine === seq) loadError = String(e);
     } finally {
@@ -179,15 +255,24 @@
 
   async function loadFunds() {
     const mine = ++fundSeq;
-    const want = symbols.filter((s) => !funds.has(s));
+    const want = pool.filter((s) => !funds.has(s));
     if (!want.length) {
       fundLoading = false;
       return;
     }
     fundLoading = true;
+    fundDone = 0;
+    fundTotal = want.length;
     try {
-      const got = await invoke<ScreenFundamentals[]>("get_screener_fundamentals", { symbols: want });
-      if (mine === fundSeq) funds = new Map([...funds, ...got.map((f): [string, ScreenFundamentals] => [f.symbol, f])]);
+      await batches(
+        want,
+        () => mine === fundSeq,
+        (chunk) => invoke<ScreenFundamentals[]>("get_screener_fundamentals", { symbols: chunk, universe }),
+        (got, n) => {
+          funds = new Map([...funds, ...got.map((f): [string, ScreenFundamentals] => [f.symbol, f])]);
+          fundDone = n;
+        },
+      );
     } catch (e) {
       console.warn(e);
     } finally {
@@ -195,7 +280,7 @@
     }
   }
 
-  const key = $derived([...symbols].sort().join(","));
+  const key = $derived(`${universe}:${[...pool].sort().join(",")}`);
   $effect(() => {
     key;
     untrack(load);
@@ -207,6 +292,11 @@
 </script>
 
 <div class="screener">
+  <div class="universe" role="group" aria-label="Universe">
+    <button class:on={universe === "watchlist"} aria-pressed={universe === "watchlist"} onclick={() => setUniverse("watchlist")}>Watchlist</button>
+    <button class:on={universe === "sp500"} aria-pressed={universe === "sp500"} onclick={() => setUniverse("sp500")}>S&amp;P 500</button>
+  </div>
+
   {#if screens.length}
     <div class="saved" role="group" aria-label="Saved filters">
       {#each screens as s (s.name)}
@@ -313,14 +403,20 @@
 
   <p class="status" aria-live="polite">
     {#if loading && !loaded.length}
-      Loading daily bars…
+      Loading daily bars… {done} of {pool.length}
+      <button class="link" onclick={cancel}>Cancel</button>
     {:else if loadError}
       Could not load: {loadError}
     {:else}
-      {matches.length} of {loaded.length - failed.length} match{drafts.length ? "" : " (no filters yet)"}{#if loading} · updating…{/if}
-      {#if fundLoading} · loading fundamentals…{/if}
+      {matches.length} of {loaded.length - failed.length} match{drafts.length ? "" : " (no filters yet)"}{#if loading} · loading {done} of {pool.length}…{/if}
+      {#if fundLoading} · loading fundamentals {fundDone} of {fundTotal}…{/if}
+      {#if loading || fundLoading}<button class="link" onclick={cancel}>Cancel</button>{/if}
+      {#if cancelled && !loading} · cancelled{/if}
       {#if failed.length}
         · <span title={failed.map((r) => `${r.symbol}: ${r.error}`).join("\n")}>{failed.length} unavailable</span>
+      {/if}
+      {#if (failed.length || cancelled) && !loading}
+        <button class="link" onclick={retry}>Retry</button>
       {/if}
       {#if fundFailed && !fundLoading}
         · <span title="Yahoo returned no fundamentals for these symbols">{fundFailed} without fundamentals</span>
@@ -341,7 +437,10 @@
       <tbody>
         {#each shown as r (r.symbol)}
           <tr>
-            <th scope="row"><button onclick={() => onopen(r.symbol)}>{r.symbol}</button></th>
+            <th scope="row">
+              <button class="star" class:on={starred.includes(r.symbol)} aria-pressed={starred.includes(r.symbol)} aria-label={`${starred.includes(r.symbol) ? "Unstar" : "Star"} ${r.symbol}`} title={starred.includes(r.symbol) ? "Remove from watchlist" : "Add to watchlist"} onclick={() => onstar(r.symbol)}>{starred.includes(r.symbol) ? "★" : "☆"}</button>
+              <button onclick={() => onopen(r.symbol)}>{r.symbol}</button>
+            </th>
             {#each cols as c (c.key)}
               <td class:text={c.text} class={tone(c, r)}>{cell(c, r)}</td>
             {/each}
@@ -362,6 +461,41 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+  }
+  .universe {
+    display: flex;
+    gap: 4px;
+  }
+  .universe button,
+  .link {
+    border: 1px solid var(--faint);
+    border-radius: 6px;
+    background: var(--surface);
+    padding: 2px 8px;
+    color: var(--muted);
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .universe button.on {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+  .link {
+    margin-left: 4px;
+  }
+  .universe button:hover,
+  .link:hover {
+    color: var(--text);
+  }
+  tbody th .star {
+    margin-right: 4px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  tbody th .star.on {
+    color: var(--accent);
   }
   .saved {
     display: flex;

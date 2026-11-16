@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { hasVolume, priceDigits } from "./lib/instrument";
   import { change, direction, num, price, ratingLabel, ratingTone, signed, span, upside, volume } from "./lib/format";
   import type { Candle, Consensus, Quote } from "./lib/types";
 
@@ -95,26 +96,26 @@
   {/if}
 
   {#if replay}
-    <div class="price">{price(replay.bar.c, replay.currency)}</div>
+    <div class="price">{price(replay.bar.c, replay.currency, symbol)}</div>
     {#if replay.change != null && replay.change_pct != null}
       <div class="chg {direction(replay.change)}" title="Change from the previous bar">{change(replay.change, replay.change_pct)}</div>
     {/if}
     <div class="session"><i class="replay"></i>{replay.label ?? "Replay"} · {replay.when}</div>
     <dl>
-      <dt>Open</dt><dd>{price(replay.bar.o, replay.currency)}</dd>
-      <dt>High</dt><dd>{price(replay.bar.h, replay.currency)}</dd>
-      <dt>Low</dt><dd>{price(replay.bar.l, replay.currency)}</dd>
-      <dt>Volume</dt><dd>{volume(replay.bar.v)}</dd>
+      <dt>Open</dt><dd>{price(replay.bar.o, replay.currency, symbol)}</dd>
+      <dt>High</dt><dd>{price(replay.bar.h, replay.currency, symbol)}</dd>
+      <dt>Low</dt><dd>{price(replay.bar.l, replay.currency, symbol)}</dd>
+      {#if hasVolume(symbol)}<dt>Volume</dt><dd>{volume(replay.bar.v)}</dd>{/if}
     </dl>
   {:else if quote}
-    <div class="price">{price(quote.price, quote.currency)}</div>
-    <div class="chg {direction(quote.change)}">{change(quote.change, quote.change_pct)}</div>
+    <div class="price">{price(quote.price, quote.currency, symbol)}</div>
+    <div class="chg {direction(quote.change)}">{change(quote.change, quote.change_pct, priceDigits(symbol, quote.price))}</div>
     {#if staleNote}<div class="stale" role="status">{staleNote}</div>{/if}
     <div class="session"><i class={quote.session}></i>{SESSION[quote.session]}</div>
     {#if quote.extended}
       <div class="ext">
         <span class="label">{quote.extended.label}</span>
-        <span>{price(quote.extended.price, quote.currency)}</span>
+        <span>{price(quote.extended.price, quote.currency, symbol)}</span>
         <span class={direction(quote.extended.change)}>{change(quote.extended.change, quote.extended.change_pct)}</span>
       </div>
     {/if}
@@ -138,11 +139,11 @@
     {/if}
 
     <dl>
-      <dt>Open</dt><dd>{price(quote.open, quote.currency)}</dd>
-      <dt>Prev close</dt><dd>{price(quote.prev_close, quote.currency)}</dd>
-      <dt>Day range</dt><dd>{span(quote.day_low, quote.day_high)}</dd>
-      <dt>52w range</dt><dd>{span(quote.low_52w, quote.high_52w)}</dd>
-      <dt>Volume</dt><dd>{volume(quote.volume)}</dd>
+      <dt>Open</dt><dd>{price(quote.open, quote.currency, symbol)}</dd>
+      <dt>Prev close</dt><dd>{price(quote.prev_close, quote.currency, symbol)}</dd>
+      <dt>Day range</dt><dd>{span(quote.day_low, quote.day_high, symbol)}</dd>
+      <dt>52w range</dt><dd>{span(quote.low_52w, quote.high_52w, symbol)}</dd>
+      {#if hasVolume(symbol)}<dt>Volume</dt><dd>{volume(quote.volume)}</dd>{/if}
     </dl>
   {:else}
     <div aria-busy="true" aria-label="Loading quote">

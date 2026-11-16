@@ -96,7 +96,7 @@
         {@const due = earnings[symbol]}
         <tr class:current={symbol === current}>
           <th scope="row"><button title={w?.error && !q ? w.error : q?.name || symbol} onclick={() => onopen(symbol)}>{symbol}</button></th>
-          <td>{q && m ? price(m.price, q.currency) : ""}</td>
+          <td>{q && m ? price(m.price, q.currency, symbol) : ""}</td>
           <td class={direction(m?.pct)}>{m?.pct == null ? "" : `${signed(m.pct)}%`}</td>
           {#if columns.score}
             <td class={s?.bias ? biasTone(s.bias) : ""} title={s?.bias ? biasLabel(s.bias) : (s?.error ?? "")}>{s?.score == null ? "" : signed(s.score, 0)}</td>

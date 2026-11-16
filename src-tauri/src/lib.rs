@@ -169,6 +169,7 @@ pub fn run() {
             commands::set_watchlist_columns,
             commands::get_watch_quotes,
             commands::get_screener_data,
+            commands::get_sp500_symbols,
             commands::get_screener_fundamentals,
             commands::set_screen_columns,
             commands::get_iv_ranks,

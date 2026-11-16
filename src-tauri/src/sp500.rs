@@ -57,6 +57,10 @@ fn parse(body: &[u8], rows: &[Row]) -> Result<Vec<HeatQuote>, String> {
         .collect())
 }
 
+pub fn symbols() -> Vec<&'static str> {
+    constituents().into_iter().map(|r| r.0).collect()
+}
+
 pub async fn fetch(analysts: &Analysts) -> Result<Vec<HeatQuote>, String> {
     let rows = constituents();
     let bodies = try_join_all(rows.chunks(CHUNK).map(|chunk| {
@@ -81,6 +85,13 @@ mod tests {
         assert!(rows.len() > 480);
         assert!(rows.iter().all(|(s, n, g)| !s.is_empty() && !n.is_empty() && !g.is_empty()));
         assert_eq!(rows.iter().map(|r| r.0).collect::<std::collections::HashSet<_>>().len(), rows.len());
+    }
+
+    #[test]
+    fn symbols_match_constituents() {
+        let all = symbols();
+        assert_eq!(all.len(), constituents().len());
+        assert!(all.contains(&"AAPL") && all.contains(&"BRK-B"));
     }
 
     #[test]

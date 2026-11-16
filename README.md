@@ -677,7 +677,19 @@ fundamentals column or condition is in use, then cached for six hours. Rows with
 missing value never match a condition. **Columns** chooses what the results show
 (kept between sessions), and clicking a header sorts by it, with missing values
 last. Type a name and click **Save** to keep a filter; saved filters appear as
-buttons above the conditions.
+buttons above the conditions. The **Watchlist / S&P 500** switch chooses what
+to screen (kept between sessions). The S&P 500 is fetched in batches of 25
+with a progress count; **Cancel** stops it and keeps what has loaded, and
+**Retry** refetches symbols that failed. Daily bars are cached for 15 minutes,
+so switching back is quick, and fundamentals are fetched only when a
+fundamentals column or condition is in use. Click a symbol to open its chart
+and the star to add or remove it from the watchlist.
+
+Yahoo futures (`ES=F`, `CL=F`, `GC=F`) and forex pairs (`EURUSD=X`, `USDJPY=X`)
+work like any symbol: search has a **Futures** filter, they trade nearly around
+the clock so the chart has no pre-market or after-hours shading, forex shows no
+volume, and forex prices use 4 to 5 decimals (2 to 3 for JPY pairs). Analysts,
+Earnings, Financials, Options and Ownership say they are not available for them.
 
 **Groups** split the watchlist into tabs such as "Tech" or "Crypto"; **All**
 always shows every starred stock. Click **+** and type a name to add a group.

@@ -4,7 +4,8 @@
 
 <script lang="ts">
   import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, num, price, quarterLabel, volume } from "./lib/format";
-  import { candleCountdown, classifyBars, displayOffset, futureTimes, isExtendedSession, isIntraday, zoneLabel, type Clock } from "./lib/session";
+  import { candleCountdown, classifyBars, displayOffset, futureTimes, isExtendedSession, isIntraday, zoneLabel, type Clock, type Session } from "./lib/session";
+  import { isDerivativeMarket, hasVolume, priceDigits } from "./lib/instrument";
   import type { Analysis, Article, Chart, ChartMode, ChartScale, ChartTimeZone, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
   import { fitScale, forward, inverse, scaleLabel, scaleTicks, shiftRange, stretchRange } from "./lib/scale";
   import type { Drawing, DrawingIcon, DrawingPoint } from "./lib/types";
@@ -126,7 +127,7 @@
   const isDay = $derived(chart?.range === "1d");
   const prevClose = $derived(isDay ? (chart?.meta.prev_close ?? null) : null);
   const clock = $derived<Clock>({ timezone: chart?.meta.timezone, gmtoffset: chart?.meta.gmtoffset ?? 0 });
-  const sessions = $derived(chart ? classifyBars(candles.map((c) => c.t), clock, chart.meta.periods, chart.interval) : []);
+  const sessions = $derived(chart ? isDerivativeMarket(chart.meta.symbol) ? candles.map((): Session => "regular") : classifyBars(candles.map((c) => c.t), clock, chart.meta.periods, chart.interval) : []);
   const hasExtended = $derived(sessions.some(isExtendedSession));
 
   // Analysis overlays: only when there is an analysis and a toggle set.
@@ -412,7 +413,7 @@
       vmax,
       scale: activeScale,
       base,
-      label: (v: number) => scaleLabel(v, activeScale, base),
+      label: (v: number) => scaleLabel(v, activeScale, base, priceDigits(chart?.meta.symbol, v)),
       plotW,
       priceH,
       volTop,
@@ -2753,19 +2754,19 @@
       </div>
       <dl>
         {#if mode === "kagi" || mode === "linebreak"}
-          <dt>From</dt><dd>{price(tip.c.o, chart.meta.currency)}</dd>
-          <dt>To</dt><dd class={tip.c.c >= tip.c.o ? "up" : "down"}>{tip.c.c > tip.c.o ? "↑" : "↓"} {price(tip.c.c, chart.meta.currency)}</dd>
+          <dt>From</dt><dd>{price(tip.c.o, chart.meta.currency, chart.meta.symbol)}</dd>
+          <dt>To</dt><dd class={tip.c.c >= tip.c.o ? "up" : "down"}>{tip.c.c > tip.c.o ? "↑" : "↓"} {price(tip.c.c, chart.meta.currency, chart.meta.symbol)}</dd>
         {:else if mode === "pointfigure"}
           <dt>Column</dt><dd class={tip.c.c >= tip.c.o ? "up" : "down"}>{tip.c.c >= tip.c.o ? "X" : "O"} × {Math.round((tip.c.h - tip.c.l) / ((tip.c as Brick).box || 1))}</dd>
-          <dt>Low</dt><dd>{price(tip.c.l, chart.meta.currency)}</dd>
-          <dt>High</dt><dd>{price(tip.c.h, chart.meta.currency)}</dd>
+          <dt>Low</dt><dd>{price(tip.c.l, chart.meta.currency, chart.meta.symbol)}</dd>
+          <dt>High</dt><dd>{price(tip.c.h, chart.meta.currency, chart.meta.symbol)}</dd>
         {:else}
-        <dt>Open</dt><dd>{price(tip.c.o, chart.meta.currency)}</dd>
-        <dt>High</dt><dd>{price(tip.c.h, chart.meta.currency)}</dd>
-        <dt>Low</dt><dd>{price(tip.c.l, chart.meta.currency)}</dd>
-        <dt>Close</dt><dd class={tip.c.c >= tip.c.o ? "up" : "down"}>{tip.c.c > tip.c.o ? "↑" : tip.c.c < tip.c.o ? "↓" : "→"} {price(tip.c.c, chart.meta.currency)}</dd>
+        <dt>Open</dt><dd>{price(tip.c.o, chart.meta.currency, chart.meta.symbol)}</dd>
+        <dt>High</dt><dd>{price(tip.c.h, chart.meta.currency, chart.meta.symbol)}</dd>
+        <dt>Low</dt><dd>{price(tip.c.l, chart.meta.currency, chart.meta.symbol)}</dd>
+        <dt>Close</dt><dd class={tip.c.c >= tip.c.o ? "up" : "down"}>{tip.c.c > tip.c.o ? "↑" : tip.c.c < tip.c.o ? "↓" : "→"} {price(tip.c.c, chart.meta.currency, chart.meta.symbol)}</dd>
         {/if}
-        <dt>Volume</dt><dd>{volume(tip.c.v)}</dd>
+        {#if hasVolume(chart.meta.symbol)}<dt>Volume</dt><dd>{volume(tip.c.v)}</dd>{/if}
         {#if tip.rsi != null}<dt>RSI</dt><dd>{num(tip.rsi, 1)}</dd>{/if}
         {#each tip.macd as line}{#if line.value != null}<dt>{line.label}</dt><dd>{num(line.value, 2)}</dd>{/if}{/each}
       </dl>

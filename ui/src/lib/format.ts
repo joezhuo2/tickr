@@ -1,3 +1,4 @@
+import { priceDigits } from "./instrument";
 import { isIntraday } from "./session";
 import type { Candle, PriceAlert, Sentiment } from "./types";
 
@@ -11,8 +12,10 @@ export function num(v: number, digits = digitsFor(v)): string {
   return v.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
-export function price(v: number | null | undefined, currency = "USD"): string {
+export function price(v: number | null | undefined, currency = "USD", symbol?: string | null): string {
   if (v == null) return "—";
+  const fx = priceDigits(symbol, v);
+  if (fx != null) return num(v, fx);
   const sym = SYMBOLS[currency || "USD"];
   const d = currency === "JPY" ? 0 : digitsFor(v);
   return sym ? `${sym}${num(v, d)}` : `${num(v, d)} ${currency}`;
@@ -24,9 +27,9 @@ export function signed(v: number, digits = 2): string {
   return `${r >= 0 ? "+" : "−"}${num(Math.abs(r), digits)}`;
 }
 
-export function change(abs: number | null, pct: number | null): string {
+export function change(abs: number | null, pct: number | null, digits = 2): string {
   if (abs == null || pct == null) return "—";
-  return `${signed(abs)} (${signed(pct)}%)`;
+  return `${signed(abs, digits)} (${signed(pct)}%)`;
 }
 
 export function direction(v: number | null | undefined): "up" | "down" | "flat" {
@@ -76,9 +79,9 @@ export function upside(target: number | null | undefined, from: number | null | 
   return ((target - from) / from) * 100;
 }
 
-export function span(lo: number | null | undefined, hi: number | null | undefined): string {
+export function span(lo: number | null | undefined, hi: number | null | undefined, symbol?: string | null): string {
   if (lo == null || hi == null) return "—";
-  return `${num(lo)} – ${num(hi)}`;
+  return `${num(lo, priceDigits(symbol, lo))} – ${num(hi, priceDigits(symbol, hi))}`;
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
