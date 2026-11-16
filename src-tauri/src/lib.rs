@@ -7,6 +7,8 @@ pub mod ai;
 pub mod analysis;
 pub mod barcache;
 pub mod alerts;
+pub mod alert_events;
+pub mod notify;
 pub mod analyst;
 pub mod autostart;
 pub mod backup;
@@ -144,6 +146,10 @@ pub fn run() {
             commands::set_ai_config,
             commands::clear_ai_key,
             commands::add_alert,
+            commands::snooze_alert,
+            commands::get_quiet,
+            commands::set_quiet,
+            commands::set_utc_offset,
             commands::set_alert_enabled,
             commands::update_alert,
             commands::duplicate_alert,
@@ -208,6 +214,7 @@ pub fn run() {
             tray::build(&handle)?;
             poller::spawn(handle.clone(), shared.clone());
             poller::spawn_chart_alert_tick(handle.clone(), shared.clone());
+            notify::spawn_digest(handle.clone(), shared.clone());
             stream::spawn(handle.clone(), shared.clone());
             updater::spawn(handle.clone(), shared.clone());
 

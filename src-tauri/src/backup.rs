@@ -43,6 +43,7 @@ fn validate(s: &mut Settings) -> Result<(), String> {
     for a in &s.alerts {
         alerts::validate(&a.symbol, a.level, a.kind, a.direction)?;
     }
+    s.quiet.check()?;
     s.chart_layout = s.chart_layout.clone().cleaned()?;
     s.event_filter = s.event_filter.clone().cleaned()?;
     s.watchlist = crate::commands::clean_symbols(std::mem::take(&mut s.watchlist));
@@ -77,6 +78,32 @@ mod tests {
         assert_eq!(root["version"], "1.2.3");
         assert_eq!(root["exported_at"], 1_700_000_000);
         assert_eq!(parse(&text).unwrap(), s);
+    }
+
+    #[test]
+    fn round_trips_event_alerts_and_quiet_settings() {
+        use crate::alerts::{AlertKind, Direction, PriceAlert};
+        let alert = PriceAlert {
+            id: 1,
+            symbol: "AAPL".into(),
+            direction: Direction::Above,
+            level: 0.0,
+            enabled: true,
+            triggered_at: None,
+            kind: AlertKind::News,
+            reference: None,
+            recurring: false,
+            cooldown_mins: 15,
+            regular_only: false,
+            triggered_price: None,
+            snooze_until: Some(5),
+            expires_at: Some(9),
+        };
+        let quiet = crate::notify::Quiet { dnd: true, digest: true, digest_time: 540, ..Default::default() };
+        let s = Settings { alerts: vec![alert], quiet, ..sample() };
+        assert_eq!(parse(&export(&s, "1", 0).unwrap()).unwrap(), s);
+        let bad = Settings { quiet: crate::notify::Quiet { dnd_start: 2000, ..Default::default() }, ..sample() };
+        assert!(parse(&export(&bad, "1", 0).unwrap()).is_err());
     }
 
     #[test]

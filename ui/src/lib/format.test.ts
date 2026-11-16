@@ -207,4 +207,13 @@ describe("alertSummary", () => {
     expect(alertSummary({ ...base, kind: "trail_percent", direction: "above" })).toBe("Rises 5% from low");
     expect(alertSummary({ ...base, kind: "trail_amount", level: 2, reference: 50 })).toBe("Falls 2 from high 50");
   });
+
+  it("describes event kinds", () => {
+    expect(alertSummary({ ...base, kind: "earnings_days", level: 3 })).toBe("Earnings within 3 days");
+    expect(alertSummary({ ...base, kind: "dividend_days", level: 1 })).toBe("Ex-dividend within 1 day");
+    expect(alertSummary({ ...base, kind: "market_open" })).toBe("Market opens");
+    expect(alertSummary({ ...base, kind: "market_close" })).toBe("Market closes");
+    expect(alertSummary({ ...base, kind: "rel_volume", level: 2.5 })).toBe("Relative volume at or above 2.5x");
+    expect(alertSummary({ ...base, kind: "news" })).toBe("New headline");
+  });
 });

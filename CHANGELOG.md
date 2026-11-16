@@ -41,6 +41,17 @@ All notable changes to tickr are listed here. The format follows
   default) saves Rust panics and uncaught UI errors to a `crashes` folder in
   the log folder, newest 10 kept, with a Clear action. Copy diagnostics
   includes the latest report, redacted. Nothing is uploaded.
+- **Event alerts:** earnings in N days, ex-dividend in N days, market open,
+  market close, relative volume above a level, and a new news headline. They
+  share the alert list, saved state, Backup and notifications.
+- **Combined conditions:** indicator alerts can join several Strategy
+  conditions with AND or OR.
+- **Snooze and expiry:** snooze an alert for 1 hour, 4 hours, until the next
+  market open or a date and time, and give an alert an optional expiry.
+- **Daily digest** notification (Settings, Chart, Notifications; off by
+  default): top watchlist movers, upcoming earnings and alerts triggered.
+- **Do not disturb hours** (Settings, Chart, Notifications; off by default),
+  including overnight ranges. Alerts still check and record Triggered.
 
 ### Fixed
 - Quotes for symbols whose trading period has no pre or post session (futures,

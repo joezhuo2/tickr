@@ -29,11 +29,11 @@ export function setChartAlerts(next: ChartAlert[]) {
   try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
 }
 
-export function addChartAlert(symbol: string, interval: string, label: string, expr: string | null, line: LineSpec | null): { id: number } | { error: string } {
+export function addChartAlert(symbol: string, interval: string, label: string, expr: string | null, line: LineSpec | null, expiresAt: number | null = null): { id: number } | { error: string } {
   const error = !interval ? "Load a chart first" : addError(chartAlerts.list, expr);
   if (error) return { error };
   const id = chartAlerts.list.reduce((m, a) => Math.max(m, a.id), 0) + 1;
-  setChartAlerts([...chartAlerts.list, { id, symbol: symbol.toUpperCase(), interval, label, expr, line, enabled: true, fired_at: null }]);
+  setChartAlerts([...chartAlerts.list, { id, symbol: symbol.toUpperCase(), interval, label, expr, line, enabled: true, fired_at: null, snooze_until: null, expires_at: expiresAt }]);
   return { id };
 }
 

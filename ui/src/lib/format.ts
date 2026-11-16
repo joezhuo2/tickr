@@ -254,6 +254,18 @@ export function alertSummary(a: Pick<PriceAlert, "kind" | "direction" | "level" 
       return `${up ? "Rises" : "Falls"} ${n(a.level)}% from ${up ? "low" : "high"}${ref}`;
     case "trail_amount":
       return `${up ? "Rises" : "Falls"} ${n(a.level)} from ${up ? "low" : "high"}${ref}`;
+    case "earnings_days":
+      return `Earnings within ${n(a.level)} ${a.level === 1 ? "day" : "days"}`;
+    case "dividend_days":
+      return `Ex-dividend within ${n(a.level)} ${a.level === 1 ? "day" : "days"}`;
+    case "market_open":
+      return "Market opens";
+    case "market_close":
+      return "Market closes";
+    case "rel_volume":
+      return `Relative volume at or above ${n(a.level)}x`;
+    case "news":
+      return "New headline";
     default:
       return `${up ? "At or above" : "At or below"} ${n(a.level)}`;
   }

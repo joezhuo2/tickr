@@ -11,10 +11,11 @@
   import { onMount, tick } from "svelte";
   import { matchSettings, type SettingEntry } from "./lib/settingsSearch";
   import { chartAlerts } from "./lib/chartAlertStore.svelte";
+  import { toHhmm, toMinutes } from "./lib/quiet";
   import { rr, setReward } from "./lib/rrStore.svelte";
   import { OVERLAY_TOGGLES, overlayVisibility, toggleChartPattern, toggleOverlay } from "./lib/indicators";
   import { CHART_PATTERN_INFO, CHART_PATTERN_KINDS } from "./lib/patternInfo";
-  import type { IndicatorConfig } from "./lib/types";
+  import type { IndicatorConfig, Quiet } from "./lib/types";
   import type { ChartTimeZone, ConnectionsReport, ServiceStatus, AiConfig, AiTestResult, DataProvider, Dots, Keybinds, RefreshMode, Theme, TextSize, Palette } from "./lib/types";
 
   let {
@@ -405,6 +406,20 @@
     const key = bindKey(e);
     if (key) saveKeybinds(rebind(keybinds, recording, key));
   }
+  let quiet = $state<Quiet | null>(null);
+  invoke<Quiet>("get_quiet").then((q) => (quiet = q)).catch(console.warn);
+
+  function saveQuiet(change: Partial<Quiet>) {
+    if (!quiet) return;
+    quiet = { ...quiet, ...change };
+    invoke("set_quiet", { quiet }).catch(console.warn);
+  }
+
+  function saveTime(key: "dnd_start" | "dnd_end" | "digest_time", value: string) {
+    const minutes = toMinutes(value);
+    if (minutes != null) saveQuiet({ [key]: minutes });
+  }
+
   const TABS = [
     { id: "display", label: "Display" },
     { id: "hotkeys", label: "Hotkeys" },
@@ -711,6 +726,36 @@
       <input type="checkbox" checked={chartAlerts.background} onchange={(e) => { chartAlerts.background = e.currentTarget.checked; invoke("set_background_chart_alerts", { enabled: chartAlerts.background }).catch(console.warn); }} />
     </label>
     <p class="hint">Downloads candles for each symbol and interval with an armed alert about once per bar (at most every 15 minutes) while tickr runs, and keeps the window loaded in memory when it is minimized or closed to the tray.</p>
+
+    <h3>Notifications</h3>
+    {#if quiet}
+      <label class="row">
+        <span>Do not disturb</span>
+        <input type="checkbox" checked={quiet.dnd} onchange={(e) => saveQuiet({ dnd: e.currentTarget.checked })} />
+      </label>
+      {#if quiet.dnd}
+        <label class="row">
+          <span>From</span>
+          <input class="field" type="time" value={toHhmm(quiet.dnd_start)} onchange={(e) => saveTime("dnd_start", e.currentTarget.value)} />
+        </label>
+        <label class="row">
+          <span>Until</span>
+          <input class="field" type="time" value={toHhmm(quiet.dnd_end)} onchange={(e) => saveTime("dnd_end", e.currentTarget.value)} />
+        </label>
+      {/if}
+      <p class="hint">Silences desktop notifications between these times, including overnight ranges. Alerts still check and show Triggered.</p>
+      <label class="row">
+        <span>Daily digest</span>
+        <input type="checkbox" checked={quiet.digest} onchange={(e) => saveQuiet({ digest: e.currentTarget.checked })} />
+      </label>
+      {#if quiet.digest}
+        <label class="row">
+          <span>Send at</span>
+          <input class="field" type="time" value={toHhmm(quiet.digest_time)} onchange={(e) => saveTime("digest_time", e.currentTarget.value)} />
+        </label>
+      {/if}
+      <p class="hint">One notification with the top watchlist movers, watchlist earnings in the next 5 days and alerts triggered in the last 24 hours. It uses your computer's time zone and follows Do not disturb.</p>
+    {/if}
 
     {#if indicators}
       {@const config = indicators}

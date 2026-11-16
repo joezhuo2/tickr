@@ -19,6 +19,8 @@ export interface ChartAlert {
   line: LineSpec | null;
   enabled: boolean;
   fired_at: number | null;
+  snooze_until?: number | null;
+  expires_at?: number | null;
 }
 
 export const MAX_CHART_ALERTS = 50;
@@ -58,9 +60,17 @@ export function holds(alert: Pick<ChartAlert, "expr" | "line">, candles: readonl
   return hits[hits.length - 1] === true;
 }
 
+export function live(a: Pick<ChartAlert, "snooze_until" | "expires_at">, now = Date.now() / 1000): boolean {
+  return !(a.expires_at != null && a.expires_at <= now) && !(a.snooze_until != null && a.snooze_until > now);
+}
+
+export function combine(parts: readonly string[], op: "and" | "or"): string {
+  return parts.length > 1 ? parts.map((p) => `(${p})`).join(` ${op} `) : (parts[0] ?? "");
+}
+
 export function due(alerts: readonly ChartAlert[], symbol: string, interval: string, candles: readonly Candle[], clock?: SessionClock): ChartAlert[] {
   const s = symbol.toUpperCase();
-  return alerts.filter((a) => a.enabled && a.symbol === s && a.interval === interval && holds(a, candles, clock, interval));
+  return alerts.filter((a) => a.enabled && live(a) && a.symbol === s && a.interval === interval && holds(a, candles, clock, interval));
 }
 
 export function claim(stored: readonly ChartAlert[], ids: ReadonlySet<number>, now: number): { list: ChartAlert[]; claimed: ChartAlert[] } {
