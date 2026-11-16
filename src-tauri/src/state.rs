@@ -38,6 +38,7 @@ pub struct Shared {
     pub http: reqwest::Client,
     /// Analyst consensus, with its own Yahoo session and cache.
     pub analysts: Analysts,
+    pub sec: crate::sec::Sec,
     pub financials: crate::financials::Cache,
     pub calendar: crate::calendar::Cache,
     pub screener: crate::screener::Screener,
@@ -94,6 +95,7 @@ impl Shared {
             settings_path,
             http: crate::quote::client(),
             analysts: Analysts::new(),
+            sec: Default::default(),
             financials: Default::default(),
             calendar: Default::default(),
             screener: crate::screener::Screener::new(),

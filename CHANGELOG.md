@@ -15,8 +15,19 @@ All notable changes to tickr are listed here. The format follows
 - **Futures and forex:** search has a Futures filter. Futures (`ES=F`) and
   forex pairs (`EURUSD=X`) show no pre-market or after-hours shading, forex
   has no volume, and forex prices use 4-5 decimals (2-3 for JPY pairs).
-  Analyst, Earnings, Financials and Options say they are not available for
+  Analysts, Earnings, Financials, Options and Ownership say they are not available for
   them. The Market view lists S&P 500 futures, EUR/USD, USD/JPY and GBP/USD.
+- **Options analytics:** a new Analytics tab with the max pain strike, open
+  interest by strike, the IV smile and the at-the-money IV term structure.
+  Contracts trading more than their open interest (at least 100 contracts) are
+  listed and tagged Unusual in the chain.
+- **Earnings implied move:** the at-the-money straddle of the first expiry after
+  the next report as a +/- $ and % move, next to each past report's actual
+  move and their average.
+- **Ownership:** a new view with insider transactions, institutional and fund
+  holders, and recent SEC filings. Filings stay off until you enter a **SEC
+  contact email** in Settings (kept in your settings and Backup; tickr never
+  ships one).
 - **First-run tour:** a short, skippable walkthrough of search, chart types,
   panels, the watchlist star, alerts and Settings, shown on fresh installs
   only. Replay it with Settings > Display > Show tour or the `tour` command.
