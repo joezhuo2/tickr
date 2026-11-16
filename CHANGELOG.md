@@ -13,6 +13,17 @@ All notable changes to tickr are listed here. The format follows
   release a dragged level.
 
 ### Added
+- **Compare overlay:** the Compare button on the chart, or `compare spy` in
+  search, overlays up to 4 other symbols on the percent scale as coloured lines
+  rebased to the first visible bar. `uncompare spy` and `compare off` remove
+  them. The list is saved across launches and in Backup.
+- **Measured move drawing:** three clicks project the A to B move again from C.
+  It is saved per symbol, styled, locked, hidden and undone like the other
+  drawings.
+- **SMA and EMA studies:** with the usual Timeframe option, so a weekly 20 SMA
+  can be drawn as a stepped line on a daily chart.
+- **Seasonality pane:** average return and share of positive years for each
+  calendar month, as a pane you can move, merge and maximize.
 - **S&P 500 screener:** the Screen panel has a Watchlist / S&P 500 switch.
   The S&P 500 loads in batches of 25 with a progress count and a Cancel
   button, keeps results that already arrived, and offers Retry for symbols

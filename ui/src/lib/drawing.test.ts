@@ -1,5 +1,5 @@
 ﻿import { describe, expect, it } from "vitest";
-import { DRAWING_NAMES, MAX_TEMPLATES, PEN_MAX_POINTS, POINT_COUNT, SHAPE_LABELS, calloutGeometry, cleanDrawingStyles, drawingSummary, harmonicRatios, hitCallout, inBounds, markerPath, necklineEnds, pointLabel, saveTemplate, shapeSegments, arrowHead, channelLines, fibExtLevels, pitchforkLines, snapPrice, hitPolyline, hitTest, indexToTime, pathBounds, polylineDistance, rulerMeasurement, segmentDistance, simplifyPath, timeToIndex, undoReducer, type History } from "./drawing";
+import { DRAWING_NAMES, MAX_TEMPLATES, PEN_MAX_POINTS, POINT_COUNT, SHAPE_LABELS, calloutGeometry, cleanDrawingStyles, drawingSummary, harmonicRatios, hitCallout, inBounds, markerPath, necklineEnds, pointLabel, saveTemplate, shapeSegments, arrowHead, channelLines, measuredMoveEnd, fibExtLevels, pitchforkLines, snapPrice, hitPolyline, hitTest, indexToTime, pathBounds, polylineDistance, rulerMeasurement, segmentDistance, simplifyPath, timeToIndex, undoReducer, type History } from "./drawing";
 import { forward, inverse, scaleLabel } from "./scale";
 import type { Drawing } from "./types";
 
@@ -176,6 +176,11 @@ describe("multi-point drawings", () => {
     expect(median[1]).toEqual({ x: 100, y: 50 });
     expect(upper[1]).toEqual({ x: 100, y: 40 });
     expect(lower[1]).toEqual({ x: 100, y: 60 });
+  });
+
+  it("projects the measured move by repeating AB from C", () => {
+    expect(measuredMoveEnd({ x: 0, y: 10 }, { x: 4, y: 2 }, { x: 6, y: 5 })).toEqual({ x: 10, y: -3 });
+    expect(POINT_COUNT.measuredmove).toBe(3);
   });
 
   it("puts the arrow head wings behind the tip", () => {

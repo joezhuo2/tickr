@@ -19,6 +19,8 @@ export const STUDIES = [
   { id: "cci", label: "CCI" },
   { id: "willr", label: "Williams %R" },
   { id: "mfi", label: "MFI" },
+  { id: "sma", label: "SMA" },
+  { id: "ema", label: "EMA" },
   { id: "wma", label: "WMA" },
   { id: "hma", label: "Hull MA" },
   { id: "vwma", label: "VWMA" },
@@ -30,6 +32,7 @@ export const STUDIES = [
   { id: "roc", label: "ROC" },
   { id: "rsi_study", label: "RSI study" },
   { id: "macd_study", label: "MACD study" },
+  { id: "seasonality", label: "Seasonality" },
 ] as const;
 
 export type StudyId = (typeof STUDIES)[number]["id"];
@@ -459,6 +462,8 @@ export function computeStudy(study: SettingGroup, candles: readonly Candle[], p:
     case "cci": return { value: cci(candles, p.length) };
     case "willr": return { value: williamsR(candles, p.length) };
     case "mfi": return { value: mfi(candles, p.length) };
+    case "sma": return { value: average(candles.map((c) => c.c), p.length) };
+    case "ema": return { value: ema(candles.map((c) => c.c), p.length) };
     case "wma": return { value: wma(candles, p.length) };
     case "hma": return { value: hma(candles, p.length) };
     case "vwma": return { value: vwma(candles, p.length) };

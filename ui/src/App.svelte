@@ -30,6 +30,8 @@
   import type { SettingEntry } from "./lib/settingsSearch";
   import { addedAlert } from "./lib/alerts";
   import { studies, toggleStudy } from "./lib/studyStore.svelte";
+  import { MAX_COMPARE } from "./lib/compare";
+  import { addCompare, compare, removeCompare } from "./lib/compareStore.svelte";
   import SecondChart from "./SecondChart.svelte";
   import IntervalPicker from "./IntervalPicker.svelte";
   import { aggregateChart } from "./lib/aggregate";
@@ -1884,6 +1886,17 @@
         if (!shown) return "Load a chart first";
         shown.goTo(c.date);
         return null;
+      }
+      case "compare": {
+        const before = [...compare.symbols];
+        const beforeScale = scale;
+        if (c.on && c.symbol) {
+          if (!before.includes(c.symbol) && before.length >= MAX_COMPARE) return `Compare up to ${MAX_COMPARE} symbols`;
+          addCompare(c.symbol);
+          if (scale !== "percent") setScale("percent");
+        } else if (c.symbol) removeCompare(c.symbol);
+        else before.forEach(removeCompare);
+        return () => { before.forEach(addCompare); compare.symbols.filter((s) => !before.includes(s)).forEach(removeCompare); setScale(beforeScale); };
       }
       case "extended": {
         const before = chartExtended;

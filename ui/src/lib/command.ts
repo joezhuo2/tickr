@@ -23,6 +23,7 @@ export type Command =
   | { kind: "scale"; scale: ChartScale }
   | { kind: "goto"; date: string }
   | { kind: "extended"; on: boolean }
+  | { kind: "compare"; symbol: string | null; on: boolean }
   | { kind: "watch"; symbol: string; on: boolean }
   | { kind: "member"; symbol: string; group: string; on: boolean }
   | { kind: "group"; group: string }
@@ -315,6 +316,15 @@ function parseCommand(text: string, tokens: string[], ctx: CommandContext): Comm
     if (!date) return bad("Chart", "Go to …", "Needs a date, e.g. goto 2024-03-15");
     if (!validDate(date)) return bad("Chart", `Go to ${date}`, "Use a date like 2024-03-15");
     return row({ kind: "goto", date }, "Chart", `Go to ${date}`, `Centers the chart on ${date}`);
+  }
+
+  if (w0 === "compare" || w0 === "uncompare") {
+    const off = w0 === "uncompare" || w1 === "off" || w1 === "clear";
+    const named = tokens.slice(w0 === "compare" && off ? 2 : 1);
+    if (named.length > 1 || (named[0] && !isTicker(named[0]))) return bad("Chart", text, "Use compare spy, uncompare spy or compare off");
+    const symbol = named[0] ? upper(named[0]) : null;
+    if (!off && !symbol) return bad("Chart", "Compare …", "Needs a symbol, e.g. compare spy");
+    return row({ kind: "compare", symbol, on: !off }, "Chart", off ? (symbol ? `Remove ${symbol} comparison` : "Clear comparisons") : `Compare with ${symbol}`, off ? "Takes it off the chart" : `Overlays ${symbol} as a percent line on the chart`);
   }
 
   if (w0 === "extended" || w0 === "ext") {

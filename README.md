@@ -137,7 +137,9 @@ taskbar to keep it visible.
     `screener`, `alerts`, `settings` or `settings theme` (jumps to and flashes
     that setting), `second chart`, `new window`, `refresh`, `toggle overview`.
   - Chart: `type candles` (any chart type, such as `type heikin ashi`),
-    `scale log|linear|percent`, `goto 2024-03-15`, `extended on|off`.
+    `scale log|linear|percent`, `goto 2024-03-15`, `extended on|off`,
+    `compare spy` (overlay another symbol on the percent scale),
+    `uncompare spy`, `compare off`.
   - Watchlist: `watch nvda` or `star nvda`, `unwatch nvda`,
     `add nvda to Tech`, `remove nvda from Tech`, `group Tech`.
   - Indicators and drawings: any study or overlay by name (`rsi`, `macd`,
@@ -199,8 +201,15 @@ taskbar to keep it visible.
   first visible candle as you pan and zoom. Press L to cycle scales. The
   **Left price scale** button at the top right adds a second scale on the left:
   the same labels as the right, or percent change from the first visible bar.
+  The **Compare** button next to it (or `compare spy`) overlays up to 4 other
+  symbols on the percent scale, each a coloured line rebased to the first
+  visible bar where it has data, with its change at the crosshair in the
+  legend. Type a symbol and press Enter to add it; click a symbol's chip to
+  remove it. Compare lines use the main chart's range and candle length, show
+  only on the percent scale, are loaded once per range or candle length (not
+  refreshed live), and the list is saved across launches and in Backup.
 - **Panes:** hover a pane for its buttons at the top right. RSI, MACD,
-  Stochastic and OBV panes move up or down, **Merge** puts a pane into the one
+  Stochastic, OBV and Seasonality panes move up or down, **Merge** puts a pane into the one
   above (or into the price pane) as an overlay with its own autoscaled range,
   and **Unmerge** splits them again. A merged pane shows the first study's
   scale on the right and the second's on the left. **Maximize** fills the chart
@@ -227,7 +236,9 @@ taskbar to keep it visible.
   arrow, price range, date range, trend-based Fibonacci extension and
   pitchfork. Channel, Fibonacci extension and pitchfork take three clicks: the
   first two set the base move and the third sets the channel width, the
-  projection start, or the second pitchfork tine. It also has arrow up and
+  projection start, or the second pitchfork tine. A **Measured move** (three
+  clicks: A, B and C) projects the A to B move again from C and prints the
+  target price at the end. It also has arrow up and
   arrow down markers (one click), a **Callout** (click the anchor, then where
   the text box goes, then type; double-click it or use **Edit** to change the
   text), **Elliott impulse** (six clicks, labelled 0 to 5) and **Elliott
@@ -564,10 +575,14 @@ it is instant.
   **Studies** at the bottom of the Technicals tab add Stochastic, OBV, CCI,
   Williams %R, MFI, Stoch RSI, Aroon (up and down), CMF and ROC in their own
   panes, and Ichimoku, Supertrend, Keltner channels, Donchian channels,
-  Parabolic SAR (dots), pivot points (P, R1, R2, S1, S2), WMA, Hull MA, VWMA,
+  Parabolic SAR (dots), pivot points (P, R1, R2, S1, S2), SMA, EMA, WMA, Hull MA, VWMA,
   ZigZag and a linear regression channel over the price. They are drawn on
   both charts without running Analyze, follow replay, and do not feed the
-  score. Their parameters (defaults: Stochastic 14/3/3, Ichimoku 9/26/52 with
+  score. SMA and EMA (length 20) take a **Timeframe** like any study, so a weekly
+  20 SMA on a daily chart is drawn as steps. **Seasonality** adds a pane with
+  the average return for each calendar month over the symbol's full monthly
+  history (the month in progress is left out) and the share of years that month
+  closed up. Their parameters (defaults: Stochastic 14/3/3, Ichimoku 9/26/52 with
   a 26-bar displacement, Supertrend 10/3, Keltner 20/10/2, Donchian 20, CCI
   20, Williams %R 14, MFI 14, SAR 0.02/0.2, WMA, Hull MA and VWMA 20, ZigZag
   5%, linear regression 100 bars with bands 2 standard deviations out, Stoch
