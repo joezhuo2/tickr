@@ -826,7 +826,18 @@ News labels each tone **AI** or **Keyword**; hover for the model and generation 
 
 Settings > Connections shows quote, news and AI status, last successes and
 readable errors, with a Retry action for each service. **Copy diagnostics**
-copies app and OS versions and connection details with credentials redacted.
+copies app and OS versions and connection details with credentials redacted,
+plus the latest crash report if there is one. **Save crash reports** (off by
+default) writes a report for each Rust panic and uncaught UI error to a
+`crashes` folder inside the log folder, keeping the newest 10; **Clear crash
+reports** deletes them. Nothing is uploaded.
+
+### First-run tour
+
+A fresh install shows a short skippable tour of the search, chart types,
+panels, watchlist star, alerts and Settings (Esc or Skip to close, arrow keys
+to move). Upgrading users do not see it. Replay it from Settings > Display >
+Show tour or with the `tour` command in search.
 
 ### Market events
 
@@ -901,6 +912,8 @@ requires. Analysis and sentiment run on your machine. Not investment advice.
 | Logs | `%LOCALAPPDATA%\dev.tickr.desktop\logs\tickr.log` | `~/Library/Logs/dev.tickr.desktop/` |
 
 Logs rotate at 1 MB and keep two old files. Attach `tickr.log` to bug reports.
+Crash reports, when enabled in Settings > Connections, are `crashes\crash-*.txt`
+in the same folder (newest 10 kept).
 
 The candle history keeps the newest 20,000 candles per symbol, interval and
 source (custom intervals store the native candles they are built from), for at most 40 series; the least recently updated series is dropped
