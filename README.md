@@ -747,6 +747,30 @@ notifications in your OS settings; on Windows, use an
 installed build for notifications. Quotes can be delayed and crossings between
 polls can be missed.
 
+**Event alerts** use the same list and the same desktop notification. Pick
+**Earnings in N days** or **Ex-dividend in N days** (fires once the date is
+within N days, today counts as 0; checked against the calendar dates),
+**Market open** or **Market close** (the regular session of the symbol's
+exchange, fires on the change; tick **Recurring** for every day, and holidays
+are handled by the exchange's session data), **Relative volume** (today's
+volume against the 20-day average, fires when it reaches the level you set,
+and a recurring one needs it to dip below first) or **News headline** (a
+headline newer than the moment you armed it). Event alerts are checked about
+every poll, with news and volume at most every 5 minutes, and are saved and
+included in Backup like the rest.
+
+**Combined conditions:** an indicator alert can hold several conditions. Type
+one, press **Add another condition**, repeat, then choose **All (AND)** or
+**Any (OR)** and add the alert. Each condition uses the Strategy syntax, so
+`close > 200` with `rsi(14) < 70` becomes `(close > 200) and (rsi(14) < 70)`.
+
+**Snooze and expiry:** every armed alert has a **Snooze** menu (1 hour, 4
+hours, until the next market open, or a date and time); it is quiet until then
+and a price alert takes a fresh baseline afterwards. Adding an alert can set an
+**Expires** date and time, after which it stops and shows **Expired**; Rearm
+clears the expiry. The next-open snooze skips weekends but not market
+holidays.
+
 ### Settings and keybinds
 
 The gear at the bottom left opens Settings. A menu on the left switches between
@@ -760,7 +784,19 @@ the global hotkey (click the field and press a new combination; **Reset**
 restores the default) and the in-window keybinds; Chart holds the session
 shading and chart dot toggles, the R:R reward multiple and **Technical
 analysis** (Auto analyze, the chart overlays and which chart patterns to
-detect). Esc or a click outside closes it.
+detect) and **Notifications**. Esc or a click outside closes it.
+
+**Notifications** (Chart) holds two options, both off by default.
+**Do not disturb** takes a start and end time, overnight ranges included
+(22:00 to 07:00): desktop notifications, including chart alerts, are
+suppressed in that window, while alerts still check and record Triggered.
+**Daily digest** sends one notification at the time you choose with the top
+watchlist movers, watchlist earnings in the next 5 days and the number of
+alerts triggered in the last 24 hours; it follows Do not disturb, is skipped
+if tickr was not running within three hours of that time, and clicking it
+does not open the window. Times use your computer's time zone as tickr last
+saw it when the window loaded, so a daylight saving change takes effect after
+the next window load.
 
 Keybinds are grouped by category. Click a keybind and press a new key to rebind it (an action already on that
 key takes the old one), or Backspace to unbind it. Keybinds are ignored while
