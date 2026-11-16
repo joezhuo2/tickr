@@ -6,6 +6,12 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- **Chart auto-fit keeps stops and targets in view:** the price axis now
+  stretches to include the entry, stop and target of long / short position
+  drawings on screen, and paper trading order lines. It refits when you
+  release a dragged level.
+
 ### Added
 - **Options analytics:** a new Analytics tab with the max pain strike, open
   interest by strike, the IV smile and the at-the-money IV term structure.

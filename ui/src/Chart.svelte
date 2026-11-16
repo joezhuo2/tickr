@@ -382,6 +382,17 @@
       }
     }
     for (const t of targetLevels) fitValues.push(t.price);
+    if (!hideDrawings) {
+      const minBars = 90 / (plotW / Math.max(view.count, 1));
+      for (const d of list) {
+        if (d.kind !== "position" || d.hidden || !visibleOn(d, intervalCls)) continue;
+        const [ia, ib] = d.points.map((p) => timeToIndex(times, p.t));
+        if (Math.max(ia, ib, Math.min(ia, ib) + minBars) < i0 || Math.min(ia, ib) > i1) continue;
+        const [entry, stop] = d.points.map((p) => p.price);
+        fitValues.push(entry, stop, positionLevels(entry, stop, rr.reward).target);
+      }
+    }
+    for (const l of orderLines) fitValues.push(l.price);
     const base = candles[i0]?.c ?? 0;
     const fit = fitScale(prices, fitValues, scale, base);
     const activeScale = fit.scale;
