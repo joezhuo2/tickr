@@ -222,10 +222,11 @@ pub fn parse_chart(body: &[u8], range: &str, interval: &str) -> Result<Chart, St
     let m = &r["meta"];
     let price = f(&m["regularMarketPrice"]).ok_or("no price in response")?;
     let tp = &m["currentTradingPeriod"];
-    let periods = match (period(&tp["pre"]), period(&tp["regular"]), period(&tp["post"])) {
-        (Some(pre), Some(regular), Some(post)) => Some(Periods { pre, regular, post }),
-        _ => None,
-    };
+    let periods = period(&tp["regular"]).map(|regular| Periods {
+        pre: period(&tp["pre"]).unwrap_or(Period { start: regular.start, end: regular.start }),
+        post: period(&tp["post"]).unwrap_or(Period { start: regular.end, end: regular.end }),
+        regular,
+    });
     let name = [&m["longName"], &m["shortName"]]
         .iter()
         .find_map(|x| x.as_str())
@@ -619,6 +620,20 @@ mod tests {
     fn unknown_symbol_is_an_error() {
         let e = parse_chart(MISSING, "1d", "5m").unwrap_err();
         assert!(e.contains("No data found"), "{e}");
+    }
+
+    #[test]
+    fn futures_without_extended_periods_are_regular_then_closed() {
+        let body = br#"{"chart":{"result":[{"meta":{"regularMarketPrice":5000,"symbol":"ES=F","currentTradingPeriod":{
+            "regular":{"start":1000,"end":83800}}}}]}}"#;
+        let c = parse_chart(body, "1d", "5m").unwrap();
+        let p = c.meta.periods.unwrap();
+        assert_eq!(session_at(Some(&p), 5000), Session::Regular);
+        assert_eq!(session_at(Some(&p), 83800), Session::Closed);
+        assert_eq!(session_at(Some(&p), 999), Session::Closed);
+        let q = quote_from(&c, 90000);
+        assert_eq!(q.session, Session::Closed);
+        assert!(q.extended.is_none());
     }
 
     #[test]

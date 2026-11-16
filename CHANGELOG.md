@@ -7,6 +7,16 @@ All notable changes to tickr are listed here. The format follows
 ## [Unreleased]
 
 ### Added
+- **S&P 500 screener:** the Screen panel has a Watchlist / S&P 500 switch.
+  The S&P 500 loads in batches of 25 with a progress count and a Cancel
+  button, keeps results that already arrived, and offers Retry for symbols
+  that failed. Fundamentals load only while a fundamentals column or condition
+  is in use. Each result has a star to add it to the watchlist.
+- **Futures and forex:** search has a Futures filter. Futures (`ES=F`) and
+  forex pairs (`EURUSD=X`) show no pre-market or after-hours shading, forex
+  has no volume, and forex prices use 4-5 decimals (2-3 for JPY pairs).
+  Analysts, Earnings, Financials, Options and Ownership say they are not available for
+  them. The Market view lists S&P 500 futures, EUR/USD, USD/JPY and GBP/USD.
 - **Options analytics:** a new Analytics tab with the max pain strike, open
   interest by strike, the IV smile and the at-the-money IV term structure.
   Contracts trading more than their open interest (at least 100 contracts) are
@@ -25,6 +35,10 @@ All notable changes to tickr are listed here. The format follows
   default) saves Rust panics and uncaught UI errors to a `crashes` folder in
   the log folder, newest 10 kept, with a Clear action. Copy diagnostics
   includes the latest report, redacted. Nothing is uploaded.
+
+### Fixed
+- Quotes for symbols whose trading period has no pre or post session (futures,
+  forex) now read as open or closed instead of always closed.
 
 ## [0.11.84] - 2026-11-14
 

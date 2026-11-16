@@ -19,8 +19,8 @@ export function percent(price: number, base: number): number {
   return (price - base) / Math.abs(base) * 100;
 }
 
-export function scaleLabel(price: number, scale: ChartScale, base: number): string {
-  if (scale !== "percent") return num(price);
+export function scaleLabel(price: number, scale: ChartScale, base: number, digits?: number): string {
+  if (scale !== "percent") return num(price, digits);
   const value = percent(price, base);
   return Math.abs(value) < 0.05 ? "0%" : `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
 }

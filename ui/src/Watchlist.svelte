@@ -20,6 +20,7 @@
     screenColumns,
     tab = $bindable(),
     onopen,
+    onstar,
     ongroups,
     onsort,
     onview,
@@ -40,6 +41,7 @@
     screenColumns: string[];
     tab: string | null;
     onopen: (symbol: string) => void;
+    onstar: (symbol: string) => void;
     ongroups: (groups: Group[]) => void;
     onsort: (sort: WatchlistSort) => void;
     onview: (view: WatchlistView) => void;
@@ -150,7 +152,7 @@
     const q = w?.quote;
     if (!q) return w?.error ? `${symbol}: ${w.error}` : symbol;
     const m = moves[symbol];
-    return `${q.name || symbol}: ${price(m.price, q.currency)} (${m.pct == null ? "—" : `${signed(m.pct)}%`})`;
+    return `${q.name || symbol}: ${price(m.price, q.currency, symbol)} (${m.pct == null ? "—" : `${signed(m.pct)}%`})`;
   }
 
   let loadedAt = 0;
@@ -278,7 +280,7 @@
       {/if}
     </div>
     {#if screening && !editing}
-      <Screener symbols={order} {screens} columns={screenColumns} {onopen} onsave={onsavescreen} ondelete={ondeletescreen} oncolumns={onscreencolumns} />
+      <Screener symbols={order} {screens} columns={screenColumns} starred={symbols} {onopen} {onstar} onsave={onsavescreen} ondelete={ondeletescreen} oncolumns={onscreencolumns} />
     {:else if tableOn}
       <WatchTable symbols={order} {quotes} {moves} {current} {columns} {onopen} {oncolumns} />
     {:else if mapOn}
@@ -321,7 +323,7 @@
               <span class="name">{q.name || q.exchange || "—"}</span>
               {@const m = moves[symbol]}
               <span class="line">
-                <span class="px">{price(m.price, q.currency)}</span>
+                <span class="px">{price(m.price, q.currency, symbol)}</span>
                 <span class="chg {direction(m.pct)}">{m.pct == null ? "—" : `${signed(m.pct)}%`}</span>
               </span>
             {:else if w?.error}

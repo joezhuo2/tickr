@@ -88,7 +88,7 @@ describe("type filter", () => {
     expect(searchTypeOf(hit("X", { quote_type: " mutualfund " }))).toBe("funds");
   });
   it("leaves unknown and missing types visible only under All", () => {
-    const fut = hit("ES=F", { quote_type: "FUTURE", kind: "Futures" });
+    const fut = hit("ES=F", { quote_type: "OPTION", kind: "Option" });
     const none = hit("ZZZ");
     const toString = hit("TS", { quote_type: "toString" });
     for (const h of [fut, none, toString]) {
@@ -96,6 +96,11 @@ describe("type filter", () => {
       expect(matchesType(h, "all")).toBe(true);
       expect(matchesType(h, "stocks")).toBe(false);
     }
+  });
+  it("maps futures", () => {
+    const fut = hit("ES=F", { quote_type: "FUTURE", kind: "Futures" });
+    expect(searchTypeOf(fut)).toBe("futures");
+    expect(symbols(filterHits([...mixed, fut], "futures", ""))).toEqual(["ES=F"]);
   });
   it("filters each type", () => {
     expect(symbols(filterHits(mixed, "all", ""))).toHaveLength(mixed.length);
@@ -174,7 +179,7 @@ describe("labels", () => {
     expect(hitTypeLabel(hit("X", { quote_type: "ETF" }))).toBe("ETF");
     expect(hitTypeLabel(hit("X", { quote_type: "MUTUALFUND" }))).toBe("Mutual Fund");
     expect(hitTypeLabel(hit("X", { kind: "Futures", quote_type: "FUTURE" }))).toBe("Futures");
-    expect(hitTypeLabel(hit("X", { quote_type: "FUTURE" }))).toBe("");
+    expect(hitTypeLabel(hit("X", { quote_type: "OPTION" }))).toBe("");
     expect(hitTypeLabel(hit("X"))).toBe("");
   });
   it("omits missing parts without stray separators", () => {

@@ -12,8 +12,12 @@ const INDICES: &[(&str, &str)] =
 const MACRO: &[(&str, &str)] = &[
     ("^TNX", "10y Treasury yield"),
     ("CL=F", "Crude oil"),
+    ("ES=F", "S&P 500 futures"),
     ("GC=F", "Gold"),
     ("DX-Y.NYB", "US dollar index"),
+    ("EURUSD=X", "EUR/USD"),
+    ("USDJPY=X", "USD/JPY"),
+    ("GBPUSD=X", "GBP/USD"),
     ("BTC-USD", "Bitcoin"),
 ];
 const SECTORS: &[(&str, &str)] = &[
