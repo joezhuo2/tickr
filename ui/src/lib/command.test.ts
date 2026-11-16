@@ -101,7 +101,7 @@ describe("alerts", () => {
 
 describe("navigation", () => {
   it("opens panels by name", () => {
-    for (const [word, panel] of [["news", "news"], ["options", "options"], ["earnings", "earnings"], ["analysts", "analysts"], ["stats", "stats"], ["financials", "stats"], ["market", "market"], ["events", "events"], ["watchlist", "watchlist"], ["technicals", "technicals"], ["paper", "paper"], ["strategy", "backtest"], ["backtest", "backtest"], ["screener", "screener"]] as const)
+    for (const [word, panel] of [["news", "news"], ["options", "options"], ["earnings", "earnings"], ["analysts", "analysts"], ["stats", "stats"], ["financials", "stats"], ["market", "market"], ["events", "events"], ["watchlist", "watchlist"], ["technicals", "technicals"], ["paper", "paper"], ["strategy", "backtest"], ["backtest", "backtest"], ["screener", "screener"], ["ownership", "ownership"], ["insiders", "ownership"], ["filings", "ownership"]] as const)
       expect(cmd(word)).toEqual({ kind: "panel", panel });
   });
 

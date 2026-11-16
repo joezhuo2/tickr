@@ -1,7 +1,9 @@
 <script lang="ts">
-  import { direction, fullTime, price, quarterLabel, signed, volume } from "./lib/format";
+  import { invoke } from "@tauri-apps/api/core";
+  import { direction, fullTime, num, price, quarterLabel, signed, volume } from "./lib/format";
   import { periodLabel } from "./lib/financials";
-  import type { Earnings } from "./lib/types";
+  import { averageAbs, expiryAfter, pastMoves, straddle, type Move, type Straddle } from "./lib/optionsStats";
+  import type { Chart, Earnings, Options } from "./lib/types";
 
   let { symbol, earnings }: { symbol: string; earnings: Earnings | null | undefined } = $props();
 
@@ -9,6 +11,49 @@
   const day = (t: number) => fullTime(t, offset, "1d");
   const until = (t: number) => Math.ceil((t - Date.now() / 1000) / 86400);
   const currency = $derived(earnings?.currency ?? "USD");
+
+  let implied = $state<{ straddle: Straddle | null; moves: Move[]; price: number | null } | undefined>(undefined);
+  let impliedError = $state<string | null>(null);
+
+  $effect(() => {
+    const sym = symbol;
+    const date = earnings?.upcoming?.date ?? null;
+    const reported = (earnings?.history ?? []).map((r) => r.reported);
+    implied = undefined;
+    impliedError = null;
+    if (!earnings) return;
+    let alive = true;
+    (async () => {
+      let found: Straddle | null = null;
+      let last: number | null = null;
+      let failure: string | null = null;
+      if (date != null) {
+        try {
+          const first = await invoke<Options>("get_options", { symbol: sym, date: null });
+          last = first.price;
+          const expiry = expiryAfter(first.expirations, date);
+          if (expiry != null) found = straddle(expiry === first.expiry ? first : await invoke<Options>("get_options", { symbol: sym, date: expiry }));
+        } catch (e) {
+          failure = String(e);
+        }
+      }
+      let moves: Move[] = [];
+      try {
+        const chart = await invoke<Chart>("get_chart", { symbol: sym, range: "5y", interval: "1d", extended: false, secondary: true });
+        moves = pastMoves(chart.candles, reported);
+      } catch (e) {
+        failure ??= String(e);
+      }
+      if (!alive) return;
+      implied = { straddle: found, moves, price: last };
+      impliedError = failure;
+    })();
+    return () => {
+      alive = false;
+    };
+  });
+
+  const avg = $derived(implied ? averageAbs(implied.moves) : null);
 </script>
 
 {#if earnings === undefined}
@@ -52,6 +97,39 @@
         </dl>
       {:else}
         <div class="sub">No date announced</div>
+      {/if}
+    </div>
+    <div class="col">
+      <h2>Implied move</h2>
+      {#if implied === undefined}
+        <span class="sk" style="width: 160px; height: 30px"></span>
+      {:else}
+        {#if implied.straddle}
+          {@const s = implied.straddle}
+          <div class="big">±{s.pct.toFixed(1)}%</div>
+          <div class="sub">±{price(s.cost, currency)} from the {num(s.strike)} straddle expiring {new Date(s.expiry * 1000).toISOString().slice(0, 10)}</div>
+        {:else if u}
+          <div class="sub">{impliedError ? `Options unavailable: ${impliedError}` : "No options expiring after the report"}</div>
+        {:else}
+          <div class="sub">No upcoming report to price</div>
+        {/if}
+        {#if implied.moves.length}
+          <dl>
+            <dt>Average past move</dt>
+            <dd>±{avg?.toFixed(1)}%</dd>
+          </dl>
+          <div class="scroll"><table>
+            <thead><tr><th>Reported</th><th>Move</th></tr></thead>
+            <tbody>
+              {#each implied.moves as m (m.reported)}
+                <tr><td>{day(m.reported)}</td><td class={direction(m.pct)}>{signed(m.pct)}%</td></tr>
+              {/each}
+            </tbody>
+          </table></div>
+          <div class="sub note">Close before to close after the report.</div>
+        {:else}
+          <div class="sub">No past moves available</div>
+        {/if}
       {/if}
     </div>
     <div class="col">
@@ -138,6 +216,9 @@
     margin: 0;
     text-align: right;
     font-variant-numeric: tabular-nums;
+  }
+  .note {
+    margin-top: 6px;
   }
   .scroll {
     overflow-x: auto;

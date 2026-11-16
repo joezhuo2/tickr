@@ -18,6 +18,17 @@ All notable changes to tickr are listed here. The format follows
   can be drawn as a stepped line on a daily chart.
 - **Seasonality pane:** average return and share of positive years for each
   calendar month, as a pane you can move, merge and maximize.
+- **Options analytics:** a new Analytics tab with the max pain strike, open
+  interest by strike, the IV smile and the at-the-money IV term structure.
+  Contracts trading more than their open interest (at least 100 contracts) are
+  listed and tagged Unusual in the chain.
+- **Earnings implied move:** the at-the-money straddle of the first expiry after
+  the next report as a +/- $ and % move, next to each past report's actual
+  move and their average.
+- **Ownership:** a new view with insider transactions, institutional and fund
+  holders, and recent SEC filings. Filings stay off until you enter a **SEC
+  contact email** in Settings (kept in your settings and Backup; tickr never
+  ships one).
 - **First-run tour:** a short, skippable walkthrough of search, chart types,
   panels, the watchlist star, alerts and Settings, shown on fresh installs
   only. Replay it with Settings > Display > Show tour or the `tour` command.
