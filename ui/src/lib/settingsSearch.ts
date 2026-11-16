@@ -15,7 +15,7 @@ export interface SettingEntry {
 const entry = (tab: SettingsTab, section: string, labels: string[]): SettingEntry[] => labels.map((label) => ({ label, section, tab }));
 
 export const SETTINGS: SettingEntry[] = [
-  ...entry("display", "Display", ["Theme", "Main color", "Sub color", "Font", "Number font", "Text size", "Gain/loss colors", "Background refresh", "Reset all colors", ...TOKENS.map((t) => t.label)]),
+  ...entry("display", "Display", ["Show tour", "Theme", "Main color", "Sub color", "Font", "Number font", "Text size", "Gain/loss colors", "Background refresh", "Reset all colors", ...TOKENS.map((t) => t.label)]),
   { label: "Show or hide tickr", section: "Hotkeys · General", tab: "hotkeys", group: "general" },
   { label: "Reset all keybinds", section: "Hotkeys · General", tab: "hotkeys", group: "general" },
   ...groupActions().flatMap((g) => g.actions.map((a) => ({ label: a.label, section: `Hotkeys · ${g.label}`, tab: "hotkeys" as const, group: g.id }))),
@@ -25,7 +25,7 @@ export const SETTINGS: SettingEntry[] = [
   ...entry("data", "Market data", ["Provider", "Clear cached history", "SEC contact email"]),
   ...entry("ai", "AI", ["News analysis", "Base URL", "Model", "News model", "Events model", "API key"]),
   ...entry("backup", "Backup", ["Export", "Import"]),
-  ...entry("connections", "Connections", ["Copy diagnostics"]),
+  ...entry("connections", "Connections", ["Copy diagnostics", "Save crash reports", "Clear crash reports"]),
 ];
 
 export function matchSettings(query: string, entries: readonly SettingEntry[] = SETTINGS, limit = 8): SettingEntry[] {
