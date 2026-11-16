@@ -37,6 +37,7 @@
     indicators,
     onindicators,
     onclose,
+    ontour,
     jump = null,
   }: {
     indicators?: IndicatorConfig;
@@ -59,6 +60,7 @@
     onshade: (enabled: boolean) => void;
     ontimezone: (zone: ChartTimeZone) => void;
     onclose: () => void;
+    ontour: () => void;
     jump?: SettingEntry | null;
   } = $props();
 
@@ -200,6 +202,17 @@
     } catch (e) {
       copyStatus = String(e);
       copyError = true;
+    }
+  }
+
+  let crashStatus = $state("");
+
+  async function clearCrashes() {
+    try {
+      await invoke("clear_crash_reports");
+      crashStatus = "Cleared";
+    } catch (e) {
+      crashStatus = String(e);
     }
   }
 
@@ -602,6 +615,7 @@
       </select>
     </div>
     <p class="hint">Low-power slows updates while the window is hidden, and alerts keep their usual cadence.</p>
+    <button class="link" onclick={ontour}>Show tour</button>
 
     {/if}
     {#if tab === "hotkeys"}
@@ -814,6 +828,15 @@
     {#if connectionError}<p class="hint error" role="status">{connectionError}</p>{/if}
     <button class="link" onclick={copyDiagnostics}>Copy diagnostics</button>
     <p class="hint" class:error={copyError} role="status">{copyStatus}</p>
+    {#if connections}
+      <label class="row">
+        <span>Save crash reports</span>
+        <input type="checkbox" checked={connections.save_crash_reports} onchange={(e) => { const enabled = e.currentTarget.checked; if (connections) connections.save_crash_reports = enabled; invoke("set_save_crash_reports", { enabled }).catch(console.warn); }} />
+      </label>
+      <p class="hint">Off by default. Writes panics and UI errors to a crashes folder in the log folder (newest 10 kept). Nothing is uploaded; Copy diagnostics includes the latest one.</p>
+      <button class="link" onclick={clearCrashes}>Clear crash reports</button>
+      <p class="hint" role="status">{crashStatus}</p>
+    {/if}
     {/if}
       </div>
       {/key}

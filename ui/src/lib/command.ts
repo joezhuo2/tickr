@@ -7,7 +7,7 @@ import { check } from "./strategy";
 import { RANGES, intervalLabel, parseInterval, type AlertKind, type ChartMode, type ChartScale, type Overlays } from "./types";
 
 export type Panel = "news" | "options" | "earnings" | "analysts" | "stats" | "market" | "events" | "watchlist" | "technicals" | "paper" | "backtest" | "screener" | "alerts";
-export type AppAction = "second_chart" | "new_window" | "refresh" | "toggle_overview" | "analyze" | "practice";
+export type AppAction = "second_chart" | "new_window" | "refresh" | "toggle_overview" | "analyze" | "practice" | "tour";
 export type Toggle = { type: "overlay"; key: keyof Overlays } | { type: "study"; id: StudyId };
 
 export type Command =
@@ -72,6 +72,7 @@ const ACTIONS: Record<string, { action: AppAction; title: string; detail: string
   "toggle overview": { action: "toggle_overview", title: "Toggle overview", detail: "Shows or hides the stock overview" },
   overview: { action: "toggle_overview", title: "Toggle overview", detail: "Shows or hides the stock overview" },
   analyze: { action: "analyze", title: "Analyze", detail: "Runs technical analysis on the current chart" },
+  tour: { action: "tour", title: "Tour", detail: "Shows the quick tour of tickr" },
   practice: { action: "practice", title: "Practice", detail: "Opens practice on a random historical setup" },
 };
 

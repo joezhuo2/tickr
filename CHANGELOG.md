@@ -18,6 +18,13 @@ All notable changes to tickr are listed here. The format follows
   can be drawn as a stepped line on a daily chart.
 - **Seasonality pane:** average return and share of positive years for each
   calendar month, as a pane you can move, merge and maximize.
+- **First-run tour:** a short, skippable walkthrough of search, chart types,
+  panels, the watchlist star, alerts and Settings, shown on fresh installs
+  only. Replay it with Settings > Display > Show tour or the `tour` command.
+- **Crash reports:** Settings > Connections > Save crash reports (off by
+  default) saves Rust panics and uncaught UI errors to a `crashes` folder in
+  the log folder, newest 10 kept, with a Clear action. Copy diagnostics
+  includes the latest report, redacted. Nothing is uploaded.
 
 ## [0.11.84] - 2026-11-14
 

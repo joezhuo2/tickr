@@ -23,6 +23,7 @@
   import Left from "./Left.svelte";
   import News from "./News.svelte";
   import CommandSearch from "./CommandSearch.svelte";
+  import Tour from "./Tour.svelte";
   import UndoFuse, { type UndoEntry } from "./UndoFuse.svelte";
   import type { Command, Panel } from "./lib/command";
   import type { SettingEntry } from "./lib/settingsSearch";
@@ -173,6 +174,7 @@
   let keybinds = $state<Keybinds>() as Keybinds;
   let dots = $state<Dots>() as Dots;
   let settingsOpen = $state(false);
+  let tourOpen = $state(false);
   let alertsOpen = $state(false);
   let searchOpen = $state(false);
   let settingsJump = $state<SettingEntry | null>(null);
@@ -385,6 +387,7 @@
     if (analystKnown) analyst = init.analyst;
     // Shown at once, refreshed by loadChart (at = 0 marks it stale).
     if (own && init.chart && init.chart.interval === (baseFor(interval, range) ?? init.chart.interval)) cache.set(cacheKey(), { chart: init.chart, at: 0 });
+    if (!ready && persist && init.tour_seen === false) tourOpen = true;
     ready = true;
     loadChart();
     if (!persist) void pollOwn();
@@ -1834,7 +1837,8 @@
         settingsOpen = true;
         return null;
       case "action":
-        if (c.action === "toggle_overview") toggleLeft();
+        if (c.action === "tour") tourOpen = true;
+        else if (c.action === "toggle_overview") toggleLeft();
         else if (c.action === "refresh") void refresh();
         else if (practice) return "Exit practice first";
         else if (c.action === "practice") {
@@ -1984,7 +1988,7 @@
   }
 
   async function onKey(e: KeyboardEvent) {
-    if (!ready || settingsOpen || e.defaultPrevented) return;
+    if (!ready || settingsOpen || tourOpen || e.defaultPrevented) return;
     if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k") {
       e.preventDefault();
       if (!e.repeat && !practice) searchOpen = !searchOpen;
@@ -2687,7 +2691,10 @@
       </div>
     {/if}
     {#if settingsOpen}
-      <Settings bind:custom bind:theme bind:textSize bind:palette bind:refreshMode extended={chartExtended} shade={shadeSessions} timeZone={chartTimeZone} onextended={saveChartExtended} onshade={saveShadeSessions} ontimezone={saveChartTimeZone} bind:hotkey bind:error={hotkeyError} {defaultHotkey} bind:keybinds bind:dots {indicators} onindicators={saveIndicators} jump={settingsJump} onclose={() => { settingsOpen = false; settingsJump = null; }} />
+      <Settings bind:custom bind:theme bind:textSize bind:palette bind:refreshMode extended={chartExtended} shade={shadeSessions} timeZone={chartTimeZone} onextended={saveChartExtended} onshade={saveShadeSessions} ontimezone={saveChartTimeZone} bind:hotkey bind:error={hotkeyError} {defaultHotkey} bind:keybinds bind:dots {indicators} onindicators={saveIndicators} jump={settingsJump} ontour={() => { settingsOpen = false; settingsJump = null; tourOpen = true; }} onclose={() => { settingsOpen = false; settingsJump = null; }} />
+    {/if}
+    {#if tourOpen}
+      <Tour {hotkey} onclose={() => { tourOpen = false; invoke("set_tour_seen").catch(console.warn); }} />
     {/if}
     {#if searchOpen}
       <CommandSearch {recent} current={symbol} groups={groups.map((g) => g.name)} onrun={runCommand} onclose={() => (searchOpen = false)} />
