@@ -24,6 +24,9 @@ pub fn parse(text: &str) -> Result<Settings, String> {
 
 fn validate(s: &mut Settings) -> Result<(), String> {
     validate_text_size(s.text_size)?;
+    if !s.sec_email.is_empty() && !crate::sec::valid_email(&s.sec_email) {
+        return Err("The SEC contact email in the backup is not a valid address.".into());
+    }
     crate::hotkey::parse(&s.hotkey)?;
     validate_indicators(&s.indicators, &s.indicator_presets)?;
     validate_drawings(&s.drawings)?;
@@ -60,6 +63,7 @@ mod tests {
             watchlist: vec!["AAPL".into(), "NVDA".into()],
             groups: vec![Group { name: "Tech".into(), symbols: vec!["NVDA".into()] }],
             recent_symbols: vec!["TSLA".into()],
+            sec_email: "me@example.com".into(),
             ..Settings::default()
         }
     }
@@ -91,6 +95,13 @@ mod tests {
         assert!(parse(r#"{"app":"tickr","settings":{"text_size":130}}"#).is_err());
         assert!(parse(r#"{"app":"tickr","settings":{"hotkey":"Nope+"}}"#).is_err());
         assert!(parse(r#"{"app":"tickr","settings":{"symbol":5}}"#).is_err());
+    }
+
+    #[test]
+    fn sec_email_must_be_an_address() {
+        assert!(parse(r#"{"app":"tickr","settings":{"sec_email":"nope"}}"#).is_err());
+        assert_eq!(parse(r#"{"app":"tickr","settings":{"sec_email":"me@example.com"}}"#).unwrap().sec_email, "me@example.com");
+        assert_eq!(parse(r#"{"app":"tickr","settings":{}}"#).unwrap().sec_email, "");
     }
 
     #[test]

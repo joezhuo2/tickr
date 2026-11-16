@@ -3,6 +3,8 @@
   import { change, direction, num, volume } from "./lib/format";
   import { greeks, yearsTo } from "./lib/greeks";
   import { addLeg, entryPrice, makeLeg, type Leg, type LegSide, type PriceMode, type SavedStrategy } from "./lib/payoff";
+  import OptionsAnalytics from "./OptionsAnalytics.svelte";
+  import { isUnusual } from "./lib/optionsStats";
   import Strategy from "./Strategy.svelte";
   import type { OptionContract, Options } from "./lib/types";
 
@@ -20,12 +22,14 @@
   }
 
   let {
+    symbol,
     options,
     error,
     onretry,
     onexpiry,
     side = $bindable("calls"),
   }: {
+    symbol: string;
     options: Options | undefined;
     error: string | null;
     onretry: () => void;
@@ -33,7 +37,7 @@
     side?: "calls" | "puts" | "both";
   } = $props();
 
-  let tab = $state<"chain" | "strategy">("chain");
+  let tab = $state<"chain" | "analytics" | "strategy">("chain");
   let text = $state("");
   let chainEl = $state<HTMLDivElement>();
   let width = $state(0);
@@ -146,7 +150,7 @@
 
 {#snippet row(c: OptionContract, kind: "call" | "put")}
   <tr class:itm={c.itm}>
-    <th scope="row">{num(c.strike)}{#if c.itm}<span class="badge">ITM</span>{/if}</th>
+    <th scope="row">{num(c.strike)}{#if c.itm}<span class="badge">ITM</span>{/if}{#if isUnusual(c)}<span class="badge hot" title="Volume above open interest">Unusual</span>{/if}</th>
     <td>{c.last == null ? "—" : num(c.last)}</td>
     <td>{c.bid == null || c.ask == null ? "—" : `${num(c.bid)} / ${num(c.ask)}`}</td>
     <td class={direction(c.change)}>{change(c.change, c.change_pct)}</td>
@@ -227,6 +231,7 @@
   <div class="bar">
     <div class="seg" role="tablist" aria-label="Options view">
       <button role="tab" class:on={tab === "chain"} aria-selected={tab === "chain"} onclick={() => (tab = "chain")}>Calls / Puts</button>
+      <button role="tab" class:on={tab === "analytics"} aria-selected={tab === "analytics"} onclick={() => (tab = "analytics")}>Analytics</button>
       <button role="tab" class:on={tab === "strategy"} aria-selected={tab === "strategy"} onclick={() => (tab = "strategy")}>Strategy</button>
     </div>
     {#if tab === "chain"}
@@ -276,6 +281,8 @@
         {@render pane("puts", 1 - split)}
       {/if}
     </div>
+    {:else if tab === "analytics"}
+      <OptionsAnalytics {options} {symbol} />
     {:else}
       <Strategy {options} bind:legs bind:saved bind:mode />
     {/if}
@@ -442,6 +449,9 @@
     font-size: 10px;
     background: var(--up);
     color: var(--bg, #000);
+  }
+  .badge.hot {
+    background: var(--accent);
   }
   .mid td {
     text-align: center;

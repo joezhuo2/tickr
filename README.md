@@ -464,7 +464,7 @@ it and press ← or →); the width is remembered. Hide or show it with the
 button left of the back arrow, or `\`.
 
 The Watchlist, Analysts, Earnings, Stats, Market, Events,
-Options and News open in a column to the right of the chart, so the chart
+Options, Ownership and News open in a column to the right of the chart, so the chart
 stays on screen. Drag the border between them (or focus it and press ← or →)
 to resize the column; the width is remembered. Turn **Dock** off in the
 toolbar to give those views the full width instead, which is also what
@@ -600,6 +600,11 @@ it is instant.
   revenue estimates, and the last four quarters with estimate, actual and
   surprise % (green beat, red miss). Older quarters follow, up to 12 in all,
   with the reported EPS and revenue only (estimate and surprise show as —).
+  An **Implied move** card prices the at-the-money straddle of the first
+  options expiry after the next report (± $ and %) and lists each past
+  report's actual move, close before to close after from daily bars, with the
+  average absolute move. The straddle uses bid/ask mids, falling back to the
+  last price; the before/after split assumes a US-style 6.5 hour session.
 - **Stats:** key statistics in Valuation, Trading, Dividends & splits, Shares
   & short interest, Profitability and Financials. ETFs get a Fund section and
   crypto a Crypto section. Changes, growth and returns are green or red.
@@ -632,7 +637,24 @@ it is instant.
   4% risk-free rate, no dividends).
   Add legs from the chain to build a strategy (presets include spreads,
   straddles and iron condors) and see its expiration payoff, break-evens and
-  max profit and loss.
+  max profit and loss. The **Analytics** tab shows the max pain strike, open
+  interest by strike (calls against puts), the IV smile for the expiry and the
+  at-the-money IV term structure (other expiries load one by one, up to eight,
+  and are kept for 10 minutes), plus unusual activity: contracts whose volume
+  is above their open interest with at least 100 contracts traded. Those
+  contracts also carry an Unusual tag in the chain.
+- **Ownership:** Insiders (recent insider transactions and the share held by
+  insiders), Holders (institutional and fund holders with shares, % held and
+  change, plus the institutional share of the stock) and Filings (recent SEC
+  EDGAR filings; click a form to open it on sec.gov). Open it from the
+  Ownership button above the chart or by typing `ownership`, `insiders`,
+  `holders` or `filings` in search; it has no keybind by default. Filings need
+  a contact email: the SEC requires one in the User-Agent, so the tab stays
+  off until you fill in **SEC contact email** under Settings, Market data
+  (stored in your settings and included in Backup; tickr ships none). EDGAR
+  requests are spaced under its 10 per second limit, the ticker map is cached
+  for 24 hours and a company's filings for 6. Funds, ETFs, indices, crypto,
+  futures and forex without data show "No ownership data".
 
 ### Watchlist
 
@@ -899,7 +921,8 @@ search and quoteSummary endpoints. They are not an official API and can change
 or rate-limit without notice, and quotes may be delayed. Logos come from
 [Elbstream](https://elbstream.com/logos)'s logo API (formerly Parqet); the
 **Logos by Elbstream** link in the footer is the attribution its free tier
-requires. Analysis and sentiment run on your machine. Not investment advice.
+requires. Filings come from SEC EDGAR's public submissions API and are only
+requested after you enter a contact email. Analysis and sentiment run on your machine. Not investment advice.
 
 ## Files
 
@@ -1048,6 +1071,8 @@ src-tauri/src/
   analysis/     local technical analysis: indicators (RSI, SMA/EMA, ATR, σ), patterns, Fibonacci swing, score and targets
   analyst.rs    Yahoo quoteSummary: cookie/crumb session, consensus and price targets, 12 h cache
   earnings.rs   Yahoo quoteSummary: past EPS reports and next report date
+  ownership.rs  Yahoo quoteSummary: insider transactions, institution and fund holders
+  sec.rs        SEC EDGAR: ticker to CIK map (24 h) and recent filings (6 h), rate limited
   events.rs     Yahoo economic calendar: any week, all countries, paged; AI analysis of one event on demand, 6 h cache
   calendar.rs   Yahoo quoteSummary calendarEvents: earnings and ex-dividend dates per watchlist symbol, 6 h cache
   grades.rs     Yahoo quoteSummary: analyst upgrades, downgrades and initiations
@@ -1068,7 +1093,7 @@ src-tauri/src/
   updater.rs    background update checks, tray menu state, install and restart
 src-tauri/windows/hooks.nsh   NSIS uninstall hook: autostart entry and app data
 .github/workflows/  ci.yml (checks on push/PR), release.yml (installers, updater bundles and latest.json on tag push)
-ui/src/         App, Left (ticker and details), Chart (canvas, analysis overlays), Technicals, Analysts, Earnings, Stats, Market, Events, WatchCalendar, News, Watchlist, CommandSearch (search and commands), UndoFuse (Undo pill), Search (second chart symbol box), Settings, Footer
+ui/src/         App, Left (ticker and details), Chart (canvas, analysis overlays), Technicals, Analysts, Earnings, Ownership, Stats, Market, Events, WatchCalendar, News, Watchlist, CommandSearch (search and commands), UndoFuse (Undo pill), Search (second chart symbol box), Settings, Footer
 ```
 
 ### Memory (Windows 11, release build)
