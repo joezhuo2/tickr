@@ -1319,7 +1319,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let shared = Shared::new(dir.path().join("settings.json"), Default::default());
         edit_alerts(&shared, |alerts| {
-            alerts.push(PriceAlert { id: 1, symbol: "AAPL".into(), direction: Direction::Above, level: 100.0, enabled: true, triggered_at: None, kind: AlertKind::Price, reference: None, recurring: false, cooldown_mins: 15, regular_only: false, triggered_price: None });
+            alerts.push(PriceAlert { id: 1, symbol: "AAPL".into(), direction: Direction::Above, level: 100.0, enabled: true, triggered_at: None, kind: AlertKind::Price, reference: None, recurring: false, cooldown_mins: 15, regular_only: false, triggered_price: None, snooze_until: None, expires_at: None });
             Ok(())
         }).unwrap();
         lock(&shared.alert_prices).insert(1, 99.0);
@@ -1341,7 +1341,7 @@ mod tests {
         std::fs::write(&blocker, "not a directory").unwrap();
         let shared = Shared::new(blocker.join("settings.json"), Default::default());
         assert!(edit_alerts(&shared, |alerts| {
-            alerts.push(PriceAlert { id: 1, symbol: "AAPL".into(), direction: Direction::Above, level: 100.0, enabled: true, triggered_at: None, kind: AlertKind::Price, reference: None, recurring: false, cooldown_mins: 15, regular_only: false, triggered_price: None });
+            alerts.push(PriceAlert { id: 1, symbol: "AAPL".into(), direction: Direction::Above, level: 100.0, enabled: true, triggered_at: None, kind: AlertKind::Price, reference: None, recurring: false, cooldown_mins: 15, regular_only: false, triggered_price: None, snooze_until: None, expires_at: None });
             Ok(())
         }).is_err());
         assert!(lock(&shared.settings).alerts.is_empty());
