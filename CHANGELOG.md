@@ -6,6 +6,8 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.85] - 2026-11-16
+
 ### Changed
 - **Chart auto-fit keeps stops and targets in view:** the price axis now
   stretches to include the entry, stop and target of long / short position
