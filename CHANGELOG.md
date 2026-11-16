@@ -6,6 +6,12 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- **Chart auto-fit keeps stops and targets in view:** the price axis now
+  stretches to include the entry, stop and target of long / short position
+  drawings on screen, and paper trading order lines. It refits when you
+  release a dragged level.
+
 ### Added
 - **S&P 500 screener:** the Screen panel has a Watchlist / S&P 500 switch.
   The S&P 500 loads in batches of 25 with a progress count and a Cancel
