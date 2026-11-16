@@ -85,7 +85,7 @@ pub fn show(app: &AppHandle, quiet: bool, title: String, body: String) -> bool {
     }
 }
 
-fn when(days: i64) -> String {
+pub fn when(days: i64) -> String {
     match days {
         0 => "today".into(),
         1 => "tomorrow".into(),
