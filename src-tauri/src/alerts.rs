@@ -4,7 +4,6 @@ use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
-use tauri_plugin_notification::NotificationExt;
 
 use crate::quote::{self, Quote, Session};
 use crate::state::{lock, now_secs, Shared};
@@ -28,9 +27,27 @@ pub enum AlertKind {
     ArmedPercent,
     TrailPercent,
     TrailAmount,
+    EarningsDays,
+    DividendDays,
+    MarketOpen,
+    MarketClose,
+    RelVolume,
+    News,
 }
 
 impl AlertKind {
+    pub fn is_event(self) -> bool {
+        matches!(self, Self::EarningsDays | Self::DividendDays | Self::MarketOpen | Self::MarketClose | Self::RelVolume | Self::News)
+    }
+
+    fn needs_level(self) -> bool {
+        !matches!(self, Self::MarketOpen | Self::MarketClose | Self::News)
+    }
+
+    fn can_recur(self) -> bool {
+        !matches!(self, Self::EarningsDays | Self::DividendDays)
+    }
+
     fn tracks_reference(self) -> bool {
         matches!(self, Self::ArmedPercent | Self::TrailPercent | Self::TrailAmount)
     }
@@ -68,6 +85,29 @@ pub struct PriceAlert {
     pub regular_only: bool,
     #[serde(default)]
     pub triggered_price: Option<f64>,
+    #[serde(default)]
+    pub snooze_until: Option<i64>,
+    #[serde(default)]
+    pub expires_at: Option<i64>,
+}
+
+pub fn dormant(alert: &PriceAlert, now: i64) -> bool {
+    alert.expires_at.is_some_and(|t| t <= now) || alert.snooze_until.is_some_and(|t| t > now)
+}
+
+pub fn expire(alerts: &mut [PriceAlert], now: i64) -> bool {
+    let mut changed = false;
+    for alert in alerts.iter_mut().filter(|a| a.enabled && a.expires_at.is_some_and(|t| t <= now)) {
+        alert.enabled = false;
+        changed = true;
+    }
+    changed
+}
+
+pub fn snooze(alerts: &mut [PriceAlert], id: u32, until: Option<i64>) -> Result<(), String> {
+    let index = position(alerts, id)?;
+    alerts[index].snooze_until = until;
+    Ok(())
 }
 
 fn has_twin(alerts: &[PriceAlert], symbol: &str, kind: AlertKind, direction: Direction, level: f64, ignoring: Option<u32>) -> bool {
@@ -101,6 +141,7 @@ pub fn add(
     recurring: bool,
     cooldown_mins: u32,
     regular_only: bool,
+    expires_at: Option<i64>,
 ) -> Result<(), String> {
     ensure_room(alerts)?;
     if has_twin(alerts, &symbol, kind, direction, level, None) {
@@ -116,10 +157,12 @@ pub fn add(
         triggered_at: None,
         kind,
         reference: None,
-        recurring,
+        recurring: recurring && kind.can_recur(),
         cooldown_mins,
-        regular_only,
+        regular_only: regular_only && !kind.is_event(),
         triggered_price: None,
+        snooze_until: None,
+        expires_at,
     });
     Ok(())
 }
@@ -132,6 +175,10 @@ pub fn set_enabled(alerts: &mut [PriceAlert], id: u32, enabled: bool) -> Result<
         alert.triggered_at = None;
         alert.triggered_price = None;
         alert.reference = None;
+        alert.snooze_until = None;
+        if alert.expires_at.is_some_and(|t| t <= now_secs()) {
+            alert.expires_at = None;
+        }
     }
     Ok(())
 }
@@ -178,9 +225,19 @@ pub fn validate(symbol: &str, level: f64, kind: AlertKind, direction: Direction)
     {
         return Err("Enter a valid symbol.".into());
     }
+    if !kind.needs_level() {
+        return Ok(symbol);
+    }
+    if matches!(kind, AlertKind::EarningsDays | AlertKind::DividendDays) {
+        if !(level.is_finite() && level.fract() == 0.0 && (0.0..=365.0).contains(&level)) {
+            return Err("Days must be a whole number from 0 to 365.".into());
+        }
+        return Ok(symbol);
+    }
     let noun = match kind {
         AlertKind::Price => "Price",
         AlertKind::TrailAmount => "Amount",
+        AlertKind::RelVolume => "Relative volume",
         _ => "Percent",
     };
     if !level.is_finite() || level <= 0.0 {
@@ -235,6 +292,7 @@ fn trigger(alert: &PriceAlert, reference: f64, prev_close: Option<f64>) -> Optio
         AlertKind::ArmedPercent | AlertKind::TrailPercent => pct(reference),
         AlertKind::TrailAmount if up => reference + alert.level,
         AlertKind::TrailAmount => reference - alert.level,
+        _ => return None,
     })
 }
 
@@ -254,8 +312,12 @@ fn evaluate(
     let mut changed = false;
     for alert in alerts
         .iter_mut()
-        .filter(|a| a.enabled && a.symbol == symbol)
+        .filter(|a| a.enabled && a.symbol == symbol && !a.kind.is_event())
     {
+        if dormant(alert, now) {
+            prices.remove(&alert.id);
+            continue;
+        }
         let current = if alert.regular_only {
             if obs.session != Session::Regular || !valid(obs.regular) {
                 continue;
@@ -328,6 +390,7 @@ fn describe(alert: &PriceAlert, symbol: &str, current: f64, currency: &str) -> S
         AlertKind::ArmedPercent => format!("{moved} {level}% since armed at {reference:.4}"),
         AlertKind::TrailPercent => format!("{level}% {side} its {reference:.4} {extreme}"),
         AlertKind::TrailAmount => format!("{level} {currency} {side} its {reference:.4} {extreme}"),
+        _ => String::new(),
     };
     format!("{symbol} is {current:.4} {currency}, {what}.")
 }
@@ -344,6 +407,7 @@ fn observe(app: &AppHandle, shared: &Shared, symbol: &str, q: &Quote) {
     {
         let mut settings = lock(&shared.settings);
         let mut prices = lock(&shared.alert_prices);
+        let quiet = crate::notify::suppressed(&settings.quiet, now_secs());
         changed = evaluate(
             &mut settings.alerts,
             &mut prices,
@@ -352,17 +416,7 @@ fn observe(app: &AppHandle, shared: &Shared, symbol: &str, q: &Quote) {
             now_secs(),
             |alert, current| {
                 let body = describe(alert, symbol, current, &q.currency);
-                if let Err(e) = app
-                    .notification()
-                    .builder()
-                    .title(format!("tickr · {symbol} price alert"))
-                    .body(body)
-                    .show()
-                {
-                    log::warn!("price alert {symbol}: {e}");
-                    return false;
-                }
-                true
+                crate::notify::show(app, quiet, format!("tickr · {symbol} price alert"), body)
             },
         );
         if changed {
@@ -391,7 +445,7 @@ pub async fn poll(app: &AppHandle, shared: &Shared, selected: &str, fresh: Optio
     let symbols: HashSet<_> = lock(&shared.settings)
         .alerts
         .iter()
-        .filter(|a| a.enabled)
+        .filter(|a| a.enabled && !a.kind.is_event())
         .map(|a| a.symbol.clone())
         .collect();
     if symbols.contains(selected) {
@@ -521,6 +575,8 @@ mod tests {
             cooldown_mins: 15,
             regular_only: false,
             triggered_price: None,
+            snooze_until: None,
+            expires_at: None,
         }
     }
 
@@ -968,7 +1024,7 @@ mod tests {
     #[test]
     fn add_rejects_twins_and_full_lists() {
         let mut alerts = Vec::new();
-        let add_one = |alerts: &mut Vec<PriceAlert>, level| add(alerts, "AAPL".into(), AlertKind::Price, Direction::Above, level, false, 15, false);
+        let add_one = |alerts: &mut Vec<PriceAlert>, level| add(alerts, "AAPL".into(), AlertKind::Price, Direction::Above, level, false, 15, false, None);
         add_one(&mut alerts, 100.0).unwrap();
         assert!(add_one(&mut alerts, 100.0).is_err());
         add_one(&mut alerts, 101.0).unwrap();
@@ -976,5 +1032,85 @@ mod tests {
         assert!(alerts.iter().all(|a| a.enabled && a.triggered_price.is_none()));
         let mut full: Vec<_> = (1..=MAX_ALERTS as u32).map(|i| alert(i, "AAPL", true)).collect();
         assert!(add_one(&mut full, 7.0).is_err());
+    }
+
+    #[test]
+    fn old_json_alert_has_no_snooze_or_expiry() {
+        let a: PriceAlert = serde_json::from_str(
+            r#"{"id":1,"symbol":"AAPL","direction":"above","level":250.0,"enabled":true,"triggered_at":null}"#,
+        )
+        .unwrap();
+        assert_eq!((a.snooze_until, a.expires_at), (None, None));
+    }
+
+    #[test]
+    fn event_kinds_validate_their_own_levels() {
+        let d = Direction::Above;
+        assert!(validate("AAPL", 0.0, AlertKind::News, d).is_ok());
+        assert!(validate("AAPL", 0.0, AlertKind::MarketOpen, d).is_ok());
+        assert!(validate("AAPL", 0.0, AlertKind::EarningsDays, d).is_ok());
+        assert!(validate("AAPL", 7.0, AlertKind::DividendDays, d).is_ok());
+        assert!(validate("AAPL", 1.5, AlertKind::EarningsDays, d).is_err());
+        assert!(validate("AAPL", 366.0, AlertKind::EarningsDays, d).is_err());
+        assert!(validate("AAPL", 2.5, AlertKind::RelVolume, d).is_ok());
+        assert!(validate("AAPL", 0.0, AlertKind::RelVolume, d).unwrap_err().starts_with("Relative volume"));
+        assert!(validate("", 0.0, AlertKind::News, d).is_err());
+    }
+
+    #[test]
+    fn event_alerts_are_not_price_alerts() {
+        let mut alerts = vec![kind_alert(AlertKind::RelVolume, Direction::Above, 2.0)];
+        let mut prices = HashMap::new();
+        assert_eq!(run(&mut alerts, &mut prices, obs(99.0), 1), (false, 0));
+        assert_eq!(run(&mut alerts, &mut prices, obs(101.0), 2), (false, 0));
+        assert!(prices.is_empty());
+    }
+
+    #[test]
+    fn add_limits_recurrence_and_session_to_what_applies() {
+        let mut alerts = Vec::new();
+        add(&mut alerts, "AAPL".into(), AlertKind::EarningsDays, Direction::Above, 3.0, true, 15, true, Some(99)).unwrap();
+        assert!(!alerts[0].recurring && !alerts[0].regular_only);
+        assert_eq!(alerts[0].expires_at, Some(99));
+        add(&mut alerts, "AAPL".into(), AlertKind::News, Direction::Above, 0.0, true, 15, false, None).unwrap();
+        assert!(alerts[1].recurring);
+    }
+
+    #[test]
+    fn snoozed_alert_stays_quiet_and_needs_a_fresh_baseline() {
+        let mut alerts = vec![alert(1, "AAPL", true)];
+        let mut prices = HashMap::new();
+        run(&mut alerts, &mut prices, obs(99.0), 1);
+        snooze(&mut alerts, 1, Some(100)).unwrap();
+        assert_eq!(run(&mut alerts, &mut prices, obs(101.0), 50), (false, 0));
+        assert!(prices.is_empty());
+        assert_eq!(run(&mut alerts, &mut prices, obs(102.0), 100), (false, 0));
+        assert_eq!(run(&mut alerts, &mut prices, obs(99.0), 101), (false, 0));
+        assert_eq!(run(&mut alerts, &mut prices, obs(101.0), 102), (true, 1));
+        assert!(snooze(&mut alerts, 9, None).is_err());
+    }
+
+    #[test]
+    fn expired_alerts_stop_and_do_not_fire() {
+        let mut alerts = vec![PriceAlert { expires_at: Some(10), ..alert(1, "AAPL", true) }];
+        let mut prices = HashMap::from([(1, 99.0)]);
+        assert_eq!(run(&mut alerts, &mut prices, obs(101.0), 10), (false, 0));
+        assert!(!expire(&mut alerts, 9));
+        assert!(expire(&mut alerts, 10));
+        assert!(!alerts[0].enabled);
+        assert_eq!(alerts[0].triggered_at, None);
+        assert!(!expire(&mut alerts, 11));
+    }
+
+    #[test]
+    fn rearming_clears_snooze_and_a_past_expiry_only() {
+        let mut alerts = vec![
+            PriceAlert { enabled: false, snooze_until: Some(5), expires_at: Some(1), ..alert(1, "AAPL", true) },
+            PriceAlert { enabled: false, expires_at: Some(i64::MAX), ..alert(2, "AAPL", true) },
+        ];
+        set_enabled(&mut alerts, 1, true).unwrap();
+        set_enabled(&mut alerts, 2, true).unwrap();
+        assert_eq!((alerts[0].snooze_until, alerts[0].expires_at), (None, None));
+        assert_eq!(alerts[1].expires_at, Some(i64::MAX));
     }
 }

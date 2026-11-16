@@ -519,7 +519,10 @@ pub fn clear_ai_key() -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn send_notification(app: AppHandle, title: String, body: String) -> Result<(), String> {
+pub fn send_notification(app: AppHandle, shared: State<'_, Arc<Shared>>, title: String, body: String) -> Result<(), String> {
+    if crate::notify::suppressed(&lock(&shared.settings).quiet, now_secs()) {
+        return Ok(());
+    }
     notification_permission(&app)?;
     let clip = |s: String, n: usize| s.chars().take(n).collect::<String>();
     app.notification()
@@ -552,13 +555,13 @@ fn edit_alerts(shared: &Shared, edit: impl FnOnce(&mut Vec<PriceAlert>) -> Resul
 
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
-pub fn add_alert(app: AppHandle, shared: State<'_, Arc<Shared>>, symbol: String, kind: AlertKind, direction: Direction, level: f64, recurring: bool, cooldown_mins: u32, regular_only: bool) -> Result<Vec<PriceAlert>, String> {
+pub fn add_alert(app: AppHandle, shared: State<'_, Arc<Shared>>, symbol: String, kind: AlertKind, direction: Direction, level: f64, recurring: bool, cooldown_mins: u32, regular_only: bool, expires_at: Option<i64>) -> Result<Vec<PriceAlert>, String> {
     let symbol = alerts::validate(&symbol, level, kind, direction)?;
     if cooldown_mins > alerts::MAX_COOLDOWN_MINS {
         return Err(format!("Cooldown can be at most {} minutes.", alerts::MAX_COOLDOWN_MINS));
     }
     notification_permission(&app)?;
-    let result = edit_alerts(&shared, |alerts| alerts::add(alerts, symbol, kind, direction, level, recurring, cooldown_mins, regular_only))?;
+    let result = edit_alerts(&shared, |alerts| alerts::add(alerts, symbol, kind, direction, level, recurring, cooldown_mins, regular_only, expires_at))?;
     shared.wake.notify_one();
     Ok(result)
 }
@@ -569,6 +572,35 @@ pub fn update_alert(shared: State<'_, Arc<Shared>>, id: u32, level: f64, directi
     lock(&shared.alert_prices).remove(&id);
     shared.wake.notify_one();
     Ok(result)
+}
+
+#[tauri::command]
+pub fn snooze_alert(shared: State<'_, Arc<Shared>>, id: u32, until: Option<i64>) -> Result<Vec<PriceAlert>, String> {
+    let result = edit_alerts(&shared, |alerts| alerts::snooze(alerts, id, until))?;
+    lock(&shared.alert_prices).remove(&id);
+    Ok(result)
+}
+
+#[tauri::command]
+pub fn get_quiet(shared: State<'_, Arc<Shared>>) -> crate::notify::Quiet {
+    lock(&shared.settings).quiet.clone()
+}
+
+#[tauri::command]
+pub fn set_quiet(app: AppHandle, shared: State<'_, Arc<Shared>>, quiet: crate::notify::Quiet) -> Result<(), String> {
+    quiet.check()?;
+    if quiet.digest {
+        let _ = app.notification().request_permission();
+    }
+    shared.update_settings(|s| s.quiet = crate::notify::Quiet { digest_last: s.quiet.digest_last, utc_offset_mins: s.quiet.utc_offset_mins, ..quiet });
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_utc_offset(shared: State<'_, Arc<Shared>>, mins: i32) {
+    if (-1440..=1440).contains(&mins) && lock(&shared.settings).quiet.utc_offset_mins != mins {
+        shared.update_settings(|s| s.quiet.utc_offset_mins = mins);
+    }
 }
 
 #[tauri::command]

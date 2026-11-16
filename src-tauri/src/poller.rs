@@ -119,6 +119,7 @@ pub fn spawn(app: AppHandle, shared: Arc<Shared>) {
             crate::tray::update(&app, &shared);
             emit(&app, &shared);
             crate::alerts::poll(&app, &shared, &symbol, fresh.as_ref()).await;
+            crate::alert_events::poll(&app, &shared).await;
 
             let visible = crate::window::get(&app).is_some_and(|w| crate::window::shown(&w));
             let delay = {
