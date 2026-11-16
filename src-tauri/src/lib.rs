@@ -23,6 +23,8 @@ pub mod ivrank;
 pub mod logo;
 pub mod market;
 pub mod options;
+pub mod ownership;
+pub mod sec;
 pub mod news;
 pub mod paper;
 pub mod poller;
@@ -150,6 +152,10 @@ pub fn run() {
             commands::get_market,
             commands::get_heatmap,
             commands::get_options,
+            commands::get_ownership,
+            commands::get_filings,
+            commands::get_sec_email,
+            commands::set_sec_email,
             commands::set_watchlist,
             commands::set_groups,
             commands::set_watchlist_sort,

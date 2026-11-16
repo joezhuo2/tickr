@@ -651,6 +651,32 @@ pub async fn get_options(shared: State<'_, Arc<Shared>>, symbol: String, date: O
     crate::options::fetch(&shared.analysts, &symbol, date).await.inspect_err(|e| log::warn!("options {symbol}: {e}"))
 }
 
+#[tauri::command]
+pub async fn get_ownership(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<Option<crate::ownership::Ownership>, String> {
+    crate::ownership::fetch(&shared.analysts, &symbol).await.inspect_err(|e| log::warn!("ownership {symbol}: {e}"))
+}
+
+#[tauri::command]
+pub async fn get_filings(shared: State<'_, Arc<Shared>>, symbol: String, force: Option<bool>) -> Result<Option<Vec<crate::sec::Filing>>, String> {
+    let email = lock(&shared.settings).sec_email.clone();
+    shared.sec.get(&shared.http, &email, &symbol, now_secs(), force.unwrap_or(false)).await.inspect_err(|e| log::warn!("filings {symbol}: {e}"))
+}
+
+#[tauri::command]
+pub fn get_sec_email(shared: State<'_, Arc<Shared>>) -> String {
+    lock(&shared.settings).sec_email.clone()
+}
+
+#[tauri::command]
+pub fn set_sec_email(shared: State<'_, Arc<Shared>>, email: String) -> Result<String, String> {
+    let email = email.trim().to_string();
+    if !email.is_empty() && !crate::sec::valid_email(&email) {
+        return Err("Enter a valid email address".into());
+    }
+    shared.update_settings(|s| s.sec_email = email.clone());
+    Ok(email)
+}
+
 /// Recent headlines for the symbol, newest first.
 #[tauri::command]
 pub async fn get_news(shared: State<'_, Arc<Shared>>, symbol: String) -> Result<Vec<Article>, String> {

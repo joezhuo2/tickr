@@ -659,6 +659,8 @@ pub struct Settings {
     pub dots: Dots,
     /// Classify headline tone with the AI endpoint from .env.local.
     pub ai_news: bool,
+    /// Contact address sent in the SEC EDGAR User-Agent; empty until the user sets it.
+    pub sec_email: String,
     pub alerts: Vec<crate::alerts::PriceAlert>,
     /// Most recently viewed symbols, newest first.
     pub recent_symbols: Vec<String>,
@@ -722,6 +724,7 @@ impl Default for Settings {
             keybinds: Keybinds::default(),
             dots: Dots::default(),
             ai_news: true,
+            sec_email: String::new(),
             alerts: Vec::new(),
             recent_symbols: Vec::new(),
             recent_intervals: Vec::new(),
