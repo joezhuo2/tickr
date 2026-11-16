@@ -13,6 +13,7 @@ pub mod backup;
 pub mod calendar;
 pub mod commands;
 pub mod connections;
+pub mod crash;
 pub mod earnings;
 pub mod events;
 pub mod financials;
@@ -42,7 +43,7 @@ pub mod window;
 use std::sync::Arc;
 
 use tauri::plugin::TauriPlugin;
-use tauri::{RunEvent, Wry};
+use tauri::{Manager, RunEvent, Wry};
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 
@@ -72,6 +73,7 @@ fn log_panics() {
     let prev = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         log::error!("{info}");
+        crash::on_panic(info);
         prev(info);
     }));
 }
@@ -95,6 +97,10 @@ pub fn run() {
             connections::get_connections,
             connections::retry_connection,
             connections::get_diagnostics,
+            crash::set_save_crash_reports,
+            crash::report_ui_error,
+            crash::clear_crash_reports,
+            commands::set_tour_seen,
             commands::get_data_provider,
             commands::set_data_provider,
             commands::clear_alpaca_keys,
@@ -183,6 +189,7 @@ pub fn run() {
 
             log::info!("tickr {} starting", app.package_info().version);
             let handle = app.handle().clone();
+            crash::configure(handle.path().app_log_dir().ok().map(|d| d.join("crashes")), lock(&shared.settings).save_crash_reports);
 
             // Before the tray, so its first tooltip can report a failure.
             let hk = lock(&shared.settings).hotkey.clone();

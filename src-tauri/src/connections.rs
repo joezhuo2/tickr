@@ -56,6 +56,7 @@ pub struct ConnectionsReport {
     pub provider: &'static str,
     pub stream: String,
     pub log_dir: String,
+    pub save_crash_reports: bool,
 }
 
 pub fn describe(service: &str, err: &str) -> String {
@@ -162,7 +163,7 @@ fn report(app: &AppHandle, shared: &Shared) -> ConnectionsReport {
             services: vec![service("quote", "Quotes", &health.quote, false, &sanitize), service("news", "News", &health.news, false, &sanitize), service("ai", "AI", &health.ai, off, &sanitize)],
             app_version: app.package_info().version.to_string(), os: os_version(),
             provider: match Provider::current(shared) { Provider::Yahoo => "yahoo", Provider::Alpaca(..) => "alpaca" },
-            stream: sanitize(&stream),
+            stream: sanitize(&stream), save_crash_reports: lock(&shared.settings).save_crash_reports,
             log_dir: sanitize(&app.path().app_log_dir().map(|p| p.to_string_lossy().into_owned()).unwrap_or_else(|_| "unavailable".into())),
         }
     })
@@ -210,7 +211,14 @@ pub async fn retry_connection(app: AppHandle, shared: State<'_, Arc<Shared>>, se
 #[tauri::command]
 pub fn get_diagnostics(app: AppHandle, shared: State<'_, Arc<Shared>>) -> String {
     let report = report(&app, &shared);
-    with_redaction(&app, |_, sanitize| sanitize(&diagnostics_text(&report)))
+    let crash = crate::crash::latest_in(&app);
+    with_redaction(&app, |_, sanitize| {
+        let mut text = diagnostics_text(&report);
+        if let Some(crash) = crash { text.push_str(&format!("
+Last crash report:
+{crash}")); }
+        sanitize(&text)
+    })
 }
 
 #[cfg(test)]
@@ -273,7 +281,7 @@ mod tests {
         let h = Health { last_ok: 1, last_error: Some("HTTP 401 ai-secret KEYID KEYSECRET https://private.example/v1 Bearer token".into()), last_error_at: 2 };
         let report = ConnectionsReport {
             services: vec![service("ai", "AI", &h, false, &sanitize), service("news", "News", &Health::default(), false, &sanitize)],
-            app_version: "1.2.3".into(), os: "Windows 11 x86_64".into(), provider: "yahoo", stream: "off".into(), log_dir: sanitize("/home/joe/logs"),
+            app_version: "1.2.3".into(), os: "Windows 11 x86_64".into(), provider: "yahoo", stream: "off".into(), log_dir: sanitize("/home/joe/logs"), save_crash_reports: false,
         };
         let json = serde_json::to_string(&report).unwrap();
         let text = sanitize(&diagnostics_text(&report));

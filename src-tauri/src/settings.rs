@@ -663,7 +663,12 @@ pub struct Settings {
     /// Most recently viewed symbols, newest first.
     pub recent_symbols: Vec<String>,
     pub recent_intervals: Vec<String>,
+    pub save_crash_reports: bool,
+    #[serde(default = "seen_by_default")]
+    pub tour_seen: bool,
 }
+
+fn seen_by_default() -> bool { true }
 
 pub const MAX_RECENT_SYMBOLS: usize = 10;
 
@@ -725,6 +730,8 @@ impl Default for Settings {
             alerts: Vec::new(),
             recent_symbols: Vec::new(),
             recent_intervals: Vec::new(),
+            save_crash_reports: false,
+            tour_seen: false,
         }
     }
 }
@@ -927,6 +934,9 @@ mod tests {
         assert!(s.ai_news);
         assert!(s.recent_symbols.is_empty());
         assert!(s.recent_intervals.is_empty());
+        assert!(!s.save_crash_reports);
+        assert!(s.tour_seen);
+        assert!(!Settings::load(&dir.path().join("missing.json")).tour_seen);
     }
 
     #[test]
