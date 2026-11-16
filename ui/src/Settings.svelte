@@ -268,8 +268,21 @@
     }
   }
 
+  let secEmail = $state("");
+  let secStatus = $state<{ text: string; ok: boolean } | null>(null);
+
+  async function saveSecEmail() {
+    try {
+      secEmail = await invoke<string>("set_sec_email", { email: secEmail });
+      secStatus = { text: secEmail ? "Saved" : "SEC filings are off", ok: true };
+    } catch (e) {
+      secStatus = { text: String(e), ok: false };
+    }
+  }
+
   onMount(() => {
     loadConnections();
+    invoke<string>("get_sec_email").then((e) => (secEmail = e)).catch(console.warn);
     invoke<DataProvider>("get_data_provider").then((c) => (market = c)).catch((e) => (marketStatus = { text: String(e), ok: false }));
     invoke<AiConfig>("get_ai_config").then((c) => (ai = c)).catch(console.warn);
   });
@@ -736,6 +749,11 @@
       <button class="link" onclick={clearHistory}>Clear cached history</button>
     </div>
     <p class="hint" class:error={historyError} role="status">{historyStatus || "Intraday candles you load are kept on this computer, so scrolling back reaches past Yahoo's limit over time."}</p>
+    <label class="row">
+      <span>SEC contact email</span>
+      <input class="field" type="email" autocomplete="off" spellcheck="false" placeholder="you@example.com" bind:value={secEmail} onchange={saveSecEmail} />
+    </label>
+    <p class="hint" class:error={secStatus && !secStatus.ok} role="status">{secStatus ? secStatus.text : "SEC EDGAR requires a contact address in the User-Agent of every request. It is sent only to sec.gov, and the Ownership view's Filings tab stays off until you fill it."}</p>
 
     {/if}
     {#if tab === "ai"}

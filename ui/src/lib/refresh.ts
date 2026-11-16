@@ -1,4 +1,4 @@
-export type RefreshView = "chart" | "technicals" | "analysts" | "earnings" | "stats" | "options" | "market" | "events" | "news" | "watchlist" | "paper" | "backtest";
+export type RefreshView = "chart" | "technicals" | "analysts" | "earnings" | "stats" | "options" | "ownership" | "market" | "events" | "news" | "watchlist" | "paper" | "backtest";
 
 export const REFRESH_LABELS: Record<RefreshView, string> = {
   chart: "Chart",
@@ -7,6 +7,7 @@ export const REFRESH_LABELS: Record<RefreshView, string> = {
   earnings: "Earnings",
   stats: "Stats",
   options: "Options",
+  ownership: "Ownership",
   market: "Market",
   events: "Events",
   news: "News",

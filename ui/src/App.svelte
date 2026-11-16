@@ -19,6 +19,7 @@
   import Footer from "./Footer.svelte";
   import MarketView from "./Market.svelte";
   import OptionsView from "./Options.svelte";
+  import OwnershipView from "./Ownership.svelte";
   import StatsView from "./Stats.svelte";
   import Left from "./Left.svelte";
   import News from "./News.svelte";
@@ -261,6 +262,7 @@
   let refreshing = $state(false);
   let refreshStatus = $state<ReturnType<typeof refreshOutcome> | null>(null);
   let watchlistView: Watchlist | undefined = $state();
+  let ownershipView: OwnershipView | undefined = $state();
   let chartView: ChartView | undefined = $state();
   let finishQuote: ((error?: string) => void) | undefined;
   let refreshTimer: ReturnType<typeof setTimeout> | undefined;
@@ -1656,6 +1658,7 @@
       case "events": panelDone = eventsTab === "watchlist" ? loadWatchCalendar(true, true) : eventsTab === "calendar" ? Promise.all([loadEvents(true, true), loadWatchCalendar(true, true)]).then((errors) => errors.find(Boolean)) : loadEvents(true, true); break;
       case "market": panelDone = loadMarket(true); break;
       case "options": panelDone = loadOptions(options?.expiry ?? undefined, true); break;
+      case "ownership": panelDone = Promise.resolve(ownershipView?.refresh()); break;
       case "watchlist": panelDone = watchlistView?.refresh() ?? Promise.resolve(); break;
       default: panelDone = chartDone;
     }
@@ -1704,7 +1707,7 @@
     else if (syncHover?.source === source) syncHover = null;
   }
 
-  const DOCKABLE = new Set(["watchlist", "analysts", "earnings", "stats", "market", "events", "options", "news"]);
+  const DOCKABLE = new Set(["watchlist", "analysts", "earnings", "stats", "market", "events", "options", "ownership", "news"]);
   const DOCK_MIN = 280;
 
   function stored(key: string): string | null {
@@ -1754,7 +1757,7 @@
   }
 
   const CHART_VIEWS: RefreshView[] = ["chart", "technicals", "paper", "backtest"];
-  const REPLAY_BLOCKED: Panel[] = ["news", "options", "market", "events", "analysts", "earnings", "stats", "backtest"];
+  const REPLAY_BLOCKED: Panel[] = ["news", "options", "ownership", "market", "events", "analysts", "earnings", "stats", "backtest"];
 
   async function openPanel(panel: Panel): Promise<string | null> {
     if (practice) return "Exit practice first";
@@ -2273,6 +2276,9 @@
               <button class:on={view === "options"} aria-pressed={view === "options"} disabled={!!replay} onclick={toggleOptions}>Options</button>
             </div>
             <div class="seg">
+              <button class:on={view === "ownership"} aria-pressed={view === "ownership"} disabled={!!replay} onclick={() => (view = view === "ownership" ? "chart" : "ownership")}>Ownership</button>
+            </div>
+            <div class="seg">
               <button class:on={view === "market"} aria-pressed={view === "market"} disabled={!!replay} onclick={toggleMarket}>Market</button>
             </div>
             <div class="seg">
@@ -2478,6 +2484,8 @@
               />
             {:else if view === "options"}
               <OptionsView {symbol} {options} error={optionsError} onretry={() => loadOptions(options?.expiry ?? undefined)} onexpiry={loadOptions} bind:side={optionsSide} />
+            {:else if view === "ownership"}
+              <OwnershipView bind:this={ownershipView} {symbol} />
             {:else if view === "news"}
               <News {symbol} {groups} bind:scope={newsScope} articles={news} {feed}
                 emptyScope={feedSymbols.length === 0} error={newsScope === "symbol" ? newsError : feedError}

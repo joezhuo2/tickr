@@ -6,7 +6,7 @@ import { STUDIES, type StudyId } from "./studies";
 import { check } from "./strategy";
 import { RANGES, intervalLabel, parseInterval, type AlertKind, type ChartMode, type ChartScale, type Overlays } from "./types";
 
-export type Panel = "news" | "options" | "earnings" | "analysts" | "stats" | "market" | "events" | "watchlist" | "technicals" | "paper" | "backtest" | "screener" | "alerts";
+export type Panel = "news" | "options" | "ownership" | "earnings" | "analysts" | "stats" | "market" | "events" | "watchlist" | "technicals" | "paper" | "backtest" | "screener" | "alerts";
 export type AppAction = "second_chart" | "new_window" | "refresh" | "toggle_overview" | "analyze" | "practice";
 export type Toggle = { type: "overlay"; key: keyof Overlays } | { type: "study"; id: StudyId };
 
@@ -50,6 +50,10 @@ const PANELS: Record<string, { panel: Panel; label: string }> = {
   news: { panel: "news", label: "News" },
   options: { panel: "options", label: "Options" },
   earnings: { panel: "earnings", label: "Earnings" },
+  ownership: { panel: "ownership", label: "Ownership" },
+  insiders: { panel: "ownership", label: "Ownership: insiders" },
+  holders: { panel: "ownership", label: "Ownership: holders" },
+  filings: { panel: "ownership", label: "Ownership: SEC filings" },
   analysts: { panel: "analysts", label: "Analysts" },
   stats: { panel: "stats", label: "Stats" },
   financials: { panel: "stats", label: "Stats and financials" },

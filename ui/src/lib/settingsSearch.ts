@@ -22,7 +22,7 @@ export const SETTINGS: SettingEntry[] = [
   ...entry("chart", "Chart", ["Extended-hours candles", "Shade pre-market and after-hours", "Chart times", "R:R reward multiple", "Earnings", "News", "Analyst ratings"]),
   ...entry("chart", "Chart alerts", ["Check indicator and drawing alerts in the background"]),
   ...entry("chart", "Technical analysis", ["Auto analyze", ...OVERLAY_TOGGLES.map((o) => o.label), ...CHART_PATTERN_KINDS.map((k) => CHART_PATTERN_INFO[k].name)]),
-  ...entry("data", "Market data", ["Provider", "Clear cached history"]),
+  ...entry("data", "Market data", ["Provider", "Clear cached history", "SEC contact email"]),
   ...entry("ai", "AI", ["News analysis", "Base URL", "Model", "News model", "Events model", "API key"]),
   ...entry("backup", "Backup", ["Export", "Import"]),
   ...entry("connections", "Connections", ["Copy diagnostics"]),

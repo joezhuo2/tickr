@@ -855,3 +855,43 @@ export interface ConnectionsReport {
 
 export interface StreamStatus { kind: "off" | "connecting" | "live" | "retrying" | "error"; message?: string }
 export interface DataProvider { provider: "yahoo" | "alpaca"; feed: "iex" | "sip"; has_keys: boolean; stream: StreamStatus }
+
+export interface Insider {
+  name: string;
+  relation: string | null;
+  text: string;
+  shares: number | null;
+  value: number | null;
+  date: number | null;
+}
+
+export interface Holder {
+  name: string;
+  pct_held: number | null;
+  shares: number | null;
+  value: number | null;
+  pct_change: number | null;
+  reported: number | null;
+}
+
+export interface OwnershipBreakdown {
+  insiders_pct: number | null;
+  institutions_pct: number | null;
+  institutions_float_pct: number | null;
+  institutions_count: number | null;
+}
+
+export interface Ownership {
+  symbol: string;
+  insiders: Insider[];
+  institutions: Holder[];
+  funds: Holder[];
+  breakdown: OwnershipBreakdown | null;
+}
+
+export interface Filing {
+  form: string;
+  date: string;
+  description: string | null;
+  url: string;
+}
