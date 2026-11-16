@@ -2477,7 +2477,7 @@
                 onopensymbol={openWatched}
               />
             {:else if view === "options"}
-              <OptionsView {options} error={optionsError} onretry={() => loadOptions(options?.expiry ?? undefined)} onexpiry={loadOptions} bind:side={optionsSide} />
+              <OptionsView {symbol} {options} error={optionsError} onretry={() => loadOptions(options?.expiry ?? undefined)} onexpiry={loadOptions} bind:side={optionsSide} />
             {:else if view === "news"}
               <News {symbol} {groups} bind:scope={newsScope} articles={news} {feed}
                 emptyScope={feedSymbols.length === 0} error={newsScope === "symbol" ? newsError : feedError}
