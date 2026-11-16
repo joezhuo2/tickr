@@ -24,6 +24,7 @@ export const MORE_TOOLS: { tool: Drawing["kind"]; label: string }[] = [
   { tool: "drange", label: "Date range" },
   { tool: "fibext", label: "Fib extension" },
   { tool: "pitchfork", label: "Pitchfork" },
+  { tool: "measuredmove", label: "Measured move" },
   { tool: "vprofile", label: "Volume profile (range)" },
   { tool: "arrowup", label: "Arrow up marker" },
   { tool: "arrowdown", label: "Arrow down marker" },

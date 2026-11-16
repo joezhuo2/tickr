@@ -137,6 +137,13 @@ describe("chart settings", () => {
     expect(first("type spaghetti").command).toBeNull();
   });
 
+  it("parses compare commands", () => {
+    expect(cmd("compare spy")).toEqual({ kind: "compare", symbol: "SPY", on: true });
+    expect(cmd("uncompare spy")).toEqual({ kind: "compare", symbol: "SPY", on: false });
+    expect(cmd("compare off")).toEqual({ kind: "compare", symbol: null, on: false });
+    expect(first("compare").command).toBeNull();
+  });
+
   it("parses scales, go to date and extended hours", () => {
     expect(cmd("scale log")).toEqual({ kind: "scale", scale: "log" });
     expect(cmd("scale linear")).toEqual({ kind: "scale", scale: "linear" });

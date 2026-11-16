@@ -328,7 +328,7 @@ pub fn validate_drawing_list(drawings: &[Drawing]) -> Result<(), String> {
         let valid = match d.kind.as_str() {
             "hline" | "text" | "avwap" | "vline" | "hray" | "note" | "arrowup" | "arrowdown" | "icon" => d.points.len() == 1,
             "trend" | "rect" | "ray" | "fib" | "position" | "arrow" | "prange" | "drange" | "vprofile" | "callout" | "gannfan" | "fibfan" | "fibtime" | "ellipse" => d.points.len() == 2,
-            "channel" | "fibext" | "pitchfork" => d.points.len() == 3,
+            "channel" | "fibext" | "pitchfork" | "measuredmove" => d.points.len() == 3,
             "corrective" => d.points.len() == 4,
             "xabcd" | "headshoulders" => d.points.len() == 5,
             "impulse" => d.points.len() == 6,

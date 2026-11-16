@@ -157,7 +157,7 @@ export const POINT_COUNT: Partial<Record<Drawing["kind"], number>> = {
   hline: 1, text: 1, avwap: 1, vline: 1, hray: 1, note: 1, arrowup: 1, arrowdown: 1, icon: 1,
   trend: 2, rect: 2, ray: 2, fib: 2, position: 2, arrow: 2, prange: 2, drange: 2, vprofile: 2, callout: 2,
   gannfan: 2, fibfan: 2, fibtime: 2, ellipse: 2,
-  channel: 3, fibext: 3, pitchfork: 3,
+  channel: 3, fibext: 3, pitchfork: 3, measuredmove: 3,
   corrective: 4, xabcd: 5, headshoulders: 5, impulse: 6,
 };
 
@@ -178,6 +178,10 @@ export function pitchforkLines(a: Pixel, b: Pixel, c: Pixel, left: number, right
   const d = { x: mid.x - a.x, y: mid.y - a.y };
   const tine = (p: Pixel): [Pixel, Pixel] => [p, rayEnd(p, { x: p.x + d.x, y: p.y + d.y }, left, right)];
   return [[a, rayEnd(a, mid, left, right)], tine(b), tine(c), [b, c]];
+}
+
+export function measuredMoveEnd(a: Pixel, b: Pixel, c: Pixel): Pixel {
+  return { x: c.x + b.x - a.x, y: c.y + b.y - a.y };
 }
 
 export const GANN_RATIOS: [number, number][] = [[1, 8], [1, 4], [1, 3], [1, 2], [1, 1], [2, 1], [3, 1], [4, 1], [8, 1]];
@@ -322,7 +326,7 @@ export function hitCallout(p: Pixel, a: Pixel, b: Pixel, textWidth: number): boo
 export const DRAWING_NAMES: Record<Drawing["kind"], string> = {
   hline: "Level", trend: "Trend line", text: "Text", pen: "Pen", rect: "Box", ray: "Ray", fib: "Fib retracement",
   position: "Long / short position", avwap: "Anchored VWAP", vline: "Vertical line", hray: "Horizontal ray", arrow: "Arrow",
-  prange: "Price range", drange: "Date range", channel: "Channel", fibext: "Fib extension", pitchfork: "Pitchfork",
+  prange: "Price range", drange: "Date range", channel: "Channel", fibext: "Fib extension", pitchfork: "Pitchfork", measuredmove: "Measured move",
   vprofile: "Volume profile", note: "Note", arrowup: "Arrow up", arrowdown: "Arrow down", callout: "Callout",
   impulse: "Elliott impulse (1-5)", corrective: "Elliott correction (A-B-C)", xabcd: "XABCD pattern", headshoulders: "Head and shoulders",
   gannfan: "Gann fan", fibfan: "Fib fan", fibtime: "Fib time zones", ellipse: "Ellipse", polyline: "Polyline", brush: "Brush", icon: "Icon",
