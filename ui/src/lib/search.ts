@@ -1,6 +1,6 @@
 import type { SearchHit } from "./types";
 
-export type SearchType = "all" | "stocks" | "etfs" | "crypto" | "currencies" | "indices" | "funds";
+export type SearchType = "all" | "stocks" | "etfs" | "crypto" | "currencies" | "futures" | "indices" | "funds";
 
 export const SEARCH_TYPES: { key: SearchType; label: string }[] = [
   { key: "all", label: "All" },
@@ -8,6 +8,7 @@ export const SEARCH_TYPES: { key: SearchType; label: string }[] = [
   { key: "etfs", label: "ETFs" },
   { key: "crypto", label: "Crypto" },
   { key: "currencies", label: "Currencies" },
+  { key: "futures", label: "Futures" },
   { key: "indices", label: "Indices" },
   { key: "funds", label: "Funds" },
 ];
@@ -17,6 +18,7 @@ const QUOTE_TYPES: Record<string, { type: Exclude<SearchType, "all">; label: str
   ETF: { type: "etfs", label: "ETF" },
   CRYPTOCURRENCY: { type: "crypto", label: "Cryptocurrency" },
   CURRENCY: { type: "currencies", label: "Currency" },
+  FUTURE: { type: "futures", label: "Futures" },
   INDEX: { type: "indices", label: "Index" },
   MUTUALFUND: { type: "funds", label: "Mutual Fund" },
 };

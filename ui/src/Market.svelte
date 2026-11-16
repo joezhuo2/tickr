@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { direction, num, signed, volume } from "./lib/format";
+  import { priceDigits } from "./lib/instrument";
   import { heatColor, tileDetail } from "./lib/heatmap";
   import { HOTLISTS, hotlist, type HotlistId } from "./lib/hotlists";
   import { layoutMarket, SECTOR_HEAD, sectorNames } from "./lib/marketmap";
@@ -65,7 +66,7 @@
   {@const pct = hotPct === undefined ? m.change_pct : hotPct}
   <button class="row" title={`${m.name} (${m.symbol})`} onclick={() => onopen(m.symbol)}>
     <span class="name">{#if showSymbol}<b>{m.symbol}</b> {/if}{m.name}</span>
-    <span class="px">{px ?? (m.price == null ? "—" : num(m.price))}</span>
+    <span class="px">{px ?? (m.price == null ? "—" : num(m.price, priceDigits(m.symbol, m.price)))}</span>
     <span class="pct {direction(pct)}">{pct == null ? "—" : `${signed(pct)}%`}</span>
   </button>
 {/snippet}

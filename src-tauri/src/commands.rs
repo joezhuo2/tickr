@@ -893,10 +893,23 @@ async fn screen_symbol(shared: &Shared, provider: &crate::provider::Provider, sy
     }
 }
 
+fn screen_universe(shared: &Shared, symbols: Vec<String>, universe: Option<&str>) -> Vec<String> {
+    let allowed: Vec<String> = if universe == Some("sp500") {
+        crate::sp500::symbols().into_iter().map(String::from).collect()
+    } else {
+        lock(&shared.settings).watchlist.clone()
+    };
+    clean_symbols(symbols).into_iter().filter(|s| allowed.contains(s)).collect()
+}
+
 #[tauri::command]
-pub async fn get_screener_data(shared: State<'_, Arc<Shared>>, symbols: Vec<String>) -> Result<Vec<ScreenRow>, String> {
-    let starred = lock(&shared.settings).watchlist.clone();
-    let symbols: Vec<String> = clean_symbols(symbols).into_iter().filter(|s| starred.contains(s)).collect();
+pub fn get_sp500_symbols() -> Vec<String> {
+    crate::sp500::symbols().into_iter().map(String::from).collect()
+}
+
+#[tauri::command]
+pub async fn get_screener_data(shared: State<'_, Arc<Shared>>, symbols: Vec<String>, universe: Option<String>) -> Result<Vec<ScreenRow>, String> {
+    let symbols = screen_universe(&shared, symbols, universe.as_deref());
     let revision = shared.revision();
     let provider = crate::provider::Provider::current(&shared);
     let shared: Arc<Shared> = shared.inner().clone();
@@ -934,9 +947,8 @@ async fn fundamentals_for(shared: &Shared, symbol: String) -> Fundamentals {
 }
 
 #[tauri::command]
-pub async fn get_screener_fundamentals(shared: State<'_, Arc<Shared>>, symbols: Vec<String>) -> Result<Vec<Fundamentals>, String> {
-    let starred = lock(&shared.settings).watchlist.clone();
-    let symbols: Vec<String> = clean_symbols(symbols).into_iter().filter(|s| starred.contains(s)).collect();
+pub async fn get_screener_fundamentals(shared: State<'_, Arc<Shared>>, symbols: Vec<String>, universe: Option<String>) -> Result<Vec<Fundamentals>, String> {
+    let symbols = screen_universe(&shared, symbols, universe.as_deref());
     let shared: Arc<Shared> = shared.inner().clone();
     let tasks: Vec<_> = symbols
         .into_iter()
