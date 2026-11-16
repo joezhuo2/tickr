@@ -76,6 +76,7 @@ pub struct Init {
     alerts: Vec<PriceAlert>,
     recent_symbols: Vec<String>,
     recent_intervals: Vec<String>,
+    tour_seen: bool,
 }
 
 fn data_uri(png: &[u8]) -> String {
@@ -133,6 +134,7 @@ pub fn init_payload(shared: &Shared) -> Init {
         alerts: s.alerts,
         recent_symbols: s.recent_symbols,
         recent_intervals: s.recent_intervals,
+        tour_seen: s.tour_seen,
     }
 }
 
@@ -352,6 +354,11 @@ pub fn set_chart_mode(shared: State<'_, Arc<Shared>>, mode: ChartMode) {
 pub fn set_refresh_mode(shared: State<'_, Arc<Shared>>, mode: RefreshMode) {
     shared.update_settings(|s| s.refresh_mode = mode);
     shared.wake.notify_one();
+}
+
+#[tauri::command]
+pub fn set_tour_seen(shared: State<'_, Arc<Shared>>) {
+    shared.update_settings(|s| s.tour_seen = true);
 }
 
 #[tauri::command]

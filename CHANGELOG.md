@@ -17,6 +17,13 @@ All notable changes to tickr are listed here. The format follows
   has no volume, and forex prices use 4-5 decimals (2-3 for JPY pairs).
   Analyst, Earnings, Financials and Options say they are not available for
   them. The Market view lists S&P 500 futures, EUR/USD, USD/JPY and GBP/USD.
+- **First-run tour:** a short, skippable walkthrough of search, chart types,
+  panels, the watchlist star, alerts and Settings, shown on fresh installs
+  only. Replay it with Settings > Display > Show tour or the `tour` command.
+- **Crash reports:** Settings > Connections > Save crash reports (off by
+  default) saves Rust panics and uncaught UI errors to a `crashes` folder in
+  the log folder, newest 10 kept, with a Clear action. Copy diagnostics
+  includes the latest report, redacted. Nothing is uploaded.
 
 ### Fixed
 - Quotes for symbols whose trading period has no pre or post session (futures,
