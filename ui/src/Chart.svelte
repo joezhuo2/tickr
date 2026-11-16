@@ -5,10 +5,10 @@
 <script lang="ts">
   import { alignTimes, axisTime, candleAt, candlesCsv, fullTime, netSentiment, num, price, quarterLabel, volume } from "./lib/format";
   import { candleCountdown, classifyBars, displayOffset, futureTimes, isExtendedSession, isIntraday, zoneLabel, type Clock } from "./lib/session";
-  import type { Analysis, Article, Chart, ChartMode, ChartScale, ChartTimeZone, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
+  import type { Analysis, Article, Candle, Chart, ChartMode, ChartScale, ChartTimeZone, EarningsReport, Line, Overlays, Pattern, RatingChange } from "./lib/types";
   import { fitScale, forward, inverse, scaleLabel, scaleTicks, shiftRange, stretchRange } from "./lib/scale";
   import type { Drawing, DrawingIcon, DrawingPoint } from "./lib/types";
-  import { DRAWING_COLORS, POINT_COUNT, arrowHead, channelLines, fibExtLevels, pitchforkLines, snapPrice, anchoredVwap, fibLevels, hitBox, positionLevels, rayEnd, timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
+  import { DRAWING_COLORS, POINT_COUNT, arrowHead, channelLines, measuredMoveEnd, fibExtLevels, pitchforkLines, snapPrice, anchoredVwap, fibLevels, hitBox, positionLevels, rayEnd, timeToIndex, indexToTime, hitTest, hitPolyline, pathBounds, segmentDistance, simplifyPath, undoReducer, rulerMeasurement, type History, type Pixel } from "./lib/drawing";
   import { MAX_TEMPLATES, SHAPE_LABELS, calloutGeometry, harmonicRatios, hitCallout, inBounds, markerPath, necklineEnds, pointLabel, saveTemplate, shapeSegments, type DrawingStyle } from "./lib/drawing";
   import { INTERVAL_CLASSES, WIDTHS, clampWidth, copyDrawing, intervalClass, nextDrawingId, toggleVisible, visibleOn } from "./lib/drawing";
   import { ICONS, PEN_MAX_POINTS, brushWidth, dropRepeats, fibFanRays, fibTimeZones, gannFanRays, hitBrush, hitEllipse, iconBounds, iconShape } from "./lib/drawing";
@@ -20,6 +20,9 @@
   import { LEFT_SCALES, mergeUp, movePane, paneName, paneRects, unmerge, visibleGroups, withPanes, type PaneId, type Slot } from "./lib/panes";
   import { panes, setPanes } from "./lib/paneStore.svelte";
   import { untrack } from "svelte";
+  import { COMPARE_COLORS, alignCloses, rebase } from "./lib/compare";
+  import { addCompare, compare, fetchCandles, removeCompare } from "./lib/compareStore.svelte";
+  import { drawSeasonality, seasonality } from "./lib/seasonality";
   import { axisRange, type GotoResult } from "./lib/scrollback";
   import { clamp } from "./lib/viewport";
   import { PANE_STUDIES, instanceOutput, obv, pivotPeriod, pivots, studyTimeframe, type Series } from "./lib/studies";
@@ -147,6 +150,45 @@
     return candles.map((c) => period(c.t));
   });
   let legendY = 0;
+  let compareOpen = $state(false);
+  let compareInput = $state("");
+  let compareData = $state.raw<Record<string, Candle[]>>({});
+  let compareFor = "";
+  const comparePending = new Set<string>();
+  $effect(() => {
+    const c = chart;
+    const symbols = compare.symbols;
+    if (!c) return;
+    const key = `${c.range}|${c.interval}|${c.extended ?? false}`;
+    untrack(() => {
+      if (key !== compareFor) { compareFor = key; compareData = {}; comparePending.clear(); }
+      for (const s of symbols) {
+        if (s in compareData || comparePending.has(s)) continue;
+        comparePending.add(s);
+        fetchCandles(s, c.range, c.interval, c.extended ?? false)
+          .catch((): Candle[] => [])
+          .then((cs) => { if (key === compareFor) compareData = { ...compareData, [s]: cs }; });
+      }
+    });
+  });
+  const compareAligned = $derived.by(() => {
+    const times = candles.map((c) => c.t);
+    return compare.symbols.map((symbol, k) => ({ symbol, color: COMPARE_COLORS[k % COMPARE_COLORS.length], aligned: compareData[symbol] ? alignCloses(times, compareData[symbol]) : null }));
+  });
+  let seasonData = $state.raw<{ symbol: string; candles: Candle[] } | null>(null);
+  let seasonPending = "";
+  $effect(() => {
+    const sym = chart?.meta.symbol;
+    if (!studies.seasonality || !sym) return;
+    untrack(() => {
+      if (seasonData?.symbol === sym || seasonPending === sym) return;
+      seasonPending = sym;
+      fetchCandles(sym, "max", "1mo", false)
+        .catch((): Candle[] => [])
+        .then((cs) => { if (seasonPending === sym) seasonData = { symbol: sym, candles: cs }; });
+    });
+  });
+  const seasonStats = $derived(studies.seasonality && seasonData && chart && seasonData.symbol === chart.meta.symbol ? seasonality(seasonData.candles, chart.meta.gmtoffset ?? 0) : null);
   let gotoOpen = $state(false);
 
   function dateOffset() {
@@ -244,7 +286,7 @@
   }
   const rsiOn = $derived(!!show?.rsi);
   const macdOn = $derived(!!show?.macd);
-  const paneOn = (id: PaneId) => (id === "rsi" ? rsiOn : id === "macd" ? macdOn : id === "obv" ? !!onBalance : byKey.has(id));
+  const paneOn = (id: PaneId) => (id === "rsi" ? rsiOn : id === "macd" ? macdOn : id === "obv" ? !!onBalance : id === "seasonality" ? !!seasonStats : byKey.has(id));
   const shownPanes = $derived(visibleGroups(layout.groups, paneOn));
   const leftAxis = $derived(panes.left !== "off" || shownPanes.some((g) => g.length > 1));
   let maxPane = $state<Slot | null>(null);
@@ -383,6 +425,8 @@
     }
     for (const t of targetLevels) fitValues.push(t.price);
     const base = candles[i0]?.c ?? 0;
+    const cmp = scale === "percent" ? compareAligned.map((x) => ({ ...x, ...(x.aligned ? rebase(x.aligned, i0, i1, base) : { values: [], first: null }) })) : [];
+    for (const x of cmp) for (let i = i0; i <= i1; i++) if (x.values[i] != null) fitValues.push(x.values[i]!);
     const fit = fitScale(prices, fitValues, scale, base);
     const activeScale = fit.scale;
     const { lo, hi } = manual ?? fit;
@@ -400,6 +444,7 @@
       hi,
       vmax,
       scale: activeScale,
+      cmp: activeScale === "percent" ? cmp : [],
       base,
       label: (v: number) => scaleLabel(v, activeScale, base),
       plotW,
@@ -702,6 +747,7 @@
     legendY = PAD.t + 2;
     if (show && analysis) drawOverlays(ctx, g, v);
     drawStudies(ctx, g, v);
+    drawCompare(ctx, g, v);
 
     clipPlot(ctx);
     const stacked = new Map<number, number>();
@@ -1219,6 +1265,37 @@
     ctx.stroke();
   }
 
+  function drawCompare(ctx: CanvasRenderingContext2D, g: Geo, v: (name: string) => string) {
+    if (!g.cmp.length || g.n === 0) return;
+    const at = hover != null && candles[hover] ? hover : g.i1;
+    const right = width - PAD.r;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(PAD.l, PAD.t, g.plotW, g.priceH);
+    ctx.clip();
+    ctx.font = `10px ${v("--font")}`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.lineWidth = 1.2;
+    let lx = PAD.l + 4;
+    for (const x of g.cmp) {
+      const col = v(x.color);
+      ctx.strokeStyle = col;
+      plot(ctx, g, x.values, g.y);
+      const val = x.aligned?.[at];
+      const change = x.first && val != null ? (val / x.first - 1) * 100 : null;
+      const text = change == null ? `${x.symbol} no data` : `${x.symbol} ${change >= 0 ? "+" : ""}${change.toFixed(1)}%`;
+      const w = ctx.measureText(text).width;
+      if (lx + w > right && lx > PAD.l + 4) { lx = PAD.l + 4; legendY += 12; }
+      ctx.fillStyle = col;
+      ctx.fillText(text, lx, legendY);
+      lx += w + 10;
+    }
+    ctx.restore();
+    legendY += 12;
+    ctx.font = `11px ${v("--font")}`;
+  }
+
   function drawStudies(ctx: CanvasRenderingContext2D, g: Geo, v: (name: string) => string) {
     if (g.n === 0 || !(overlayStudies.length || pivotLevels || sessionKeys)) return;
     const at = hover != null && candles[hover] ? hover : g.i1;
@@ -1336,7 +1413,7 @@
         ctx.stroke();
         legend(`${name}%`, v("--accent"));
       } else {
-        const col = tint(inst, inst.study === "wma" ? 0 : inst.study === "hma" ? 1 : 2);
+        const col = tint(inst, Math.max(0, ["wma", "hma", "vwma", "sma", "ema"].indexOf(inst.study)));
         line(r.value, col);
         legend(legendText(name, [r.value[at]]), v(col));
       }
@@ -1364,6 +1441,7 @@
       const span = hi - lo || 1;
       return { y: (val) => top + h * (0.92 - ((val - lo) / span) * 0.84), ticks: [[hi, volume(hi)], [lo, volume(lo)]] };
     }
+    if (id === "seasonality") return { y: () => top + h / 2, ticks: [] };
     const x = byKey.get(id);
     const study = x?.inst.study;
     if (x && study === "cci") {
@@ -1479,6 +1557,10 @@
       ctx.strokeStyle = col;
       plot(ctx, g, onBalance, y);
       legend = `OBV  ${volume(onBalance[at] ?? 0)}`;
+    } else if (id === "seasonality" && seasonStats) {
+      col = v("--accent");
+      drawSeasonality(ctx, seasonStats, { left: PAD.l, width: g.plotW, top, h }, { up: v("--up"), down: v("--down"), text: v("--muted"), grid: v("--grid") });
+      legend = `Seasonality  average return and % of years up by month · ${Math.max(...seasonStats.map((s) => s.years))} years`;
     }
     ctx.restore();
     ctx.fillStyle = col;
@@ -1938,6 +2020,7 @@
           : d.kind === "prange" || d.kind === "drange" || d.kind === "vprofile" ? hitBox(p, a, b)
           : d.kind === "channel" ? channelLines(a, b, c).some(([s, e]) => hitTest(p, s, e))
           : d.kind === "pitchfork" ? pitchforkLines(a, b, c, PAD.l, right).some(([s, e]) => hitTest(p, s, e))
+          : d.kind === "measuredmove" ? [[a, b], [b, c], [c, measuredMoveEnd(a, b, c)]].some(([s, e]) => hitTest(p, s, e))
           : d.kind === "fibext" ? p.x >= c.x - 6 && fibExtLevels(d.points[0].price, d.points[1].price, d.points[2].price).some((l) => Math.abs(p.y - geo.y(l.price)) <= 6)
           : SHAPE_LABELS[d.kind] ? shapeSegments(d.kind, pts).some(([s, e]) => hitTest(p, s, e))
           : d.kind === "callout" ? hitCallout(p, a, b, ctx?.measureText(d.text).width ?? 0)
@@ -2304,6 +2387,22 @@
         ctx.beginPath();
         for (const [s, e] of lines) { ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); }
         ctx.stroke();
+      } else if (d.kind === "measuredmove") {
+        const e = measuredMoveEnd(a, b, c);
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.moveTo(c.x, c.y);
+        ctx.lineTo(e.x, e.y);
+        ctx.stroke();
+        ctx.save();
+        ctx.setLineDash([2, 3]);
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y);
+        ctx.lineTo(c.x, c.y);
+        ctx.stroke();
+        ctx.restore();
+        ctx.fillText(num(inverse(1 - (e.y - PAD.t) / geo.priceH, geo.lo, geo.hi, geo.scale)), e.x + 4, e.y - 3);
       } else if (d.kind === "fibext") {
         ctx.save();
         ctx.setLineDash([2, 3]);
@@ -2701,6 +2800,9 @@
       <button title="Go to date" aria-label="Go to date" aria-pressed={gotoOpen} onclick={() => (gotoOpen = !gotoOpen)}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
       </button>
+      <button title="Compare with other symbols" aria-label="Compare with other symbols" aria-pressed={compareOpen || compare.symbols.length > 0} onclick={() => (compareOpen = !compareOpen)}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5-6 4 3 8-9M3 21l6-4 5 2 6-5" /></svg>
+      </button>
       <button title="Left price scale: {LEFT_LABELS[panes.left]} (click to change)" aria-label="Left price scale: {LEFT_LABELS[panes.left]}" aria-pressed={panes.left !== "off"} onclick={cycleLeft}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v18M9 7h4M9 12h7M9 17h4" /></svg>
       </button>
@@ -2714,6 +2816,26 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
         </button>
       {/if}
+    </div>
+  {/if}
+  {#if compareOpen}
+    <div class="compare-box" role="group" aria-label="Compare symbols">
+      <input
+        aria-label="Compare symbol"
+        placeholder="Add symbol"
+        maxlength="15"
+        bind:value={compareInput}
+        onkeydown={(e) => {
+          e.stopPropagation();
+          if (e.key === "Escape") compareOpen = false;
+          else if (e.key === "Enter") { addCompare(compareInput); compareInput = ""; }
+        }}
+        use:focusInput
+      />
+      {#each compare.symbols as s (s)}
+        <button title="Remove {s}" aria-label="Remove {s}" onclick={() => removeCompare(s)}>{s} ×</button>
+      {/each}
+      {#if scale !== "percent"}<span class="muted">Shown on the percent scale (L)</span>{/if}
     </div>
   {/if}
   {#if gotoOpen && chart && candles.length}
@@ -2890,6 +3012,10 @@
   .note-actions { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
   .note-actions button { font-size: 11px; padding: 2px 8px; }
   .note-actions .swatch { width: 16px; height: 16px; padding: 0; border-radius: 50%; background: var(--swatch); }
+  .compare-box { position: absolute; top: 34px; right: 8px; z-index: 2; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; max-width: 260px; cursor: default; }
+  .compare-box input { width: 100px; }
+  .compare-box button { font-size: 11px; padding: 2px 6px; }
+  .compare-box .muted { font-size: 11px; color: var(--muted); }
   .goto { position: absolute; top: 34px; right: 8px; z-index: 2; cursor: default; }
   .countdown {
     position: absolute;
