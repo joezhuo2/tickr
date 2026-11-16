@@ -261,9 +261,21 @@ export interface PriceAlert {
   recurring: boolean;
   cooldown_mins: number;
   regular_only: boolean;
+  snooze_until: number | null;
+  expires_at: number | null;
 }
 
-export type AlertKind = "price" | "day_percent" | "armed_percent" | "trail_percent" | "trail_amount";
+export interface Quiet {
+  dnd: boolean;
+  dnd_start: number;
+  dnd_end: number;
+  digest: boolean;
+  digest_time: number;
+  digest_last: number;
+  utc_offset_mins: number;
+}
+
+export type AlertKind = "price" | "day_percent" | "armed_percent" | "trail_percent" | "trail_amount" | "earnings_days" | "dividend_days" | "market_open" | "market_close" | "rel_volume" | "news";
 
 /** A named subset of the watchlist, shown as a tab. */
 export interface Group {

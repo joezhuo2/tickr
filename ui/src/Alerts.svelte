@@ -1,7 +1,9 @@
 <script lang="ts">
   import ChartAlerts from "./ChartAlerts.svelte";
+  import SnoozeMenu from "./SnoozeMenu.svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { ALERT_FILTERS, addedAlert, alertCounts, alertStatus, emptyMessage, levelError, toggleLabel, triggerInfo, visibleAlerts, type AlertFilter } from "./lib/alerts";
+  import { ALERT_FILTERS, addedAlert, alertCounts, alertStatus, dormancy, emptyMessage, fireTime, isEventKind, kindLevelError, levelNoun, levelUnit, toggleLabel, triggerInfo, usesLevel, visibleAlerts, type AlertFilter } from "./lib/alerts";
+  import { localInputToEpoch } from "./lib/snooze";
   import { alertSummary } from "./lib/format";
   import { noteTitle, notesOf } from "./lib/notes";
   import type { AlertKind, PriceAlert, Quote } from "./lib/types";
@@ -23,6 +25,7 @@
   let recurring = $state(false);
   let cooldownMins = $state<number | undefined>(15);
   let regularOnly = $state(false);
+  let expires = $state("");
   let busy = $state(false);
   let error = $state<string | null>(null);
 
@@ -32,8 +35,14 @@
     armed_percent: ["Up", "Down"],
     trail_percent: ["Rises from low", "Falls from high"],
     trail_amount: ["Rises from low", "Falls from high"],
+    earnings_days: ["", ""],
+    dividend_days: ["", ""],
+    market_open: ["", ""],
+    market_close: ["", ""],
+    rel_volume: ["", ""],
+    news: ["", ""],
   };
-  const noun = $derived(kind === "price" ? "Price" : kind === "trail_amount" ? "Amount" : "Percent");
+  const noun = $derived(levelNoun(kind));
 
   let filter = $state<AlertFilter>("all");
   let editingId = $state<number | null>(null);
@@ -42,14 +51,6 @@
 
   const counts = $derived(alertCounts(alerts));
   const shown = $derived(visibleAlerts(alerts, filter));
-
-  function unit(a: PriceAlert): string {
-    return a.kind === "price" || a.kind === "trail_amount" ? "" : "%";
-  }
-
-  function nounFor(a: PriceAlert): string {
-    return a.kind === "price" ? "Price" : a.kind === "trail_amount" ? "Amount" : "Percent";
-  }
 
   async function save(command: string, args: Record<string, unknown>): Promise<PriceAlert[] | null> {
     if (busy) return null;
@@ -82,7 +83,7 @@
 
   async function saveEdit(e: SubmitEvent, a: PriceAlert) {
     e.preventDefault();
-    const invalid = levelError(editLevel, nounFor(a));
+    const invalid = kindLevelError(a.kind, editLevel);
     if (invalid) {
       error = invalid;
       return;
@@ -102,8 +103,14 @@
 
   function add(e: SubmitEvent) {
     e.preventDefault();
-    if (level === undefined || !Number.isFinite(level) || level <= 0) {
-      error = `Enter a ${noun.toLowerCase()} greater than zero.`;
+    const invalid = kindLevelError(kind, level);
+    if (invalid) {
+      error = invalid;
+      return;
+    }
+    const expiresAt = expires ? localInputToEpoch(expires) : null;
+    if (expires && (expiresAt == null || expiresAt <= Date.now() / 1000)) {
+      error = "Pick an expiry in the future.";
       return;
     }
     const cooldown = recurring ? cooldownMins : 15;
@@ -111,13 +118,15 @@
       error = "Enter a whole number of cooldown minutes.";
       return;
     }
-    save("add_alert", { symbol, kind, direction, level, recurring, cooldownMins: cooldown, regularOnly });
+    save("add_alert", { symbol, kind, direction: isEventKind(kind) ? "above" : direction, level: usesLevel(kind) ? level : 0, recurring, cooldownMins: cooldown, regularOnly: regularOnly && !isEventKind(kind), expiresAt }).then((next) => {
+      if (next) expires = "";
+    });
   }
 </script>
 
 <div class="alerts">
   <header>
-    <h2>Price alerts</h2>
+    <h2>Alerts</h2>
     <p>Set an alert for {symbol}. One-shot alerts fire once when crossed; rearm to use one again. Recurring alerts stay armed and fire again after a fresh crossing and the cooldown.</p>
   </header>
   <form onsubmit={add}>
@@ -130,31 +139,46 @@
         <option value="armed_percent">Move since armed %</option>
         <option value="trail_percent">Trailing %</option>
         <option value="trail_amount">Trailing amount</option>
+        <option value="earnings_days">Earnings in N days</option>
+        <option value="dividend_days">Ex-dividend in N days</option>
+        <option value="market_open">Market open</option>
+        <option value="market_close">Market close</option>
+        <option value="rel_volume">Relative volume</option>
+        <option value="news">News headline</option>
       </select>
     </label>
-    <label>
-      <span class="sr-only">Alert direction</span>
-      <select bind:value={direction} disabled={busy}>
-        <option value="above">{labels[kind][0]}</option>
-        <option value="below">{labels[kind][1]}</option>
-      </select>
-    </label>
-    <label class="level">
-      <span class="sr-only">Alert {noun.toLowerCase()}</span>
-      <input type="number" min="0" step="any" placeholder={noun} required bind:value={level} disabled={busy} />
-    </label>
-    {#if kind === "price" || kind === "trail_amount"}
-      {#if quote?.currency}<span class="currency">{quote.currency}</span>{/if}
-    {:else}
-      <span class="currency">%</span>
+    {#if !isEventKind(kind)}
+      <label>
+        <span class="sr-only">Alert direction</span>
+        <select bind:value={direction} disabled={busy}>
+          <option value="above">{labels[kind][0]}</option>
+          <option value="below">{labels[kind][1]}</option>
+        </select>
+      </label>
     {/if}
-    <label class="check"><input type="checkbox" bind:checked={recurring} disabled={busy} /> Recurring</label>
-    {#if recurring}
+    {#if usesLevel(kind)}
+      <label class="level">
+        <span class="sr-only">Alert {noun.toLowerCase()}</span>
+        <input type="number" min="0" step={kind === "earnings_days" || kind === "dividend_days" ? "1" : "any"} placeholder={noun} required bind:value={level} disabled={busy} />
+      </label>
+      {#if levelUnit(kind)}
+        <span class="currency">{levelUnit(kind)}</span>
+      {:else if quote?.currency}
+        <span class="currency">{quote.currency}</span>
+      {/if}
+    {/if}
+    {#if kind !== "earnings_days" && kind !== "dividend_days"}
+      <label class="check"><input type="checkbox" bind:checked={recurring} disabled={busy} /> Recurring</label>
+    {/if}
+    {#if recurring && kind !== "earnings_days" && kind !== "dividend_days"}
       <label class="check">
         <input class="cooldown" type="number" min="0" step="1" aria-label="Cooldown minutes" bind:value={cooldownMins} disabled={busy} /> min cooldown
       </label>
     {/if}
-    <label class="check"><input type="checkbox" bind:checked={regularOnly} disabled={busy} /> Regular session only</label>
+    {#if !isEventKind(kind)}
+      <label class="check"><input type="checkbox" bind:checked={regularOnly} disabled={busy} /> Regular session only</label>
+    {/if}
+    <label class="check">Expires <input class="when" type="datetime-local" aria-label="Alert expiry" bind:value={expires} disabled={busy} /></label>
     <button class="add" type="submit" disabled={busy}>Add alert</button>
   </form>
   {#if error}<p class="error" role="alert">{error}</p>{/if}
@@ -173,6 +197,7 @@
   {:else}
     <ul aria-label="Saved price alerts">
       {#each shown as alert (alert.id)}
+        {@const now = Date.now() / 1000}
         {@const status = alertStatus(alert)}
         {@const fired = triggerInfo(alert)}
         {@const label = `${alert.symbol} ${alertSummary(alert)} alert`}
@@ -181,24 +206,28 @@
             <button class="ticker" type="button" title={`Open ${alert.symbol} chart`} aria-label={`Open ${alert.symbol} chart`} onclick={() => onopen(alert.symbol)}>{alert.symbol}</button>
             {#if editingId === alert.id}
               <form class="edit" onsubmit={(e) => saveEdit(e, alert)}>
-                <label>
-                  <span class="sr-only">Direction for {label}</span>
-                  <select bind:value={editDirection} disabled={busy}>
-                    <option value="above">{labels[alert.kind][0]}</option>
-                    <option value="below">{labels[alert.kind][1]}</option>
-                  </select>
-                </label>
+                {#if !isEventKind(alert.kind)}
+                  <label>
+                    <span class="sr-only">Direction for {label}</span>
+                    <select bind:value={editDirection} disabled={busy}>
+                      <option value="above">{labels[alert.kind][0]}</option>
+                      <option value="below">{labels[alert.kind][1]}</option>
+                    </select>
+                  </label>
+                {/if}
                 <label class="level">
-                  <span class="sr-only">{nounFor(alert)} for {label}</span>
+                  <span class="sr-only">{levelNoun(alert.kind)} for {label}</span>
                   <input type="number" min="0" step="any" required bind:value={editLevel} disabled={busy} />
                 </label>
-                {#if unit(alert)}<span class="currency">{unit(alert)}</span>{/if}
+                {#if levelUnit(alert.kind)}<span class="currency">{levelUnit(alert.kind)}</span>{/if}
                 <button class="add" type="submit" disabled={busy}>Save</button>
                 <button type="button" disabled={busy} onclick={cancelEdit}>Cancel</button>
               </form>
             {:else}
               <span>{alertSummary(alert)}</span>
             {/if}
+            {#if dormancy(alert, now) === "snoozed"}<span class="tag">Snoozed until {fireTime(alert.snooze_until!)}</span>{/if}
+            {#if alert.expires_at != null}<span class="tag">{dormancy(alert, now) === "expired" ? "Expired" : "Expires"} {fireTime(alert.expires_at)}</span>{/if}
             {#if alert.recurring}<span class="tag">Recurring, {alert.cooldown_mins} min cooldown</span>{/if}
             {#if alert.regular_only}<span class="tag">Regular only</span>{/if}
             <span class="status {status}">{status === "armed" ? "Armed" : status === "triggered" ? "Triggered" : "Paused"}</span>
@@ -209,7 +238,12 @@
             {/if}
           </div>
           <div class="actions">
-            <button disabled={busy || editingId === alert.id} onclick={() => startEdit(alert)} aria-label={`Edit ${label}`}>Edit</button>
+            {#if usesLevel(alert.kind)}
+              <button disabled={busy || editingId === alert.id} onclick={() => startEdit(alert)} aria-label={`Edit ${label}`}>Edit</button>
+            {/if}
+            {#if alert.enabled}
+              <SnoozeMenu until={alert.snooze_until} disabled={busy} label={`Snooze ${label}`} onsnooze={(until) => save("snooze_alert", { id: alert.id, until })} />
+            {/if}
             <button disabled={busy} onclick={() => duplicate(alert)} aria-label={`Duplicate ${label}`}>Duplicate</button>
             <button disabled={busy} onclick={() => save("set_alert_enabled", { id: alert.id, enabled: !alert.enabled })}
               aria-label={`${toggleLabel(status)} ${label}`}>
@@ -250,6 +284,7 @@
   .check { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
   .check input { width: auto; }
   .check .cooldown { width: 60px; }
+  .when { width: auto; }
   .level { flex: 1; min-width: 90px; max-width: 180px; }
   input { width: 100%; }
   input, select, button { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--faint); border-radius: 6px; padding: 6px 9px; }

@@ -1,4 +1,4 @@
-import { holds, type ChartAlert } from "./chartAlerts";
+import { holds, live, type ChartAlert } from "./chartAlerts";
 import type { SessionClock } from "./strategy";
 import { intervalSpec, isCustom, type Candle } from "./types";
 
@@ -46,7 +46,7 @@ export function groups(alerts: readonly ChartAlert[]): Group[] {
   for (const a of alerts) {
     const base = alertBase(a.interval);
     const key = `${a.symbol}|${a.interval}`;
-    if (a.enabled && base && !out.has(key)) out.set(key, { key, symbol: a.symbol, interval: a.interval, base, range: TABLE.get(base)!.range });
+    if (a.enabled && live(a) && base && !out.has(key)) out.set(key, { key, symbol: a.symbol, interval: a.interval, base, range: TABLE.get(base)!.range });
   }
   return [...out.values()];
 }
@@ -73,5 +73,5 @@ export function triggered(alerts: readonly ChartAlert[], symbol: string, interva
   const s = symbol.toUpperCase();
   const closedSince = since != null && candles.length > 0 && candles[candles.length - 1].t > since;
   const closed = candles.slice(0, -1);
-  return alerts.filter((a) => a.enabled && a.symbol === s && a.interval === interval && (holds(a, candles, clock, interval) || (closedSince && holds(a, closed, clock, interval))));
+  return alerts.filter((a) => a.enabled && live(a) && a.symbol === s && a.interval === interval && (holds(a, candles, clock, interval) || (closedSince && holds(a, closed, clock, interval))));
 }

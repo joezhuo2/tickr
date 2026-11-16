@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addedAlert, alertCounts, alertStatus, emptyMessage, filterAlerts, fireTime, levelError, sortAlerts, toggleLabel, triggerInfo, visibleAlerts } from "./alerts";
+import { addedAlert, alertCounts, alertStatus, dormancy, emptyMessage, filterAlerts, fireTime, isEventKind, kindLevelError, levelError, levelNoun, levelUnit, sortAlerts, toggleLabel, triggerInfo, usesLevel, visibleAlerts } from "./alerts";
 import type { PriceAlert } from "./types";
 
 function make(over: Partial<PriceAlert> & { id: number }): PriceAlert {
@@ -15,9 +15,43 @@ function make(over: Partial<PriceAlert> & { id: number }): PriceAlert {
     recurring: false,
     cooldown_mins: 15,
     regular_only: false,
+    snooze_until: null,
+    expires_at: null,
     ...over,
   };
 }
+
+describe("event alert helpers", () => {
+  it("knows which kinds take a level and what it means", () => {
+    expect(usesLevel("news")).toBe(false);
+    expect(usesLevel("market_open")).toBe(false);
+    expect(usesLevel("earnings_days")).toBe(true);
+    expect(isEventKind("rel_volume")).toBe(true);
+    expect(isEventKind("price")).toBe(false);
+    expect([levelNoun("earnings_days"), levelUnit("earnings_days")]).toEqual(["Days", "days"]);
+    expect([levelNoun("rel_volume"), levelUnit("rel_volume")]).toEqual(["Relative volume", "x"]);
+    expect([levelNoun("price"), levelUnit("day_percent")]).toEqual(["Price", "%"]);
+  });
+
+  it("validates day counts as whole numbers from 0 to 365", () => {
+    expect(kindLevelError("earnings_days", 0)).toBeNull();
+    expect(kindLevelError("dividend_days", 365)).toBeNull();
+    expect(kindLevelError("earnings_days", 1.5)).not.toBeNull();
+    expect(kindLevelError("earnings_days", 366)).not.toBeNull();
+    expect(kindLevelError("earnings_days", undefined)).not.toBeNull();
+    expect(kindLevelError("news", undefined)).toBeNull();
+    expect(kindLevelError("rel_volume", 0)).not.toBeNull();
+    expect(kindLevelError("rel_volume", 2)).toBeNull();
+  });
+
+  it("reports snoozed and expired alerts", () => {
+    expect(dormancy({ enabled: true, snooze_until: 200, expires_at: null }, 100)).toBe("snoozed");
+    expect(dormancy({ enabled: true, snooze_until: 100, expires_at: null }, 100)).toBeNull();
+    expect(dormancy({ enabled: false, snooze_until: 200, expires_at: null }, 100)).toBeNull();
+    expect(dormancy({ enabled: false, snooze_until: null, expires_at: 100 }, 100)).toBe("expired");
+    expect(dormancy({ enabled: true, snooze_until: null, expires_at: 101 }, 100)).toBeNull();
+  });
+});
 
 const armed = make({ id: 1 });
 const armedRecurring = make({ id: 2, recurring: true, triggered_at: 500, triggered_price: 101 });

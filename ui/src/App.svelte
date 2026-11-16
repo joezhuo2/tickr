@@ -2164,6 +2164,7 @@
       if (refreshMode === "low_power" && !document.hidden) refreshChart();
     };
     document.addEventListener("visibilitychange", onVisible);
+    invoke("set_utc_offset", { mins: -new Date().getTimezoneOffset() }).catch(console.warn);
     if (!boot) invoke<Init>("get_init").then(apply);
     const un = listen<QuoteState>("quote", (e) => {
       if (!persist && e.payload.quote?.symbol !== symbol) return;

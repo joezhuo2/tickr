@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { PRESETS, type ChartAlert, type LineSpec } from "./lib/chartAlerts";
+  import SnoozeMenu from "./SnoozeMenu.svelte";
+  import { PRESETS, combine, live, type ChartAlert, type LineSpec } from "./lib/chartAlerts";
+  import { check } from "./lib/strategy";
+  import { localInputToEpoch } from "./lib/snooze";
   import { addChartAlert, chartAlerts, setChartAlerts } from "./lib/chartAlertStore.svelte";
   import { inBackground } from "./lib/chartAlertSchedule";
   import { fireTime } from "./lib/alerts";
@@ -12,12 +15,29 @@
   let lineId = $state("");
   let direction = $state<"above" | "below">("above");
   let error = $state<string | null>(null);
+  let parts = $state<string[]>([]);
+  let join = $state<"and" | "or">("and");
+  let expires = $state("");
 
   const lines = $derived(drawings.filter((d) => d.kind === "trend" || d.kind === "ray"));
 
   function add(label: string, condition: string | null, line: LineSpec | null) {
-    const r = addChartAlert(symbol, interval, label, condition, line);
+    const expiresAt = expires ? localInputToEpoch(expires) : null;
+    if (expires && (expiresAt == null || expiresAt <= Date.now() / 1000)) { error = "Pick an expiry in the future"; return; }
+    const r = addChartAlert(symbol, interval, label, condition, line, expiresAt);
     error = "error" in r ? r.error : null;
+    if (!("error" in r)) { parts = []; expires = ""; }
+  }
+
+  function addCondition() {
+    const c = expr.trim();
+    error = c ? check(c) : "Enter a condition";
+    if (!error) parts = [...parts, c];
+  }
+
+  function addCombined() {
+    const text = combine([...parts, expr.trim()], join);
+    add(text, text, null);
   }
 
   function addLine() {
@@ -33,13 +53,28 @@
 
 <section aria-label="Chart alerts">
   <h3>Indicator and drawing alerts</h3>
-  <form onsubmit={(e) => { e.preventDefault(); add(expr.trim(), expr.trim(), null); }}>
+  <form onsubmit={(e) => { e.preventDefault(); addCombined(); }}>
     <select aria-label="Condition preset" onchange={(e) => { if (e.currentTarget.value) expr = e.currentTarget.value; }}>
       {#each PRESETS as p}<option value={p.expr}>{p.label}</option>{/each}
     </select>
     <input class="expr" aria-label="Condition" maxlength="200" spellcheck="false" bind:value={expr} />
     <button type="submit">Add for {symbol} {interval}</button>
   </form>
+  <form onsubmit={(e) => { e.preventDefault(); addCondition(); }}>
+    <select aria-label="Join conditions with" bind:value={join}>
+      <option value="and">All conditions (AND)</option>
+      <option value="or">Any condition (OR)</option>
+    </select>
+    <button type="submit">Add another condition</button>
+    <label class="muted">Expires <input type="datetime-local" aria-label="Chart alert expiry" bind:value={expires} /></label>
+  </form>
+  {#if parts.length}
+    <ul aria-label="Conditions so far">
+      {#each parts as p, i (i)}
+        <li><code>{p}</code><button type="button" aria-label={`Remove condition ${p}`} onclick={() => (parts = parts.filter((_, j) => j !== i))}>Remove</button></li>
+      {/each}
+    </ul>
+  {/if}
   <form onsubmit={(e) => { e.preventDefault(); addLine(); }}>
     <select aria-label="Trendline" bind:value={lineId} disabled={!lines.length}>
       <option value="">{lines.length ? "Trendline or ray" : "No trendlines on this symbol"}</option>
@@ -52,17 +87,20 @@
     <button type="submit" disabled={!lines.length}>Add line alert</button>
   </form>
   {#if error}<p class="error" role="alert">{error}</p>{/if}
-  <p class="hint">Conditions use the Strategy syntax (sma, ema, rsi, atr, vwap, crosses_above, crosses_below). They are checked each time the chart refreshes while this symbol and candle interval are on the main chart, and fire once. Turn on Settings, Chart, "Check indicator and drawing alerts in the background" to check every symbol and interval while tickr runs, even with the window hidden. A line alert keeps the line as it was when added.</p>
+  <p class="hint">Conditions use the Strategy syntax (sma, ema, rsi, atr, vwap, crosses_above, crosses_below, and comparisons such as close > 200). Use Add another condition to join several with AND or OR. They are checked each time the chart refreshes while this symbol and candle interval are on the main chart, and fire once. Turn on Settings, Chart, "Check indicator and drawing alerts in the background" to check every symbol and interval while tickr runs, even with the window hidden. A line alert keeps the line as it was when added.</p>
   {#if chartAlerts.list.length}
     <ul aria-label="Saved chart alerts">
       {#each chartAlerts.list as a (a.id)}
+        {@const now = Date.now() / 1000}
         <li>
           <div class="details">
             <strong>{a.symbol}</strong> <span class="muted">{a.interval}</span> {a.label}
-            <span class="muted">{a.enabled ? "Armed" : a.fired_at != null ? `Triggered ${fireTime(a.fired_at)}` : "Paused"}</span>
+            <span class="muted">{#if a.expires_at != null && a.expires_at <= now}Expired {fireTime(a.expires_at)}{:else if a.enabled && !live(a, now)}Snoozed until {fireTime(a.snooze_until!)}{:else if a.enabled}Armed{:else if a.fired_at != null}Triggered {fireTime(a.fired_at)}{:else}Paused{/if}</span>
+            {#if a.enabled && a.expires_at != null && a.expires_at > now}<span class="muted">Expires {fireTime(a.expires_at)}</span>{/if}
             {#if a.enabled}<span class="muted">{chartAlerts.background && inBackground(a) ? "Checked in the background" : "Checked only on screen"}</span>{/if}
           </div>
-          <button type="button" onclick={() => patch(a.id, { enabled: !a.enabled })}>{a.enabled ? "Pause" : "Rearm"}</button>
+          {#if a.enabled}<SnoozeMenu until={a.snooze_until ?? null} label={`Snooze ${a.symbol} ${a.label}`} onsnooze={(until) => patch(a.id, { snooze_until: until })} />{/if}
+          <button type="button" onclick={() => patch(a.id, a.enabled && !(a.expires_at != null && a.expires_at <= now) ? { enabled: false } : { enabled: true, snooze_until: null, expires_at: a.expires_at != null && a.expires_at <= now ? null : a.expires_at })}>{a.enabled && !(a.expires_at != null && a.expires_at <= now) ? "Pause" : "Rearm"}</button>
           <button type="button" aria-label={`Delete ${a.symbol} ${a.label}`} onclick={() => setChartAlerts(chartAlerts.list.filter((x) => x.id !== a.id))}>Delete</button>
         </li>
       {/each}

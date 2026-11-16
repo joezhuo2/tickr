@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_CHART_ALERTS, PRESETS, addError, claim, due, holds, lineBroken, lineValue, type ChartAlert } from "./chartAlerts";
+import { MAX_CHART_ALERTS, PRESETS, addError, claim, combine, due, holds, lineBroken, lineValue, live, type ChartAlert } from "./chartAlerts";
 import type { Candle } from "./types";
 
 const closes = (...values: number[]): Candle[] => values.map((c, i) => ({ t: i * 60, o: c, h: c, l: c, c, v: 1 }));
@@ -64,5 +64,45 @@ describe("chart alerts", () => {
     expect(claimed.map((a) => a.id)).toEqual([1]);
     expect(list.map((a) => [a.id, a.enabled, a.fired_at])).toEqual([[1, false, 9], [2, false, 5], [3, true, null]]);
     expect(claim(list, new Set([1]), 10).claimed).toEqual([]);
+  });
+});
+
+describe("combined conditions", () => {
+  it("joins conditions with AND or OR", () => {
+    expect(combine(["close > 200"], "and")).toBe("close > 200");
+    expect(combine(["close > 200", "rsi(14) < 70"], "and")).toBe("(close > 200) and (rsi(14) < 70)");
+    expect(combine(["a", "b", "c"], "or")).toBe("(a) or (b) or (c)");
+    expect(combine([], "and")).toBe("");
+  });
+
+  it("evaluates AND and OR together", () => {
+    const bars = closes(100, 101, 110);
+    expect(holds({ expr: combine(["close > 105", "close < 120"], "and"), line: null }, bars)).toBe(true);
+    expect(holds({ expr: combine(["close > 105", "close < 100"], "and"), line: null }, bars)).toBe(false);
+    expect(holds({ expr: combine(["close > 105", "close < 100"], "or"), line: null }, bars)).toBe(true);
+    expect(addError([], combine(["close > 105", "nope("], "or"))).not.toBeNull();
+  });
+});
+
+describe("snooze and expiry", () => {
+  const bars = closes(100, 101, 110);
+  const base = { expr: "close > 105" };
+
+  it("only counts alerts that are neither snoozed nor expired", () => {
+    expect(live({}, 100)).toBe(true);
+    expect(live({ snooze_until: 101 }, 100)).toBe(false);
+    expect(live({ snooze_until: 100 }, 100)).toBe(true);
+    expect(live({ expires_at: 100 }, 100)).toBe(false);
+    expect(live({ expires_at: 101 }, 100)).toBe(true);
+  });
+
+  it("skips snoozed and expired alerts when due", () => {
+    const future = Date.now() / 1000 + 3600;
+    const past = Date.now() / 1000 - 3600;
+    expect(due([alert(base)], "AAPL", "5m", bars)).toHaveLength(1);
+    expect(due([alert({ ...base, snooze_until: future })], "AAPL", "5m", bars)).toHaveLength(0);
+    expect(due([alert({ ...base, snooze_until: past })], "AAPL", "5m", bars)).toHaveLength(1);
+    expect(due([alert({ ...base, expires_at: past })], "AAPL", "5m", bars)).toHaveLength(0);
+    expect(due([alert({ ...base, expires_at: future })], "AAPL", "5m", bars)).toHaveLength(1);
   });
 });
