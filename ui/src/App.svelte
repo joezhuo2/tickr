@@ -32,6 +32,8 @@
   import IntervalPicker from "./IntervalPicker.svelte";
   import { aggregateChart } from "./lib/aggregate";
   import Settings from "./Settings.svelte";
+  import NotAvailable from "./NotAvailable.svelte";
+  import { isDerivativeMarket } from "./lib/instrument";
   import Technicals from "./Technicals.svelte";
   import Watchlist from "./Watchlist.svelte";
   import {
@@ -1469,7 +1471,11 @@
   }
 
   function toggleStar() {
-    saveWatchlist(watchlist.includes(symbol) ? watchlist.filter((s) => s !== symbol) : [...watchlist, symbol]);
+    toggleWatched(symbol);
+  }
+
+  function toggleWatched(next: string) {
+    saveWatchlist(watchlist.includes(next) ? watchlist.filter((s) => s !== next) : [...watchlist, next]);
   }
 
   async function openWatched(next: string) {
@@ -2441,7 +2447,13 @@
         {/if}
             {#snippet panel()}
             {#if view === "watchlist"}
-              <Watchlist bind:this={watchlistView} {refreshMode} symbols={watchlist} {groups} current={symbol} sort={watchlistSort} view={watchlistLayout} columns={watchlistColumns} {screens} {screenColumns} bind:tab={groupTab} onopen={openWatched} ongroups={saveGroups} onsort={saveSort} onview={saveWatchlistLayout} oncolumns={saveWatchlistColumns} onsavescreen={saveScreen} ondeletescreen={deleteScreen} onscreencolumns={saveScreenColumns} />
+              <Watchlist bind:this={watchlistView} {refreshMode} symbols={watchlist} {groups} current={symbol} sort={watchlistSort} view={watchlistLayout} columns={watchlistColumns} {screens} {screenColumns} bind:tab={groupTab} onopen={openWatched} onstar={toggleWatched} ongroups={saveGroups} onsort={saveSort} onview={saveWatchlistLayout} oncolumns={saveWatchlistColumns} onsavescreen={saveScreen} ondeletescreen={deleteScreen} onscreencolumns={saveScreenColumns} />
+            {:else if view === "analysts" && isDerivativeMarket(symbol)}
+              <NotAvailable {symbol} what="Analyst ratings" />
+            {:else if view === "earnings" && isDerivativeMarket(symbol)}
+              <NotAvailable {symbol} what="Earnings" />
+            {:else if view === "options" && isDerivativeMarket(symbol)}
+              <NotAvailable {symbol} what="Options" />
             {:else if view === "analysts"}
               <Analysts {symbol} {quote} {analyst} />
             {:else if view === "earnings"}
@@ -2449,7 +2461,11 @@
             {:else if view === "stats"}
               <div class="stats-scroll">
                 <StatsView {symbol} {stats} />
-                <FinancialsView {symbol} {financials} error={financialsError} onretry={() => loadFinancials()} />
+                {#if isDerivativeMarket(symbol)}
+                  <NotAvailable {symbol} what="Financials" />
+                {:else}
+                  <FinancialsView {symbol} {financials} error={financialsError} onretry={() => loadFinancials()} />
+                {/if}
               </div>
             {:else if view === "market"}
               <MarketView {market} error={marketError} onretry={() => loadMarket()} onopen={openWatched} />
