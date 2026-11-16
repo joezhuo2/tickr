@@ -245,6 +245,7 @@ export interface Init {
   alerts: PriceAlert[];
   recent_symbols: string[];
   recent_intervals?: string[];
+  tour_seen?: boolean;
 }
 
 export interface PriceAlert {
@@ -851,6 +852,7 @@ export interface ConnectionsReport {
   provider: "yahoo" | "alpaca";
   stream: string;
   log_dir: string;
+  save_crash_reports: boolean;
 }
 
 export interface StreamStatus { kind: "off" | "connecting" | "live" | "retrying" | "error"; message?: string }
