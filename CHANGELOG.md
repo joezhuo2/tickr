@@ -6,6 +6,25 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.87] - 2026-11-17
+
+### Added
+- **Live updates settings:** Settings → Chart → Live updates can turn live
+  candles off, set how often intraday charts refresh (15 seconds to 5 minutes)
+  and set how often streamed trades update the price (10 per second to every
+  2 seconds).
+- **Limits settings:** Settings → Chart → Limits sets the most candles
+  scroll-back may load (10,000 to 200,000), the backtest sweep limit (100 to
+  2,500 runs) and how many symbols Compare can overlay (2 to 8).
+- **Minimum candles for patterns:** Settings → Chart → Patterns sets how many
+  candles a chart needs before patterns are detected.
+
+### Changed
+- **Chart settings are split into sections:** the Chart tab in Settings now
+  expands like Hotkeys into Sessions, Live updates, Limits, Drawings, Dots,
+  Alerts, Notifications, Analysis and Patterns. Settings search opens the
+  right section.
+
 ## [0.11.86] - 2026-11-17
 
 ### Changed
