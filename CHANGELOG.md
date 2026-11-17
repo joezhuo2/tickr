@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.86] - 2026-11-17
+
+### Changed
+- **Live candles:** the forming candle now moves with every quote instead of
+  waiting for the next chart refresh. It keeps the highs and lows it reaches,
+  and a new candle opens as soon as the interval rolls over. Candles opened
+  this way show no volume until the next refresh fills it in.
+
 ## [0.11.85] - 2026-11-16
 
 ### Changed
