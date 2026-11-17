@@ -639,6 +639,7 @@ pub struct Settings {
     pub unload_on_minimize: bool,
     pub start_hidden: bool,
     pub background_chart_alerts: bool,
+    pub stream_ms: u64,
     /// macOS: price and change next to the menu bar icon.
     pub show_tray_title: bool,
     /// Launch at login as last chosen; None until first recorded.
@@ -716,6 +717,7 @@ impl Default for Settings {
             unload_on_minimize: true,
             start_hidden: false,
             background_chart_alerts: false,
+            stream_ms: 250,
             show_tray_title: true,
             autostart: None,
             watchlist: Vec::new(),

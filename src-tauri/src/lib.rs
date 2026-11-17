@@ -135,6 +135,7 @@ pub fn run() {
             commands::set_chart_mode,
             commands::set_refresh_mode,
             commands::set_background_chart_alerts,
+            commands::set_stream_ms,
             commands::set_chart_scale,
             commands::set_hotkey,
             commands::export_settings,

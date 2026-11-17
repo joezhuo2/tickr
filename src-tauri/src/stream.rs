@@ -61,7 +61,8 @@ async fn connection(app: &AppHandle, shared: &Shared, config: &Config<'_>, live_
     let (mut socket, _) = tokio::time::timeout(Duration::from_secs(15), tokio_tungstenite::connect_async(feed.stream_url())).await.map_err(|_| None)?.map_err(|_| None)?;
     let mut stage = 0;
     let mut pending = None;
-    let mut tick = tokio::time::interval(Duration::from_millis(250));
+    let every = lock(&shared.settings).stream_ms.clamp(100, 2000);
+    let mut tick = tokio::time::interval(Duration::from_millis(every));
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
     loop {
