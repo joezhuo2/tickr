@@ -99,8 +99,27 @@ export function bucketIndex(candles: readonly Candle[], interval: string, frame:
   return keys.map((k, i) => (i > 0 && k === keys[i - 1] ? b : ++b));
 }
 
+function frameOf(chart: Chart): Frame {
+  return { clock: { timezone: chart.meta.timezone, gmtoffset: chart.meta.gmtoffset }, periods: chart.meta.periods, extended: chart.extended };
+}
+
 export function aggregateChart(chart: Chart, interval: string): Chart {
   if (!isCustom(interval) || !intervalSpec(interval)?.bases.includes(chart.interval)) return chart;
-  const frame = { clock: { timezone: chart.meta.timezone, gmtoffset: chart.meta.gmtoffset }, periods: chart.meta.periods, extended: chart.extended };
-  return { ...chart, interval, candles: aggregate(chart.candles, interval, frame) };
+  return { ...chart, interval, candles: aggregate(chart.candles, interval, frameOf(chart)) };
+}
+
+// shortcut: a new intraday bar continues the last bar's time grid and has no volume, so it can sit off the session grid after a gap until the next refetch replaces it; bucket by session to make it exact
+export function withTick(chart: Chart, price: number, t: number): Chart {
+  const spec = intervalSpec(chart.interval);
+  const last = chart.candles[chart.candles.length - 1];
+  if (!spec || !last || !(price > 0) || !(t >= last.t)) return chart;
+  let start = last.t;
+  if (spec.unit === "m" || spec.unit === "h") start += Math.floor((t - last.t) / spec.seconds) * spec.seconds;
+  else {
+    const [a, b] = bucketsFor([last, { ...last, t }], spec, frameOf(chart));
+    if (a !== b) start = t;
+  }
+  if (start !== last.t) return { ...chart, candles: [...chart.candles, { t: start, o: price, h: price, l: price, c: price, v: 0 }] };
+  if (price === last.c) return chart;
+  return { ...chart, candles: [...chart.candles.slice(0, -1), { ...last, h: Math.max(last.h, price), l: Math.min(last.l, price), c: price }] };
 }
