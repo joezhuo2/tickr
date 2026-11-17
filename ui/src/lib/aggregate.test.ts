@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aggregate, aggregateChart, type Frame } from "./aggregate";
+import { aggregate, aggregateChart, withTick, type Frame } from "./aggregate";
 import { indexToTime, timeToIndex } from "./drawing";
 import { futureTimes, type Clock, type TradingPeriods } from "./session";
 import type { Candle, Chart } from "./types";
@@ -47,6 +47,48 @@ function merged(group: Candle[]): Candle {
     v: group.reduce((s, c) => s + c.v, 0),
   };
 }
+
+describe("withTick", () => {
+  const meta = { timezone: "America/New_York", gmtoffset: -18000, periods: NY_WINTER };
+  const chartOf = (interval: string, candles: Candle[]) => ({ meta, interval, extended: false, candles }) as unknown as Chart;
+
+  it("moves the forming intraday bar and opens the next one on the same grid", () => {
+    const base = bars("2026-01-05T14:30:00Z", 3, 5);
+    const chart = chartOf("5m", base);
+    const last = base[2];
+    const up = withTick(chart, last.h + 1, last.t + 299);
+    expect(up.candles).toHaveLength(3);
+    expect(up.candles[2]).toEqual({ ...last, h: last.h + 1, c: last.h + 1 });
+    expect(withTick(chart, last.l - 1, last.t).candles[2]).toEqual({ ...last, l: last.l - 1, c: last.l - 1 });
+    expect(withTick(chart, 9, last.t + 700).candles.slice(2)).toEqual([last, { t: last.t + 600, o: 9, h: 9, l: 9, c: 9, v: 0 }]);
+    expect(chart.candles).toBe(base);
+    expect(base[2]).toBe(last);
+  });
+
+  it("ignores stale, invalid and unchanged ticks", () => {
+    const base = bars("2026-01-05T14:30:00Z", 2, 5);
+    const chart = chartOf("5m", base);
+    expect(withTick(chart, 9, base[1].t - 1)).toBe(chart);
+    expect(withTick(chart, 0, base[1].t + 1)).toBe(chart);
+    expect(withTick(chart, NaN, base[1].t + 1)).toBe(chart);
+    expect(withTick(chart, base[1].c, base[1].t + 1)).toBe(chart);
+    expect(withTick(chartOf("auto", base), 9, base[1].t + 1).candles).toBe(base);
+    expect(withTick(chartOf("5m", []), 9, 1).candles).toEqual([]);
+  });
+
+  it("keeps a daily bar for the whole exchange day and starts a new one the next day", () => {
+    const base = days(["2026-01-05", "2026-01-06"]);
+    const chart = chartOf("1d", base);
+    const same = withTick(chart, 99, utc("2026-01-06T20:59:00Z"));
+    expect(same.candles).toHaveLength(2);
+    expect(same.candles[1]).toEqual({ ...base[1], l: 99, c: 99 });
+    const next = utc("2026-01-07T14:31:00Z");
+    expect(withTick(chart, 99, next).candles[2]).toEqual({ t: next, o: 99, h: 99, l: 99, c: 99, v: 0 });
+    const week = chartOf("1wk", days(["2026-01-05"]));
+    expect(withTick(week, 99, utc("2026-01-09T20:00:00Z")).candles).toHaveLength(1);
+    expect(withTick(week, 99, utc("2026-01-12T14:31:00Z")).candles).toHaveLength(2);
+  });
+});
 
 describe("aggregate", () => {
   it.each([

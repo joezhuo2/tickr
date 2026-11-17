@@ -1659,7 +1659,7 @@
 
   // Reset hover when the data changes.
   $effect(() => {
-    void chart;
+    void [chart?.meta.symbol, chart?.range, chart?.interval, candles.length, candles[0]?.t];
     hover = null;
   });
 

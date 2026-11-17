@@ -34,7 +34,7 @@
   import { addCompare, compare, removeCompare } from "./lib/compareStore.svelte";
   import SecondChart from "./SecondChart.svelte";
   import IntervalPicker from "./IntervalPicker.svelte";
-  import { aggregateChart } from "./lib/aggregate";
+  import { aggregateChart, withTick } from "./lib/aggregate";
   import Settings from "./Settings.svelte";
   import NotAvailable from "./NotAvailable.svelte";
   import { isDerivativeMarket } from "./lib/instrument";
@@ -1296,6 +1296,14 @@
   });
   let patternFocus = $state<{ from: number; to: number } | null>(null);
   const mainChart = $derived(replay ? replayChart : chart);
+  let ticked = $state.raw<{ from: Chart; chart: Chart } | null>(null);
+  const liveChart = $derived(ticked && ticked.from === chart ? ticked.chart : chart);
+  function tickChart() {
+    if (!chart || !quote || practice || chart.meta.symbol.toUpperCase() !== quote.symbol.toUpperCase()) return;
+    const base = ticked?.from === chart ? ticked.chart : chart;
+    if (quote.session === "regular" && !quote.extended) ticked = { from: chart, chart: withTick(base, quote.price, quote.market_time) };
+    else if (chart.extended && quote.extended && quote.session !== "regular") ticked = { from: chart, chart: withTick(base, quote.extended.price, quote.extended.t) };
+  }
   const split = $derived(layout.split && !practice);
   const analysisOffset = $derived(
     techAnalysis && mainChart
@@ -2189,6 +2197,7 @@
       if (!persist && e.payload.quote?.symbol !== symbol) return;
       qs = e.payload;
       finishQuote?.(e.payload.error ?? undefined);
+      tickChart();
       // Keep intraday-candle charts (1D, 5D, 1M) current; daily ones barely move.
       refreshChart();
     });
@@ -2538,7 +2547,7 @@
                   <ChartView
                     bind:this={chartView}
                     redrawKey={displayKey}
-                    chart={mainChart}
+                    chart={replay ? replayChart : liveChart}
                     staleNote={replay ? null : chartStale}
                     {mode}
                     {scale}
