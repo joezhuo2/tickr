@@ -1,6 +1,6 @@
 import type { Candle } from "./types";
 
-export const MAX_COMPARE = 4;
+export const MAX_COMPARE = 8;
 export const COMPARE_COLORS = ["--ma-1", "--ma-2", "--accent", "--rsi"] as const;
 
 export function cleanCompare(v: unknown): string[] {

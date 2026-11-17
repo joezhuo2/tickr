@@ -1,6 +1,7 @@
 import { MAX_CHART_ALERTS, type ChartAlert } from "./chartAlerts";
 import { sanitizeCustom, type Custom } from "./display";
 import { clampReward, cleanDrawingStyles, type DrawingStyles } from "./drawing";
+import { cleanPrefs, type Prefs } from "./prefs";
 import { STUDIES } from "./studies";
 import { cleanSettings, type StudySettings } from "./studySettings";
 import { cleanPanes, type PaneState } from "./panes";
@@ -17,6 +18,7 @@ export interface LocalBackup {
   technicals_settings_open?: boolean;
   panes?: PaneState;
   rr?: number;
+  prefs?: Prefs;
   chart_type_settings?: TypeSettings;
   drawing_styles?: DrawingStyles;
   compare?: string[];
@@ -24,7 +26,7 @@ export interface LocalBackup {
 
 type Store = Pick<Storage, "getItem" | "setItem">;
 
-const KEYS = { custom: "tickr.custom", studies: "tickr.studies", study_settings: "tickr.studySettings", chart_alerts: "tickr.chartAlerts", magnet: "tickr.magnet", hide_drawings: "tickr.hideDrawings", technicals_settings_open: "tickr.technicalsSettingsOpen", panes: "tickr.panes", rr: "tickr.rr", chart_type_settings: "tickr.chartTypeSettings", drawing_styles: "tickr.drawingStyles", compare: "tickr.compare" };
+const KEYS = { custom: "tickr.custom", studies: "tickr.studies", study_settings: "tickr.studySettings", chart_alerts: "tickr.chartAlerts", magnet: "tickr.magnet", hide_drawings: "tickr.hideDrawings", technicals_settings_open: "tickr.technicalsSettingsOpen", panes: "tickr.panes", rr: "tickr.rr", prefs: "tickr.prefs", chart_type_settings: "tickr.chartTypeSettings", drawing_styles: "tickr.drawingStyles", compare: "tickr.compare" };
 
 function read(store: Store, key: string): unknown {
   try { return JSON.parse(store.getItem(key) ?? "null"); } catch { return null; }
@@ -56,6 +58,8 @@ export function collectLocal(store: Store): LocalBackup {
   if (types != null) out.chart_type_settings = cleanTypeSettings(types);
   const rr = store.getItem(KEYS.rr);
   if (rr != null) out.rr = clampReward(Number(rr));
+  const prefs = read(store, KEYS.prefs);
+  if (prefs != null) out.prefs = cleanPrefs(prefs);
   const styles = read(store, KEYS.drawing_styles);
   if (styles != null) out.drawing_styles = cleanDrawingStyles(styles);
   const compare = read(store, KEYS.compare);
@@ -80,6 +84,7 @@ export function parseLocal(text: string): LocalBackup {
   if ("panes" in l) out.panes = cleanPanes(l.panes);
   if ("chart_type_settings" in l) out.chart_type_settings = cleanTypeSettings(l.chart_type_settings);
   if (typeof l.rr === "number") out.rr = clampReward(l.rr);
+  if ("prefs" in l) out.prefs = cleanPrefs(l.prefs);
   if ("drawing_styles" in l) out.drawing_styles = cleanDrawingStyles(l.drawing_styles);
   if ("compare" in l) out.compare = cleanCompare(l.compare);
   return out;
@@ -94,6 +99,7 @@ export function applyLocal(store: Store, local: LocalBackup) {
     if (local.panes) store.setItem(KEYS.panes, JSON.stringify(local.panes));
     if (local.chart_type_settings) store.setItem(KEYS.chart_type_settings, JSON.stringify(local.chart_type_settings));
     if (local.rr !== undefined) store.setItem(KEYS.rr, String(local.rr));
+    if (local.prefs) store.setItem(KEYS.prefs, JSON.stringify(local.prefs));
     if (local.drawing_styles) store.setItem(KEYS.drawing_styles, JSON.stringify(local.drawing_styles));
     if (local.compare) store.setItem(KEYS.compare, JSON.stringify(local.compare));
     if (local.magnet !== undefined) store.setItem(KEYS.magnet, local.magnet ? "1" : "0");

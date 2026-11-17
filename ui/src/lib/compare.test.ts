@@ -6,7 +6,7 @@ const bar = (t: number, c: number): Candle => ({ t, o: c, h: c, l: c, c, v: 0 })
 
 describe("compare", () => {
   it("cleans symbols", () => {
-    expect(cleanCompare(["spy", " SPY ", "qqq", 5, "", "bad symbol", "a", "b", "c"])).toEqual(["SPY", "QQQ", "A", "B"]);
+    expect(cleanCompare(["spy", " SPY ", "qqq", 5, "", "bad symbol", "a", "b", "c", "d", "e", "f", "g"])).toEqual(["SPY", "QQQ", "A", "B", "C", "D", "E", "F"]);
     expect(cleanCompare(null)).toEqual([]);
   });
 

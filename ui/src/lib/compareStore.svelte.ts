@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { aggregateChart } from "./aggregate";
-import { MAX_COMPARE, cleanCompare } from "./compare";
+import { cleanCompare } from "./compare";
+import { prefs } from "./prefsStore.svelte";
 import { baseFor, type Candle, type Chart } from "./types";
 
 const KEY = "tickr.compare";
@@ -18,7 +19,7 @@ function save(next: string[]) {
 
 export function addCompare(symbol: string) {
   const sym = cleanCompare([symbol])[0];
-  if (sym && compare.symbols.length < MAX_COMPARE) save([...compare.symbols, sym]);
+  if (sym && compare.symbols.length < prefs.compare_max) save([...compare.symbols, sym]);
 }
 
 export function removeCompare(symbol: string) {

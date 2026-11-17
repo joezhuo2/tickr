@@ -289,8 +289,8 @@ function finish(f: Found, sign: number): ChartPattern {
   return { ...f, kind, name, bias, points: f.points.map(flip), lines: f.lines.map(([a, b]): [Point, Point] => [flip(a), flip(b)]) };
 }
 
-export function detectChartPatterns(candles: readonly Candle[], kinds: readonly ChartPatternKind[] = CHART_PATTERN_KINDS): ChartPattern[] {
-  if (candles.length < MIN_BARS) return [];
+export function detectChartPatterns(candles: readonly Candle[], kinds: readonly ChartPatternKind[] = CHART_PATTERN_KINDS, minBars = MIN_BARS): ChartPattern[] {
+  if (candles.length < minBars) return [];
   const tol = candles.reduce((s, c) => s + c.h - c.l, 0) / candles.length;
   if (!(tol > 0)) return [];
   const flipped = candles.map((c) => ({ ...c, o: -c.o, h: -c.l, l: -c.h, c: -c.c }));

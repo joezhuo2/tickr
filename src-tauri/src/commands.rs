@@ -41,6 +41,7 @@ pub struct Init {
     chart_mode: ChartMode,
     refresh_mode: RefreshMode,
     background_chart_alerts: bool,
+    stream_ms: u64,
     chart_scale: ChartScale,
     chart_extended_hours: bool,
     chart_shade_sessions: bool,
@@ -104,6 +105,7 @@ pub fn init_payload(shared: &Shared) -> Init {
         chart_mode: s.chart_mode,
         refresh_mode: s.refresh_mode,
         background_chart_alerts: s.background_chart_alerts,
+        stream_ms: s.stream_ms,
         chart_scale: s.chart_scale,
         chart_extended_hours: s.chart_extended_hours,
         chart_shade_sessions: s.chart_shade_sessions,
@@ -364,6 +366,12 @@ pub fn set_tour_seen(shared: State<'_, Arc<Shared>>) {
 #[tauri::command]
 pub fn set_background_chart_alerts(shared: State<'_, Arc<Shared>>, enabled: bool) {
     shared.update_settings(|s| s.background_chart_alerts = enabled);
+}
+
+#[tauri::command]
+pub fn set_stream_ms(shared: State<'_, Arc<Shared>>, ms: u64) {
+    shared.update_settings(|s| s.stream_ms = ms.clamp(100, 2000));
+    shared.stream_wake.notify_one();
 }
 
 #[tauri::command]

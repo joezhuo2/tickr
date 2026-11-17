@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { prefs } from "./lib/prefsStore.svelte";
   import { rangeFor } from "./lib/scrollback";
   import { invoke } from "@tauri-apps/api/core";
   import { untrack } from "svelte";
@@ -62,7 +63,6 @@
     onlayout: (patch: Partial<ChartLayout>) => void;
   } = $props();
 
-  const FRESH_MS = 60_000;
   const symbol = $derived(layout.symbol || mainSymbol);
   const defaults = $derived(secondaryDefaults(mainRange, mainInterval));
   const range = $derived(layout.range || defaults.range);
@@ -89,7 +89,7 @@
     const hit = cache.get(k);
     if (!force) chart = hit?.chart ?? null;
     error = null;
-    if (hit && !force && Date.now() - hit.at < FRESH_MS) {
+    if (hit && !force && Date.now() - hit.at < prefs.refresh_secs * 1000) {
       at = hit.at;
       loading = false;
       return;
