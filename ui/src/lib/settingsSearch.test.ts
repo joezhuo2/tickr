@@ -13,7 +13,8 @@ describe("settings search", () => {
     expect(matchSettings("backup").map((e) => e.label)).toEqual(["Export", "Import"]);
     expect(matchSettings("zzz")).toEqual([]);
     expect(matchSettings("auto an")[0]).toMatchObject({ label: "Auto analyze", tab: "chart" });
-    expect(matchSettings("head and")[0]).toMatchObject({ label: "Head and shoulders", section: "Technical analysis" });
+    expect(matchSettings("head and")[0]).toMatchObject({ label: "Head and shoulders", section: "Chart · Patterns", part: "patterns" });
+    expect(matchSettings("maximum candles")[0]).toMatchObject({ tab: "chart", part: "limits" });
   });
 
   it("points hotkey entries at their category and respects the limit", () => {

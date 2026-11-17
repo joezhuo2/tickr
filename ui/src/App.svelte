@@ -30,11 +30,11 @@
   import type { SettingEntry } from "./lib/settingsSearch";
   import { addedAlert } from "./lib/alerts";
   import { studies, toggleStudy } from "./lib/studyStore.svelte";
-  import { MAX_COMPARE } from "./lib/compare";
   import { addCompare, compare, removeCompare } from "./lib/compareStore.svelte";
   import SecondChart from "./SecondChart.svelte";
   import IntervalPicker from "./IntervalPicker.svelte";
   import { aggregateChart, withTick } from "./lib/aggregate";
+  import { prefs, stream } from "./lib/prefsStore.svelte";
   import Settings from "./Settings.svelte";
   import NotAvailable from "./NotAvailable.svelte";
   import { isDerivativeMarket } from "./lib/instrument";
@@ -292,7 +292,6 @@
   let chartAt = 0;
   /** Charts fetched this session, keyed "SYMBOL|range|interval". */
   const cache = new Map<string, { chart: Chart; at: number }>();
-  const FRESH_MS = 60_000;
   const cacheKey = () => `${symbol}|${range}|${interval}|${chartExtended && range === "1d"}`;
   /** Headlines fetched this session, keyed by symbol. */
   const newsCache = new Map<string, Article[]>();
@@ -361,6 +360,7 @@
     mode = init.chart_mode;
     refreshMode = init.refresh_mode ?? "balanced";
     chartAlerts.background = init.background_chart_alerts ?? false;
+    stream.ms = init.stream_ms ?? 250;
     scale = init.chart_scale;
     chartExtended = init.chart_extended_hours ?? true;
     shadeSessions = init.chart_shade_sessions ?? true;
@@ -416,6 +416,7 @@
     textSize = init.text_size;
     palette = init.palette;
     chartAlerts.background = init.background_chart_alerts ?? false;
+    stream.ms = init.stream_ms ?? 250;
     watchlist = keep(watchlist, init.watchlist ?? []);
     groups = keep(groups, init.groups ?? []);
     screens = keep(screens, init.screens ?? []);
@@ -521,7 +522,7 @@
     const base = cache.get(key)?.chart;
     if (!c || !base || replay || olderDone.has(key) || !base.candles.length) return false;
     const first = base.candles[0].t;
-    const w = base.candles.length < Scrollback.MAX_CANDLES ? Scrollback.olderWindow(base.interval, first, base.candles[base.candles.length - 1].t) : null;
+    const w = base.candles.length < prefs.max_candles ? Scrollback.olderWindow(base.interval, first, base.candles[base.candles.length - 1].t) : null;
     if (!w) return false;
     olderBusy = true;
     try {
@@ -558,7 +559,7 @@
     const hit = cache.get(key);
     if (!manual) chart = hit ? aggregateChart(hit.chart, interval) : null;
     chartError = null;
-    if (hit && !force && !shouldAnalyze(!!analysis, indicators?.keep_analysis ?? false) && Date.now() - hit.at < FRESH_MS) {
+    if (hit && !force && !shouldAnalyze(!!analysis, indicators?.keep_analysis ?? false) && Date.now() - hit.at < prefs.refresh_secs * 1000) {
       loading = false;
       chartAt = hit.at;
       return;
@@ -1292,14 +1293,14 @@
   const chartPatterns = $derived.by(() => {
     const a = techAnalysis;
     if (!a || !indicators || (quiz && quiz.mode !== "move" && quizGuess == null)) return [];
-    return detectChartPatterns(mainChart?.candles.filter((c) => c.t <= a.as_of) ?? [], chartPatternKinds(indicators));
+    return detectChartPatterns(mainChart?.candles.filter((c) => c.t <= a.as_of) ?? [], chartPatternKinds(indicators), prefs.pattern_min_bars);
   });
   let patternFocus = $state<{ from: number; to: number } | null>(null);
   const mainChart = $derived(replay ? replayChart : chart);
   let ticked = $state.raw<{ from: Chart; chart: Chart } | null>(null);
-  const liveChart = $derived(ticked && ticked.from === chart ? ticked.chart : chart);
+  const liveChart = $derived(prefs.live_candles && ticked && ticked.from === chart ? ticked.chart : chart);
   function tickChart() {
-    if (!chart || !quote || practice || chart.meta.symbol.toUpperCase() !== quote.symbol.toUpperCase()) return;
+    if (!prefs.live_candles || !chart || !quote || practice || chart.meta.symbol.toUpperCase() !== quote.symbol.toUpperCase()) return;
     const base = ticked?.from === chart ? ticked.chart : chart;
     if (quote.session === "regular" && !quote.extended) ticked = { from: chart, chart: withTick(base, quote.price, quote.market_time) };
     else if (chart.extended && quote.extended && quote.session !== "regular") ticked = { from: chart, chart: withTick(base, quote.extended.price, quote.extended.t) };
@@ -1899,7 +1900,7 @@
         const before = [...compare.symbols];
         const beforeScale = scale;
         if (c.on && c.symbol) {
-          if (!before.includes(c.symbol) && before.length >= MAX_COMPARE) return `Compare up to ${MAX_COMPARE} symbols`;
+          if (!before.includes(c.symbol) && before.length >= prefs.compare_max) return `Compare up to ${prefs.compare_max} symbols`;
           addCompare(c.symbol);
           if (scale !== "percent") setScale("percent");
         } else if (c.symbol) removeCompare(c.symbol);
@@ -2177,7 +2178,7 @@
 
   function refreshChart() {
     if (refreshMode === "low_power" && (document.hidden || loading)) return;
-    if (isIntraday(chart?.interval ?? "") && Date.now() - chartAt > FRESH_MS) loadChart(true);
+    if (isIntraday(chart?.interval ?? "") && Date.now() - chartAt > prefs.refresh_secs * 1000) loadChart(true);
   }
 
   if (boot) apply(boot);

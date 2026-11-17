@@ -9,7 +9,9 @@
   import { DEFAULT_KEYBINDS, actionFor, bindKey, groupActions, keybindsCustomized, keyLabel, rebind, type Action, type Category } from "./lib/keybinds";
   import { backdrop, dialog, expand, paneIn } from "./lib/motion";
   import { onMount, tick } from "svelte";
-  import { matchSettings, type SettingEntry } from "./lib/settingsSearch";
+  import { CHART_GROUPS, matchSettings, type ChartGroup, type SettingEntry } from "./lib/settingsSearch";
+  import { PREF_OPTIONS, STREAM_MS_OPTIONS } from "./lib/prefs";
+  import { prefs, setPref, stream } from "./lib/prefsStore.svelte";
   import { chartAlerts } from "./lib/chartAlertStore.svelte";
   import { toHhmm, toMinutes } from "./lib/quiet";
   import { rr, setReward } from "./lib/rrStore.svelte";
@@ -432,7 +434,14 @@
   let tab = $state<(typeof TABS)[number]["id"]>("display");
   const KEY_GROUPS = groupActions();
   let keyGroup = $state<Category>(KEY_GROUPS[0].id);
-  let keysOpen = $state(true);
+  let chartGroup = $state<ChartGroup>(CHART_GROUPS[0].id);
+  let subOpen = $state(true);
+  const SUBNAV = { hotkeys: KEY_GROUPS, chart: CHART_GROUPS } as const;
+  const subOf = (id: keyof typeof SUBNAV) => (id === "hotkeys" ? keyGroup : chartGroup);
+  function pickSub(id: keyof typeof SUBNAV, group: string) {
+    if (id === "hotkeys") keyGroup = group as Category;
+    else chartGroup = group as ChartGroup;
+  }
 
   let find = $state("");
   let findOpen = $state(false);
@@ -444,10 +453,9 @@
     findOpen = false;
     find = "";
     tab = entry.tab;
-    if (entry.group) {
-      keyGroup = entry.group;
-      keysOpen = true;
-    }
+    if (entry.group) keyGroup = entry.group;
+    if (entry.part) chartGroup = entry.part;
+    if (entry.group || entry.part) subOpen = true;
     await tick();
     const rows = [...(content?.querySelectorAll<HTMLElement>(".row, button.link") ?? [])];
     const text = (el: Element | null | undefined) => el?.textContent?.trim() ?? "";
@@ -476,9 +484,9 @@
     e.preventDefault();
   }
 
-  function openHotkeys() {
-    keysOpen = tab === "hotkeys" ? !keysOpen : true;
-    tab = "hotkeys";
+  function openSub(id: keyof typeof SUBNAV) {
+    subOpen = tab === id ? !subOpen : true;
+    tab = id;
   }
   const keys = $derived(KEY_GROUPS.find((g) => g.id === keyGroup) ?? KEY_GROUPS[0]);
 </script>
@@ -546,12 +554,13 @@
     <div class="body">
       <div class="nav" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
         {#each TABS as t (t.id)}
-          {#if t.id === "hotkeys"}
-            <button aria-expanded={tab === "hotkeys" && keysOpen} class:open={tab === "hotkeys"} onclick={openHotkeys}>{t.label}<span class="caret" class:turned={tab === "hotkeys" && keysOpen} aria-hidden="true">▸</span></button>
-            {#if tab === "hotkeys" && keysOpen}
+          {#if t.id === "hotkeys" || t.id === "chart"}
+            {@const id = t.id}
+            <button aria-expanded={tab === id && subOpen} class:open={tab === id} onclick={() => openSub(id)}>{t.label}<span class="caret" class:turned={tab === id && subOpen} aria-hidden="true">▸</span></button>
+            {#if tab === id && subOpen}
               <div class="subnav" transition:expand>
-                {#each KEY_GROUPS as g (g.id)}
-                  <button role="tab" class="sub" aria-selected={keyGroup === g.id} class:on={keyGroup === g.id} onclick={() => (keyGroup = g.id)}>{g.label}</button>
+                {#each SUBNAV[id] as g (g.id)}
+                  <button role="tab" class="sub" aria-selected={subOf(id) === g.id} class:on={subOf(id) === g.id} onclick={() => pickSub(id, g.id)}>{g.label}</button>
                 {/each}
               </div>
             {/if}
@@ -561,7 +570,7 @@
         {/each}
       </div>
       <div class="content" role="tabpanel" bind:this={content}>
-      {#key `${tab} ${tab === "hotkeys" ? keyGroup : ""}`}
+      {#key `${tab} ${tab === "hotkeys" ? keyGroup : tab === "chart" ? chartGroup : ""}`}
       <div class="section" in:paneIn={{ y: 8 }}>
     {#if tab === "display"}
     <h3>Display</h3>
@@ -688,6 +697,7 @@
 
     {/if}
     {#if tab === "chart"}
+    {#if chartGroup === "sessions"}
     <h3>Chart sessions</h3>
     <label class="row">
       <span>Extended-hours candles</span>
@@ -704,14 +714,58 @@
       </select>
     </label>
     <p class="hint">Extended-hours candles apply to the 1D chart. The tray quote has its own extended-hours setting. Local time applies to intraday candles; daily and longer candles keep exchange dates.</p>
-
+    {:else if chartGroup === "live"}
+    <h3>Live updates</h3>
+    <label class="row">
+      <span>Live candles</span>
+      <input type="checkbox" checked={prefs.live_candles} onchange={(e) => setPref("live_candles", e.currentTarget.checked)} />
+    </label>
+    <p class="hint">Moves the forming candle with every quote. Turn it off to draw candles only from each chart refresh.</p>
+    <label class="row">
+      <span>Chart refresh</span>
+      <select class="field" value={prefs.refresh_secs} onchange={(e) => setPref("refresh_secs", Number(e.currentTarget.value))}>
+        {#each PREF_OPTIONS.refresh_secs as s (s)}<option value={s}>{s < 60 ? `Every ${s} seconds` : s === 60 ? "Every minute" : `Every ${s / 60} minutes`}</option>{/each}
+      </select>
+    </label>
+    <p class="hint">How often intraday charts download fresh candles. Shorter intervals use more data requests.</p>
+    <label class="row">
+      <span>Live update rate</span>
+      <select class="field" value={stream.ms} onchange={(e) => { stream.ms = Number(e.currentTarget.value); invoke("set_stream_ms", { ms: stream.ms }).catch(console.warn); }}>
+        {#each STREAM_MS_OPTIONS as ms (ms)}<option value={ms}>{ms < 1000 ? `${1000 / ms} per second` : ms === 1000 ? "Every second" : `Every ${ms / 1000} seconds`}</option>{/each}
+      </select>
+    </label>
+    <p class="hint">How often streamed trades update the price and the forming candle. Applies to the Alpaca live stream; changing it reconnects the stream.</p>
+    {:else if chartGroup === "limits"}
+    <h3>Limits</h3>
+    <label class="row">
+      <span>Maximum candles to load</span>
+      <select class="field" value={prefs.max_candles} onchange={(e) => setPref("max_candles", Number(e.currentTarget.value))}>
+        {#each PREF_OPTIONS.max_candles as n (n)}<option value={n}>{n.toLocaleString()}</option>{/each}
+      </select>
+    </label>
+    <p class="hint">How far back scrolling the chart can load. Backtests, replay and analysis use the candles loaded, so a higher limit reaches further back but can make the chart slower. Your data provider may hold less history than this.</p>
+    <label class="row">
+      <span>Backtest sweep limit</span>
+      <select class="field" value={prefs.sweep_runs} onchange={(e) => setPref("sweep_runs", Number(e.currentTarget.value))}>
+        {#each PREF_OPTIONS.sweep_runs as n (n)}<option value={n}>{n.toLocaleString()} runs</option>{/each}
+      </select>
+    </label>
+    <p class="hint">The most parameter combinations one sweep may run. Larger sweeps take longer.</p>
+    <label class="row">
+      <span>Compare overlay limit</span>
+      <select class="field" value={prefs.compare_max} onchange={(e) => setPref("compare_max", Number(e.currentTarget.value))}>
+        {#each PREF_OPTIONS.compare_max as n (n)}<option value={n}>{n} symbols</option>{/each}
+      </select>
+    </label>
+    <p class="hint">How many symbols Compare can overlay. Above four, line colors repeat. Lowering it keeps symbols already added.</p>
+    {:else if chartGroup === "drawings"}
     <h3>Drawings</h3>
     <label class="row">
       <span>R:R reward multiple</span>
       <input class="field" type="number" min="0.1" max="20" step="0.1" value={rr.reward} onchange={(e) => { setReward(e.currentTarget.valueAsNumber); e.currentTarget.value = String(rr.reward); }} />
     </label>
     <p class="hint">Target distance of the R:R drawing as a multiple of the risk. Applies to every R:R drawing.</p>
-
+    {:else if chartGroup === "dots"}
     <h3>Chart dots</h3>
     {#each DOTS as d (d.id)}
       <label class="row">
@@ -719,14 +773,14 @@
         <input type="checkbox" checked={dots[d.id]} onchange={() => toggleDot(d.id)} />
       </label>
     {/each}
-
+    {:else if chartGroup === "alerts"}
     <h3>Chart alerts</h3>
     <label class="row">
       <span>Check indicator and drawing alerts in the background</span>
       <input type="checkbox" checked={chartAlerts.background} onchange={(e) => { chartAlerts.background = e.currentTarget.checked; invoke("set_background_chart_alerts", { enabled: chartAlerts.background }).catch(console.warn); }} />
     </label>
     <p class="hint">Downloads candles for each symbol and interval with an armed alert about once per bar (at most every 15 minutes) while tickr runs, and keeps the window loaded in memory when it is minimized or closed to the tray.</p>
-
+    {:else if chartGroup === "notifications"}
     <h3>Notifications</h3>
     {#if quiet}
       <label class="row">
@@ -756,9 +810,9 @@
       {/if}
       <p class="hint">One notification with the top watchlist movers, watchlist earnings in the next 5 days and alerts triggered in the last 24 hours. It uses your computer's time zone and follows Do not disturb.</p>
     {/if}
-
-    {#if indicators}
+    {:else if indicators}
       {@const config = indicators}
+      {#if chartGroup === "analysis"}
       <h3>Technical analysis</h3>
       <label class="row">
         <span>Auto analyze</span>
@@ -771,13 +825,21 @@
           <input type="checkbox" checked={overlayVisibility(config)[o.key]} disabled={analysisBusy} onchange={(e) => saveAnalysis(toggleOverlay(config, o.key, e.currentTarget.checked))} />
         </label>
       {/each}
+      {:else}
       <h3>Chart patterns to detect</h3>
+      <label class="row">
+        <span>Minimum candles for patterns</span>
+        <select class="field" value={prefs.pattern_min_bars} onchange={(e) => setPref("pattern_min_bars", Number(e.currentTarget.value))}>
+          {#each PREF_OPTIONS.pattern_min_bars as n (n)}<option value={n}>{n}</option>{/each}
+        </select>
+      </label>
       {#each CHART_PATTERN_KINDS as k (k)}
         <label class="row">
           <span>{CHART_PATTERN_INFO[k].name}</span>
           <input type="checkbox" checked={!config.chart_patterns_off.includes(k)} disabled={analysisBusy} onchange={(e) => saveAnalysis(toggleChartPattern(config, k, e.currentTarget.checked))} />
         </label>
       {/each}
+      {/if}
       {#if analysisError}<p class="error">{analysisError}</p>{/if}
     {/if}
 
@@ -941,6 +1003,7 @@
     flex-direction: column;
     gap: 2px;
     overflow: hidden;
+    flex-shrink: 0;
   }
   .caret.turned {
     transform: rotate(90deg);

@@ -10,19 +10,41 @@ export interface SettingEntry {
   section: string;
   tab: SettingsTab;
   group?: Category;
+  part?: ChartGroup;
 }
 
+export const CHART_GROUPS = [
+  { id: "sessions", label: "Sessions" },
+  { id: "live", label: "Live updates" },
+  { id: "limits", label: "Limits" },
+  { id: "drawings", label: "Drawings" },
+  { id: "dots", label: "Dots" },
+  { id: "alerts", label: "Alerts" },
+  { id: "notifications", label: "Notifications" },
+  { id: "analysis", label: "Analysis" },
+  { id: "patterns", label: "Patterns" },
+] as const;
+export type ChartGroup = (typeof CHART_GROUPS)[number]["id"];
+
 const entry = (tab: SettingsTab, section: string, labels: string[]): SettingEntry[] => labels.map((label) => ({ label, section, tab }));
+const chart = (part: ChartGroup, labels: string[]): SettingEntry[] =>
+  labels.map((label) => ({ label, section: `Chart · ${CHART_GROUPS.find((g) => g.id === part)?.label}`, tab: "chart", part }));
 
 export const SETTINGS: SettingEntry[] = [
   ...entry("display", "Display", ["Show tour", "Theme", "Main color", "Sub color", "Font", "Number font", "Text size", "Gain/loss colors", "Background refresh", "Reset all colors", ...TOKENS.map((t) => t.label)]),
   { label: "Show or hide tickr", section: "Hotkeys · General", tab: "hotkeys", group: "general" },
   { label: "Reset all keybinds", section: "Hotkeys · General", tab: "hotkeys", group: "general" },
   ...groupActions().flatMap((g) => g.actions.map((a) => ({ label: a.label, section: `Hotkeys · ${g.label}`, tab: "hotkeys" as const, group: g.id }))),
-  ...entry("chart", "Chart", ["Extended-hours candles", "Shade pre-market and after-hours", "Chart times", "R:R reward multiple", "Earnings", "News", "Analyst ratings"]),
-  ...entry("chart", "Chart alerts", ["Check indicator and drawing alerts in the background"]),
-  ...entry("chart", "Notifications", ["Do not disturb", "Daily digest"]),
-  ...entry("chart", "Technical analysis", ["Auto analyze", ...OVERLAY_TOGGLES.map((o) => o.label), ...CHART_PATTERN_KINDS.map((k) => CHART_PATTERN_INFO[k].name)]),
+  ...chart("sessions", ["Extended-hours candles", "Shade pre-market and after-hours", "Chart times"]),
+  ...chart("live", ["Live candles", "Chart refresh", "Live update rate"]),
+  ...chart("limits", ["Maximum candles to load", "Backtest sweep limit", "Compare overlay limit"]),
+  ...chart("drawings", ["R:R reward multiple"]),
+  ...chart("dots", ["Earnings", "News", "Analyst ratings"]),
+  ...chart("alerts", ["Check indicator and drawing alerts in the background"]),
+  ...chart("notifications", ["Do not disturb", "Daily digest"]),
+  ...chart("analysis", ["Auto analyze", ...OVERLAY_TOGGLES.map((o) => o.label)]),
+  ...chart("patterns", ["Minimum candles for patterns"]),
+  ...chart("patterns", CHART_PATTERN_KINDS.map((k) => CHART_PATTERN_INFO[k].name)),
   ...entry("data", "Market data", ["Provider", "Clear cached history", "SEC contact email"]),
   ...entry("ai", "AI", ["News analysis", "Base URL", "Model", "News model", "Events model", "API key"]),
   ...entry("backup", "Backup", ["Export", "Import"]),

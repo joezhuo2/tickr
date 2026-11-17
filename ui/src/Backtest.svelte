@@ -1,7 +1,8 @@
 <script lang="ts">
   import { num, price, signed } from "./lib/format";
   import { buildCondition, check, DEFAULT_CLOCK, type Condition, type Operand, type SessionClock } from "./lib/strategy";
-  import { grid, MAX_RUNS, parameters, sweepRow, withParam, type ExitReason, type Param, type Range, type Report, type Rules, type Side, type SweepRow } from "./lib/backtest";
+  import { prefs } from "./lib/prefsStore.svelte";
+  import { grid, parameters, sweepRow, withParam, type ExitReason, type Param, type Range, type Report, type Rules, type Side, type SweepRow } from "./lib/backtest";
   import type { Candle } from "./lib/types";
 
   let {
@@ -185,7 +186,7 @@
   let sortDesc = $state(true);
 
   const chosen = $derived([pickA, pickB].filter((id, i, all) => id && all.indexOf(id) === i && params.some((p) => p.id === id)));
-  const plan = $derived(grid(chosen.map((id) => (id === pickA ? rangeA : rangeB))));
+  const plan = $derived(grid(chosen.map((id) => (id === pickA ? rangeA : rangeB)), prefs.sweep_runs));
   const sorted = $derived.by(() => {
     const rows = swept?.rows ?? [];
     const rank = (v: number | null) => (v == null ? null : Number.isNaN(v) ? null : v);
@@ -344,7 +345,7 @@
           {@render picker("B", pickB, rangeB, (r) => (rangeB = r))}
           <button type="button" disabled={sweeping || !plan.points.length || !bars} onclick={sweep}>{sweeping ? "Sweeping…" : `Run sweep${plan.points.length ? ` (${plan.points.length})` : ""}`}</button>
         </div>
-        {#if plan.capped}<p class="error" role="alert">That grid is {num(plan.total, 0)} runs; the limit is {MAX_RUNS}. Narrow a range or raise a step.</p>{/if}
+        {#if plan.capped}<p class="error" role="alert">That grid is {num(plan.total, 0)} runs; the limit is {num(prefs.sweep_runs, 0)}. Narrow a range, raise a step, or raise the limit in Settings.</p>{/if}
         {#if swept && !sweeping}
           {#if swept.skipped}<p class="note">{swept.skipped} of {swept.rows.length + swept.skipped} runs were skipped because the rules failed with those values.</p>{/if}
           {#if heat}
