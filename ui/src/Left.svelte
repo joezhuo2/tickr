@@ -2,6 +2,7 @@
   import { hasVolume, priceDigits } from "./lib/instrument";
   import { change, direction, num, price, ratingLabel, ratingTone, signed, span, upside, volume } from "./lib/format";
   import type { Candle, Consensus, Quote } from "./lib/types";
+  import AnimatedNumber from "./AnimatedNumber.svelte";
 
   // logo: undefined while loading, null when the symbol has none.
   // analyst: undefined while loading, null without coverage.
@@ -108,15 +109,21 @@
       {#if hasVolume(symbol)}<dt>Volume</dt><dd>{volume(replay.bar.v)}</dd>{/if}
     </dl>
   {:else if quote}
-    <div class="price">{price(quote.price, quote.currency, symbol)}</div>
-    <div class="chg {direction(quote.change)}">{change(quote.change, quote.change_pct, priceDigits(symbol, quote.price))}</div>
+    {#key symbol}
+      <div class="price"><AnimatedNumber value={quote.price} format={(v) => price(v, quote.currency, symbol)} /></div>
+      <div class="chg {direction(quote.change)}">
+        {#if quote.change == null || quote.change_pct == null}—{:else}<AnimatedNumber value={quote.change} format={(v) => signed(v, priceDigits(symbol, quote.price))} /> (<AnimatedNumber value={quote.change_pct} format={(v) => `${signed(v)}%`} />){/if}
+      </div>
+    {/key}
     {#if staleNote}<div class="stale" role="status">{staleNote}</div>{/if}
     <div class="session"><i class={quote.session}></i>{SESSION[quote.session]}</div>
     {#if quote.extended}
       <div class="ext">
         <span class="label">{quote.extended.label}</span>
-        <span>{price(quote.extended.price, quote.currency, symbol)}</span>
-        <span class={direction(quote.extended.change)}>{change(quote.extended.change, quote.extended.change_pct)}</span>
+        {#key symbol}
+          <span><AnimatedNumber value={quote.extended.price} format={(v) => price(v, quote.currency, symbol)} /></span>
+          <span class={direction(quote.extended.change)}><AnimatedNumber value={quote.extended.change} format={(v) => signed(v)} /> (<AnimatedNumber value={quote.extended.change_pct} format={(v) => `${signed(v)}%`} />)</span>
+        {/key}
       </div>
     {/if}
 
