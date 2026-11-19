@@ -7,6 +7,7 @@
   import type { Group, RefreshMode, SavedScreen, ScreenRule, WatchQuote, WatchlistColumns, WatchlistSort, WatchlistView } from "./lib/types";
   import Screener from "./Screener.svelte";
   import WatchTable from "./WatchTable.svelte";
+  import AnimatedNumber from "./AnimatedNumber.svelte";
 
   let {
     symbols,
@@ -323,8 +324,8 @@
               <span class="name">{q.name || q.exchange || "—"}</span>
               {@const m = moves[symbol]}
               <span class="line">
-                <span class="px">{price(m.price, q.currency, symbol)}</span>
-                <span class="chg {direction(m.pct)}">{m.pct == null ? "—" : `${signed(m.pct)}%`}</span>
+                <span class="px"><AnimatedNumber value={m.price} format={(v) => price(v, q.currency, symbol)} /></span>
+                <span class="chg {direction(m.pct)}">{#if m.pct == null}—{:else}<AnimatedNumber value={m.pct} format={(v) => `${signed(v)}%`} />{/if}</span>
               </span>
             {:else if w?.error}
               <span class="name">Unavailable</span>

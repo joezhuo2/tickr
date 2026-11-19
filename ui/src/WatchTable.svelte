@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { untrack } from "svelte";
+  import AnimatedNumber from "./AnimatedNumber.svelte";
   import { biasLabel, biasTone, direction, num, price, signed } from "./lib/format";
   import { daysUntil, localDay } from "./lib/calendar";
   import type { IvRank, ScreenRow, WatchDates, WatchQuote, WatchlistColumns } from "./lib/types";
@@ -96,8 +97,8 @@
         {@const due = earnings[symbol]}
         <tr class:current={symbol === current}>
           <th scope="row"><button title={w?.error && !q ? w.error : q?.name || symbol} onclick={() => onopen(symbol)}>{symbol}</button></th>
-          <td>{q && m ? price(m.price, q.currency, symbol) : ""}</td>
-          <td class={direction(m?.pct)}>{m?.pct == null ? "" : `${signed(m.pct)}%`}</td>
+          <td>{#if q && m}<AnimatedNumber value={m.price} format={(v) => price(v, q.currency, symbol)} />{/if}</td>
+          <td class={direction(m?.pct)}>{#if m?.pct != null}<AnimatedNumber value={m.pct} format={(v) => `${signed(v)}%`} />{/if}</td>
           {#if columns.score}
             <td class={s?.bias ? biasTone(s.bias) : ""} title={s?.bias ? biasLabel(s.bias) : (s?.error ?? "")}>{s?.score == null ? "" : signed(s.score, 0)}</td>
           {/if}
