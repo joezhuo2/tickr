@@ -6,6 +6,14 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.88] - 2026-11-19
+
+### Added
+- **Animated numbers:** live prices and changes now glide to their new value
+  instead of jumping, in the quote header, the extended-hours line and the
+  watchlist cards and table. The animation is skipped when the system asks
+  for reduced motion.
+
 ## [0.11.87] - 2026-11-17
 
 ### Added
