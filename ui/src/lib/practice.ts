@@ -18,11 +18,20 @@ export type Decision = "long" | "short" | "skip";
 export type Direction = Paper.Direction;
 export type Bar = Paper.Bar;
 
-export const INTERVALS = ["60m", "1d", "1wk"] as const;
+export const INTERVALS = ["1m", "5m", "15m", "60m", "1d", "1wk"] as const;
 export type Interval = (typeof INTERVALS)[number];
-export const INTERVAL_LABELS: Record<Interval, string> = { "60m": "1 hour", "1d": "1 day", "1wk": "1 week" };
+export const INTERVAL_LABELS: Record<Interval, string> = { "1m": "1 minute", "5m": "5 minutes", "15m": "15 minutes", "60m": "1 hour", "1d": "1 day", "1wk": "1 week" };
+const INTRADAY: readonly string[] = ["1m", "5m", "15m"];
+export const IMPORTED = "imported";
+
+export interface ImportedSeries {
+  symbol: string;
+  interval: string;
+}
 
 export const RANGES = [
+  { id: "1wk", label: "Last week", days: 7 },
+  { id: "1mo", label: "Last month", days: 30 },
   { id: "3mo", label: "Last 3 months", days: 91 },
   { id: "1y", label: "Last year", days: 365 },
   { id: "2y", label: "Last 2 years", days: 730 },
@@ -30,9 +39,10 @@ export const RANGES = [
 ] as const;
 export type Range = (typeof RANGES)[number]["id"];
 
-const RANGES_FOR: Record<Interval, readonly Range[]> = { "60m": ["3mo", "1y"], "1d": ["3mo", "1y", "2y", "5y"], "1wk": ["2y", "5y"] };
-const PAD_DAYS: Record<Interval, number> = { "60m": 30, "1d": 150, "1wk": 600 };
-const DISPLAY_RANGE: Record<Interval, string> = { "60m": "1y", "1d": "1y", "1wk": "5y" };
+const LONG_INTRADAY: readonly Range[] = ["1mo", "3mo", "1y", "5y"];
+const RANGES_FOR: Record<Interval, readonly Range[]> = { "1m": ["1wk", "1mo", "1y"], "5m": LONG_INTRADAY, "15m": LONG_INTRADAY, "60m": ["3mo", "1y"], "1d": ["3mo", "1y", "2y", "5y"], "1wk": ["2y", "5y"] };
+const PAD_DAYS: Record<Interval, number> = { "1m": 0, "5m": 0, "15m": 0, "60m": 30, "1d": 150, "1wk": 600 };
+const DISPLAY_RANGE: Record<Interval, string> = { "1m": "5d", "5m": "1mo", "15m": "1mo", "60m": "1y", "1d": "1y", "1wk": "5y" };
 
 export interface Setup {
   scope: string;
@@ -54,20 +64,25 @@ export function displayRange(interval: Interval): string {
   return DISPLAY_RANGE[interval];
 }
 
-export function scopes(groups: readonly Group[]): { id: string; label: string }[] {
-  return [{ id: "watchlist", label: "All starred" }, ...groups.map((g) => ({ id: `group:${g.name}`, label: g.name }))];
+export function importedSymbols(series: readonly ImportedSeries[], interval: Interval): string[] {
+  const want = INTRADAY.indexOf(interval);
+  return [...new Set(series.filter((s) => want >= 0 && INTRADAY.indexOf(s.interval) >= 0 && INTRADAY.indexOf(s.interval) <= want).map((s) => s.symbol))];
 }
 
-export function validSetup(s: Setup, groups: readonly Group[]): Setup {
+export function scopes(groups: readonly Group[], imported: readonly string[] = []): { id: string; label: string }[] {
+  return [{ id: "watchlist", label: "All starred" }, ...(imported.length ? [{ id: IMPORTED, label: "Imported data" }] : []), ...groups.map((g) => ({ id: `group:${g.name}`, label: g.name }))];
+}
+
+export function validSetup(s: Setup, groups: readonly Group[], series: readonly ImportedSeries[] = []): Setup {
   const interval = isInterval(s.interval) ? s.interval : DEFAULT_SETUP.interval;
   const ranges = rangesFor(interval);
   const range = ranges.includes(s.range) ? s.range : ranges[ranges.length - 1];
-  const scope = scopes(groups).some((x) => x.id === s.scope) ? s.scope : "watchlist";
+  const scope = scopes(groups, importedSymbols(series, interval)).some((x) => x.id === s.scope) ? s.scope : "watchlist";
   return { scope, interval, range };
 }
 
-export function scopeSymbols(scope: string, watchlist: readonly string[], groups: readonly Group[]): string[] {
-  const list = scope === "watchlist" ? watchlist : (groups.find((g) => `group:${g.name}` === scope)?.symbols ?? []);
+export function scopeSymbols(scope: string, watchlist: readonly string[], groups: readonly Group[], imported: readonly string[] = []): string[] {
+  const list = scope === "watchlist" ? watchlist : scope === IMPORTED ? imported : (groups.find((g) => `group:${g.name}` === scope)?.symbols ?? []);
   return [...new Set(list.filter(Boolean))];
 }
 
