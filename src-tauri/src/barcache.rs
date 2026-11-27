@@ -71,13 +71,17 @@ pub fn load(dir: &Path, key: &str) -> Vec<Candle> {
         .unwrap_or_default()
 }
 
-fn save(dir: &Path, key: &str, bars: &[Candle]) -> std::io::Result<()> {
+pub fn write(dir: &Path, key: &str, bars: &[Candle]) -> std::io::Result<()> {
     std::fs::create_dir_all(dir)?;
     let path = path(dir, key);
     let tmp = path.with_extension("json.tmp");
     let rows: Vec<Row> = bars.iter().map(|c| (c.t, c.o, c.h, c.l, c.c, c.v)).collect();
     std::fs::write(&tmp, serde_json::to_vec(&rows)?)?;
-    std::fs::rename(tmp, &path)?;
+    std::fs::rename(tmp, &path)
+}
+
+fn save(dir: &Path, key: &str, bars: &[Candle]) -> std::io::Result<()> {
+    write(dir, key, bars)?;
     let files = std::fs::read_dir(dir)?
         .filter_map(|e| e.ok())
         .map(|e| e.path())

@@ -20,7 +20,7 @@ use crate::sp500::HeatQuote;
 use crate::options::Options;
 use crate::stats::Section;
 use crate::news::Article;
-use crate::barcache;
+use crate::{barcache, barimport};
 use crate::quote::{self, Candle, Chart, Quote, SearchHit};
 use crate::ivrank::{self, IvRank};
 use crate::screener::{self, ScreenRow};
@@ -160,9 +160,13 @@ pub async fn get_chart(shared: State<'_, Arc<Shared>>, symbol: String, range: St
 }
 
 #[tauri::command]
-pub async fn get_history(shared: State<'_, Arc<Shared>>, symbol: String, interval: String, start: i64, end: i64) -> Result<Chart, String> {
+pub async fn get_history(shared: State<'_, Arc<Shared>>, symbol: String, interval: String, start: i64, end: i64, pick: Option<f64>) -> Result<Chart, String> {
     let revision = shared.revision();
-    let chart = crate::provider::Provider::current(&shared).fetch_period(&shared.http, &symbol, &interval, start, end).await?;
+    let chart = if barimport::secs(&interval).is_some() {
+        intraday_history(&shared, &symbol, &interval, start, end, pick.unwrap_or(0.5)).await?
+    } else {
+        crate::provider::Provider::current(&shared).fetch_period(&shared.http, &symbol, &interval, start, end).await?
+    };
     let _settings = lock(&shared.settings);
     if shared.revision() != revision { return Err("Market data settings changed; try again".into()); }
     *lock(&shared.history) = Some(chart.clone());
@@ -188,6 +192,59 @@ pub async fn get_older(shared: State<'_, Arc<Shared>>, symbol: String, interval:
             if cached.is_empty() { other.map(|(_, candles)| candles) } else { Ok(cached) }
         }
     }
+}
+
+async fn intraday_history(shared: &Shared, symbol: &str, interval: &str, start: i64, end: i64, pick: f64) -> Result<Chart, String> {
+    let symbol = symbol.trim().to_uppercase();
+    let provider = crate::provider::Provider::current(shared);
+    let (dir, sym, iv) = (barimport::dir(&shared.settings_path), symbol.clone(), interval.to_string());
+    let imported = tauri::async_runtime::spawn_blocking(move || barimport::load(&dir, &sym, &iv)).await.map_err(|e| e.to_string())?;
+    let (source, bars) = if imported.iter().any(|c| c.t >= start && c.t < end) {
+        ("import", imported)
+    } else {
+        let fetched = provider.fetch_older(&shared.http, &symbol, interval, start.max(end - barimport::fetch_span(interval)), end, false).await;
+        let cache = barcache::dir(&shared.settings_path);
+        let saved_source = provider.bar_source(&symbol);
+        let _bars = lock(&shared.bar_cache);
+        let saved = barcache::load(&cache, &barcache::key(saved_source, &symbol, interval, false));
+        match fetched {
+            Ok((source, fresh)) if !fresh.is_empty() => {
+                barcache::record(&cache, &barcache::key(source, &symbol, interval, false), &fresh);
+                (source, barcache::merge(&saved, &fresh))
+            }
+            _ if !saved.is_empty() => (saved_source, saved),
+            Ok(_) => return Err(format!("No {interval} bars for {symbol}")),
+            Err(e) => return Err(e),
+        }
+    };
+    let candles = barimport::window(&bars, start, end, pick);
+    let Some(last) = candles.last().copied().filter(|_| candles.len() >= 2) else {
+        return Err(format!("No {interval} bars for {symbol} in that range; import a CSV to practice further back"));
+    };
+    let meta = quote::fetch_chart(&shared.http, &symbol, "5d", "1d", false).await.map(|c| c.meta).unwrap_or_else(|_| barimport::fallback_meta(&symbol));
+    Ok(Chart {
+        source: source.into(),
+        meta: quote::Meta { price: last.c, market_time: last.t, prev_close: None, ..meta },
+        range: quote::PERIOD_RANGE.into(),
+        interval: interval.into(),
+        extended: false,
+        candles,
+        dividends: Vec::new(),
+        splits: Vec::new(),
+        last_bar_time: Some(last.t),
+        delay_secs: None,
+    })
+}
+
+#[tauri::command]
+pub async fn import_bars(shared: State<'_, Arc<Shared>>, name: String, text: String) -> Result<barimport::Imported, String> {
+    let dir = barimport::dir(&shared.settings_path);
+    tauri::async_runtime::spawn_blocking(move || barimport::import(&dir, &name, &text)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub fn list_bar_imports(shared: State<'_, Arc<Shared>>) -> Vec<barimport::Series> {
+    barimport::list(&barimport::dir(&shared.settings_path))
 }
 
 #[tauri::command]

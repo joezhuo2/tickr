@@ -72,7 +72,7 @@ impl PracticeRun {
         if !short(&self.name, 200) || !short(&self.exchange, 64) || !short(&self.currency, 16) || !short(&self.timezone, 64) {
             return Err("Invalid practice run text".into());
         }
-        if !matches!(self.interval.as_str(), "60m" | "1d" | "1wk") || !matches!(self.range.as_str(), "3mo" | "1y" | "2y" | "5y") {
+        if !matches!(self.interval.as_str(), "1m" | "5m" | "15m" | "60m" | "1d" | "1wk") || !matches!(self.range.as_str(), "1wk" | "1mo" | "3mo" | "1y" | "2y" | "5y") {
             return Err("Invalid practice interval or range".into());
         }
         let n = self.candles.len();
@@ -201,7 +201,7 @@ mod tests {
     fn rejects_invalid_runs() {
         let invalid: Vec<fn(&mut PracticeRun)> = vec![
             |r| r.symbol = String::new(),
-            |r| r.interval = "5m".into(),
+            |r| r.interval = "2m".into(),
             |r| r.range = "max".into(),
             |r| r.trade.decision = "hold".into(),
             |r| r.trade.decided = 3,

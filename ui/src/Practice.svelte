@@ -1,7 +1,7 @@
 <script lang="ts">
   import { direction, newsDate, price, signed } from "./lib/format";
   import { localOffset } from "./lib/freshness";
-  import { INTERVALS, INTERVAL_LABELS, RANGES, isInterval, rangesFor, scopes, validSetup, type Decision, type Exercise, type Result, type SavedRun, type Setup, type Summary } from "./lib/practice";
+  import { INTERVALS, INTERVAL_LABELS, RANGES, importedSymbols, isInterval, rangesFor, scopes, validSetup, type Decision, type ImportedSeries, type Exercise, type Result, type SavedRun, type Setup, type Summary } from "./lib/practice";
   import { breakdown, computeStats, filterRows, parseTags, tradeRows, type TradeRow } from "./lib/practiceStats";
   import { MODE_LABELS, NEXT_BARS, quizInfo, type PracticeMode, type Question, type Score } from "./lib/quiz";
   import type { Group } from "./lib/types";
@@ -15,6 +15,9 @@
     summary,
     busy,
     error,
+    notice,
+    imports,
+    onimport,
     currency,
     canDecide,
     canClose,
@@ -50,6 +53,9 @@
     summary: Summary | null;
     busy: boolean;
     error: string | null;
+    notice: string | null;
+    imports: ImportedSeries[];
+    onimport: (files: File[]) => void;
     currency: string;
     canDecide: boolean;
     canClose: boolean;
@@ -78,6 +84,7 @@
     onannotate: (id: number, note: string, tags: string[]) => void;
   } = $props();
 
+  let csvInput = $state<HTMLInputElement>();
   let confirming = $state<number | null>(null);
   let editing = $state<number | null>(null);
   let noteDraft = $state("");
@@ -133,8 +140,8 @@
       </label>
       <label>
         <span>Symbols</span>
-        <select aria-label="Practice symbols" value={setup.scope} disabled={busy} onchange={(e) => onsetup(validSetup({ ...setup, scope: e.currentTarget.value }, groups))}>
-          {#each scopes(groups) as s (s.id)}
+        <select aria-label="Practice symbols" value={setup.scope} disabled={busy} onchange={(e) => onsetup(validSetup({ ...setup, scope: e.currentTarget.value }, groups, imports))}>
+          {#each scopes(groups, importedSymbols(imports, setup.interval)) as s (s.id)}
             <option value={s.id}>{s.label}</option>
           {/each}
         </select>
@@ -148,7 +155,7 @@
           disabled={busy}
           onchange={(e) => {
             const v = e.currentTarget.value;
-            if (isInterval(v)) onsetup(validSetup({ ...setup, interval: v }, groups));
+            if (isInterval(v)) onsetup(validSetup({ ...setup, interval: v }, groups, imports));
           }}
         >
           {#each INTERVALS as i (i)}
@@ -158,7 +165,7 @@
       </label>
       <label>
         <span>From</span>
-        <select aria-label="Practice date range" value={setup.range} disabled={busy} onchange={(e) => onsetup(validSetup({ ...setup, range: e.currentTarget.value as Setup["range"] }, groups))}>
+        <select aria-label="Practice date range" value={setup.range} disabled={busy} onchange={(e) => onsetup(validSetup({ ...setup, range: e.currentTarget.value as Setup["range"] }, groups, imports))}>
           {#each rangesFor(setup.interval) as r (r)}
             <option value={r}>{rangeLabel(r)}</option>
           {/each}
@@ -166,7 +173,20 @@
       </label>
       <button class="primary" type="submit" disabled={busy || count === 0}>{busy ? "Finding a setup…" : "Start"}</button>
       <button type="button" onclick={oncancel}>Cancel</button>
-      {#if error}<span class="error" role="alert">{error}</span>{:else if count === 0}<span class="muted">Star symbols or pick a group with symbols</span>{/if}
+      <button type="button" disabled={busy} title="Import 1m, 5m or 15m bars from CSVs (timestamp, open, high, low, close, volume), e.g. an Alpaca export named QQQ_5m.csv" onclick={() => csvInput?.click()}>Import CSV…</button>
+      <input
+        bind:this={csvInput}
+        type="file"
+        accept=".csv,text/csv"
+        multiple
+        hidden
+        onchange={(e) => {
+          const files = [...(e.currentTarget.files ?? [])];
+          e.currentTarget.value = "";
+          onimport(files);
+        }}
+      />
+      {#if error}<span class="error" role="alert">{error}</span>{:else if notice}<span class="muted" role="status">{notice}</span>{:else if count === 0}<span class="muted">Star symbols or pick a group with symbols</span>{/if}
     </form>
     {#if runs.length}
       <div class="card runs" role="region" aria-label="Saved runs">

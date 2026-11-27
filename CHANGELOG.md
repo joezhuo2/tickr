@@ -6,6 +6,19 @@ All notable changes to tickr are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.11.89] - 2026-11-27
+
+### Added
+- **Minute candles in practice:** practice now offers 1-, 5- and 15-minute
+  candles. They use the bars tickr has saved from charts you viewed plus what
+  the data provider still serves (about a week of 1-minute bars and two months
+  of 5- and 15-minute bars), with ranges from the last week to the last five
+  years.
+- **CSV import for practice:** **Import CSV…** in the practice setup copies
+  1-, 5- or 15-minute bars from CSV files, such as Alpaca exports named
+  `QQQ_5m.csv`, into tickr. Imported symbols appear under **Imported data**,
+  and 15-minute practice can use 5- or 1-minute imports.
+
 ## [0.11.88] - 2026-11-19
 
 ### Added

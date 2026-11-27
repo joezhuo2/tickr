@@ -735,6 +735,8 @@
   let practiceOpen = $state(false);
   let practiceBusy = $state(false);
   let practiceError = $state<string | null>(null);
+  let practiceImports = $state.raw<Practice.ImportedSeries[]>([]);
+  let practiceNotice = $state<string | null>(null);
   let practiceSeq = 0;
   let practiceRuns = $state.raw<Practice.SavedRun[]>([]);
   let practiceRunId = $state<number | null>(null);
@@ -746,7 +748,8 @@
   let quizScore = $state<Quiz.Score>(Quiz.EMPTY_SCORE);
   const quizOutcome = $derived(quiz && quizGuess != null ? Quiz.outcome(replayBars, quiz.end) : null);
   const quizHighlight = $derived(quiz && replayBars[quiz.start] && replayBars[quiz.end] ? { from: replayBars[quiz.start].t, to: replayBars[quiz.end].t } : null);
-  const practiceCount = $derived(Practice.scopeSymbols(practiceSetup.scope, watchlist, groups).length);
+  const practiceImported = $derived(Practice.importedSymbols(practiceImports, practiceSetup.interval));
+  const practiceCount = $derived(Practice.scopeSymbols(practiceSetup.scope, watchlist, groups, practiceImported).length);
   const practiceResult = $derived(practice?.trade && replay ? Practice.evaluate(practice.trade, replayBars, replay.cursor) : null);
   const practiceSummary = $derived(practice?.ended && practice.trade ? Practice.summarize(practice.trade, replayBars) : null);
   const practiceCanDecide = $derived(!!practice && !!replay && !practice.trade && !practice.ended && !Replay.isAtEnd(replay));
@@ -788,9 +791,47 @@
     else if (practiceOpen) cancelPractice();
     else {
       exitReplay();
-      practiceSetup = Practice.validSetup(practiceSetup, groups);
+      practiceSetup = Practice.validSetup(practiceSetup, groups, practiceImports);
       practiceError = null;
       practiceOpen = true;
+      void loadPracticeImports();
+    }
+  }
+
+  async function loadPracticeImports() {
+    try {
+      practiceImports = await invoke<Practice.ImportedSeries[]>("list_bar_imports");
+    } catch (e) {
+      console.warn("list imports", e);
+    }
+  }
+
+  async function importPracticeBars(files: File[]) {
+    if (practiceBusy || !files.length) return;
+    practiceBusy = true;
+    practiceError = null;
+    practiceNotice = null;
+    const done: string[] = [];
+    let interval: string | null = null;
+    try {
+      for (const file of files) {
+        try {
+          const r = await invoke<{ symbol: string; interval: string; bars: number }>("import_bars", { name: file.name, text: await file.text() });
+          done.push(`${r.symbol} ${r.interval} (${r.bars.toLocaleString()} bars)`);
+          interval = r.interval;
+        } catch (e) {
+          practiceError = `${file.name}: ${e}`;
+        }
+      }
+      await loadPracticeImports();
+      if (done.length) {
+        practiceNotice = `Imported ${done.join(", ")}`;
+        const keep = Practice.importedSymbols(practiceImports, practiceSetup.interval).length > 0;
+        const next = keep || !Practice.isInterval(interval) ? practiceSetup.interval : interval;
+        practiceSetup = Practice.validSetup({ ...practiceSetup, scope: Practice.IMPORTED, interval: next }, groups, practiceImports);
+      }
+    } finally {
+      practiceBusy = false;
     }
   }
 
@@ -798,20 +839,21 @@
     practiceSeq++;
     practiceBusy = false;
     practiceError = null;
+    practiceNotice = null;
     practiceOpen = false;
   }
 
   function changePractice() {
     exitReplay();
-    practiceSetup = Practice.validSetup(practiceSetup, groups);
+    practiceSetup = Practice.validSetup(practiceSetup, groups, practiceImports);
     practiceOpen = true;
   }
 
   async function startPractice() {
     if (practiceBusy) return;
-    const setup = Practice.validSetup(practiceSetup, groups);
+    const setup = Practice.validSetup(practiceSetup, groups, practiceImports);
     practiceSetup = setup;
-    const pool = Practice.scopeSymbols(setup.scope, watchlist, groups);
+    const pool = Practice.scopeSymbols(setup.scope, watchlist, groups, Practice.importedSymbols(practiceImports, setup.interval));
     if (!pool.length) {
       practiceError = "No symbols to practice on";
       return;
@@ -827,7 +869,7 @@
         const pick = pool.splice(Practice.randomInt(rng, pool.length), 1)[0];
         let c: Chart;
         try {
-          c = await invoke<Chart>("get_history", { symbol: pick, interval: setup.interval, start: w.start, end: w.end });
+          c = await invoke<Chart>("get_history", { symbol: pick, interval: setup.interval, start: w.start, end: w.end, pick: rng() });
         } catch (e) {
           if (mine !== practiceSeq) return;
           misses.push(`${pick}: ${e}`);
@@ -2451,6 +2493,9 @@
             summary={practiceSummary}
             busy={practiceBusy}
             error={practiceError}
+            notice={practiceNotice}
+            imports={practiceImports}
+            onimport={importPracticeBars}
             currency={replayBase?.meta.currency ?? "USD"}
             canDecide={practiceCanDecide}
             canClose={practiceCanClose}

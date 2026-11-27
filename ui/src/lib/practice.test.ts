@@ -24,6 +24,7 @@ import {
   reopen,
   savedRun,
   sortRuns,
+  importedSymbols,
   scopeSymbols,
   scopes,
   seeded,
@@ -188,6 +189,17 @@ describe("setup", () => {
     expect(scopeSymbols("watchlist", ["SPY", "QQQ"], groups)).toEqual(["SPY", "QQQ"]);
     expect(scopeSymbols("group:Tech", ["SPY"], groups)).toEqual(["AAPL", "MSFT"]);
     expect(scopeSymbols("group:None", ["SPY"], groups)).toEqual([]);
+  });
+  it("offers imported intraday data at its interval or coarser", () => {
+    const series = [{ symbol: "QQQ", interval: "5m" }, { symbol: "SPY", interval: "1m" }, { symbol: "QQQ", interval: "15m" }];
+    expect(importedSymbols(series, "1m")).toEqual(["SPY"]);
+    expect(importedSymbols(series, "15m")).toEqual(["QQQ", "SPY"]);
+    expect(importedSymbols(series, "1d")).toEqual([]);
+    expect(rangesFor("1m")).toEqual(["1wk", "1mo", "1y"]);
+    expect(scopes([], ["QQQ"]).map((s) => s.id)).toEqual(["watchlist", "imported"]);
+    expect(scopeSymbols("imported", ["SPY"], [], ["QQQ"])).toEqual(["QQQ"]);
+    expect(validSetup({ scope: "imported", interval: "5m", range: "5y" }, [], series)).toEqual({ scope: "imported", interval: "5m", range: "5y" });
+    expect(validSetup({ scope: "imported", interval: "1d", range: "1y" }, [], series).scope).toBe("watchlist");
   });
 });
 

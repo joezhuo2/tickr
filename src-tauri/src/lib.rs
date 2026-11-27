@@ -6,6 +6,7 @@ pub mod stream;
 pub mod ai;
 pub mod analysis;
 pub mod barcache;
+pub mod barimport;
 pub mod alerts;
 pub mod alert_events;
 pub mod notify;
@@ -129,6 +130,8 @@ pub fn run() {
             commands::send_notification,
             commands::get_older,
             commands::clear_bar_cache,
+            commands::import_bars,
+            commands::list_bar_imports,
             commands::set_theme,
             commands::set_text_size,
             commands::set_palette,

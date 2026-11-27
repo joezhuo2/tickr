@@ -407,7 +407,11 @@ taskbar to keep it visible.
   quantity, stop-loss and 2R take-profit into the order ticket.
 - **Random historical practice** (`Q`) draws a symbol and starting point from
   your watchlist or a group, using the candle interval and date range you pick.
-  Choose **Long**, **Short** or **Skip** with future candles hidden. Close at a
+  1-, 5- and 15-minute candles use saved bars plus what the provider still
+  serves (about a week of 1m, two months of 5m/15m); **Import CSV…** copies
+  older bars (timestamp, open, high, low, close, volume, such as an Alpaca
+  export named `QQQ_5m.csv`) into tickr, and 15m practice can use 5m or 1m
+  imports. Choose **Long**, **Short** or **Skip** with future candles hidden. Close at a
   revealed candle's close to see your return, bars held and how you did against
   skipping the trade. Saved runs feed a **Practice stats** section with trades,
   win rate, average R, expectancy, profit factor and win/loss streaks, broken
